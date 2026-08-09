@@ -49,7 +49,16 @@ const neonIntensityRange = document.getElementById('neonIntensityRange');
 const neonIntensityValue = document.getElementById('neonIntensityValue');
 
 const shadowToggle = document.getElementById('shadowToggle');
+const shadowIntensityField = document.getElementById('shadowIntensityField');
+const shadowIntensityRange = document.getElementById('shadowIntensityRange');
+const shadowIntensityValue = document.getElementById('shadowIntensityValue');
+
 const reflectionToggle = document.getElementById('reflectionToggle');
+const reflectionIntensityField = document.getElementById('reflectionIntensityField');
+const reflectionIntensityRange = document.getElementById('reflectionIntensityRange');
+const reflectionIntensityValue = document.getElementById('reflectionIntensityValue');
+
+const dragRotateToggle = document.getElementById('dragRotateToggle');
 const resetCameraBtn = document.getElementById('resetCameraBtn');
 
 const qualityPresetGrid = document.getElementById('qualityPresetGrid');
@@ -216,7 +225,10 @@ const state = {
   lightingPreset: 'studio',
   neonIntensity: Number(neonIntensityRange.value),
   shadowsOn: shadowToggle.checked,
+  shadowIntensity: Number(shadowIntensityRange ? shadowIntensityRange.value : 0.35),
   reflectionsOn: reflectionToggle.checked,
+  reflectionIntensity: Number(reflectionIntensityRange ? reflectionIntensityRange.value : 1.2),
+  dragRotateOn: dragRotateToggle ? dragRotateToggle.checked : false,
   autoRotate: false,
   quality: 'medium', // Phase 5: low/medium/high — medium = old fixed behavior
 };
@@ -245,6 +257,7 @@ function getBaseOpacity() {
 // ---------- material presets (Phase 2: 5 presets) ----------
 function buildMaterial(type, colorHex) {
   const color = new THREE.Color(colorHex);
+  const refIntensity = state.reflectionsOn ? state.reflectionIntensity : 0;
 
   switch (type) {
     case 'matte':
@@ -252,7 +265,7 @@ function buildMaterial(type, colorHex) {
         color,
         roughness: 0.95,
         metalness: 0.0,
-        envMapIntensity: state.reflectionsOn ? 0.25 : 0,
+        envMapIntensity: refIntensity * 0.2,
       });
 
     case 'glossy':
@@ -260,7 +273,7 @@ function buildMaterial(type, colorHex) {
         color,
         roughness: 0.22,
         metalness: 0.35,
-        envMapIntensity: state.reflectionsOn ? 1 : 0,
+        envMapIntensity: refIntensity * 0.8,
       });
 
     case 'metallic':
@@ -268,42 +281,35 @@ function buildMaterial(type, colorHex) {
         color,
         roughness: 0.18,
         metalness: 1.0,
-        envMapIntensity: state.reflectionsOn ? 1.4 : 0,
+        envMapIntensity: refIntensity * 1.2,
       });
 
     case 'glass':
-      // Note: full `transmission: 1` refracts whatever is *behind* the mesh in
-      // the WebGL scene itself — and this scene is intentionally kept empty/
-      // transparent (renderer alpha:true, scene.background = null) so Phase 4
-      // can export with a transparent background. With nothing there to
-      // refract, transmission=1 rendered indistinguishable from Glossy (caught
-      // by the in-sandbox screenshot diff during this session, see
-      // README "Known issues fixed in Phase 2 testing"). Using real opacity
-      // instead of full transmission is what actually reads as "glass" here;
-      // a low transmission value is kept for a bit of blur/refraction should
-      // this later render over real content (e.g. composited in Phase 4).
       return new THREE.MeshPhysicalMaterial({
         color,
-        metalness: 0,
-        roughness: 0.06,
-        transmission: 0.35,
-        thickness: 18,
-        ior: 1.45,
+        metalness: 0.02,
+        roughness: 0.04,
+        transmission: 0.88,
+        thickness: 25,
+        ior: 1.52,
         transparent: true,
-        opacity: 0.55,
-        envMapIntensity: state.reflectionsOn ? 1.6 : 0.2,
-        clearcoat: 0.8,
-        clearcoatRoughness: 0.1,
+        opacity: 0.95,
+        envMapIntensity: refIntensity * 1.4,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.05,
+        depthWrite: true,
       });
 
     case 'neon': {
-      const mat = new THREE.MeshStandardMaterial({
-        color: 0x0d0d10,
-        roughness: 0.4,
-        metalness: 0.0,
+      const mat = new THREE.MeshPhysicalMaterial({
+        color: color,
+        roughness: 0.08,
+        metalness: 0.1,
         emissive: color,
         emissiveIntensity: state.neonIntensity,
-        envMapIntensity: state.reflectionsOn ? 0.3 : 0,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.05,
+        envMapIntensity: refIntensity * 0.5,
       });
       return mat;
     }
@@ -319,35 +325,55 @@ function rebuildTextMesh() {
 
   if (textMesh) {
     scene.remove(textMesh);
-    textMesh.geometry.dispose();
-    if (Array.isArray(textMesh.material)) {
-      textMesh.material.forEach((m) => m.dispose());
-    } else {
-      textMesh.material.dispose();
-    }
+    textMesh.traverse((child) => {
+      if (child.isMesh) {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
+          else child.material.dispose();
+        }
+      }
+    });
     textMesh = null;
   }
 
-  const content = state.text.trim() || ' ';
-
+  const rawContent = state.text || ' ';
+  const lines = rawContent.split(/\r?\n/);
   const q = QUALITY_PRESETS[state.quality];
-  const geometry = new TextGeometry(content, {
-    font,
-    size: state.size,
-    depth: state.depth,
-    curveSegments: q.curveSegments,
-    bevelEnabled: true,
-    bevelThickness: Math.max(1, state.depth * 0.06),
-    bevelSize: Math.max(0.5, state.depth * 0.03),
-    bevelSegments: q.bevelSegments,
-  });
-  geometry.computeBoundingBox();
-  geometry.center(); // pivot at the text's own center, so rotation looks natural
+  const lineHeight = state.size * 1.35;
 
+  const group = new THREE.Group();
   const material = buildMaterial(state.materialType, state.color);
-  textMesh = new THREE.Mesh(geometry, material);
-  textMesh.castShadow = state.shadowsOn;
-  textMesh.receiveShadow = state.shadowsOn;
+
+  const totalLinesHeight = (lines.length - 1) * lineHeight;
+
+  lines.forEach((lineStr, idx) => {
+    const content = lineStr.trim() || ' ';
+    const geometry = new TextGeometry(content, {
+      font,
+      size: state.size,
+      depth: state.depth,
+      curveSegments: q.curveSegments,
+      bevelEnabled: true,
+      bevelThickness: Math.max(1, state.depth * 0.06),
+      bevelSize: Math.max(0.5, state.depth * 0.03),
+      bevelSegments: q.bevelSegments,
+    });
+    geometry.computeBoundingBox();
+    geometry.center();
+
+    const lineMesh = new THREE.Mesh(geometry, material.clone ? material.clone() : material);
+    lineMesh.castShadow = state.shadowsOn;
+    lineMesh.receiveShadow = state.shadowsOn;
+
+    // Vertical placement: centered around Y = 0
+    lineMesh.position.y = (totalLinesHeight / 2) - (idx * lineHeight);
+
+    group.add(lineMesh);
+  });
+
+  textMesh = group;
+  textMesh.material = material;
   applyRotation();
   scene.add(textMesh);
   updateQualityNote();
@@ -391,16 +417,27 @@ function applyRotation() {
 
 function applyMaterial() {
   if (!textMesh) return;
-  const old = textMesh.material;
-  textMesh.material = buildMaterial(state.materialType, state.color);
-  old.dispose();
+  const newMat = buildMaterial(state.materialType, state.color);
+  textMesh.material = newMat;
+  textMesh.traverse((child) => {
+    if (child.isMesh) {
+      const old = child.material;
+      child.material = newMat.clone ? newMat.clone() : newMat;
+      if (old && old.dispose) old.dispose();
+    }
+  });
 }
 
 function applyShadowToggle() {
   ground.visible = state.shadowsOn;
+  groundMat.opacity = state.shadowsOn ? state.shadowIntensity : 0;
   if (textMesh) {
-    textMesh.castShadow = state.shadowsOn;
-    textMesh.receiveShadow = state.shadowsOn;
+    textMesh.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = state.shadowsOn;
+        child.receiveShadow = state.shadowsOn;
+      }
+    });
   }
   for (const l of lights.children) {
     if (l.isDirectionalLight) l.castShadow = state.shadowsOn;
@@ -606,13 +643,89 @@ shadowToggle.addEventListener('change', () => {
   applyShadowToggle();
 });
 
+shadowIntensityRange.addEventListener('input', () => {
+  state.shadowIntensity = Number(shadowIntensityRange.value);
+  shadowIntensityValue.textContent = state.shadowIntensity.toFixed(2);
+  applyShadowToggle();
+});
+
 reflectionToggle.addEventListener('change', () => {
   state.reflectionsOn = reflectionToggle.checked;
   applyReflectionToggle();
 });
 
+reflectionIntensityRange.addEventListener('input', () => {
+  state.reflectionIntensity = Number(reflectionIntensityRange.value);
+  reflectionIntensityValue.textContent = state.reflectionIntensity.toFixed(1);
+  applyReflectionToggle();
+});
+
+// ---------- Direct Drag Pointer Rotation ----------
+let isPointerDragging = false;
+let previousPointerPos = { x: 0, y: 0 };
+
+viewportEl.addEventListener('pointerdown', (e) => {
+  if (!state.dragRotateOn) return;
+  isPointerDragging = true;
+  previousPointerPos = { x: e.clientX, y: e.clientY };
+  controls.enabled = false;
+  try { viewportEl.setPointerCapture(e.pointerId); } catch (_) {}
+});
+
+viewportEl.addEventListener('pointermove', (e) => {
+  if (!isPointerDragging || !state.dragRotateOn) return;
+  const deltaX = e.clientX - previousPointerPos.x;
+  const deltaY = e.clientY - previousPointerPos.y;
+  previousPointerPos = { x: e.clientX, y: e.clientY };
+
+  let newRotY = (state.rotY + deltaX * 0.5) % 360;
+  if (newRotY > 180) newRotY -= 360;
+  if (newRotY < -180) newRotY += 360;
+
+  let newRotX = (state.rotX + deltaY * 0.5) % 360;
+  if (newRotX > 180) newRotX -= 360;
+  if (newRotX < -180) newRotX += 360;
+
+  state.rotX = Math.round(newRotX);
+  state.rotY = Math.round(newRotY);
+
+  rotXRange.value = state.rotX;
+  rotXValue.textContent = `${state.rotX}°`;
+  rotYRange.value = state.rotY;
+  rotYValue.textContent = `${state.rotY}°`;
+
+  applyRotation();
+});
+
+const stopPointerDrag = (e) => {
+  if (isPointerDragging) {
+    isPointerDragging = false;
+    controls.enabled = true;
+    try { viewportEl.releasePointerCapture(e.pointerId); } catch (_) {}
+  }
+};
+viewportEl.addEventListener('pointerup', stopPointerDrag);
+viewportEl.addEventListener('pointercancel', stopPointerDrag);
+
+dragRotateToggle.addEventListener('change', () => {
+  state.dragRotateOn = dragRotateToggle.checked;
+  viewportEl.style.cursor = state.dragRotateOn ? 'grab' : 'default';
+});
+
 resetCameraBtn.addEventListener('click', () => {
-  camera.position.copy(DEFAULT_CAMERA_POS);
+  if (!textMesh) {
+    camera.position.copy(DEFAULT_CAMERA_POS);
+    controls.target.set(0, 0, 0);
+    controls.update();
+    return;
+  }
+  const box = new THREE.Box3().setFromObject(textMesh);
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z, 10);
+  const fovRad = camera.fov * (Math.PI / 180);
+  let dist = (maxDim / 2) / Math.tan(fovRad / 2) * 1.4;
+  dist = Math.max(80, Math.min(3500, dist));
+  camera.position.set(0, size.y * 0.1, dist);
   controls.target.set(0, 0, 0);
   controls.update();
 });
