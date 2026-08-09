@@ -65,8 +65,10 @@
                             পরিবর্তন
                         </button>
                     </div>
-                    <div class="preview-image-wrapper">
+                    <div class="preview-image-wrapper" style="position:relative;">
                         <img id="previewImage" src="" alt="Preview">
+                        <!-- Lasso overlay canvas -->
+                        <canvas id="bgLassoCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;z-index:10;display:none;"></canvas>
                     </div>
                     <div class="image-info">
                         <div class="info-item">
@@ -145,6 +147,15 @@
                             <path d="M1 6.13L16 6a2 2 0 0 1 2 2v15" />
                         </svg>
                         <span>ক্রপ</span>
+                    </button>
+                    <button class="tab-btn" data-tab="bgremove">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            <line x1="9" y1="9" x2="15" y2="15"/>
+                            <line x1="15" y1="9" x2="9" y2="15"/>
+                        </svg>
+                        <span>BG রিমুভ</span>
                     </button>
                 </div>
 
@@ -464,6 +475,98 @@
                             অ্যাপ্লাই করুন
                         </button>
                     </div>
+                </div>
+
+                <!-- ===== Background Remove Tab ===== -->
+                <div class="tool-content" id="tab-bgremove">
+
+                    <!-- METHOD 1: AI Remove -->
+                    <div class="tool-card bg-method-card" id="bgcard-ai">
+                        <div class="bg-method-header">
+                            <div class="bg-method-icon">🤖</div>
+                            <div>
+                                <h3>AI অটো রিমুভ</h3>
+                                <p class="tool-desc">Remove.bg API — বিনামূল্যে ৫০টি/মাস। যেকোনো জটিল ব্যাকগ্রাউন্ড সরায়।</p>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Remove.bg API Key
+                                <a href="https://www.remove.bg/api" target="_blank" class="api-link">→ বিনামূল্যে পাবেন</a>
+                            </label>
+                            <input type="password" id="bgApiKey" placeholder="rmve_xxxxxxxxxxxxxxxxxxxx" class="api-key-input">
+                            <small style="color:var(--text-secondary);margin-top:4px;display:block;">🔒 শুধুমাত্র আপনার ব্রাউজারে সংরক্ষিত থাকবে</small>
+                        </div>
+                        <button class="btn btn-primary btn-action" id="bgRemoveAiBtn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm-1-5h2v2h-2zm0-8h2v6h-2z"/></svg>
+                            AI দিয়ে অটো রিমুভ করুন
+                        </button>
+                        <div class="bg-ai-loading" id="bgAiLoading" style="display:none;">
+                            <div class="spinner"></div>
+                            <span>AI প্রসেস করছে...</span>
+                        </div>
+                    </div>
+
+                    <!-- METHOD 2: Color Tolerance Eraser -->
+                    <div class="tool-card bg-method-card" id="bgcard-color">
+                        <div class="bg-method-header">
+                            <div class="bg-method-icon">🎨</div>
+                            <div>
+                                <h3>রঙ-ভিত্তিক ইরেজার</h3>
+                                <p class="tool-desc">ব্যাকগ্রাউন্ডের রঙ বেছে নিন — সেই রঙের সব পিক্সেল মুছে যাবে।</p>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>টার্গেট রঙ (ব্যাকগ্রাউন্ড রঙ)</label>
+                            <div style="display:flex;gap:10px;align-items:center;">
+                                <input type="color" id="bgTargetColor" value="#ffffff" style="width:56px;height:40px;border:none;cursor:pointer;border-radius:8px;">
+                                <button class="btn btn-ghost" id="bgEyedropperBtn" title="ছবি থেকে রঙ তুলুন">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l-1 1-8.5 8.5A2 2 0 0 0 2 13v2a2 2 0 0 0 2 2h2a2 2 0 0 0 1.41-.59L16 8l-4-4zM15 5l4 4"/><line x1="20" y1="22" x2="20" y2="16"/><line x1="17" y1="19" x2="23" y2="19"/></svg>
+                                    আইড্রপার
+                                </button>
+                                <span id="bgEyedropperStatus" style="font-size:12px;color:var(--accent);"></span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>টলারেন্স: <strong id="bgToleranceVal">30</strong></label>
+                            <input type="range" id="bgTolerance" min="0" max="100" value="30" class="range-slider">
+                            <div class="range-labels"><span>সুনির্দিষ্ট</span><span>প্রশস্ত</span></div>
+                        </div>
+                        <div class="form-group">
+                            <label>এজ ফেদারিং: <strong id="bgFeatherVal">1</strong></label>
+                            <input type="range" id="bgFeather" min="0" max="10" value="1" class="range-slider">
+                            <div class="range-labels"><span>তীক্ষ্ণ</span><span>নরম</span></div>
+                        </div>
+                        <button class="btn btn-primary btn-action" id="bgColorRemoveBtn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                            রঙ-ভিত্তিক রিমুভ করুন
+                        </button>
+                    </div>
+
+                    <!-- METHOD 3: Lasso Selection -->
+                    <div class="tool-card bg-method-card" id="bgcard-lasso">
+                        <div class="bg-method-header">
+                            <div class="bg-method-icon">🪢</div>
+                            <div>
+                                <h3>লাসো সিলেকশন</h3>
+                                <p class="tool-desc">বিষয়বস্তুর চারপাশে ড্র করুন — ফটোশপের মতো।</p>
+                            </div>
+                        </div>
+                        <div class="lasso-mode-btns">
+                            <button class="btn lasso-mode-btn active" id="bgLassoFreeBtn">✏️ ফ্রিহ্যান্ড লাসো</button>
+                            <button class="btn lasso-mode-btn" id="bgLassoPolyBtn">📐 পলিগন সিলেক্ট</button>
+                        </div>
+                        <p class="lasso-hint" id="bgLassoHint" style="font-size:12px;color:var(--text-secondary);margin:8px 0;">প্রথমে নিচের বোতামে ক্লিক করুন, তারপর ছবির উপর আঁকুন।</p>
+                        <button class="btn btn-warning btn-action" id="bgStartLassoBtn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                            লাসো আঁকা শুরু করুন
+                        </button>
+                        <div class="lasso-action-btns" id="bgLassoActions" style="display:none;gap:8px;flex-direction:column;">
+                            <button class="btn btn-primary btn-action" id="bgRemoveOutsideBtn">✅ বাইরেরটা রিমুভ করুন (বিষয়বস্তু রাখুন)</button>
+                            <button class="btn btn-danger btn-action" id="bgRemoveInsideBtn">❌ ভেতরেরটা রিমুভ করুন</button>
+                            <button class="btn btn-ghost" id="bgCancelLassoBtn">বাতিল করুন</button>
+                        </div>
+                    </div>
+
                 </div>
 
                 <!-- Download Section -->
