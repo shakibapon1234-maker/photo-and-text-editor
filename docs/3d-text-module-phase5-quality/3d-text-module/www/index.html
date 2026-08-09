@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>3D Text Module — Phase 4</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-mark">◆</span>
+      <span class="brand-name">3D Text Module</span>
+      <span class="phase-badge">Phase 4 — Export Pipeline</span>
+    </div>
+    <div class="topbar-note" id="statusNote">মডেল/ফন্ট লোড হচ্ছে…</div>
+  </div>
+
+  <div class="workspace">
+    <div class="viewport" id="viewport">
+      <canvas id="scene-canvas"></canvas>
+    </div>
+
+    <aside class="panel">
+      <section class="panel-section">
+        <h3>টেক্সট</h3>
+        <label class="field" style="align-items: flex-start;">
+          <span style="margin-top: 6px;">কন্টেন্ট</span>
+          <textarea id="textInput" rows="2" placeholder="লেখা লিখুন (Enter দিয়ে একাধিক লাইন)" style="resize: vertical; min-height: 52px; font-family: inherit;">Hello 3D</textarea>
+        </label>
+        <label class="field">
+          <span>Depth (গভীরতা)</span>
+          <input type="range" id="depthRange" min="1" max="60" value="18" />
+          <span class="field-value" id="depthValue">18</span>
+        </label>
+        <label class="field">
+          <span>সাইজ</span>
+          <input type="range" id="sizeRange" min="5" max="140" value="70" />
+          <span class="field-value" id="sizeValue">70</span>
+        </label>
+      </section>
+
+      <section class="panel-section">
+        <h3>Rotate / Tilt</h3>
+        <label class="field">
+          <span>X অক্ষ</span>
+          <input type="range" id="rotXRange" min="-180" max="180" value="0" />
+          <span class="field-value" id="rotXValue">0°</span>
+        </label>
+        <label class="field">
+          <span>Y অক্ষ</span>
+          <input type="range" id="rotYRange" min="-180" max="180" value="20" />
+          <span class="field-value" id="rotYValue">20°</span>
+        </label>
+        <label class="field">
+          <span>Z অক্ষ</span>
+          <input type="range" id="rotZRange" min="-180" max="180" value="0" />
+          <span class="field-value" id="rotZValue">0°</span>
+        </label>
+        <label class="field checkbox-field">
+          <input type="checkbox" id="autoRotateToggle" />
+          <span>অটো-রোটেট (প্রিভিউ)</span>
+        </label>
+        <label class="field checkbox-field">
+          <input type="checkbox" id="dragRotateToggle" />
+          <span>মাউস দিয়ে ক্যানভাসে টেক্সট রোটেট (Direct Drag)</span>
+        </label>
+      </section>
+
+      <section class="panel-section">
+        <h3>ম্যাটেরিয়াল প্রিসেট</h3>
+        <div class="preset-grid" id="materialPresetGrid">
+          <button type="button" class="preset-btn" data-material="matte">Matte</button>
+          <button type="button" class="preset-btn" data-material="glossy">Glossy</button>
+          <button type="button" class="preset-btn" data-material="metallic">Metallic</button>
+          <button type="button" class="preset-btn" data-material="glass">Glass</button>
+          <button type="button" class="preset-btn" data-material="neon">Neon</button>
+        </div>
+        <label class="field" style="margin-top:10px;">
+          <span>কালার</span>
+          <input type="color" id="colorPicker" value="#c97f2e" />
+        </label>
+        <label class="field" id="neonIntensityField" hidden>
+          <span>Glow তীব্রতা</span>
+          <input type="range" id="neonIntensityRange" min="0.5" max="4" step="0.1" value="1.8" />
+          <span class="field-value" id="neonIntensityValue">1.8</span>
+        </label>
+      </section>
+
+      <section class="panel-section">
+        <h3>লাইটিং প্রিসেট</h3>
+        <div class="preset-grid preset-grid-3" id="lightingPresetGrid">
+          <button type="button" class="preset-btn" data-lighting="studio">Studio</button>
+          <button type="button" class="preset-btn" data-lighting="dramatic">Dramatic</button>
+          <button type="button" class="preset-btn" data-lighting="soft">Soft</button>
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <h3>শ্যাডো / রিফ্লেকশন</h3>
+        <label class="field checkbox-field">
+          <input type="checkbox" id="shadowToggle" checked />
+          <span>শ্যাডো (গ্রাউন্ড প্লেনে)</span>
+        </label>
+        <label class="field" id="shadowIntensityField">
+          <span>শ্যাডো তীব্রতা</span>
+          <input type="range" id="shadowIntensityRange" min="0" max="1" step="0.05" value="0.35" />
+          <span class="field-value" id="shadowIntensityValue">0.35</span>
+        </label>
+        <label class="field checkbox-field" style="margin-top: 10px;">
+          <input type="checkbox" id="reflectionToggle" checked />
+          <span>রিফ্লেকশন / এনভায়রনমেন্ট লাইটিং</span>
+        </label>
+        <label class="field" id="reflectionIntensityField">
+          <span>রিফ্লেকশন তীব্রতা</span>
+          <input type="range" id="reflectionIntensityRange" min="0" max="3" step="0.1" value="1.2" />
+          <span class="field-value" id="reflectionIntensityValue">1.2</span>
+        </label>
+        <p class="field-note">
+          রিফ্লেকশন ও শ্যাডো আপনার সুবিধা অনুযায়ী বাড়িয়ে/কমিয়ে ব্যবহার করতে পারবেন।
+        </p>
+      </section>
+
+      <section class="panel-section">
+        <h3>কোয়ালিটি (পারফরম্যান্স)</h3>
+        <div class="preset-grid preset-grid-3" id="qualityPresetGrid">
+          <button type="button" class="preset-btn" data-quality="low">Low</button>
+          <button type="button" class="preset-btn" data-quality="medium">Medium</button>
+          <button type="button" class="preset-btn" data-quality="high">High</button>
+        </div>
+        <p class="field-note" id="qualityNote">—</p>
+      </section>
+
+      <section class="panel-section">
+        <h3>ক্যামেরা</h3>
+        <p class="field-note">মাউস দিয়ে ড্র্যাগ করে ক্যামেরা ঘোরানো যায় (drag = orbit, scroll = zoom)।</p>
+        <button id="resetCameraBtn" class="btn-secondary">ক্যামেরা রিসেট</button>
+      </section>
+
+      <section class="panel-section">
+        <h3>অ্যানিমেশন প্রিসেট</h3>
+        <div class="preset-grid" id="animPresetGrid">
+          <button type="button" class="preset-btn" data-anim="none">কোনোটাই না</button>
+          <button type="button" class="preset-btn" data-anim="fadeIn">Fade In</button>
+          <button type="button" class="preset-btn" data-anim="popIn">Pop In</button>
+          <button type="button" class="preset-btn" data-anim="rotateIn">Rotate In</button>
+          <button type="button" class="preset-btn" data-anim="flipIn">Flip In</button>
+          <button type="button" class="preset-btn" data-anim="slideInLeft">Slide In ⭠</button>
+          <button type="button" class="preset-btn" data-anim="slideInRight">Slide In ⭢</button>
+          <button type="button" class="preset-btn" data-anim="dropIn">Drop In</button>
+          <button type="button" class="preset-btn" data-anim="wobble">Wobble</button>
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <h3>টাইমলাইন</h3>
+        <label class="field">
+          <span>Duration</span>
+          <input type="range" id="animDurationRange" min="200" max="4000" step="100" value="1200" />
+          <span class="field-value" id="animDurationValue">1.2s</span>
+        </label>
+        <label class="field">
+          <span>Delay</span>
+          <input type="range" id="animDelayRange" min="0" max="3000" step="100" value="0" />
+          <span class="field-value" id="animDelayValue">0.0s</span>
+        </label>
+        <label class="field">
+          <span>Easing</span>
+          <select id="animEasingSelect">
+            <option value="linear">Linear</option>
+            <option value="easeInQuad">Ease In</option>
+            <option value="easeOutQuad" selected>Ease Out</option>
+            <option value="easeInOutQuad">Ease In-Out</option>
+            <option value="easeOutElastic">Elastic (Out)</option>
+            <option value="easeOutBounce">Bounce (Out)</option>
+          </select>
+        </label>
+        <label class="field checkbox-field">
+          <input type="checkbox" id="animLoopToggle" />
+          <span>লুপ (বার বার চলবে)</span>
+        </label>
+      </section>
+
+      <section class="panel-section">
+        <h3>প্রিভিউ প্লেব্যাক</h3>
+        <div class="playback-row">
+          <button id="animPlayBtn" class="btn-secondary btn-accent" disabled>প্লে</button>
+          <button id="animStopBtn" class="btn-secondary">স্টপ</button>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-bar-fill" id="animProgressFill"></div>
+        </div>
+        <p class="field-note" id="animProgressLabel">বন্ধ</p>
+      </section>
+
+      <section class="panel-section panel-section-export panel-section-footer">
+        <h3>এক্সপোর্ট</h3>
+
+        <label class="field">
+          <span>ফরম্যাট</span>
+          <select id="exportFormatSelect">
+            <option value="webm">Transparent WebM (ভিডিও)</option>
+            <option value="png">PNG Sequence (ZIP)</option>
+          </select>
+        </label>
+        <p class="field-note" id="webmSupportNote" hidden>
+          ⚠️ এই ব্রাউজার/ডিভাইসে transparent WebM রেকর্ডিং সাপোর্টেড না মনে হচ্ছে
+          (Chrome/Edge-এ ভালো কাজ করে)। এর বদলে PNG Sequence ব্যবহার করুন।
+        </p>
+
+        <label class="field">
+          <span>রেজলিউশন</span>
+          <select id="exportResolutionSelect">
+            <option value="1280x720">1280×720 (720p)</option>
+            <option value="1920x1080" selected>1920×1080 (1080p)</option>
+            <option value="1080x1080">1080×1080 (স্কয়ার)</option>
+            <option value="800x800">800×800 (দ্রুত টেস্ট)</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>FPS</span>
+          <select id="exportFpsSelect">
+            <option value="24">24</option>
+            <option value="30" selected>30</option>
+            <option value="60">60</option>
+          </select>
+        </label>
+
+        <label class="field" id="turntableLengthField" hidden>
+          <span>দৈর্ঘ্য</span>
+          <input type="range" id="turntableLengthRange" min="1000" max="8000" step="250" value="4000" />
+          <span class="field-value" id="turntableLengthValue">4.0s</span>
+        </label>
+        <p class="field-note" id="turntableNote" hidden>
+          অটো-রোটেট চালু আছে বলে এটা একটা পূর্ণ ৩৬০° টার্নটেবল হিসেবে এক্সপোর্ট হবে।
+        </p>
+
+        <p class="field-note" id="exportSourceNote">সোর্স: স্থির (কোনো অ্যানিমেশন নেই)</p>
+
+        <button id="exportBtn" class="btn-secondary btn-accent">এক্সপোর্ট করুন</button>
+        <div class="progress-bar" style="margin-top:10px;">
+          <div class="progress-bar-fill" id="exportProgressFill"></div>
+        </div>
+        <p class="field-note" id="exportStatusLabel">প্রস্তুত</p>
+
+        <div class="export-result" id="exportResult" hidden>
+          <p class="field-note" id="exportResultInfo"></p>
+          <a id="exportDownloadLink" class="btn-secondary btn-accent" download>ডাউনলোড</a>
+        </div>
+
+        <p class="field-note">
+          এক্সপোর্ট করা ফাইলটা আপনার ভিডিও এডিটরে ম্যানুয়ালি import করে
+          background সত্যিই transparent থাকছে কিনা দেখে নিন — এটা sandbox-এ
+          অটোমেটিক টেস্ট করা যায় না (README দেখুন)।
+        </p>
+      </section>
+    </aside>
+  </div>
+
+  <script type="module" src="main.bundle.js"></script>
+</body>
+</html>

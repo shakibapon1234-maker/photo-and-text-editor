@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="bn">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Editor by Shakib</title>
+    <meta name="description" content="A powerful local photo editor to resize, adjust brightness, and crop images.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                </div>
+                <h1>Photo Editor by Shakib</h1>
+            </div>
+            <p class="tagline">ফটো সাইজ, পিক্সেল, ব্রাইটনেস এবং ক্রপ সহজেই এডিট করুন</p>
+        </header>
+
+        <!-- Upload Section -->
+        <div class="upload-section" id="uploadSection">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">
+                    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                </div>
+                <h2>ফটো আপলোড করুন</h2>
+                <p>এখানে ক্লিক করুন অথবা ফটো টেনে আনুন</p>
+                <span class="supported-formats">সাপোর্টেড: JPG, PNG, WEBP, BMP</span>
+                <input type="file" id="fileInput" accept="image/*" hidden>
+            </div>
+        </div>
+
+        <!-- Main Editor Section (hidden initially) -->
+        <div class="editor-section" id="editorSection" style="display:none;">
+
+            <!-- Preview & Info -->
+            <div class="preview-panel">
+                <div class="preview-card">
+                    <div class="preview-header">
+                        <h3>📷 প্রিভিউ</h3>
+                        <button class="btn btn-ghost" id="changePhotoBtn" title="ফটো পরিবর্তন করুন">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="1 4 1 10 7 10" />
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                            </svg>
+                            পরিবর্তন
+                        </button>
+                    </div>
+                    <div class="preview-image-wrapper">
+                        <img id="previewImage" src="" alt="Preview">
+                    </div>
+                    <div class="image-info">
+                        <div class="info-item">
+                            <span class="info-label">ফাইলের নাম</span>
+                            <span class="info-value" id="infoName">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">সাইজ</span>
+                            <span class="info-value" id="infoSize">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">ডাইমেনশন</span>
+                            <span class="info-value" id="infoDimension">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">টাইপ</span>
+                            <span class="info-value" id="infoType">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tools Panel -->
+            <div class="tools-panel">
+                <!-- Tool Tabs -->
+                <div class="tool-tabs">
+                    <button class="tab-btn active" data-tab="filesize">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                        </svg>
+                        <span>ফাইল সাইজ</span>
+                    </button>
+                    <button class="tab-btn" data-tab="pixel">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="7" />
+                            <rect x="14" y="3" width="7" height="7" />
+                            <rect x="14" y="14" width="7" height="7" />
+                            <rect x="3" y="14" width="7" height="7" />
+                        </svg>
+                        <span>পিক্সেল</span>
+                    </button>
+                    <button class="tab-btn" data-tab="dimension">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="15 3 21 3 21 9" />
+                            <polyline points="9 21 3 21 3 15" />
+                            <line x1="21" y1="3" x2="14" y2="10" />
+                            <line x1="3" y1="21" x2="10" y2="14" />
+                        </svg>
+                        <span>হাইট ও ওয়াইড</span>
+                    </button>
+                    <button class="tab-btn" data-tab="brightness">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="5" />
+                            <line x1="12" y1="1" x2="12" y2="3" />
+                            <line x1="12" y1="21" x2="12" y2="23" />
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                            <line x1="1" y1="12" x2="3" y2="12" />
+                            <line x1="21" y1="12" x2="23" y2="12" />
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                        </svg>
+                        <span>ব্রাইটনেস</span>
+                    </button>
+                    <button class="tab-btn" data-tab="crop">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M6.13 1L6 16a2 2 0 0 0 2 2h15" />
+                            <path d="M1 6.13L16 6a2 2 0 0 1 2 2v15" />
+                        </svg>
+                        <span>ক্রপ</span>
+                    </button>
+                </div>
+
+                <!-- File Size Tool -->
+                <div class="tool-content active" id="tab-filesize">
+                    <div class="tool-card">
+                        <h3>📁 ফাইল সাইজ এডিট করুন</h3>
+                        <p class="tool-desc">ফটোর কোয়ালিটি কমিয়ে/বাড়িয়ে সাইজ নিয়ন্ত্রণ করুন</p>
+
+                        <div class="form-group">
+                            <label>টার্গেট সাইজ (KB)</label>
+                            <div class="input-with-unit">
+                                <input type="number" id="targetSizeKB" min="1" max="50000" placeholder="উদাহরণ: 200">
+                                <span class="unit">KB</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>কোয়ালিটি: <strong id="qualityValue">80</strong>%</label>
+                            <input type="range" id="qualitySlider" min="1" max="100" value="80" class="range-slider">
+                            <div class="range-labels">
+                                <span>কম সাইজ</span>
+                                <span>ভালো কোয়ালিটি</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>আউটপুট ফরম্যাট</label>
+                            <select id="outputFormatSize">
+                                <option value="image/jpeg">JPEG</option>
+                                <option value="image/png">PNG</option>
+                                <option value="image/webp">WEBP</option>
+                            </select>
+                        </div>
+
+                        <div class="result-preview" id="fileSizeResult" style="display:none;">
+                            <div class="result-info">
+                                <span>নতুন সাইজ:</span>
+                                <strong id="newFileSize">-</strong>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="applyFileSize">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            অ্যাপ্লাই করুন
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Pixel Tool -->
+                <div class="tool-content" id="tab-pixel">
+                    <div class="tool-card">
+                        <h3>🔲 পিক্সেল এডিট করুন</h3>
+                        <p class="tool-desc">ফটোর মোট পিক্সেল (মেগাপিক্সেল) পরিবর্তন করুন</p>
+
+                        <div class="current-pixels-info">
+                            <span>বর্তমান পিক্সেল:</span>
+                            <strong id="currentPixels">-</strong>
+                        </div>
+
+                        <div class="form-group">
+                            <label>টার্গেট পিক্সেল</label>
+                            <div class="pixel-presets">
+                                <button class="preset-btn" data-pixels="307200">0.3 MP<small>640×480</small></button>
+                                <button class="preset-btn" data-pixels="786432">0.8 MP<small>1024×768</small></button>
+                                <button class="preset-btn" data-pixels="2073600">2 MP<small>1920×1080</small></button>
+                                <button class="preset-btn" data-pixels="3145728">3 MP<small>2048×1536</small></button>
+                                <button class="preset-btn" data-pixels="8294400">8 MP<small>3840×2160</small></button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>কাস্টম পিক্সেল সংখ্যা</label>
+                            <div class="input-with-unit">
+                                <input type="number" id="targetPixels" min="1000" placeholder="উদাহরণ: 2073600">
+                                <span class="unit">px</span>
+                            </div>
+                        </div>
+
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="maintainRatioPixel" checked>
+                                <span class="checkmark"></span>
+                                আসপেক্ট রেশিও বজায় রাখুন
+                            </label>
+                        </div>
+
+                        <div class="result-preview" id="pixelResult" style="display:none;">
+                            <div class="result-info">
+                                <span>নতুন ডাইমেনশন:</span>
+                                <strong id="newPixelDimension">-</strong>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="applyPixel">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            অ্যাপ্লাই করুন
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Dimension Tool -->
+                <div class="tool-content" id="tab-dimension">
+                    <div class="tool-card">
+                        <h3>📐 হাইট ও ওয়াইড এডিট করুন</h3>
+                        <p class="tool-desc">ফটোর নির্দিষ্ট হাইট এবং ওয়াইড সেট করুন</p>
+
+                        <div class="dimension-inputs">
+                            <div class="form-group">
+                                <label>ওয়াইড (Width)</label>
+                                <div class="input-with-unit">
+                                    <input type="number" id="targetWidth" min="1" max="10000" placeholder="px">
+                                    <span class="unit">px</span>
+                                </div>
+                            </div>
+                            <div class="link-icon" id="linkIcon" title="আসপেক্ট রেশিও লক/আনলক">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                </svg>
+                            </div>
+                            <div class="form-group">
+                                <label>হাইট (Height)</label>
+                                <div class="input-with-unit">
+                                    <input type="number" id="targetHeight" min="1" max="10000" placeholder="px">
+                                    <span class="unit">px</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="maintainRatioDim" checked>
+                                <span class="checkmark"></span>
+                                আসপেক্ট রেশিও বজায় রাখুন
+                            </label>
+                        </div>
+
+                        <div class="dimension-presets">
+                            <label>প্রিসেট ডাইমেনশন:</label>
+                            <div class="preset-grid">
+                                <button class="preset-btn-dim" data-w="800" data-h="600">800×600</button>
+                                <button class="preset-btn-dim" data-w="1024" data-h="768">1024×768</button>
+                                <button class="preset-btn-dim" data-w="1280"
+                                    data-h="720">1280×720<small>HD</small></button>
+                                <button class="preset-btn-dim" data-w="1920"
+                                    data-h="1080">1920×1080<small>FHD</small></button>
+                                <button class="preset-btn-dim" data-w="2560"
+                                    data-h="1440">2560×1440<small>2K</small></button>
+                                <button class="preset-btn-dim" data-w="3840"
+                                    data-h="2160">3840×2160<small>4K</small></button>
+                            </div>
+                        </div>
+
+                        <div class="result-preview" id="dimensionResult" style="display:none;">
+                            <div class="result-info">
+                                <span>নতুন ডাইমেনশন:</span>
+                                <strong id="newDimension">-</strong>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="applyDimension">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            অ্যাপ্লাই করুন
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Brightness Tool -->
+                <div class="tool-content" id="tab-brightness">
+                    <div class="tool-card">
+                        <h3>☀️ ব্রাইটনেস এডিট করুন</h3>
+                        <p class="tool-desc">ফটোর ব্রাইটনেস, কন্ট্রাস্ট এবং স্যাচুরেশন অ্যাডজাস্ট করুন</p>
+
+                        <div class="form-group">
+                            <label>ব্রাইটনেস: <strong id="brightnessValue">100</strong>%</label>
+                            <input type="range" id="brightnessSlider" min="0" max="300" value="100"
+                                class="range-slider">
+                            <div class="range-labels">
+                                <span>অন্ধকার</span>
+                                <span>উজ্জ্বল</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>কন্ট্রাস্ট: <strong id="contrastValue">100</strong>%</label>
+                            <input type="range" id="contrastSlider" min="0" max="300" value="100" class="range-slider">
+                            <div class="range-labels">
+                                <span>কম</span>
+                                <span>বেশি</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>স্যাচুরেশন: <strong id="saturationValue">100</strong>%</label>
+                            <input type="range" id="saturationSlider" min="0" max="300" value="100"
+                                class="range-slider">
+                            <div class="range-labels">
+                                <span>ধূসর</span>
+                                <span>রঙিন</span>
+                            </div>
+                        </div>
+
+                        <div class="brightness-presets">
+                            <label>প্রিসেট:</label>
+                            <div class="preset-grid">
+                                <button class="preset-btn-bright" data-b="100" data-c="100" data-s="0">গ্রের
+                                    স্কেল</button>
+                                <button class="preset-btn-bright" data-b="120" data-c="110"
+                                    data-s="130">ভাইব্র্যান্ট</button>
+                                <button class="preset-btn-bright" data-b="90" data-c="120" data-s="80">ভিনটেজ</button>
+                                <button class="preset-btn-bright" data-b="110" data-c="105" data-s="90">সফট</button>
+                                <button class="preset-btn-bright" data-b="80" data-c="130"
+                                    data-s="110">ড্রামাটিক</button>
+                                <button class="preset-btn-bright" data-b="100" data-c="100" data-s="100">রিসেট</button>
+                            </div>
+                        </div>
+
+                        <div class="result-preview" id="brightnessResult" style="display:none;">
+                            <div class="result-info">
+                                <span>ফিল্টার অ্যাপ্লাইড:</span>
+                                <strong id="newBrightness">-</strong>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="applyBrightness">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            অ্যাপ্লাই করুন
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Crop Tool -->
+                <div class="tool-content" id="tab-crop">
+                    <div class="tool-card">
+                        <h3>✂️ ক্রপ করুন</h3>
+                        <p class="tool-desc">ফটোর নির্দিষ্ট অংশ কেটে নিন</p>
+
+                        <div class="crop-preview-container">
+                            <div class="crop-canvas-wrapper">
+                                <canvas id="cropCanvas"></canvas>
+                                <div class="crop-overlay" id="cropOverlay"></div>
+                            </div>
+                        </div>
+
+                        <div class="dimension-inputs">
+                            <div class="form-group">
+                                <label>X (বাম থেকে)</label>
+                                <div class="input-with-unit">
+                                    <input type="number" id="cropX" min="0" value="0" placeholder="0">
+                                    <span class="unit">px</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Y (উপর থেকে)</label>
+                                <div class="input-with-unit">
+                                    <input type="number" id="cropY" min="0" value="0" placeholder="0">
+                                    <span class="unit">px</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dimension-inputs">
+                            <div class="form-group">
+                                <label>ক্রপ ওয়াইড</label>
+                                <div class="input-with-unit">
+                                    <input type="number" id="cropWidth" min="1" placeholder="px">
+                                    <span class="unit">px</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>ক্রপ হাইট</label>
+                                <div class="input-with-unit">
+                                    <input type="number" id="cropHeight" min="1" placeholder="px">
+                                    <span class="unit">px</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="dimension-presets">
+                            <label>ক্রপ রেশিও প্রিসেট:</label>
+                            <div class="preset-grid">
+                                <button class="preset-btn-crop" data-ratio="1:1">1:1<small>স্কয়ার</small></button>
+                                <button class="preset-btn-crop" data-ratio="4:3">4:3<small>ফটো</small></button>
+                                <button class="preset-btn-crop" data-ratio="16:9">16:9<small>ওয়াইড</small></button>
+                                <button class="preset-btn-crop" data-ratio="3:2">3:2<small>প্রিন্ট</small></button>
+                                <button class="preset-btn-crop" data-ratio="9:16">9:16<small>পোর্ট্রেট</small></button>
+                                <button class="preset-btn-crop" data-ratio="free">ফ্রি<small>যেকোনো</small></button>
+                            </div>
+                        </div>
+
+                        <div class="result-preview" id="cropResult" style="display:none;">
+                            <div class="result-info">
+                                <span>ক্রপ ডাইমেনশন:</span>
+                                <strong id="newCropDimension">-</strong>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="applyCrop">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            অ্যাপ্লাই করুন
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Download Section -->
+                <div class="download-section" id="downloadSection" style="display:none;">
+                    <button class="btn btn-download" id="downloadBtn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        ডাউনলোড করুন
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Canvas -->
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
