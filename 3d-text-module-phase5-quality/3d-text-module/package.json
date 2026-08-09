@@ -5,7 +5,7 @@
   "main": "main.js",
   "scripts": {
     "build": "node build.js",
-    "serve": "python3 -m http.server 8000 -d www"
+    "serve": "python -m http.server 8000 -d www"
   },
   "keywords": [],
   "author": "",
