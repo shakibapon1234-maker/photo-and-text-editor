@@ -25325,9 +25325,11 @@ function rebuildTextMesh() {
   const lineHeight = state.size * 1.35;
   const group = new Group();
   const material = buildMaterial(state.materialType, state.color);
-  const totalLinesHeight = (lines.length - 1) * lineHeight;
-  lines.forEach((lineStr, idx) => {
-    const content = lineStr.trim() || " ";
+  const validLines = lines.map((l) => l.length > 0 ? l : " ");
+  const totalLinesHeight = (validLines.length - 1) * lineHeight;
+  validLines.forEach((lineStr, idx) => {
+    const hasText = lineStr.trim().length > 0;
+    const content = hasText ? lineStr : " ";
     const geometry = new TextGeometry(content, {
       font,
       size: state.size,
@@ -25339,8 +25341,10 @@ function rebuildTextMesh() {
       bevelSegments: q.bevelSegments
     });
     geometry.computeBoundingBox();
-    geometry.center();
-    const lineMesh = new Mesh(geometry, material.clone ? material.clone() : material);
+    if (hasText && geometry.boundingBox && !isNaN(geometry.boundingBox.min.x)) {
+      geometry.center();
+    }
+    const lineMesh = new Mesh(geometry, material);
     lineMesh.castShadow = state.shadowsOn;
     lineMesh.receiveShadow = state.shadowsOn;
     lineMesh.position.y = totalLinesHeight / 2 - idx * lineHeight;
@@ -25361,13 +25365,17 @@ function applyQuality() {
 function updateQualityNote() {
   if (!qualityNote) return;
   const q = QUALITY_PRESETS[state.quality];
-  let triLabel = "\u2014";
+  let triCount = 0;
   if (textMesh) {
-    const geo = textMesh.geometry;
-    const posCount = geo.attributes.position.count;
-    const triCount = Math.round(geo.index ? geo.index.count / 3 : posCount / 3);
-    triLabel = triCount.toLocaleString("bn-BD");
+    textMesh.traverse((child) => {
+      if (child.isMesh && child.geometry) {
+        const geo = child.geometry;
+        const posCount = geo.attributes.position ? geo.attributes.position.count : 0;
+        triCount += Math.round(geo.index ? geo.index.count / 3 : posCount / 3);
+      }
+    });
   }
+  const triLabel = triCount > 0 ? triCount.toLocaleString("bn-BD") : "\u2014";
   qualityNote.textContent = `\u09AC\u09B0\u09CD\u09A4\u09AE\u09BE\u09A8: ~${triLabel} \u099F\u09CD\u09B0\u09BE\u09AF\u09BC\u09BE\u0999\u09CD\u0997\u09C7\u09B2, \u09AA\u09BF\u0995\u09CD\u09B8\u09C7\u09B2-\u09B0\u09C7\u09B6\u09BF\u0993 \u09B8\u09B0\u09CD\u09AC\u09CB\u099A\u09CD\u099A ${q.pixelRatioCap}x, \u09B6\u09CD\u09AF\u09BE\u09A1\u09CB \u09AE\u09CD\u09AF\u09BE\u09AA ${q.shadowMapSize}px\u0964 \u09B2\u09CB-\u098F\u09A8\u09CD\u09A1 \u09A1\u09BF\u09AD\u09BE\u0987\u09B8/\u0995\u09AE-\u09B6\u0995\u09CD\u09A4\u09BF\u09B0 \u09AA\u09BF\u09B8\u09BF\u09A4\u09C7 \u09B2\u09CD\u09AF\u09BE\u0997 \u09B9\u09B2\u09C7 "Low" \u09AC\u09C7\u099B\u09C7 \u09A8\u09BF\u09A8\u0964`;
 }
 function applyRotation() {
@@ -25420,19 +25428,27 @@ function applyPresetOffset(preset, t) {
   );
   const s = Math.max(0, scaleMul);
   textMesh.scale.set(s, s, s);
-  const mat = textMesh.material;
   const baseOpacity = getBaseOpacity();
-  mat.transparent = true;
-  mat.opacity = Math.min(1, Math.max(0, opacityMul)) * baseOpacity;
+  const finalOpacity = Math.min(1, Math.max(0, opacityMul)) * baseOpacity;
+  textMesh.traverse((child) => {
+    if (child.isMesh && child.material) {
+      child.material.transparent = true;
+      child.material.opacity = finalOpacity;
+    }
+  });
 }
 function resetMeshToBaseTransform() {
   if (!textMesh) return;
   textMesh.position.set(0, 0, 0);
   textMesh.scale.set(1, 1, 1);
   applyRotation();
-  const mat = textMesh.material;
-  mat.transparent = state.materialType === "glass";
-  mat.opacity = getBaseOpacity();
+  const baseOpacity = getBaseOpacity();
+  textMesh.traverse((child) => {
+    if (child.isMesh && child.material) {
+      child.material.transparent = state.materialType === "glass";
+      child.material.opacity = baseOpacity;
+    }
+  });
 }
 function updateProgressUI(t, label) {
   animProgressFill.style.width = `${Math.round(Math.min(1, Math.max(0, t)) * 100)}%`;

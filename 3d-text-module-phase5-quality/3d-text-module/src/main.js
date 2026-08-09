@@ -345,10 +345,13 @@ function rebuildTextMesh() {
   const group = new THREE.Group();
   const material = buildMaterial(state.materialType, state.color);
 
-  const totalLinesHeight = (lines.length - 1) * lineHeight;
+  const validLines = lines.map((l) => (l.length > 0 ? l : ' '));
+  const totalLinesHeight = (validLines.length - 1) * lineHeight;
 
-  lines.forEach((lineStr, idx) => {
-    const content = lineStr.trim() || ' ';
+  validLines.forEach((lineStr, idx) => {
+    const hasText = lineStr.trim().length > 0;
+    const content = hasText ? lineStr : ' ';
+
     const geometry = new TextGeometry(content, {
       font,
       size: state.size,
@@ -359,10 +362,13 @@ function rebuildTextMesh() {
       bevelSize: Math.max(0.5, state.depth * 0.03),
       bevelSegments: q.bevelSegments,
     });
-    geometry.computeBoundingBox();
-    geometry.center();
 
-    const lineMesh = new THREE.Mesh(geometry, material.clone ? material.clone() : material);
+    geometry.computeBoundingBox();
+    if (hasText && geometry.boundingBox && !isNaN(geometry.boundingBox.min.x)) {
+      geometry.center();
+    }
+
+    const lineMesh = new THREE.Mesh(geometry, material);
     lineMesh.castShadow = state.shadowsOn;
     lineMesh.receiveShadow = state.shadowsOn;
 
@@ -394,13 +400,17 @@ function applyQuality() {
 function updateQualityNote() {
   if (!qualityNote) return;
   const q = QUALITY_PRESETS[state.quality];
-  let triLabel = '—';
+  let triCount = 0;
   if (textMesh) {
-    const geo = textMesh.geometry;
-    const posCount = geo.attributes.position.count;
-    const triCount = Math.round(geo.index ? geo.index.count / 3 : posCount / 3);
-    triLabel = triCount.toLocaleString('bn-BD');
+    textMesh.traverse((child) => {
+      if (child.isMesh && child.geometry) {
+        const geo = child.geometry;
+        const posCount = geo.attributes.position ? geo.attributes.position.count : 0;
+        triCount += Math.round(geo.index ? geo.index.count / 3 : posCount / 3);
+      }
+    });
   }
+  const triLabel = triCount > 0 ? triCount.toLocaleString('bn-BD') : '—';
   qualityNote.textContent =
     `বর্তমান: ~${triLabel} ট্রায়াঙ্গেল, পিক্সেল-রেশিও সর্বোচ্চ ${q.pixelRatioCap}x, শ্যাডো ম্যাপ ${q.shadowMapSize}px। ` +
     `লো-এন্ড ডিভাইস/কম-শক্তির পিসিতে ল্যাগ হলে "Low" বেছে নিন।`;
@@ -466,26 +476,31 @@ function applyPresetOffset(preset, t) {
     THREE.MathUtils.degToRad(state.rotZ) + rot[2]
   );
 
-  const s = Math.max(0, scaleMul); // negative scale would inside-out the mesh
+  const s = Math.max(0, scaleMul);
   textMesh.scale.set(s, s, s);
 
-  const mat = textMesh.material;
   const baseOpacity = getBaseOpacity();
-  mat.transparent = true; // needed to preview opacityMul < 1 (fadeIn etc.)
-  mat.opacity = Math.min(1, Math.max(0, opacityMul)) * baseOpacity;
+  const finalOpacity = Math.min(1, Math.max(0, opacityMul)) * baseOpacity;
+  textMesh.traverse((child) => {
+    if (child.isMesh && child.material) {
+      child.material.transparent = true;
+      child.material.opacity = finalOpacity;
+    }
+  });
 }
 
-// Puts the mesh back exactly where the sliders/material panel say it should
-// be — i.e. preset.apply(1) for whichever preset, but done directly so it
-// doesn't depend on ANIMATION_PRESETS having a valid entry.
 function resetMeshToBaseTransform() {
   if (!textMesh) return;
   textMesh.position.set(0, 0, 0);
   textMesh.scale.set(1, 1, 1);
   applyRotation();
-  const mat = textMesh.material;
-  mat.transparent = state.materialType === 'glass';
-  mat.opacity = getBaseOpacity();
+  const baseOpacity = getBaseOpacity();
+  textMesh.traverse((child) => {
+    if (child.isMesh && child.material) {
+      child.material.transparent = state.materialType === 'glass';
+      child.material.opacity = baseOpacity;
+    }
+  });
 }
 
 function updateProgressUI(t, label) {
