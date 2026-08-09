@@ -1290,3 +1290,168 @@ select:focus {
     letter-spacing: 0.5px;
     font-family: 'Courier New', monospace;
 }
+
+/* ===== Clone Stamp: touch-device long-press source-selection ring =====
+   Fixed-positioned at the finger's touch point (same "fixed + JS sets
+   left/top" pattern as .eyedropper-loupe above). The ring-fill circle's
+   stroke-dashoffset animates from full (empty) to 0 (full circle) over
+   the long-press duration, via a CSS transition whose duration JS sets
+   inline to match CLONE_LONG_PRESS_MS — so the fill IS the progress
+   feedback, no separate percentage readout needed. */
+.clone-longpress-ring {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+}
+
+.clone-longpress-ring svg {
+    display: block;
+    transform: rotate(-90deg);
+}
+
+.clone-longpress-ring .ring-track {
+    fill: rgba(15, 15, 25, 0.55);
+    stroke: rgba(255, 255, 255, 0.28);
+    stroke-width: 3;
+}
+
+.clone-longpress-ring .ring-fill {
+    fill: none;
+    stroke: var(--accent-primary);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 125.6;
+    stroke-dashoffset: 125.6;
+    transition-property: stroke-dashoffset;
+    transition-timing-function: linear;
+}
+
+.clone-longpress-ring.filling .ring-fill {
+    stroke-dashoffset: 0;
+}
+
+/* Brief green flash the instant the long-press fires and the source
+   point locks in, so touch users get the same "it worked" confirmation
+   desktop users get from the cloneStatus text updating instantly. */
+.clone-longpress-ring.fired .ring-fill {
+    stroke: #22c55e;
+    transition-duration: 150ms;
+}
+
+/* ===== Phase 6: Checkerboard transparency pattern =====
+   Sits behind previewImage at all times. Fully covered (invisible) for
+   opaque JPG/etc photos; shows through wherever the current image has
+   transparent pixels (after AI/color/lasso/wand background removal), so
+   the transparent area is unambiguous instead of matching the wrapper's
+   solid --bg-primary colour. */
+.preview-image-wrapper {
+    background-image:
+        linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%, rgba(255, 255, 255, 0.06)),
+        linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%, rgba(255, 255, 255, 0.06));
+    background-size: 20px 20px;
+    background-position: 0 0, 10px 10px;
+}
+
+/* ===== Phase 6: Undo/Redo/Compare header buttons ===== */
+#undoBtn:disabled,
+#redoBtn:disabled,
+#compareBtn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+#compareBtn.active {
+    color: var(--accent-primary);
+    background: rgba(108, 99, 255, 0.12);
+}
+
+/* ===== Phase 6: Before/After comparison overlay =====
+   baBeforeImg and previewImage are both sized to fill the wrapper via
+   object-fit:contain (same rule previewImage already uses), so they line
+   up without any JS box-matching — only the divider position is tracked
+   in JS as a 0-100% split. */
+.before-after-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    pointer-events: none;
+}
+.before-after-overlay img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    clip-path: inset(0 50% 0 0);
+}
+.ba-divider {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    margin-left: -1px;
+    background: #fff;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+    cursor: ew-resize;
+    pointer-events: auto;
+}
+.ba-divider::after {
+    content: '⇔';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #fff;
+    color: #111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.ba-label {
+    position: absolute;
+    top: 8px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    pointer-events: none;
+}
+.ba-label-before { left: 8px; }
+.ba-label-after  { right: 8px; }
+
+/* ===== Phase 6: secondary button + keyboard-shortcut hint style ===== */
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.14);
+    transform: translateY(-1px);
+}
+kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+}
+
+/* ===== Phase 6: Erase/Restore brush + Magic Wand active button state ===== */
+#eraseStartBtn.active,
+#wandBtn.active {
+    outline: 2px solid var(--accent);
+}

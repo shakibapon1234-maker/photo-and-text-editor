@@ -92,6 +92,11 @@
     // Toast
     const toast = document.getElementById('toast');
 
+    // Undo/Redo/Compare (Phase 6)
+    const undoBtn = document.getElementById('undoBtn');
+    const redoBtn = document.getElementById('redoBtn');
+    const compareBtn = document.getElementById('compareBtn');
+
     // ============================================
     // Upload & File Handling
     // ============================================
@@ -143,6 +148,11 @@
                 originalHeight = img.naturalHeight;
                 aspectRatio = originalWidth / originalHeight;
                 previewImage.src = e.target.result;
+                // Phase 6: every fresh upload starts a brand-new undo/redo
+                // timeline — the uploaded file itself becomes history[0],
+                // the permanent "restore to original" baseline (also used
+                // by the Erase/Restore brush and the Before/After slider).
+                resetHistory(e.target.result);
                 document.dispatchEvent(new CustomEvent('app:newimage'));
                 showEditor(file);
             };
@@ -243,6 +253,7 @@
                     newFileSize.textContent = formatBytes(blob.size);
                     downloadSection.style.display = 'block';
                     updatePreview(blob);
+                    pushHistory(blob);
                     applyFileSize.classList.remove('loading');
                     showToast('✅ ফাইল সাইজ সফলভাবে পরিবর্তন হয়েছে!', 'success');
                 });
@@ -257,6 +268,7 @@
                     newFileSize.textContent = formatBytes(blob.size);
                     downloadSection.style.display = 'block';
                     updatePreview(blob);
+                    pushHistory(blob);
                     applyFileSize.classList.remove('loading');
                     showToast('✅ কোয়ালিটি সফলভাবে পরিবর্তন হয়েছে!', 'success');
                 }, format, quality);
@@ -376,6 +388,7 @@
                 newPixelDimension.textContent = `${newW} × ${newH} (${formatPixels(newW * newH)})`;
                 downloadSection.style.display = 'block';
                 updatePreview(blob);
+                pushHistory(blob);
                 applyPixel.classList.remove('loading');
                 showToast('✅ পিক্সেল সফলভাবে পরিবর্তন হয়েছে!', 'success');
             }, 'image/png');
@@ -446,6 +459,7 @@
                 newDimension.textContent = `${w} × ${h}`;
                 downloadSection.style.display = 'block';
                 updatePreview(blob);
+                pushHistory(blob);
                 applyDimension.classList.remove('loading');
                 showToast('✅ ডাইমেনশন সফলভাবে পরিবর্তন হয়েছে!', 'success');
             }, 'image/png');
@@ -513,6 +527,7 @@
                 newBrightness.textContent = `B:${brightnessSlider.value}% C:${contrastSlider.value}% S:${saturationSlider.value}%`;
                 downloadSection.style.display = 'block';
                 updatePreview(blob);
+                pushHistory(blob);
                 applyBrightness.classList.remove('loading');
                 showToast('✅ ব্রাইটনেস সফলভাবে পরিবর্তন হয়েছে!', 'success');
             }, 'image/png');
@@ -743,6 +758,7 @@
                 newCropDimension.textContent = `${cw} × ${ch}`;
                 downloadSection.style.display = 'block';
                 updatePreview(blob);
+                pushHistory(blob);
                 applyCrop.classList.remove('loading');
                 showToast('✅ ক্রপ সফলভাবে সম্পন্ন হয়েছে!', 'success');
             }, 'image/png');
@@ -806,6 +822,118 @@
     }
 
     // ============================================
+    // Phase 6: Undo / Redo History
+    // ============================================
+    // A flat stack of {url, revoke} entries + a pointer (historyIndex).
+    // Every successful "apply" across every tool (file size, pixel,
+    // dimension, brightness, crop, and all 7 BG-remove methods) pushes
+    // one entry here. Undo/redo just replays previewImage.src + keeps
+    // `originalImage`/`processedBlob` in sync with whatever state is
+    // restored, reusing the same "keep originalImage in sync" pattern
+    // the Phase-0 AI-remove eyedropper bugfix established.
+    let historyStack = [];
+    let historyIndex = -1;
+    const MAX_HISTORY = 30;
+    let isRestoringHistory = false; // guards against a restore re-pushing itself
+
+    function resetHistory(urlOrBlob) {
+        historyStack.forEach(h => { if (h.revoke) URL.revokeObjectURL(h.url); });
+        historyStack = [];
+        historyIndex = -1;
+        pushHistory(urlOrBlob);
+    }
+
+    function pushHistory(urlOrBlob) {
+        if (isRestoringHistory || !urlOrBlob) return;
+        let url, revoke;
+        if (urlOrBlob instanceof Blob) {
+            url = URL.createObjectURL(urlOrBlob);
+            revoke = true;
+        } else {
+            url = urlOrBlob; // data: URL (from FileReader) — nothing to revoke
+            revoke = false;
+        }
+        // A fresh edit after undoing a few steps discards the redo branch,
+        // same as any normal undo/redo stack (Photoshop, text editors, etc.)
+        if (historyIndex < historyStack.length - 1) {
+            historyStack.slice(historyIndex + 1).forEach(h => { if (h.revoke) URL.revokeObjectURL(h.url); });
+            historyStack = historyStack.slice(0, historyIndex + 1);
+        }
+        historyStack.push({ url, revoke });
+        historyIndex++;
+        if (historyStack.length > MAX_HISTORY) {
+            const removed = historyStack.shift();
+            if (removed.revoke) URL.revokeObjectURL(removed.url);
+            historyIndex--;
+        }
+        updateHistoryButtons();
+    }
+
+    function loadImageFromUrl(url) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = url;
+        });
+    }
+
+    async function restoreHistoryAt(index) {
+        if (index < 0 || index >= historyStack.length) return;
+        const entry = historyStack[index];
+        isRestoringHistory = true;
+        try {
+            const img = await loadImageFromUrl(entry.url);
+            originalImage = img;
+            originalWidth = img.naturalWidth;
+            originalHeight = img.naturalHeight;
+            aspectRatio = originalWidth / originalHeight;
+            previewImage.src = entry.url;
+            // Keep the Download button working against whatever state the
+            // user is currently looking at, not a stale earlier blob.
+            processedBlob = await fetch(entry.url).then(r => r.blob());
+            downloadSection.style.display = 'block';
+            historyIndex = index;
+            document.dispatchEvent(new CustomEvent('app:historyrestored'));
+        } catch (err) {
+            showToast('❌ পূর্বাবস্থায় ফেরানো যায়নি', 'error');
+        } finally {
+            isRestoringHistory = false;
+            updateHistoryButtons();
+        }
+    }
+
+    function undoEdit() {
+        if (historyIndex <= 0) { showToast('আর পেছনে যাওয়ার কিছু নেই', 'error'); return; }
+        restoreHistoryAt(historyIndex - 1);
+    }
+
+    function redoEdit() {
+        if (historyIndex >= historyStack.length - 1) { showToast('আর সামনে যাওয়ার কিছু নেই', 'error'); return; }
+        restoreHistoryAt(historyIndex + 1);
+    }
+
+    function updateHistoryButtons() {
+        if (undoBtn) undoBtn.disabled = historyIndex <= 0;
+        if (redoBtn) redoBtn.disabled = historyIndex >= historyStack.length - 1;
+        if (compareBtn) compareBtn.disabled = historyStack.length === 0;
+    }
+
+    undoBtn.addEventListener('click', undoEdit);
+    redoBtn.addEventListener('click', redoEdit);
+
+    // Global keyboard shortcuts for undo/redo — active editor-wide (not just
+    // inside the BG-remove tab), but never while typing in a text field.
+    document.addEventListener('keydown', (e) => {
+        const tag = (e.target.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+        if (!(e.ctrlKey || e.metaKey)) return;
+        const key = e.key.toLowerCase();
+        if (key === 'z' && !e.shiftKey) { e.preventDefault(); undoEdit(); }
+        else if (key === 'y' || (key === 'z' && e.shiftKey)) { e.preventDefault(); redoEdit(); }
+    });
+
+    // ============================================
     // BACKGROUND REMOVE MODULE
     // ============================================
 
@@ -847,6 +975,7 @@
         const cloneResetSourceBtn = document.getElementById('cloneResetSourceBtn');
         const cloneApplyBtn       = document.getElementById('cloneApplyBtn');
         const cloneCancelBtn      = document.getElementById('cloneCancelBtn');
+        const cloneLongPressRing  = document.getElementById('cloneLongPressRing');
 
         const paintFillColor    = document.getElementById('paintFillColor');
         const paintTolerance    = document.getElementById('paintTolerance');
@@ -855,12 +984,42 @@
         const paintStatus       = document.getElementById('paintStatus');
         const paintBucketBtn    = document.getElementById('paintBucketBtn');
 
+        // Phase 6 — Method 6: Erase/Restore Brush
+        const bgEraseCanvas       = document.getElementById('bgEraseCanvas');
+        const eraseModeEraseBtn   = document.getElementById('eraseModeEraseBtn');
+        const eraseModeRestoreBtn = document.getElementById('eraseModeRestoreBtn');
+        const eraseBrushSize      = document.getElementById('eraseBrushSize');
+        const eraseBrushSizeVal   = document.getElementById('eraseBrushSizeVal');
+        const eraseHardness       = document.getElementById('eraseHardness');
+        const eraseHardnessVal    = document.getElementById('eraseHardnessVal');
+        const eraseHint           = document.getElementById('eraseHint');
+        const eraseStatus         = document.getElementById('eraseStatus');
+        const eraseStartBtn       = document.getElementById('eraseStartBtn');
+        const eraseActionBtns     = document.getElementById('eraseActionBtns');
+        const eraseApplyBtn       = document.getElementById('eraseApplyBtn');
+        const eraseCancelBtn      = document.getElementById('eraseCancelBtn');
+
+        // Phase 6 — Method 7: Magic Wand Selection
+        const bgWandCanvas      = document.getElementById('bgWandCanvas');
+        const wandTolerance     = document.getElementById('wandTolerance');
+        const wandToleranceVal  = document.getElementById('wandToleranceVal');
+        const wandContiguous    = document.getElementById('wandContiguous');
+        const wandFillColor     = document.getElementById('wandFillColor');
+        const wandStatus        = document.getElementById('wandStatus');
+        const wandBtn            = document.getElementById('wandBtn');
+        const wandActionBtns    = document.getElementById('wandActionBtns');
+        const wandRemoveBtn     = document.getElementById('wandRemoveBtn');
+        const wandFillBtn       = document.getElementById('wandFillBtn');
+        const wandCancelBtn     = document.getElementById('wandCancelBtn');
+
         let lassoMode = 'free'; // 'free' or 'poly'
         let lassoPoints = [];
         let isDrawingLasso = false;
         let isEyedropperActive = false;
         let isCloneActive = false;
         let isPaintBucketActive = false;
+        let isEraseBrushActive = false;
+        let isWandActive = false;
         let animFrame = null;
 
         // Restore saved API key
@@ -971,6 +1130,7 @@
                 downloadSection.style.display = 'block';
                 // Make download use PNG
                 downloadBtn.setAttribute('data-ext', 'png');
+                pushHistory(resultBlob);
                 showToast('✅ AI ব্যাকগ্রাউন্ড সফলভাবে রিমুভ হয়েছে!', 'success');
             } catch (err) {
                 showToast(`❌ ত্রুটি: ${err.message}`, 'error');
@@ -1228,6 +1388,7 @@
                 previewImage.src = url;
                 downloadSection.style.display = 'block';
                 downloadBtn.setAttribute('data-ext', 'png');
+                pushHistory(blob);
                 showToast('✅ রঙ-ভিত্তিক রিমুভ সম্পন্ন! PNG হিসেবে ডাউনলোড করুন।', 'success');
             }, 'image/png');
         }
@@ -1280,21 +1441,25 @@
                 showToast('উইন্ডো সাইজ পরিবর্তনের কারণে সিলেকশন বাতিল হয়েছে, আবার আঁকুন', 'error');
                 bgCancelLasso.click();
             }
-            // Unlike the lasso overlay, the clone canvas's drawing buffer is
-            // fixed at the image's full resolution (not the display size),
-            // so a resize only needs to reposition/resize the CSS box —
-            // nothing painted so far is lost.
+            // Unlike the lasso overlay, the clone/erase canvases' drawing
+            // buffers are fixed at the image's full resolution (not the
+            // display size), so a resize only needs to reposition/resize
+            // the CSS box — nothing painted so far is lost.
             if (isCloneActive) syncCloneCanvasBox();
+            if (isEraseBrushActive) syncEraseCanvasBox();
+            if (isWandActive) syncWandCanvasBox();
         });
 
-        // Leaving the BG-remove tab mid-selection (or mid-eyedropper/clone) should
-        // not leave stray listeners/overlays behind.
+        // Leaving the BG-remove tab mid-selection (or mid-eyedropper/clone/erase/wand)
+        // should not leave stray listeners/overlays behind.
         document.addEventListener('app:tabchange', (e) => {
             if (e.detail !== 'bgremove') {
                 if (isEyedropperActive) deactivateEyedropper();
                 if (bgLassoCanvas.style.display !== 'none') bgCancelLasso.click();
                 if (isCloneActive) endCloneSession(false);
                 if (isPaintBucketActive) deactivatePaintBucket();
+                if (isEraseBrushActive) endEraseSession(false);
+                if (isWandActive) deactivateWand();
             }
         });
 
@@ -1311,6 +1476,12 @@
             }
             if (isCloneActive) {
                 syncCloneCanvasBox();
+            }
+            if (isEraseBrushActive) {
+                syncEraseCanvasBox();
+            }
+            if (isWandActive) {
+                syncWandCanvasBox();
             }
         });
 
@@ -1547,6 +1718,7 @@
                 lassoPoints = [];
                 downloadSection.style.display = 'block';
                 downloadBtn.setAttribute('data-ext', 'png');
+                pushHistory(blob);
                 showToast('✅ লাসো রিমুভ সম্পন্ন! PNG ডাউনলোড করুন।', 'success');
             }, 'image/png');
         }
@@ -1584,6 +1756,19 @@
         let isPainting = false;
         let lastPaintPoint = null;
 
+        // Touch-device source selection: Alt+click has no touch equivalent,
+        // so a long-press on the canvas sets the source point instead. A
+        // touchstart starts this timer rather than painting immediately;
+        // if the finger holds still past CLONE_LONG_PRESS_MS it's a
+        // source-pick, if it moves past the tolerance first it's the start
+        // of a normal paint drag, and if it lifts before either happens
+        // it's a quick tap-to-stamp (mirrors a plain desktop click).
+        const CLONE_LONG_PRESS_MS = 550;
+        const CLONE_LONG_PRESS_MOVE_TOLERANCE = 12; // client px
+        let cloneTouchTimer = null;
+        let cloneTouchStartClient = null;  // {x,y} in client coords
+        let cloneTouchLongPressFired = false;
+
         // Cached brush + patch canvases so every stamp doesn't allocate new
         // ones — only rebuilt when the brush size/hardness actually change.
         const cloneBrushCanvas = document.createElement('canvas');
@@ -1606,6 +1791,9 @@
             cloneOffset = null;
             isPainting = false;
             lastPaintPoint = null;
+            cloneTouchTimer = null;
+            cloneTouchStartClient = null;
+            cloneTouchLongPressFired = false;
 
             const w = originalImage.naturalWidth  || originalWidth;
             const h = originalImage.naturalHeight || originalHeight;
@@ -1624,8 +1812,10 @@
             bgCloneCanvas.addEventListener('mousedown', onCloneMouseDown);
             bgCloneCanvas.addEventListener('mousemove', onCloneMouseMove);
             document.addEventListener('mouseup', onCloneMouseUp);
-            bgCloneCanvas.addEventListener('touchstart', onCloneTouchStart, { passive: false });
-            bgCloneCanvas.addEventListener('touchmove',  onCloneTouchMove,  { passive: false });
+            bgCloneCanvas.addEventListener('touchstart',  onCloneTouchStart,  { passive: false });
+            bgCloneCanvas.addEventListener('touchmove',   onCloneTouchMove,   { passive: false });
+            bgCloneCanvas.addEventListener('touchend',    onCloneTouchEnd,    { passive: false });
+            bgCloneCanvas.addEventListener('touchcancel', onCloneTouchCancel, { passive: false });
             document.addEventListener('touchend', onCloneMouseUp);
         }
 
@@ -1634,9 +1824,12 @@
             bgCloneCanvas.removeEventListener('mousedown', onCloneMouseDown);
             bgCloneCanvas.removeEventListener('mousemove', onCloneMouseMove);
             document.removeEventListener('mouseup', onCloneMouseUp);
-            bgCloneCanvas.removeEventListener('touchstart', onCloneTouchStart);
-            bgCloneCanvas.removeEventListener('touchmove',  onCloneTouchMove);
+            bgCloneCanvas.removeEventListener('touchstart',  onCloneTouchStart);
+            bgCloneCanvas.removeEventListener('touchmove',   onCloneTouchMove);
+            bgCloneCanvas.removeEventListener('touchend',    onCloneTouchEnd);
+            bgCloneCanvas.removeEventListener('touchcancel', onCloneTouchCancel);
             document.removeEventListener('touchend', onCloneMouseUp);
+            cancelCloneLongPress();
 
             if (apply) {
                 bgCloneCanvas.toBlob(blob => {
@@ -1647,6 +1840,7 @@
                     previewImage.src = url;
                     downloadSection.style.display = 'block';
                     downloadBtn.setAttribute('data-ext', 'png');
+                    pushHistory(blob);
                     showToast('✅ ক্লোন স্ট্যাম্প প্রয়োগ হয়েছে! PNG হিসেবে ডাউনলোড করুন।', 'success');
                 }, 'image/png');
             }
@@ -1676,7 +1870,7 @@
 
         function updateCloneStatus() {
             if (!cloneSourcePoint) {
-                cloneStatus.textContent = '⚪ সোর্স নেই — ছবিতে Alt/Option + ক্লিক করে সোর্স বাছাই করুন';
+                cloneStatus.textContent = '⚪ সোর্স নেই — Alt/Option + ক্লিক (টাচে চেপে ধরুন) করে সোর্স বাছাই করুন';
             } else if (!cloneOffset) {
                 cloneStatus.textContent = `🟢 সোর্স সেট হয়েছে (${cloneSourcePoint.x}, ${cloneSourcePoint.y}) — এখন ব্রাশ দিয়ে টানুন`;
             } else {
@@ -1721,7 +1915,7 @@
             }
 
             if (!cloneSourcePoint) {
-                showToast('আগে Alt/Option + ক্লিক করে সোর্স বাছাই করুন', 'error');
+                showToast('আগে সোর্স বাছাই করুন — Alt/Option + ক্লিক (টাচে চেপে ধরুন)', 'error');
                 return;
             }
 
@@ -1747,8 +1941,122 @@
             lastPaintPoint = null;
         }
 
-        function onCloneTouchStart(e) { e.preventDefault(); onCloneMouseDown(e.touches[0]); }
-        function onCloneTouchMove(e)  { e.preventDefault(); onCloneMouseMove(e.touches[0]); }
+        // ── Touch long-press source selection ──────────────────────────
+        // touchstart never paints/sets-source immediately (unlike
+        // mousedown) — it starts a timer and shows the progress ring.
+        // What happens next depends on what the finger does before the
+        // timer fires: see onCloneTouchMove/onCloneTouchEnd below.
+        function onCloneTouchStart(e) {
+            e.preventDefault();
+            if (!isCloneActive) return;
+            const touch = e.touches[0];
+            cloneTouchStartClient = { x: touch.clientX, y: touch.clientY };
+            cloneTouchLongPressFired = false;
+
+            showCloneLongPressRing(touch.clientX, touch.clientY);
+
+            cloneTouchTimer = setTimeout(() => {
+                cloneTouchTimer = null;
+                cloneTouchLongPressFired = true;
+                hideCloneLongPressRing(true);
+
+                const pt = clonePointFromClient(touch.clientX, touch.clientY);
+                if (!pt) return;
+                cloneSourcePoint = pt;
+                cloneOffset = null; // a new source re-locks the offset on the next stroke
+                updateCloneStatus();
+                if (navigator.vibrate) navigator.vibrate(20);
+                showToast('🎯 সোর্স সেট হয়েছে — এখন আঙুল দিয়ে টেনে ক্লোন করুন', 'success');
+            }, CLONE_LONG_PRESS_MS);
+        }
+
+        function onCloneTouchMove(e) {
+            e.preventDefault();
+            if (!isCloneActive) return;
+            const touch = e.touches[0];
+
+            // Still deciding tap vs long-press vs drag: if the finger has
+            // moved past the tolerance, this is a paint drag, not a
+            // long-press — cancel the timer/ring and start painting from
+            // right here (mirrors a desktop mousedown at this point).
+            if (cloneTouchTimer) {
+                const dx = touch.clientX - cloneTouchStartClient.x;
+                const dy = touch.clientY - cloneTouchStartClient.y;
+                if (Math.sqrt(dx * dx + dy * dy) > CLONE_LONG_PRESS_MOVE_TOLERANCE) {
+                    clearTimeout(cloneTouchTimer);
+                    cloneTouchTimer = null;
+                    hideCloneLongPressRing(false);
+                    onCloneMouseDown(touch);
+                }
+                return;
+            }
+
+            // This touch already fired a long-press (source was just set
+            // by this same finger) — ignore the rest of the gesture so it
+            // doesn't also start painting.
+            if (cloneTouchLongPressFired) return;
+
+            onCloneMouseMove(touch);
+        }
+
+        function onCloneTouchEnd(e) {
+            e.preventDefault();
+            if (cloneTouchTimer) {
+                // Finger lifted before the long-press fired and before it
+                // moved past the tolerance — treat it as a quick tap, same
+                // as a plain desktop click-and-release.
+                clearTimeout(cloneTouchTimer);
+                cloneTouchTimer = null;
+                hideCloneLongPressRing(false);
+                const touch = e.changedTouches[0];
+                onCloneMouseDown(touch);
+            }
+            cloneTouchLongPressFired = false;
+            onCloneMouseUp();
+        }
+
+        function onCloneTouchCancel(e) {
+            if (cloneTouchTimer) {
+                clearTimeout(cloneTouchTimer);
+                cloneTouchTimer = null;
+            }
+            hideCloneLongPressRing(false);
+            cloneTouchLongPressFired = false;
+            onCloneMouseUp();
+        }
+
+        function cancelCloneLongPress() {
+            if (cloneTouchTimer) {
+                clearTimeout(cloneTouchTimer);
+                cloneTouchTimer = null;
+            }
+            cloneTouchLongPressFired = false;
+            hideCloneLongPressRing(false);
+        }
+
+        function showCloneLongPressRing(clientX, clientY) {
+            const ringFill = cloneLongPressRing.querySelector('.ring-fill');
+            cloneLongPressRing.style.left = clientX + 'px';
+            cloneLongPressRing.style.top  = clientY + 'px';
+            cloneLongPressRing.classList.remove('filling', 'fired');
+            cloneLongPressRing.style.display = 'block';
+            // Force a reflow so the dashoffset transition restarts cleanly
+            // on every new press instead of animating from wherever the
+            // previous press left off.
+            void cloneLongPressRing.offsetWidth;
+            ringFill.style.transitionDuration = CLONE_LONG_PRESS_MS + 'ms';
+            cloneLongPressRing.classList.add('filling');
+        }
+
+        function hideCloneLongPressRing(fired) {
+            if (fired) {
+                cloneLongPressRing.classList.add('fired');
+                setTimeout(() => { cloneLongPressRing.style.display = 'none'; }, 180);
+            } else {
+                cloneLongPressRing.style.display = 'none';
+            }
+            cloneLongPressRing.classList.remove('filling');
+        }
 
         // Soft radial brush shape (hardness 100 = solid disc, 0 = fully
         // feathered from centre to edge), cached until size/hardness change.
@@ -1908,6 +2216,7 @@
                 previewImage.src = url;
                 downloadSection.style.display = 'block';
                 downloadBtn.setAttribute('data-ext', 'png');
+                pushHistory(blob);
                 showToast('✅ পেইন্ট বাকেট প্রয়োগ হয়েছে! PNG হিসেবে ডাউনলোড করুন।', 'success');
             }, 'image/png');
         }
@@ -1949,6 +2258,437 @@
             if (!originalImage) { showToast('প্রথমে ছবি আপলোড করুন', 'error'); return; }
             if (isPaintBucketActive) deactivatePaintBucket();
             else activatePaintBucket();
+        });
+
+        // ──────────────────────────────────────────
+        // METHOD 6: Manual Erase/Restore Brush (Phase 6)
+        // ──────────────────────────────────────────
+        // Same full-res overlay-canvas architecture as Method 4 (Clone
+        // Stamp): bgEraseCanvas sits over previewImage via
+        // syncEraseCanvasBox() (the same getImageDisplayRect() CSS-box
+        // pattern), but its drawing buffer is the image's own resolution
+        // so brushed pixels stay full quality regardless of zoom/float.
+        //
+        // Erase mode: destination-out compositing with the same soft
+        // radial brush shape Method 4 uses — punches transparent holes
+        // with a feathered edge instead of a hard-edged cutout.
+        // Restore mode: paints back pixels from the history entry just
+        // BEFORE the current one (historyIndex - 1 at session start) —
+        // i.e. "undo, but only where I brush". This is what actually
+        // lets a user fix a bad AI/color-remove edge by hand: painting
+        // "restore" brings back the pixels that specific edit erased,
+        // without discarding every other edit made since.
+
+        const eraseCtx = bgEraseCanvas.getContext('2d');
+        let eraseMode = 'erase'; // 'erase' | 'restore'
+        let eraseRestoreCanvas = null; // offscreen full-res copy of the "before" state for this session
+        let isErasePainting = false;
+        let lastErasePoint = null;
+
+        const eraseBrushCanvas = document.createElement('canvas');
+        const eraseBrushCtx    = eraseBrushCanvas.getContext('2d');
+        let lastEraseBrushRadius = -1, lastEraseBrushHardness = -1;
+
+        eraseBrushSize.addEventListener('input', () => eraseBrushSizeVal.textContent = eraseBrushSize.value);
+        eraseHardness.addEventListener('input',  () => eraseHardnessVal.textContent  = eraseHardness.value);
+
+        eraseModeEraseBtn.addEventListener('click', () => {
+            eraseMode = 'erase';
+            eraseModeEraseBtn.classList.add('active');
+            eraseModeRestoreBtn.classList.remove('active');
+        });
+        eraseModeRestoreBtn.addEventListener('click', () => {
+            if (!eraseRestoreCanvas) {
+                showToast('রিস্টোরের জন্য কোনো আগের অবস্থা নেই (এটাই প্রথম এডিট)', 'error');
+                return;
+            }
+            eraseMode = 'restore';
+            eraseModeRestoreBtn.classList.add('active');
+            eraseModeEraseBtn.classList.remove('active');
+        });
+
+        eraseStartBtn.addEventListener('click', () => {
+            if (!originalImage) { showToast('প্রথমে ছবি আপলোড করুন', 'error'); return; }
+            startEraseSession();
+        });
+
+        async function startEraseSession() {
+            isEraseBrushActive = true;
+            isErasePainting = false;
+            lastErasePoint = null;
+
+            const w = originalImage.naturalWidth  || originalWidth;
+            const h = originalImage.naturalHeight || originalHeight;
+            bgEraseCanvas.width  = w;
+            bgEraseCanvas.height = h;
+            eraseCtx.clearRect(0, 0, w, h);
+            eraseCtx.drawImage(originalImage, 0, 0, w, h);
+
+            // Build the "restore from" snapshot: the history state right
+            // before this one, scaled to the current canvas size. If this
+            // is the very first edit (nothing to go "back" to), Restore
+            // mode simply stays unavailable for this session.
+            eraseRestoreCanvas = null;
+            if (typeof historyStack !== 'undefined' && historyIndex > 0) {
+                try {
+                    const prevEntry = historyStack[historyIndex - 1];
+                    const prevImg = await loadImageFromUrl(prevEntry.url);
+                    const rc = document.createElement('canvas');
+                    rc.width = w; rc.height = h;
+                    rc.getContext('2d').drawImage(prevImg, 0, 0, w, h);
+                    eraseRestoreCanvas = rc;
+                } catch (err) {
+                    eraseRestoreCanvas = null;
+                }
+            }
+
+            syncEraseCanvasBox();
+            bgEraseCanvas.style.display = 'block';
+            previewImage.style.visibility = 'hidden';
+            eraseActionBtns.style.display = 'flex';
+            eraseStartBtn.style.display = 'none';
+            eraseMode = 'erase';
+            eraseModeEraseBtn.classList.add('active');
+            eraseModeRestoreBtn.classList.remove('active');
+            eraseStatus.textContent = eraseRestoreCanvas
+                ? '🧽 ইরেজ মোড চালু — ব্রাশ দিয়ে টানুন। রিস্টোর মোডে আগের অবস্থা ফিরিয়ে আনা যাবে।'
+                : '🧽 ইরেজ মোড চালু — ব্রাশ দিয়ে টানুন। (এটাই প্রথম এডিট বলে রিস্টোর মোড এখন অকার্যকর)';
+
+            bgEraseCanvas.addEventListener('mousedown', onEraseMouseDown);
+            bgEraseCanvas.addEventListener('mousemove', onEraseMouseMove);
+            document.addEventListener('mouseup', onEraseMouseUp);
+            bgEraseCanvas.addEventListener('touchstart', onEraseTouchStart, { passive: false });
+            bgEraseCanvas.addEventListener('touchmove',  onEraseTouchMove,  { passive: false });
+            document.addEventListener('touchend', onEraseMouseUp);
+        }
+
+        function endEraseSession(apply) {
+            if (!isEraseBrushActive) return;
+            bgEraseCanvas.removeEventListener('mousedown', onEraseMouseDown);
+            bgEraseCanvas.removeEventListener('mousemove', onEraseMouseMove);
+            document.removeEventListener('mouseup', onEraseMouseUp);
+            bgEraseCanvas.removeEventListener('touchstart', onEraseTouchStart);
+            bgEraseCanvas.removeEventListener('touchmove',  onEraseTouchMove);
+            document.removeEventListener('touchend', onEraseMouseUp);
+
+            if (apply) {
+                bgEraseCanvas.toBlob(blob => {
+                    processedBlob = blob;
+                    const url = URL.createObjectURL(blob);
+                    originalImage = new Image();
+                    originalImage.src = url;
+                    previewImage.src = url;
+                    downloadSection.style.display = 'block';
+                    downloadBtn.setAttribute('data-ext', 'png');
+                    pushHistory(blob);
+                    showToast('✅ ব্রাশ প্রয়োগ হয়েছে! PNG হিসেবে ডাউনলোড করুন।', 'success');
+                }, 'image/png');
+            }
+
+            isEraseBrushActive = false;
+            isErasePainting = false;
+            lastErasePoint = null;
+            eraseRestoreCanvas = null;
+            bgEraseCanvas.style.display = 'none';
+            previewImage.style.visibility = '';
+            eraseActionBtns.style.display = 'none';
+            eraseStartBtn.style.display = '';
+            eraseStatus.textContent = '';
+            eraseHint.textContent = 'প্রথমে নিচের বোতামে ক্লিক করুন, তারপর ছবিতে ব্রাশ দিয়ে টানুন।';
+        }
+
+        eraseApplyBtn.addEventListener('click', () => endEraseSession(true));
+        eraseCancelBtn.addEventListener('click', () => endEraseSession(false));
+
+        function syncEraseCanvasBox() {
+            const rect = getImageDisplayRect();
+            bgEraseCanvas.style.left   = rect.left + 'px';
+            bgEraseCanvas.style.top    = rect.top + 'px';
+            bgEraseCanvas.style.width  = Math.max(1, Math.round(rect.width))  + 'px';
+            bgEraseCanvas.style.height = Math.max(1, Math.round(rect.height)) + 'px';
+        }
+
+        function erasePointFromClient(clientX, clientY) {
+            const rect = bgEraseCanvas.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return null;
+            let xRatio = (clientX - rect.left) / rect.width;
+            let yRatio = (clientY - rect.top)  / rect.height;
+            xRatio = Math.min(1, Math.max(0, xRatio));
+            yRatio = Math.min(1, Math.max(0, yRatio));
+            const x = Math.min(bgEraseCanvas.width  - 1, Math.floor(xRatio * bgEraseCanvas.width));
+            const y = Math.min(bgEraseCanvas.height - 1, Math.floor(yRatio * bgEraseCanvas.height));
+            return { x, y };
+        }
+
+        function rebuildEraseBrush(radius, hardnessPct) {
+            if (radius === lastEraseBrushRadius && hardnessPct === lastEraseBrushHardness) return;
+            lastEraseBrushRadius = radius;
+            lastEraseBrushHardness = hardnessPct;
+
+            const size = Math.max(2, Math.round(radius * 2));
+            eraseBrushCanvas.width  = size;
+            eraseBrushCanvas.height = size;
+            eraseBrushCtx.clearRect(0, 0, size, size);
+
+            const cx = size / 2, cy = size / 2;
+            const inner = Math.max(0, (hardnessPct / 100) * radius);
+            const grad = eraseBrushCtx.createRadialGradient(cx, cy, inner, cx, cy, radius);
+            grad.addColorStop(0, 'rgba(0,0,0,1)');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            eraseBrushCtx.fillStyle = grad;
+            eraseBrushCtx.beginPath();
+            eraseBrushCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+            eraseBrushCtx.fill();
+        }
+
+        function eraseStampAt(x, y) {
+            const radius = parseInt(eraseBrushSize.value, 10) / 2;
+            rebuildEraseBrush(radius, parseInt(eraseHardness.value, 10));
+            const size = eraseBrushCanvas.width;
+
+            if (eraseMode === 'erase') {
+                eraseCtx.globalCompositeOperation = 'destination-out';
+                eraseCtx.drawImage(eraseBrushCanvas, x - size / 2, y - size / 2);
+                eraseCtx.globalCompositeOperation = 'source-over';
+            } else {
+                if (!eraseRestoreCanvas) return;
+                // Same masked-patch trick Method 4 uses: cut a brush-shaped
+                // piece out of the restore-source at the SAME coordinates
+                // (no offset — this isn't cloning from elsewhere, it's
+                // recovering what used to be at this exact spot) and paint
+                // it back with source-over so it blends softly.
+                eraseBrushCtx.save();
+                const patchCanvas = document.createElement('canvas');
+                patchCanvas.width = size; patchCanvas.height = size;
+                const patchCtx = patchCanvas.getContext('2d');
+                patchCtx.drawImage(eraseRestoreCanvas, x - size / 2, y - size / 2, size, size, 0, 0, size, size);
+                patchCtx.globalCompositeOperation = 'destination-in';
+                patchCtx.drawImage(eraseBrushCanvas, 0, 0);
+                eraseCtx.drawImage(patchCanvas, x - size / 2, y - size / 2);
+                eraseBrushCtx.restore();
+            }
+        }
+
+        function eraseStrokeTo(pt) {
+            const radius = parseInt(eraseBrushSize.value, 10) / 2;
+            const spacing = Math.max(2, radius / 4);
+            const from = lastErasePoint || pt;
+            const dx = pt.x - from.x, dy = pt.y - from.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const steps = Math.max(1, Math.floor(dist / spacing));
+            for (let i = 1; i <= steps; i++) {
+                eraseStampAt(from.x + (dx * i) / steps, from.y + (dy * i) / steps);
+            }
+            lastErasePoint = pt;
+        }
+
+        function onEraseMouseDown(e) {
+            if (!isEraseBrushActive) return;
+            const pt = erasePointFromClient(e.clientX, e.clientY);
+            if (!pt) return;
+            isErasePainting = true;
+            lastErasePoint = pt;
+            eraseStampAt(pt.x, pt.y);
+        }
+        function onEraseMouseMove(e) {
+            if (!isEraseBrushActive || !isErasePainting) return;
+            const pt = erasePointFromClient(e.clientX, e.clientY);
+            if (!pt) return;
+            eraseStrokeTo(pt);
+        }
+        function onEraseMouseUp() { isErasePainting = false; lastErasePoint = null; }
+        function onEraseTouchStart(e) { e.preventDefault(); onEraseMouseDown(e.touches[0]); }
+        function onEraseTouchMove(e)  { e.preventDefault(); onEraseMouseMove(e.touches[0]); }
+
+        // ──────────────────────────────────────────
+        // METHOD 7: Magic Wand Selection (Phase 6)
+        // ──────────────────────────────────────────
+        // Click-to-activate like Method 5 (Paint Bucket) — reuses the exact
+        // same ensurePickCanvas()/clientPointToPixel() coordinate mapping.
+        // Also reuses floodFillMask() directly, so the "connected region of
+        // similar colour" logic (and its 7 standalone unit tests) is shared
+        // with Method 5 rather than re-implemented.
+        //
+        // Unlike Paint Bucket (which fills immediately on click), the wand
+        // shows the selection first (a tinted overlay) and only acts once
+        // the user picks Remove or Fill — closer to Photoshop's actual
+        // magic-wand-then-act workflow.
+
+        const wandCtx = bgWandCanvas.getContext('2d');
+        let wandMask = null;   // Uint8Array, full-res
+        let wandMaskW = 0, wandMaskH = 0;
+
+        wandTolerance.addEventListener('input', () => wandToleranceVal.textContent = wandTolerance.value);
+
+        function syncWandCanvasBox() {
+            const rect = getImageDisplayRect();
+            bgWandCanvas.style.left   = rect.left + 'px';
+            bgWandCanvas.style.top    = rect.top + 'px';
+            bgWandCanvas.style.width  = Math.max(1, Math.round(rect.width))  + 'px';
+            bgWandCanvas.style.height = Math.max(1, Math.round(rect.height)) + 'px';
+        }
+
+        function activateWand() {
+            isWandActive = true;
+            wandBtn.classList.add('active');
+            wandStatus.textContent = '👆 ছবিতে ক্লিক করুন যেখান থেকে সিলেক্ট করতে চান';
+            const w = originalImage.naturalWidth  || originalWidth;
+            const h = originalImage.naturalHeight || originalHeight;
+            bgWandCanvas.width  = w;
+            bgWandCanvas.height = h;
+            syncWandCanvasBox();
+            bgWandCanvas.style.display = 'block';
+            bgWandCanvas.style.cursor = 'crosshair';
+            bgWandCanvas.addEventListener('click', onWandClick);
+            document.addEventListener('keydown', onWandEscape);
+        }
+
+        function deactivateWand() {
+            isWandActive = false;
+            wandMask = null;
+            wandBtn.classList.remove('active');
+            wandStatus.textContent = '';
+            wandActionBtns.style.display = 'none';
+            bgWandCanvas.style.display = 'none';
+            bgWandCanvas.removeEventListener('click', onWandClick);
+            document.removeEventListener('keydown', onWandEscape);
+            if (wandCtx) wandCtx.clearRect(0, 0, bgWandCanvas.width, bgWandCanvas.height);
+        }
+
+        function onWandEscape(e) { if (e.key === 'Escape') deactivateWand(); }
+
+        function onWandClick(e) {
+            const rect = bgWandCanvas.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return;
+            let xRatio = (e.clientX - rect.left) / rect.width;
+            let yRatio = (e.clientY - rect.top)  / rect.height;
+            xRatio = Math.min(1, Math.max(0, xRatio));
+            yRatio = Math.min(1, Math.max(0, yRatio));
+            const px = Math.min(bgWandCanvas.width  - 1, Math.floor(xRatio * bgWandCanvas.width));
+            const py = Math.min(bgWandCanvas.height - 1, Math.floor(yRatio * bgWandCanvas.height));
+
+            const w = bgWandCanvas.width, h = bgWandCanvas.height;
+            canvas.width = w; canvas.height = h;
+            ctx.clearRect(0, 0, w, h);
+            ctx.drawImage(originalImage, 0, 0, w, h);
+            const imageData = ctx.getImageData(0, 0, w, h);
+            const data = imageData.data;
+            const threshold = (parseInt(wandTolerance.value, 10) / 100) * 441.67;
+            const mask = floodFillMask(data, w, h, px, py, threshold, wandContiguous.checked);
+
+            let selectedCount = 0;
+            for (let i = 0; i < w * h; i++) if (mask[i]) selectedCount++;
+            if (selectedCount === 0) {
+                showToast('কোনো এলাকা সিলেক্ট হয়নি — টলারেন্স বাড়িয়ে দেখুন', 'error');
+                return;
+            }
+
+            wandMask = mask;
+            wandMaskW = w;
+            wandMaskH = h;
+
+            // Visual feedback: tint the selected pixels so the user can see
+            // exactly what will be affected before committing to an action.
+            wandCtx.clearRect(0, 0, w, h);
+            const overlay = wandCtx.createImageData(w, h);
+            for (let i = 0; i < w * h; i++) {
+                if (mask[i]) {
+                    overlay.data[i * 4]     = 56;
+                    overlay.data[i * 4 + 1] = 132;
+                    overlay.data[i * 4 + 2] = 255;
+                    overlay.data[i * 4 + 3] = 130;
+                }
+            }
+            wandCtx.putImageData(overlay, 0, 0);
+
+            wandStatus.textContent = `🔵 ${selectedCount.toLocaleString()} পিক্সেল সিলেক্ট হয়েছে — এখন রিমুভ বা রঙ ভরাট করুন`;
+            wandActionBtns.style.display = 'flex';
+        }
+
+        function applyWandAction(mode) {
+            if (!wandMask) return;
+            const w = wandMaskW, h = wandMaskH;
+            canvas.width = w; canvas.height = h;
+            ctx.clearRect(0, 0, w, h);
+            ctx.drawImage(originalImage, 0, 0, w, h);
+            const imageData = ctx.getImageData(0, 0, w, h);
+            const data = imageData.data;
+
+            if (mode === 'remove') {
+                for (let i = 0; i < w * h; i++) {
+                    if (wandMask[i]) data[i * 4 + 3] = 0;
+                }
+            } else {
+                const fill = hexToRgb(wandFillColor.value);
+                for (let i = 0; i < w * h; i++) {
+                    if (wandMask[i]) {
+                        data[i * 4]     = fill.r;
+                        data[i * 4 + 1] = fill.g;
+                        data[i * 4 + 2] = fill.b;
+                        data[i * 4 + 3] = 255;
+                    }
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+            canvas.toBlob(blob => {
+                processedBlob = blob;
+                const url = URL.createObjectURL(blob);
+                originalImage = new Image();
+                originalImage.src = url;
+                previewImage.src = url;
+                downloadSection.style.display = 'block';
+                downloadBtn.setAttribute('data-ext', 'png');
+                pushHistory(blob);
+                showToast(mode === 'remove'
+                    ? '✅ সিলেকশন রিমুভ হয়েছে! PNG হিসেবে ডাউনলোড করুন।'
+                    : '✅ সিলেকশনে রঙ ভরাট হয়েছে! PNG হিসেবে ডাউনলোড করুন।', 'success');
+                deactivateWand();
+            }, 'image/png');
+        }
+
+        wandRemoveBtn.addEventListener('click', () => applyWandAction('remove'));
+        wandFillBtn.addEventListener('click',   () => applyWandAction('fill'));
+        wandCancelBtn.addEventListener('click', () => deactivateWand());
+
+        wandBtn.addEventListener('click', () => {
+            if (!originalImage) { showToast('প্রথমে ছবি আপলোড করুন', 'error'); return; }
+            if (isWandActive) deactivateWand();
+            else activateWand();
+        });
+
+        // ──────────────────────────────────────────
+        // Phase 6: Keyboard shortcuts
+        // ──────────────────────────────────────────
+        // E = eyedropper, L = lasso, C = clone stamp, B = erase brush,
+        // W = magic wand, P = paint bucket — only while the BG-remove tab
+        // is active, an image is loaded, and focus isn't in a text field.
+        // Esc cancels whichever tool (of the ones that don't already
+        // listen for Escape themselves) is currently active.
+        document.addEventListener('keydown', (e) => {
+            const tag = (e.target.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+            if (!originalImage) return;
+
+            if (e.key === 'Escape') {
+                if (bgLassoCanvas.style.display !== 'none') bgCancelLasso.click();
+                if (isCloneActive) endCloneSession(false);
+                if (isEraseBrushActive) endEraseSession(false);
+                if (isWandActive) deactivateWand();
+                return;
+            }
+
+            const bgTabActive = document.getElementById('tab-bgremove').classList.contains('active');
+            if (!bgTabActive || e.ctrlKey || e.metaKey || e.altKey) return;
+
+            switch (e.key.toLowerCase()) {
+                case 'e': bgEyedropperBtn.click(); break;
+                case 'l': if (bgLassoCanvas.style.display === 'none') bgStartLassoBtn.click(); break;
+                case 'c': if (!isCloneActive) cloneStartBtn.click(); break;
+                case 'b': if (!isEraseBrushActive) eraseStartBtn.click(); break;
+                case 'w': wandBtn.click(); break;
+                case 'p': paintBucketBtn.click(); break;
+            }
         });
 
     })(); // end initBgRemoveModule
@@ -2150,5 +2890,92 @@
         });
 
     })(); // end initPreviewZoomFloatModule
+
+    // ================================================================
+    // Phase 6 — Before/After comparison slider.
+    // See photo-editor/PLAN_BG_Remove_Advanced.md → "Phase 6".
+    // ================================================================
+    // Design: baBeforeImg is an absolutely-positioned <img> laid directly
+    // over previewImage inside the same wrapper, using the exact same
+    // sizing rule (width/height:100% + object-fit:contain — see CSS) that
+    // previewImage itself uses via its max-width/max-height + flex-center
+    // rules. Because object-fit:contain always centers same-content at the
+    // same scale within its box regardless of *how* that box was sized,
+    // the two images land in the same rendered rectangle without any of
+    // the getImageDisplayRect() pixel-math the lasso/clone/erase/wand
+    // canvases need — this overlay is a plain <img>, not a canvas, so no
+    // JS box-syncing is required at all, only the divider's 0–100% split.
+    (function initBeforeAfterModule() {
+
+        const baOverlay   = document.getElementById('baOverlay');
+        const baBeforeImg = document.getElementById('baBeforeImg');
+        const baDivider   = document.getElementById('baDivider');
+
+        let isComparing = false;
+        let isDraggingDivider = false;
+
+        function setDividerPercent(pct) {
+            pct = Math.min(100, Math.max(0, pct));
+            baBeforeImg.style.clipPath = `inset(0 ${100 - pct}% 0 0)`;
+            baDivider.style.left = pct + '%';
+        }
+
+        function enterCompare() {
+            if (typeof historyStack === 'undefined' || historyStack.length === 0) {
+                showToast('তুলনা করার মতো কোনো ইতিহাস নেই', 'error');
+                return;
+            }
+            baBeforeImg.src = historyStack[0].url; // always the original upload
+            isComparing = true;
+            compareBtn.classList.add('active');
+            baOverlay.style.display = 'block';
+            setDividerPercent(50);
+        }
+
+        function exitCompare() {
+            isComparing = false;
+            compareBtn.classList.remove('active');
+            baOverlay.style.display = 'none';
+        }
+
+        compareBtn.addEventListener('click', () => {
+            if (isComparing) exitCompare();
+            else enterCompare();
+        });
+
+        // If a brand-new photo is uploaded, or an undo/redo just fired,
+        // close any open comparison rather than show a stale/mismatched
+        // "before" image — the user can re-open it with the fresh state.
+        document.addEventListener('app:newimage', () => { if (isComparing) exitCompare(); });
+        document.addEventListener('app:historyrestored', () => { if (isComparing) exitCompare(); });
+
+        function percentFromClientX(clientX) {
+            const rect = baOverlay.getBoundingClientRect();
+            if (rect.width === 0) return 50;
+            return ((clientX - rect.left) / rect.width) * 100;
+        }
+
+        function onDividerDown(e) {
+            isDraggingDivider = true;
+            e.preventDefault();
+        }
+        function onDividerMove(clientX) {
+            if (!isDraggingDivider) return;
+            setDividerPercent(percentFromClientX(clientX));
+        }
+        function onDividerUp() { isDraggingDivider = false; }
+
+        baDivider.addEventListener('mousedown', onDividerDown);
+        document.addEventListener('mousemove', (e) => onDividerMove(e.clientX));
+        document.addEventListener('mouseup', onDividerUp);
+
+        baDivider.addEventListener('touchstart', (e) => { isDraggingDivider = true; }, { passive: true });
+        document.addEventListener('touchmove', (e) => {
+            if (!isDraggingDivider) return;
+            onDividerMove(e.touches[0].clientX);
+        }, { passive: true });
+        document.addEventListener('touchend', onDividerUp);
+
+    })(); // end initBeforeAfterModule
 
 })();

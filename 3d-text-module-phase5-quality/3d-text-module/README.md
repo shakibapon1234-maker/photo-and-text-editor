@@ -97,9 +97,14 @@ If you edit `src/main.js`, re-run `npm run build` to regenerate the bundle.
 
 ## What's implemented (Phase 3 checklist)
 
-- [x] **Preset animation library** — 9 buttons (`None` + 8 effects): Fade In, Pop In,
-      Rotate In, Flip In, Slide In (left/right), Drop In, Wobble. Lives in
-      `src/animations.js` as plain functions (`ANIMATION_PRESETS`), no `three` import.
+- [x] **Preset animation library** — finalized at 17 buttons (`None` + 16 effects):
+      original 8 (Fade In, Pop In, Rotate In, Flip In, Slide In left/right, Drop In,
+      Wobble) plus 8 added in the animation-list-finalization pass (Zoom Blast, Rise Up,
+      Flip In vertical-axis, Rotate In reverse-direction, Spin + Pop, Swing In, Diagonal
+      In, Drop In with squash-landing). Lives in `src/animations.js` as plain functions
+      (`ANIMATION_PRESETS`), no `three` import. Every preset — old and new — was
+      re-verified with the same `apply(1) === neutral offset` unit test (see "What's
+      tested" below), all 17 pass.
 - [x] **Timeline control** — Duration slider (0.2s–4s), Delay slider (0–3s), Easing
       dropdown (Linear, Ease In, Ease Out, Ease In-Out, Elastic-Out, Bounce-Out), Loop
       toggle.
@@ -222,9 +227,10 @@ actually done:
 - `src/animations.js` has **zero `three` imports** by design, so it could be loaded and
   actually *executed* with plain Node (no bundler, no DOM) to numerically verify the
   easing curves and, more importantly, the contract every preset must satisfy: calling
-  `preset.apply(1)` for all 9 presets and asserting the result is the exact neutral
+  `preset.apply(1)` for all 17 presets (the original 9 plus the 8 added in the
+  animation-list-finalization pass) and asserting the result is the exact neutral
   offset (`pos [0,0,0]`, `rot [0,0,0]`, `scaleMul 1`, `opacityMul 1`) — confirmed for all
-  9. This matters because it's the guarantee that an animation always *lands* on exactly
+  17. This matters because it's the guarantee that an animation always *lands* on exactly
   what the Text/Rotate panel sliders say, regardless of which preset/duration/delay/
   easing was chosen — a bug here would mean the mesh ends up in the wrong pose after
   every playback.
@@ -308,7 +314,126 @@ GL), served over local HTTP, with the actual bundled `three` build:
 dependency and bundling with esbuild... Worth deciding before Phase 2.~~ → Done, see
 "Build system" above.
 
+## Bangla text support (this session, per PLAN_2 §8.1)
+
+`TextGeometry` (Phase 1-5, still used for Latin text) extrudes glyph outlines from a
+Three.js typeface-JSON font. That's wrong for Bangla for two independent reasons: the
+vendored fonts (helvetiker/optimer) have no Bengali glyphs, and even a Bengali font run
+through `TextGeometry`'s pipeline wouldn't shape conjuncts (যুক্তাক্ষর) or matra/kar marks
+correctly — that pipeline is built for simple Latin-style glyph runs.
+
+**Approach taken: hybrid canvas-texture card** (PLAN_2 §8.1 option 3, not option 1 —
+vendor a Bengali typeface-JSON — or option 2 — switch to `troika-three-text`). Text is
+auto-detected via the Bengali Unicode block (`\u0980`–`\u09FF`); when present, the line(s)
+are drawn into an offscreen `<canvas>` using the *browser's own* text shaping (the same
+engine that already renders the `<textarea>` correctly), then mapped as a texture onto an
+extruded `BoxGeometry` "card" — front/back faces get the text texture with `alphaTest` for
+a clean cutout, the 4 side faces get a plain material of the current preset as the card's
+edge. Latin text is completely unaffected; it still goes through the original per-glyph
+`TextGeometry` path.
+
+This was chosen over the alternatives because it needs no new font file (this sandbox has
+no network access this session — see below — so downloading a Bengali font wasn't an
+option anyway) and because it reuses every existing material/animation/export code path
+unchanged, since the result is still just a `Group` with `.position`/`.rotation`/
+`.material`, same shape as the Latin-text mesh. The trade-off, stated up front rather than
+discovered later: depth comes from the card's rectangular edge, not from each letter's own
+silhouette — a flat card with depth, not per-letter extrusion. A UI note
+(`#textModeNote`, under the text input) says this explicitly whenever Bangla is detected.
+
+**What changed in `src/main.js`:** `isBanglaText()`, `drawCanvasTextTexture()`,
+`makeCardTexture()`, `buildCanvasCardMaterials()`, `buildCanvasCardTextMesh()` (new);
+`rebuildTextMesh()` now branches into `buildVectorTextMesh()` (old logic, renamed) or
+`buildCanvasCardTextMesh()` based on `isBanglaText()`; `applyMaterial()`,
+`applyPresetOffset()`, and `resetMeshToBaseTransform()` were extended to handle a
+multi-material array (`[side,side,side,side,front,back]`) since they previously assumed
+`child.material` was always a single object.
+
+**What was tested this session:** `node --check` on `src/main.js` (syntax valid); every
+`getElementById()` call cross-checked programmatically against `www/index.html` (60/60
+matched, including the new `textModeNote`); the Bangla-detection regex checked in plain
+Node against English/Bangla/mixed/Bangla-numeral cases.
+
+**What could NOT be tested this session — sandbox had no network access at all** (`npm
+install` itself returned `403 Forbidden` from `registry.npmjs.org`, a step stricter than
+earlier sessions where the registry was reachable but `unpkg.com`/`cdn.playwright.dev`
+weren't):
+- **`npm run build` could not be run**, so `www/main.bundle.js` in this delivery is still
+  the **pre-Bangla build** — you must run `npm install && npm run build` yourself before
+  this feature will actually appear in the browser.
+- No real browser render of the canvas-text path at all: whether the font fallback stack
+  (`Noto Sans Bengali` → `Nirmala UI` → `Vrinda` → `Kalpurush` → `Siyam Rupali` → generic
+  sans-serif) actually resolves to a Bengali-capable font on your OS, whether conjuncts/
+  matras look visually correct, whether the card's size/aspect lines up reasonably with
+  the Size slider, and how all 5 material presets / shadows / reflections / the 17
+  animation presets / WebM+PNG export look on a Bangla card specifically.
+
+## 3D image support (this session, per PLAN_2 §8.2)
+
+An "উপলোড ছবি" (upload image) option alongside text: pick an image file and it becomes a
+3D object with the same depth/rotate/material/animation/export controls text already had.
+
+**Approach taken:** reuse §8.1's canvas-texture-card pipeline as-is, instead of building a
+separate image path. `drawImageCardCanvas()` draws the uploaded `<img>` onto an offscreen
+canvas with `ctx.drawImage()` (in place of §8.1's `ctx.fillText()`), downscaled to a
+quality-preset-dependent cap first (`IMAGE_TEXTURE_MAX_PX = { low: 512, medium: 1024, high:
+2048 }` — resolves the plan's "large image performance" open question: polygon count never
+changes, only the texture's pixel budget does, and it's re-applied automatically whenever
+the Quality preset changes since that already triggers a mesh rebuild). The canvas becomes
+a `CanvasTexture` mapped onto a 6-material `BoxGeometry` exactly like the Bangla card, so it
+reuses the existing `renderMode === 'canvas'` branch in `applyMaterial()`/
+`resetMeshToBaseTransform()` unchanged — no new material-handling code, no export.js
+changes. One small difference from the text card: front/back textures are **not** mirrored,
+since a photo has no "reading direction" to protect (text mirrors its back face so letters
+don't read backwards from behind).
+
+**Text vs. image — mutually exclusive, not simultaneous** (resolves the plan's other open
+question): a new content-type toggle (টেক্সট / ছবি) switches which one is the single active
+object (`textMesh`), matching how every other panel already assumes one active object.
+Showing both at once in the same scene would need a real architecture change (an array of
+active objects, each with independent transform/preset state) and was treated as a
+separate, larger feature rather than folded into this pass. The Depth/Size sliders, which
+used to live only inside the text panel, were pulled out into their own always-visible
+section so both modes can reach them.
+
+**What changed in `src/main.js`:** `drawImageCardCanvas()`, `buildImageCardMesh()` (new);
+`rebuildTextMesh()` now branches on `state.contentMode` before its existing text-vs-Bangla
+branching; new DOM refs/listeners for the content-type toggle and the file `<input>`
+(`FileReader` → `Image` → `state.imageElement` → rebuild); the Export button now checks
+`textMesh` is non-null before starting (previously an empty scene could silently "export").
+
+**What was tested this session:** `node --check` on `src/main.js` (syntax valid); every
+`getElementById()` call cross-checked against `www/index.html` (66/66 matched, including
+the 6 new ids for the content toggle and image panel); the `IMAGE_TEXTURE_MAX_PX` downscale
+math (cap per quality tier, aspect-ratio preservation, no upscaling of small images) checked
+in plain Node against several width/height/quality combinations.
+
+**What could NOT be tested this session — sandbox again had no `npm install`/network
+access** (same limitation as §8.1 above, so `www/main.bundle.js` still does not include
+this feature either — you'll need `npm install && npm run build` to see both this and the
+§8.1 Bangla work in the browser):
+- Real file-picker → `FileReader` → `Image.onload` flow in an actual browser; whether the
+  preview thumbnail and the 3D card's aspect ratio both look right for a real uploaded
+  photo.
+- Whether the front/back `alphaTest` cutout (0.4, same threshold as the Bangla card)
+  introduces any visible edge artifact on a transparent PNG with soft/anti-aliased edges.
+- All 5 material presets, animation presets, shadow/reflection, and quality-preset
+  switching specifically on an image card (code-level all reuse the same paths as the
+  Bangla card, which itself is still browser-unverified — see §8.1 above).
+- Export (WebM/PNG) of an image card, and that switching content-type mid-preview/mid-export
+  resets state cleanly.
+
 ## Next (per PLAN_2)
+
+0. **New, most urgent (this session's Bangla + image work — neither tested in a real
+   browser, see both sections above):** run `npm install && npm run build && npm run
+   serve`, then (a) type Bangla text into the Content field and confirm it renders as a
+   readable card, and (b) switch to "ছবি" and upload a photo and confirm the card looks
+   right and export works. If the font fallback stack doesn't pick up a Bengali-capable
+   font on your system, the next step would be vendoring a Noto Sans Bengali
+   `.ttf`/`.woff2` and adding it via `@font-face` in `www/style.css` (or drawing with it
+   directly in the canvas context) so the module doesn't depend on whatever happens to be
+   installed on the machine.
 
 Phase 4's code is written and tested end-to-end in this sandbox (real exports produced,
 downloaded, and inspected with tools outside the browser — see "What's tested — Phase 4"
@@ -326,10 +451,12 @@ above). One Phase 4 checklist item is inherently outside sandbox reach:
    - If WebM import doesn't preserve transparency, PNG Sequence is the fallback — most
      video editors can import a PNG sequence as an image-sequence clip with alpha intact,
      since PNG alpha is universal rather than a codec-specific feature.
-2. Also worth doing on your machine since this sandbox has no real GPU: click through the
-   9 animation presets and 3 easing curves that weren't individually eyeballed this
-   session (only Rotate In was, as part of export testing) — see the Phase 3 section
-   above for what specifically to look at (Wobble, elastic/bounce easing).
+2. Also worth doing on your machine since this sandbox has no real GPU: click through all
+   17 animation presets (9 original + 8 added in the finalization pass) and 3 easing
+   curves that weren't individually eyeballed this session (only Rotate In was, as part
+   of export testing) — see the Phase 3 section above for what specifically to look at
+   (Wobble, Swing In, Spin + Pop, squash-landing on Drop In (স্কোয়াশ), elastic/bounce
+   easing).
 3. If PNG Sequence export feels meaningfully slow on your machine too, that's worth
    reporting — this session found it very slow specifically under this sandbox's software
    GL rasterizer (SwiftShader), not something expected to reproduce with a real GPU, but

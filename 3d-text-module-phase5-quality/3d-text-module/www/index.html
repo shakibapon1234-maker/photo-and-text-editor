@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>3D Text Module — Phase 4</title>
+<title>3D Text Module — Phase 4 (+ ছবি)</title>
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -12,7 +12,7 @@
     <div class="brand">
       <span class="brand-mark">◆</span>
       <span class="brand-name">3D Text Module</span>
-      <span class="phase-badge">Phase 4 — Export Pipeline</span>
+      <span class="phase-badge">Phase 4 — Export Pipeline (+ 3D ইমেজ, §৮.২)</span>
     </div>
     <div class="topbar-note" id="statusNote">মডেল/ফন্ট লোড হচ্ছে…</div>
   </div>
@@ -24,11 +24,35 @@
 
     <aside class="panel">
       <section class="panel-section">
+        <h3>কন্টেন্ট টাইপ</h3>
+        <div class="preset-grid" id="contentModeGrid">
+          <button type="button" class="preset-btn" data-content="text">টেক্সট</button>
+          <button type="button" class="preset-btn" data-content="image">ছবি</button>
+        </div>
+        <p class="field-note">টেক্সট বা ছবি — যেকোনো একটা একবারে অ্যাক্টিভ থাকে (একই Rotate/Material/Animation/Export প্যানেল দুটোতেই কাজ করে)।</p>
+      </section>
+
+      <section class="panel-section" id="textContentSection">
         <h3>টেক্সট</h3>
         <label class="field" style="align-items: flex-start;">
           <span style="margin-top: 6px;">কন্টেন্ট</span>
           <textarea id="textInput" rows="2" placeholder="লেখা লিখুন (Enter দিয়ে একাধিক লাইন)" style="resize: vertical; min-height: 52px; font-family: inherit;">Hello 3D</textarea>
         </label>
+        <p class="field-note" id="textModeNote" hidden>—</p>
+      </section>
+
+      <section class="panel-section" id="imageContentSection" hidden>
+        <h3>ছবি</h3>
+        <label class="field file-field">
+          <span>আপলোড</span>
+          <input type="file" id="imageFileInput" accept="image/*" />
+        </label>
+        <img id="imagePreviewThumb" class="image-preview-thumb" alt="প্রিভিউ" hidden />
+        <p class="field-note" id="imageNote">এখনো কোনো ছবি নির্বাচন করা হয়নি।</p>
+      </section>
+
+      <section class="panel-section">
+        <h3>সাইজ ও গভীরতা</h3>
         <label class="field">
           <span>Depth (গভীরতা)</span>
           <input type="range" id="depthRange" min="1" max="60" value="18" />
@@ -150,6 +174,14 @@
           <button type="button" class="preset-btn" data-anim="slideInRight">Slide In ⭢</button>
           <button type="button" class="preset-btn" data-anim="dropIn">Drop In</button>
           <button type="button" class="preset-btn" data-anim="wobble">Wobble</button>
+          <button type="button" class="preset-btn" data-anim="zoomBlast">Zoom Blast</button>
+          <button type="button" class="preset-btn" data-anim="riseUp">Rise Up</button>
+          <button type="button" class="preset-btn" data-anim="flipInY">Flip In (উল্লম্ব)</button>
+          <button type="button" class="preset-btn" data-anim="rotateInReverse">Rotate In ⭯</button>
+          <button type="button" class="preset-btn" data-anim="spinPop">Spin + Pop</button>
+          <button type="button" class="preset-btn" data-anim="swingIn">Swing In</button>
+          <button type="button" class="preset-btn" data-anim="diagonalIn">Diagonal In</button>
+          <button type="button" class="preset-btn" data-anim="squashDrop">Drop In (স্কোয়াশ)</button>
         </div>
       </section>
 

@@ -65,8 +65,10 @@ export const EASING_LABELS = {
   easeOutBounce: 'Bounce (Out)',
 };
 
-// 8 effect presets + "none" = 9 buttons, within the plan's "5-10 common
-// effects" target for Phase 3.
+// Finalized library (Phase 3 follow-up, animation list finalization): 16
+// effect presets + "none" = 17 buttons. Original 8 (fadeIn..wobble) plus 8
+// new ones added below (zoomBlast..squashDrop) to round out common
+// entrance/attention effects, well past the plan's original "5-10" target.
 export const ANIMATION_PRESETS = {
   none: {
     label: 'কোনোটাই না',
@@ -108,6 +110,67 @@ export const ANIMATION_PRESETS = {
       const decay = Math.max(0, 1 - t);
       const wag = Math.sin(t * TAU * 3) * decay * 0.35; // radians
       return { pos: [0, 0, 0], rot: [0, 0, wag], scaleMul: 1, opacityMul: 1 };
+    },
+  },
+
+  // ---- Added in the animation-list finalization pass ----
+
+  zoomBlast: {
+    // Starts big (as if flying toward camera) and settles to scale 1 — the
+    // opposite read from popIn (which starts from nothing).
+    label: 'Zoom Blast (কাছ থেকে)',
+    apply: (t) => ({ pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 1 + 2 * (1 - t), opacityMul: 1 }),
+  },
+  riseUp: {
+    label: 'Rise Up (নিচ থেকে)',
+    apply: (t) => ({ pos: [0, -220 * (1 - t), 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: 1 }),
+  },
+  flipInY: {
+    // Vertical-axis flip, distinct from flipIn's horizontal-axis (X) flip.
+    label: 'Flip In (উল্লম্ব)',
+    apply: (t) => ({ pos: [0, 0, 0], rot: [0, Math.PI * (1 - t), 0], scaleMul: 1, opacityMul: 1 }),
+  },
+  rotateInReverse: {
+    // Same idea as rotateIn but spins the opposite direction — kept as a
+    // separate preset (not a "reverse" checkbox) so it stays a single-click
+    // choice like every other preset.
+    label: 'Rotate In (উল্টো দিকে)',
+    apply: (t) => ({ pos: [0, 0, 0], rot: [0, -TAU * (1 - t), 0], scaleMul: 1, opacityMul: 1 }),
+  },
+  spinPop: {
+    // Combo preset: two full spins while scaling up from nothing.
+    label: 'Spin + Pop',
+    apply: (t) => ({ pos: [0, 0, 0], rot: [0, TAU * 2 * (1 - t), 0], scaleMul: t, opacityMul: 1 }),
+  },
+  swingIn: {
+    // Pendulum-style decaying tilt on the X axis (front/back), distinct from
+    // wobble's Z-axis (roll) wiggle. Starts at a wide swing and settles flat.
+    label: 'Swing In (দোলনা)',
+    apply: (t) => {
+      const decay = Math.max(0, 1 - t);
+      const swing = Math.sin((1 - t) * TAU * 1.5) * decay * 0.5; // radians
+      return { pos: [0, 0, 0], rot: [swing, 0, 0], scaleMul: 1, opacityMul: 1 };
+    },
+  },
+  diagonalIn: {
+    // Slides in from the top-left corner (combined X+Y offset) rather than a
+    // single axis like slideInLeft/dropIn.
+    label: 'Diagonal In (কোণ থেকে)',
+    apply: (t) => ({ pos: [-200 * (1 - t), 150 * (1 - t), 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: 1 }),
+  },
+  squashDrop: {
+    // Drop In with a squash-and-stretch landing: falls from above, and right
+    // as it lands the scale briefly squashes (wide/short) before settling to
+    // exactly 1 — a cheap but effective "weight" cue. `landPhase` is clamped
+    // to [0,1] and the squash uses sin(landPhase * PI), which is exactly 0
+    // at both landPhase=0 (still falling) and landPhase=1 (t=1, landed) —
+    // no floating-point residue to worry about at the t=1 neutral check.
+    label: 'Drop In (স্কোয়াশ সহ)',
+    apply: (t) => {
+      const fall = 220 * (1 - t);
+      const landPhase = Math.min(1, Math.max(0, (t - 0.85) / 0.15)); // 0→1 over the last 15%
+      const squash = t >= 1 ? 0 : Math.sin(landPhase * Math.PI) * 0.25;
+      return { pos: [0, fall, 0], rot: [0, 0, 0], scaleMul: 1 + squash, opacityMul: 1 };
     },
   },
 };

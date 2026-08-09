@@ -1,6 +1,7 @@
 // 3D Text Module — Phase 3: Animation System
 // Scope (per PLAN_2 Phase 3 checklist):
-//   - Preset animation library (8 effects + "none")
+//   - Preset animation library (16 effects + "none" — finalized in the
+//     animation-list-finalization pass, see PLAN_2 §6 Open Decisions)
 //   - Timeline control (duration, delay, easing)
 //   - Preview playback (play/stop, loop toggle, progress readout)
 //
@@ -27,7 +28,14 @@ const statusNote = document.getElementById('statusNote');
 const canvas = document.getElementById('scene-canvas');
 const viewportEl = document.getElementById('viewport');
 
+const contentModeGrid = document.getElementById('contentModeGrid');
+const textContentSection = document.getElementById('textContentSection');
+const imageContentSection = document.getElementById('imageContentSection');
 const textInput = document.getElementById('textInput');
+const textModeNote = document.getElementById('textModeNote');
+const imageFileInput = document.getElementById('imageFileInput');
+const imagePreviewThumb = document.getElementById('imagePreviewThumb');
+const imageNote = document.getElementById('imageNote');
 const depthRange = document.getElementById('depthRange');
 const depthValue = document.getElementById('depthValue');
 const sizeRange = document.getElementById('sizeRange');
@@ -214,6 +222,8 @@ function buildLightingPreset(preset) {
 let font = null;
 let textMesh = null;
 const state = {
+  contentMode: 'text', // §8.2: 'text' | 'image' — mutually exclusive, one active object at a time
+  imageElement: null, // HTMLImageElement of the uploaded photo, null until one is chosen
   text: textInput.value,
   depth: Number(depthRange.value),
   size: Number(sizeRange.value),
@@ -319,33 +329,209 @@ function buildMaterial(type, colorHex) {
   }
 }
 
-// ---------- text mesh (re)build ----------
-function rebuildTextMesh() {
-  if (!font) return; // font still loading
+// ---------- Bangla support (this session, PLAN_2 §8.1) ----------
+// `TextGeometry` extrudes glyph outlines from a Three.js typeface-JSON font,
+// which is fine for Latin (helvetiker) but wrong for Bangla: (1) the vendored
+// fonts have no Bengali glyphs at all, and (2) even with a Bengali font,
+// TextGeometry's glyph pipeline doesn't handle complex-script shaping
+// (juktakkhor/conjuncts, matra/kar positioning) — so per-character extrusion
+// would render broken/disconnected shapes even with the right font data.
+//
+// Chosen fix = plan §8.1 option 3 (hybrid canvas-texture card), NOT option 1
+// (vendor a Bengali typeface-JSON) or option 2 (switch to troika-three-text):
+//   - Option 1 was rejected because TextGeometry's shaping limitation (2)
+//     above would remain even with a correct font file.
+//   - Option 2 was rejected for this pass because troika doesn't give true
+//     extrude/depth out of the box, and swapping the text engine would touch
+//     every existing Latin-text code path (materials, animation, export) —
+//     much larger blast radius than adding a second, isolated render path.
+//   - Option 3 draws the line(s) into an offscreen 2D <canvas> using the
+//     *browser's own* text shaping (correct for Bangla, or any script, by
+//     construction — it's the same engine that renders the <textarea> above)
+//     and maps that as a texture onto an extruded card (BoxGeometry). This
+//     keeps every existing material/animation/export code path working
+//     unchanged, because the result is still just a Group containing
+//     mesh(es) with a `.rotation`/`.position`/`.material`.
+//
+// Trade-off (documented up front, not discovered later): this is a flat
+// card with depth, not per-letter extrusion — the depth "wall" is the
+// card's rectangular edge, not each glyph's silhouette. That matches what
+// §8.1 option 3 describes ("extruded plane/shape"), not what Latin text
+// currently does. Latin text is completely unaffected — it still uses the
+// original per-glyph TextGeometry path.
+const BANGLA_RANGE = /[\u0980-\u09FF]/;
+function isBanglaText(str) {
+  return BANGLA_RANGE.test(str);
+}
 
-  if (textMesh) {
-    scene.remove(textMesh);
-    textMesh.traverse((child) => {
-      if (child.isMesh) {
-        if (child.geometry) child.geometry.dispose();
-        if (child.material) {
-          if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
-          else child.material.dispose();
-        }
-      }
-    });
-    textMesh = null;
+const CANVAS_TEXT_FONT_STACK =
+  '"Noto Sans Bengali","Nirmala UI","Vrinda UI","Vrinda","Kalpurush","Siyam Rupali","Bangla Sans UI","Segoe UI",sans-serif';
+const CANVAS_TEXT_FONT_PX = 220; // supersampled resolution, independent of world-space size
+const CANVAS_TEXT_LINE_HEIGHT_PX = CANVAS_TEXT_FONT_PX * 1.35;
+const CANVAS_TEXT_PAD_PX = CANVAS_TEXT_FONT_PX * 0.35;
+
+// Draws all lines onto one offscreen canvas (white glyphs on a transparent
+// background) and returns it plus its aspect ratio. Using the *real* browser
+// text-layout engine here is the entire point — it's what makes Bangla
+// (or Arabic, Devanagari, emoji, anything) come out correctly shaped without
+// this module needing to know anything about any specific script.
+function drawCanvasTextTexture(lines) {
+  const measureCtx = document.createElement('canvas').getContext('2d');
+  measureCtx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${CANVAS_TEXT_FONT_STACK}`;
+  const maxWidthPx = Math.max(1, ...lines.map((l) => measureCtx.measureText(l).width));
+
+  const canvasW = Math.ceil(maxWidthPx + CANVAS_TEXT_PAD_PX * 2);
+  const canvasH = Math.ceil(CANVAS_TEXT_LINE_HEIGHT_PX * lines.length + CANVAS_TEXT_PAD_PX * 2);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+  const ctx = canvas.getContext('2d');
+  ctx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${CANVAS_TEXT_FONT_STACK}`;
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  lines.forEach((line, i) => {
+    const y = CANVAS_TEXT_PAD_PX + CANVAS_TEXT_LINE_HEIGHT_PX * i + CANVAS_TEXT_LINE_HEIGHT_PX / 2;
+    ctx.fillText(line, canvasW / 2, y);
+  });
+
+  return { canvas, aspect: canvasW / canvasH };
+}
+
+function makeCardTexture(canvas, mirrored) {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  if (mirrored) {
+    // Back face of the card: mirror horizontally so text reads correctly
+    // (not backwards) if the user rotates the card around.
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.repeat.x = -1;
+    tex.offset.x = 1;
   }
+  tex.needsUpdate = true;
+  return tex;
+}
 
-  const rawContent = state.text || ' ';
-  const lines = rawContent.split(/\r?\n/);
+// BoxGeometry material slot order is [+x, -x, +y, -y, +z, -z]. Front (+z,
+// facing the default camera) and back (-z) get the text texture as `.map`
+// with alphaTest so background pixels are fully discarded (no
+// transparency-sorting artifacts); the 4 side slots get a plain material of
+// the current preset, standing in for the card's extruded edge.
+function buildCanvasCardMaterials(frontTex, backTex) {
+  const sideMat = buildMaterial(state.materialType, state.color);
+
+  const frontMat = buildMaterial(state.materialType, state.color);
+  frontMat.map = frontTex;
+  frontMat.transparent = true;
+  frontMat.alphaTest = 0.4;
+  frontMat.needsUpdate = true;
+
+  const backMat = buildMaterial(state.materialType, state.color);
+  backMat.map = backTex;
+  backMat.transparent = true;
+  backMat.alphaTest = 0.4;
+  backMat.needsUpdate = true;
+
+  return [sideMat, sideMat, sideMat, sideMat, frontMat, backMat];
+}
+
+// ---------- 3D image support (PLAN_2 §8.2) ----------
+// Reuses the exact same "canvas-texture card" plumbing §8.1 built for Bangla
+// text (drawCanvasTextTexture → makeCardTexture → buildCanvasCardMaterials →
+// a BoxGeometry with 6 materials): draw source content onto an offscreen
+// <canvas>, wrap it as a CanvasTexture on the front/back faces of an
+// extruded box, and let the 4 side faces carry the current material preset
+// as the card's "edge". For an uploaded photo the "drawing" step is just
+// `ctx.drawImage()` instead of `ctx.fillText()`, downscaled to the active
+// quality preset's texture cap first (see IMAGE_TEXTURE_MAX_PX below — this
+// resolves the §8.2 "large image performance" open question: polygon count
+// never changes, only the texture's pixel budget does). Because the result
+// is, again, just a Group of mesh(es) with position/rotation/material, every
+// existing Rotate/Material/Shadow/Reflection/Animation/Export code path
+// keeps working unmodified — none of them are told or care whether the
+// active object is text or an image.
+const IMAGE_TEXTURE_MAX_PX = { low: 512, medium: 1024, high: 2048 };
+
+function drawImageCardCanvas(img) {
+  const srcW = img.naturalWidth || img.width || 1;
+  const srcH = img.naturalHeight || img.height || 1;
+  const maxDim = IMAGE_TEXTURE_MAX_PX[state.quality] || IMAGE_TEXTURE_MAX_PX.medium;
+  const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(srcW * scale));
+  canvas.height = Math.max(1, Math.round(srcH * scale));
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  return { canvas, aspect: srcW / srcH };
+}
+
+function buildImageCardMesh(img) {
+  const { canvas, aspect } = drawImageCardCanvas(img);
+  // Unlike the Bangla text card, an uploaded photo reads the same forwards
+  // or mirrored (there's no glyph direction to preserve), so both faces use
+  // the same un-mirrored texture — cheaper than the text path's two
+  // separately-drawn canvases and visually correct either way.
+  const frontTex = makeCardTexture(canvas, false);
+  const backTex = makeCardTexture(canvas, false);
+
+  const worldHeight = state.size * 1.6; // roughly matches a single line of 3D text at the same `size`
+  const worldWidth = worldHeight * aspect;
+  const depth = Math.max(1, state.depth);
+
+  const geometry = new THREE.BoxGeometry(worldWidth, worldHeight, depth);
+  const materials = buildCanvasCardMaterials(frontTex, backTex);
+  const mesh = new THREE.Mesh(geometry, materials);
+  mesh.castShadow = state.shadowsOn;
+  mesh.receiveShadow = state.shadowsOn;
+
+  const group = new THREE.Group();
+  group.add(mesh);
+  group.userData.frontTex = frontTex;
+  group.userData.backTex = backTex;
+
+  // Reuses the 'canvas' renderMode tag (not a new 'image' tag) — applyMaterial()
+  // only needs to know "is this mesh's `.material` an array of 6 [side,side,
+  // side,side,front,back] materials or a single material", and that's exactly
+  // what renderMode already distinguishes. A photo card and a Bangla text card
+  // are structurally identical Three.js objects.
+  renderMode = 'canvas';
+  textMesh = group;
+  textMesh.material = materials;
+}
+
+// ---------- text mesh (re)build ----------
+let renderMode = 'vector'; // 'vector' (TextGeometry, Latin) | 'canvas' (Bangla card / §8.2 image card)
+
+function disposeTextMesh() {
+  if (!textMesh) return;
+  scene.remove(textMesh);
+  if (textMesh.userData) {
+    if (textMesh.userData.frontTex) textMesh.userData.frontTex.dispose();
+    if (textMesh.userData.backTex) textMesh.userData.backTex.dispose();
+  }
+  textMesh.traverse((child) => {
+    if (child.isMesh) {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
+        else child.material.dispose();
+      }
+    }
+  });
+  textMesh = null;
+}
+
+function buildVectorTextMesh(validLines) {
   const q = QUALITY_PRESETS[state.quality];
   const lineHeight = state.size * 1.35;
 
   const group = new THREE.Group();
   const material = buildMaterial(state.materialType, state.color);
 
-  const validLines = lines.map((l) => (l.length > 0 ? l : ' '));
   const totalLinesHeight = (validLines.length - 1) * lineHeight;
 
   validLines.forEach((lineStr, idx) => {
@@ -378,11 +564,76 @@ function rebuildTextMesh() {
     group.add(lineMesh);
   });
 
+  renderMode = 'vector';
   textMesh = group;
   textMesh.material = material;
+}
+
+function buildCanvasCardTextMesh(validLines) {
+  const { canvas, aspect } = drawCanvasTextTexture(validLines);
+  const frontTex = makeCardTexture(canvas, false);
+  const backTex = makeCardTexture(canvas, true);
+
+  const lineHeight = state.size * 1.35;
+  const worldHeight = lineHeight * validLines.length + state.size * 0.5; // pad to roughly match canvas padding
+  const worldWidth = worldHeight * aspect;
+  const depth = Math.max(1, state.depth);
+
+  const geometry = new THREE.BoxGeometry(worldWidth, worldHeight, depth);
+  const materials = buildCanvasCardMaterials(frontTex, backTex);
+  const mesh = new THREE.Mesh(geometry, materials);
+  mesh.castShadow = state.shadowsOn;
+  mesh.receiveShadow = state.shadowsOn;
+
+  const group = new THREE.Group();
+  group.add(mesh);
+  group.userData.frontTex = frontTex;
+  group.userData.backTex = backTex;
+
+  renderMode = 'canvas';
+  textMesh = group;
+  textMesh.material = materials;
+}
+
+function rebuildTextMesh() {
+  // §8.2: image mode builds/rebuilds a photo card instead of a text mesh —
+  // completely separate branch from the text paths below, but converges on
+  // the same `textMesh` variable + applyRotation()/scene.add() tail, since
+  // that's the "current active object" every other panel (material, shadow,
+  // animation, export) already reads from.
+  if (state.contentMode === 'image') {
+    disposeTextMesh();
+    if (!state.imageElement) {
+      updateQualityNote();
+      updateTextModeNote(false);
+      return; // nothing uploaded yet — leave the scene empty, same as an empty text field
+    }
+    buildImageCardMesh(state.imageElement);
+    applyRotation();
+    scene.add(textMesh);
+    updateQualityNote();
+    updateTextModeNote(false);
+    return;
+  }
+
+  if (!font) return; // font still loading
+
+  disposeTextMesh();
+
+  const rawContent = state.text || ' ';
+  const lines = rawContent.split(/\r?\n/);
+  const validLines = lines.map((l) => (l.length > 0 ? l : ' '));
+
+  if (isBanglaText(rawContent)) {
+    buildCanvasCardTextMesh(validLines);
+  } else {
+    buildVectorTextMesh(validLines);
+  }
+
   applyRotation();
   scene.add(textMesh);
   updateQualityNote();
+  updateTextModeNote(isBanglaText(rawContent));
 }
 
 // ---------- Phase 5: quality preset apply + readout ----------
@@ -416,6 +667,14 @@ function updateQualityNote() {
     `লো-এন্ড ডিভাইস/কম-শক্তির পিসিতে ল্যাগ হলে "Low" বেছে নিন।`;
 }
 
+function updateTextModeNote(isBangla) {
+  if (!textModeNote) return;
+  textModeNote.textContent = isBangla
+    ? 'বাংলা লেখা শনাক্ত হয়েছে — ছবি-টেক্সচার কার্ড মোডে রেন্ডার হচ্ছে (ব্রাউজারের নিজস্ব বাংলা ফন্ট/শেপিং ব্যবহার করে, তাই যুক্তাক্ষর/মাত্রা ঠিকভাবে বসে), বাক্যের প্রান্ত থেকে গভীরতা বের হয় — আলাদা আলাদা অক্ষরের কিনারা থেকে না।'
+    : '';
+  textModeNote.hidden = !isBangla;
+}
+
 function applyRotation() {
   if (!textMesh) return;
   textMesh.rotation.set(
@@ -427,6 +686,22 @@ function applyRotation() {
 
 function applyMaterial() {
   if (!textMesh) return;
+
+  if (renderMode === 'canvas') {
+    // Multi-material box (front/back textured faces + plain side faces) —
+    // rebuild the material array from the cached textures rather than the
+    // single-material clone-per-mesh logic below, which doesn't apply to a
+    // mesh whose `.material` is an array.
+    const mesh = textMesh.children[0];
+    if (!mesh) return;
+    const old = mesh.material;
+    const materials = buildCanvasCardMaterials(textMesh.userData.frontTex, textMesh.userData.backTex);
+    mesh.material = materials;
+    textMesh.material = materials;
+    if (Array.isArray(old)) old.forEach((m) => m.dispose());
+    return;
+  }
+
   const newMat = buildMaterial(state.materialType, state.color);
   textMesh.material = newMat;
   textMesh.traverse((child) => {
@@ -483,8 +758,11 @@ function applyPresetOffset(preset, t) {
   const finalOpacity = Math.min(1, Math.max(0, opacityMul)) * baseOpacity;
   textMesh.traverse((child) => {
     if (child.isMesh && child.material) {
-      child.material.transparent = true;
-      child.material.opacity = finalOpacity;
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      materials.forEach((m) => {
+        m.transparent = true;
+        m.opacity = finalOpacity;
+      });
     }
   });
 }
@@ -497,8 +775,15 @@ function resetMeshToBaseTransform() {
   const baseOpacity = getBaseOpacity();
   textMesh.traverse((child) => {
     if (child.isMesh && child.material) {
-      child.material.transparent = state.materialType === 'glass';
-      child.material.opacity = baseOpacity;
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      materials.forEach((m) => {
+        // Canvas-card front/back faces (identified by having a `.map`) rely
+        // on alphaTest to cut out the background, so they must always stay
+        // transparent — unlike vector-mode/side materials, which are only
+        // transparent for the glass preset.
+        m.transparent = m.map ? true : state.materialType === 'glass';
+        m.opacity = baseOpacity;
+      });
     }
   });
 }
@@ -590,6 +875,53 @@ function scheduleRebuild() {
 textInput.addEventListener('input', () => {
   state.text = textInput.value;
   scheduleRebuild();
+});
+
+// ---------- §8.2: content-type toggle (text vs image) ----------
+contentModeGrid.addEventListener('click', (e) => {
+  const btn = e.target.closest('.preset-btn');
+  if (!btn) return;
+  state.contentMode = btn.dataset.content;
+  setActivePreset(contentModeGrid, 'content', state.contentMode);
+  textContentSection.hidden = state.contentMode !== 'text';
+  imageContentSection.hidden = state.contentMode !== 'image';
+  stopAnimation(); // switching the active object mid-playback would animate a stale mesh
+  rebuildTextMesh();
+  updateExportSourceNote();
+});
+
+// ---------- §8.2: image upload ----------
+imageFileInput.addEventListener('change', () => {
+  const file = imageFileInput.files && imageFileInput.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    imageNote.textContent = 'শুধু ইমেজ ফাইল সাপোর্টেড (JPG/PNG/WebP ইত্যাদি)।';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      state.imageElement = img;
+      imagePreviewThumb.src = reader.result;
+      imagePreviewThumb.hidden = false;
+      const capPx = IMAGE_TEXTURE_MAX_PX[state.quality];
+      imageNote.textContent =
+        `${file.name} — মূল ${img.naturalWidth}×${img.naturalHeight}px, ` +
+        `বর্তমান কোয়ালিটি প্রিসেট অনুযায়ী টেক্সচার সর্বোচ্চ ${capPx}px-এ ব্যবহার হবে।`;
+      rebuildTextMesh();
+    };
+    img.onerror = () => {
+      imageNote.textContent = 'ছবিটা লোড করা যায়নি — ফাইলটা কি ঠিক আছে দেখুন।';
+    };
+    img.src = reader.result;
+  };
+  reader.onerror = () => {
+    imageNote.textContent = 'ফাইলটা পড়া যায়নি।';
+  };
+  reader.readAsDataURL(file);
 });
 
 depthRange.addEventListener('input', () => {
@@ -851,6 +1183,14 @@ turntableLengthRange.addEventListener('input', () => {
 });
 
 exportBtn.addEventListener('click', async () => {
+  // §8.2: image mode with nothing uploaded yet has no active mesh — nothing
+  // meaningful to export (an all-transparent clip), so bail with a status
+  // note instead of silently producing an empty file.
+  if (!textMesh) {
+    updateExportProgress(0, 'কোনো অ্যাক্টিভ অবজেক্ট নেই — আগে টেক্সট লিখুন বা ছবি আপলোড করুন।');
+    return;
+  }
+
   // Stop any running preview playback first: export.js drives animState
   // directly (WebM path) or reads the mesh/preset state directly (PNG
   // path), and either would race against the main render loop's own
@@ -947,6 +1287,7 @@ exportBtn.addEventListener('click', async () => {
 });
 
 // ---------- initial preset UI state ----------
+setActivePreset(contentModeGrid, 'content', state.contentMode);
 setActivePreset(materialPresetGrid, 'material', state.materialType);
 setActivePreset(lightingPresetGrid, 'lighting', state.lightingPreset);
 setActivePreset(animPresetGrid, 'anim', animState.presetId);
