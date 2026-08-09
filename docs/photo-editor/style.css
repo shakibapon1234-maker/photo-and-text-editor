@@ -990,11 +990,25 @@ select:focus {
     color: var(--accent-secondary);
     text-decoration: none;
     font-size: 12px;
-    margin-left: 8px;
-    opacity: 0.8;
+    opacity: 0.85;
     transition: var(--transition);
 }
 .api-link:hover { opacity: 1; text-decoration: underline; }
+
+.api-link-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 4px 0 8px;
+}
+
+.btn-copy-link {
+    padding: 4px 10px;
+    font-size: 12px;
+    gap: 4px;
+    flex-shrink: 0;
+}
 
 /* AI Loading */
 .bg-ai-loading {
@@ -1084,4 +1098,38 @@ select:focus {
 /* Make variables accessible */
 :root {
     --accent: var(--accent-primary);
+}
+/* ===== Eyedropper: active button + magnifier loupe ===== */
+#bgEyedropperBtn.active {
+    background: var(--accent-primary);
+    color: #fff;
+    border-color: var(--accent-primary);
+}
+
+.eyedropper-loupe {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    background: rgba(15, 15, 25, 0.9);
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    text-align: center;
+}
+
+.eyedropper-loupe canvas {
+    display: block;
+    border-radius: 8px;
+    image-rendering: pixelated;
+}
+
+.loupe-hex {
+    margin-top: 6px;
+    padding: 3px 6px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    font-family: 'Courier New', monospace;
 }

@@ -206,6 +206,9 @@
             tabContents.forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
             document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+            // Notify other modules (e.g. BG remove) that the active tab changed,
+            // so tools like eyedropper/lasso can safely deactivate themselves.
+            document.dispatchEvent(new CustomEvent('app:tabchange', { detail: btn.dataset.tab }));
         });
     });
 
@@ -843,6 +846,33 @@
             localStorage.setItem('removebg_api_key', bgApiKey.value.trim());
         });
 
+        // Copy the Remove.bg signup link to the clipboard
+        const copyApiLinkBtn = document.getElementById('copyApiLinkBtn');
+        if (copyApiLinkBtn) {
+            copyApiLinkBtn.addEventListener('click', async () => {
+                const link = 'https://www.remove.bg/api';
+                try {
+                    await navigator.clipboard.writeText(link);
+                    showToast('✅ লিংক কপি হয়েছে', 'success');
+                } catch (err) {
+                    // Fallback for browsers/contexts without Clipboard API access
+                    const tmp = document.createElement('textarea');
+                    tmp.value = link;
+                    tmp.style.position = 'fixed';
+                    tmp.style.opacity = '0';
+                    document.body.appendChild(tmp);
+                    tmp.select();
+                    try {
+                        document.execCommand('copy');
+                        showToast('✅ লিংক কপি হয়েছে', 'success');
+                    } catch (e2) {
+                        showToast('❌ কপি করা যায়নি, লিংকে ক্লিক করুন', 'error');
+                    }
+                    document.body.removeChild(tmp);
+                }
+            });
+        }
+
         // Slider live display
         bgTolerance.addEventListener('input', () => bgToleranceVal.textContent = bgTolerance.value);
         bgFeather.addEventListener('input',   () => bgFeatherVal.textContent   = bgFeather.value);
@@ -901,6 +931,19 @@
                 const resultBlob = await response.blob();
                 processedBlob = resultBlob;
                 const url = URL.createObjectURL(resultBlob);
+
+                // IMPORTANT: keep `originalImage` in sync with the new pixels.
+                // Previously only previewImage.src was updated here, so the
+                // eyedropper / color-eraser / lasso tools kept sampling the
+                // OLD (pre-AI-remove) image afterwards, silently corrupting
+                // every edit made after an AI removal.
+                await new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => { originalImage = img; resolve(); };
+                    img.onerror = reject;
+                    img.src = url;
+                });
+
                 previewImage.src = url;
                 downloadSection.style.display = 'block';
                 // Make download use PNG
@@ -918,46 +961,169 @@
         // METHOD 2: Color Tolerance Eraser
         // ──────────────────────────────────────────
 
-        // Eyedropper: pick colour from the displayed image
+        // Eyedropper: pick colour from the displayed image, with a
+        // Photoshop-style zoomed loupe for pixel-accurate picking.
+        const loupe       = document.getElementById('eyedropperLoupe');
+        const loupeCanvas = document.getElementById('loupeCanvas');
+        const loupeCtx    = loupeCanvas ? loupeCanvas.getContext('2d') : null;
+        const loupeHex    = document.getElementById('loupeHex');
+
+        let pickCanvas = null, pickCtx = null; // cached full-res copy of the current image
+        let lastPick = null; // {px, py, hex} from the most recent mousemove
+
         bgEyedropperBtn.addEventListener('click', () => {
-            if (!originalImage) { showToast('প্রথমে ছবি আপলোড করুন', 'error'); return; }
+            if (!originalImage || !originalImage.naturalWidth) {
+                showToast('প্রথমে ছবি আপলোড করুন', 'error');
+                return;
+            }
             isEyedropperActive = !isEyedropperActive;
             if (isEyedropperActive) {
-                bgEyedropperStatus.textContent = '👆 ছবিতে ক্লিক করুন';
-                bgEyedropperBtn.style.outline = '2px solid var(--accent)';
-                previewImage.style.cursor = 'crosshair';
-                previewImage.addEventListener('click', pickColour, { once: false });
+                activateEyedropper();
             } else {
                 deactivateEyedropper();
             }
         });
 
-        function pickColour(e) {
-            // Draw image to off-screen canvas and read pixel
-            const tmpCanvas = document.createElement('canvas');
-            tmpCanvas.width  = originalImage.naturalWidth  || canvas.width;
-            tmpCanvas.height = originalImage.naturalHeight || canvas.height;
-            const tmpCtx = tmpCanvas.getContext('2d');
-            tmpCtx.drawImage(originalImage, 0, 0);
-
-            const rect   = previewImage.getBoundingClientRect();
-            const scaleX = tmpCanvas.width  / rect.width;
-            const scaleY = tmpCanvas.height / rect.height;
-            const px = Math.floor((e.clientX - rect.left) * scaleX);
-            const py = Math.floor((e.clientY - rect.top)  * scaleY);
-            const pixel = tmpCtx.getImageData(px, py, 1, 1).data;
-            const hex = '#' + [pixel[0], pixel[1], pixel[2]].map(v => v.toString(16).padStart(2, '0')).join('');
-            bgTargetColor.value = hex;
-            showToast(`✅ রঙ নির্বাচিত: ${hex}`);
-            deactivateEyedropper();
+        function activateEyedropper() {
+            ensurePickCanvas();
+            bgEyedropperStatus.textContent = '👆 ছবিতে ক্লিক করুন (নিখুঁত পিক্সেলের জন্য জুম দেখুন)';
+            bgEyedropperBtn.classList.add('active');
+            bgEyedropperBtn.style.outline = '2px solid var(--accent)';
+            previewImage.style.cursor = 'crosshair';
+            previewImage.addEventListener('mousemove', onEyedropperMove);
+            previewImage.addEventListener('click', onEyedropperClick);
+            document.addEventListener('keydown', onEyedropperEscape);
         }
 
         function deactivateEyedropper() {
             isEyedropperActive = false;
             bgEyedropperStatus.textContent = '';
+            bgEyedropperBtn.classList.remove('active');
             bgEyedropperBtn.style.outline = '';
             previewImage.style.cursor = '';
-            previewImage.removeEventListener('click', pickColour);
+            previewImage.removeEventListener('mousemove', onEyedropperMove);
+            previewImage.removeEventListener('click', onEyedropperClick);
+            document.removeEventListener('keydown', onEyedropperEscape);
+            if (loupe) loupe.style.display = 'none';
+            lastPick = null;
+        }
+
+        function onEyedropperEscape(e) {
+            if (e.key === 'Escape') deactivateEyedropper();
+        }
+
+        // Redraw the cached sample canvas from whatever image is current.
+        // Always call this right before a picking session starts so we
+        // never sample stale pixels (e.g. from before an AI/color/lasso edit).
+        function ensurePickCanvas() {
+            if (!pickCanvas) {
+                pickCanvas = document.createElement('canvas');
+                pickCtx = pickCanvas.getContext('2d');
+            }
+            const w = originalImage.naturalWidth  || canvas.width;
+            const h = originalImage.naturalHeight || canvas.height;
+            pickCanvas.width  = w;
+            pickCanvas.height = h;
+            pickCtx.clearRect(0, 0, w, h);
+            pickCtx.drawImage(originalImage, 0, 0, w, h);
+        }
+
+        // Map a client (viewport) point to a clamped pixel coordinate on
+        // the full-resolution image, based on the image's own rendered box.
+        function clientPointToPixel(clientX, clientY) {
+            const rect = previewImage.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return null;
+            let xRatio = (clientX - rect.left) / rect.width;
+            let yRatio = (clientY - rect.top)  / rect.height;
+            xRatio = Math.min(1, Math.max(0, xRatio));
+            yRatio = Math.min(1, Math.max(0, yRatio));
+            const px = Math.min(pickCanvas.width  - 1, Math.floor(xRatio * pickCanvas.width));
+            const py = Math.min(pickCanvas.height - 1, Math.floor(yRatio * pickCanvas.height));
+            return { px, py };
+        }
+
+        function rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+        }
+
+        function onEyedropperMove(e) {
+            const pt = clientPointToPixel(e.clientX, e.clientY);
+            if (!pt) return;
+            const pixel = pickCtx.getImageData(pt.px, pt.py, 1, 1).data;
+            const hex = rgbToHex(pixel[0], pixel[1], pixel[2]);
+            lastPick = { px: pt.px, py: pt.py, hex };
+            updateLoupe(pt.px, pt.py, hex, e.clientX, e.clientY);
+        }
+
+        function onEyedropperClick(e) {
+            const pt = clientPointToPixel(e.clientX, e.clientY);
+            if (!pt) { showToast('ছবির উপরে ক্লিক করুন', 'error'); return; }
+            const pixel = pickCtx.getImageData(pt.px, pt.py, 1, 1).data;
+            const hex = rgbToHex(pixel[0], pixel[1], pixel[2]);
+            bgTargetColor.value = hex;
+            showToast(`✅ রঙ নির্বাচিত: ${hex}`, 'success');
+            deactivateEyedropper();
+        }
+
+        function updateLoupe(px, py, hex, clientX, clientY) {
+            if (!loupe || !loupeCtx) return;
+            const GRID = 9;              // 9x9 source pixels shown
+            const CELL = loupeCanvas.width / GRID;
+
+            loupeCtx.imageSmoothingEnabled = false;
+            loupeCtx.clearRect(0, 0, loupeCanvas.width, loupeCanvas.height);
+
+            const half = Math.floor(GRID / 2);
+            const sx = Math.max(0, Math.min(pickCanvas.width  - GRID, px - half));
+            const sy = Math.max(0, Math.min(pickCanvas.height - GRID, py - half));
+            const sw = Math.min(GRID, pickCanvas.width);
+            const sh = Math.min(GRID, pickCanvas.height);
+
+            loupeCtx.drawImage(pickCanvas, sx, sy, sw, sh, 0, 0, sw * CELL, sh * CELL);
+
+            // Grid lines
+            loupeCtx.strokeStyle = 'rgba(0,0,0,0.25)';
+            loupeCtx.lineWidth = 1;
+            for (let i = 0; i <= GRID; i++) {
+                loupeCtx.beginPath();
+                loupeCtx.moveTo(i * CELL, 0);
+                loupeCtx.lineTo(i * CELL, loupeCanvas.height);
+                loupeCtx.stroke();
+                loupeCtx.beginPath();
+                loupeCtx.moveTo(0, i * CELL);
+                loupeCtx.lineTo(loupeCanvas.width, i * CELL);
+                loupeCtx.stroke();
+            }
+
+            // Highlight the exact centre pixel being picked
+            const cx = (px - sx) * CELL;
+            const cy = (py - sy) * CELL;
+            loupeCtx.strokeStyle = '#ffffff';
+            loupeCtx.lineWidth = 2;
+            loupeCtx.strokeRect(cx + 1, cy + 1, CELL - 2, CELL - 2);
+            loupeCtx.strokeStyle = '#2563eb';
+            loupeCtx.lineWidth = 1;
+            loupeCtx.strokeRect(cx + 1, cy + 1, CELL - 2, CELL - 2);
+
+            if (loupeHex) {
+                loupeHex.textContent = hex.toUpperCase();
+                loupeHex.style.background = hex;
+                // Pick readable text colour for the swatch
+                const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+                const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+                loupeHex.style.color = luminance > 150 ? '#000' : '#fff';
+            }
+
+            // Position the loupe near the cursor, offset so the fingertip
+            // never blocks the view, and clamped to stay on-screen.
+            const OFFSET = 24, SIZE = 132;
+            let left = clientX + OFFSET;
+            let top  = clientY - SIZE - OFFSET;
+            if (left + SIZE > window.innerWidth)  left = clientX - SIZE - OFFSET;
+            if (top < 0) top = clientY + OFFSET;
+            loupe.style.left = left + 'px';
+            loupe.style.top  = top + 'px';
+            loupe.style.display = 'block';
         }
 
         bgColorRemoveBtn.addEventListener('click', () => {
@@ -1049,11 +1215,58 @@
 
         let lassoCtx = bgLassoCanvas.getContext('2d');
 
-        function syncLassoCanvasSize() {
-            // Match pixel size of the preview image
-            bgLassoCanvas.width  = previewImage.offsetWidth  || 400;
-            bgLassoCanvas.height = previewImage.offsetHeight || 300;
+        // Compute the image's actual rendered box relative to its wrapper.
+        // Because the wrapper centers the image with flexbox (object-fit
+        // style letterboxing), the <img> element usually does NOT fill the
+        // whole wrapper — so the overlay canvas must be positioned/sized to
+        // match the IMAGE, not the wrapper, or drawing will be stretched
+        // and misaligned with the cursor (this was the root cause of the
+        // "can't drag-select" bug).
+        function getImageDisplayRect() {
+            const wrapper = previewImage.parentElement;
+            const imgRect = previewImage.getBoundingClientRect();
+            const wrapRect = wrapper.getBoundingClientRect();
+            return {
+                left: imgRect.left - wrapRect.left,
+                top: imgRect.top - wrapRect.top,
+                width: imgRect.width,
+                height: imgRect.height
+            };
         }
+
+        function syncLassoCanvasSize() {
+            const rect = getImageDisplayRect();
+            const w = Math.max(1, Math.round(rect.width));
+            const h = Math.max(1, Math.round(rect.height));
+            // Position & CSS size exactly over the visible image...
+            bgLassoCanvas.style.left   = rect.left + 'px';
+            bgLassoCanvas.style.top    = rect.top + 'px';
+            bgLassoCanvas.style.width  = w + 'px';
+            bgLassoCanvas.style.height = h + 'px';
+            // ...and make the drawing buffer match 1:1 so nothing is
+            // stretched/warped between the canvas pixels and screen pixels.
+            bgLassoCanvas.width  = w;
+            bgLassoCanvas.height = h;
+        }
+
+        // If the window resizes while a lasso session is open, the overlay
+        // position/size and all recorded points would go stale — safest is
+        // to cancel the in-progress selection rather than silently corrupt it.
+        window.addEventListener('resize', () => {
+            if (bgLassoCanvas.style.display !== 'none') {
+                showToast('উইন্ডো সাইজ পরিবর্তনের কারণে সিলেকশন বাতিল হয়েছে, আবার আঁকুন', 'error');
+                bgCancelLasso.click();
+            }
+        });
+
+        // Leaving the BG-remove tab mid-selection (or mid-eyedropper) should
+        // not leave stray listeners/overlays behind.
+        document.addEventListener('app:tabchange', (e) => {
+            if (e.detail !== 'bgremove') {
+                if (isEyedropperActive) deactivateEyedropper();
+                if (bgLassoCanvas.style.display !== 'none') bgCancelLasso.click();
+            }
+        });
 
         bgStartLassoBtn.addEventListener('click', () => {
             if (!originalImage) { showToast('প্রথমে ছবি আপলোড করুন', 'error'); return; }

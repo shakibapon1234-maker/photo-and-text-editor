@@ -206,9 +206,13 @@ body {
 /* ===== Editor Section ===== */
 .editor-section {
     display: grid;
-    grid-template-columns: 380px 1fr;
+    /* Phase 2: preview column is now flexible instead of a fixed 380px
+       sidebar, so the preview can breathe on wide screens while the
+       tools panel keeps a sane minimum width. */
+    grid-template-columns: minmax(360px, 1.15fr) minmax(380px, 1fr);
     gap: 24px;
     animation: fadeInUp 0.5s ease;
+    align-items: start;
 }
 
 @keyframes fadeInUp {
@@ -247,9 +251,81 @@ body {
     font-weight: 600;
 }
 
+.preview-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#previewFloatBtn.active {
+    color: var(--accent-primary);
+    background: rgba(108, 99, 255, 0.12);
+}
+
+/* ===== Zoom Toolbar (Phase 2) ===== */
+.zoom-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+    padding: 6px 8px;
+    background: rgba(13, 27, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-sm);
+    width: fit-content;
+}
+
+.zoom-btn {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.zoom-btn:hover {
+    color: var(--text-primary);
+    background: rgba(108, 99, 255, 0.12);
+}
+
+.zoom-btn-text {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.zoom-level {
+    min-width: 44px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    user-select: none;
+}
+
+.zoom-divider {
+    width: 1px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 0 2px;
+}
+
 .preview-image-wrapper {
     width: 100%;
-    aspect-ratio: 4/3;
+    /* Phase 2: fixed 4:3 cap removed — height now follows the image's own
+       proportions (up to a sane viewport-relative cap) instead of forcing
+       every photo into a letterboxed 4:3 box. */
+    min-height: 220px;
+    max-height: min(70vh, 640px);
+    height: auto;
     border-radius: var(--radius-md);
     overflow: hidden;
     background: var(--bg-primary);
@@ -264,6 +340,25 @@ body {
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
+}
+
+/* When zoomed beyond "fit", the wrapper becomes a scroll/pan viewport and
+   the image is drawn at its explicit pixel width instead of being capped. */
+.preview-image-wrapper.zoomed {
+    overflow: auto;
+    justify-content: flex-start;
+    align-items: flex-start;
+    cursor: grab;
+}
+
+.preview-image-wrapper.zoomed:active {
+    cursor: grabbing;
+}
+
+.preview-image-wrapper img.zoomed {
+    max-width: none;
+    max-height: none;
+    object-fit: unset;
 }
 
 .image-info {
@@ -841,6 +936,62 @@ select:focus {
     background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), var(--bg-card));
 }
 
+/* ===== Floating Preview Window (Phase 2) ===== */
+.preview-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 220px;
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius-lg);
+    background: rgba(22, 33, 62, 0.3);
+    color: var(--text-muted);
+    font-size: 13px;
+    text-align: center;
+    padding: 24px;
+}
+
+.preview-card.floating {
+    position: fixed;
+    top: 90px;
+    right: 24px;
+    left: auto;
+    z-index: 500;
+    width: 420px;
+    min-width: 300px;
+    min-height: 320px;
+    max-width: 92vw;
+    max-height: 88vh;
+    resize: both;
+    overflow: auto;
+    box-shadow: var(--shadow-lg), 0 0 0 1px var(--border-active);
+    margin-bottom: 0;
+}
+
+.preview-card.floating .preview-image-wrapper {
+    max-height: none;
+}
+
+.preview-card.floating .preview-header {
+    cursor: move;
+    user-select: none;
+    position: sticky;
+    top: 0;
+    background: rgba(22, 33, 62, 0.95);
+    z-index: 1;
+    margin: -20px -20px 16px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-color);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.preview-card.floating.dragging {
+    box-shadow: var(--shadow-lg), 0 0 0 2px var(--accent-primary);
+    transition: none;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 800px) {
     .editor-section {
@@ -867,6 +1018,12 @@ select:focus {
     .pixel-presets,
     .preset-grid {
         grid-template-columns: repeat(3, 1fr);
+    }
+
+    .preview-card.floating {
+        width: 92vw;
+        right: 4vw;
+        top: 70px;
     }
 
     .dimension-inputs {
@@ -990,11 +1147,25 @@ select:focus {
     color: var(--accent-secondary);
     text-decoration: none;
     font-size: 12px;
-    margin-left: 8px;
-    opacity: 0.8;
+    opacity: 0.85;
     transition: var(--transition);
 }
 .api-link:hover { opacity: 1; text-decoration: underline; }
+
+.api-link-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 4px 0 8px;
+}
+
+.btn-copy-link {
+    padding: 4px 10px;
+    font-size: 12px;
+    gap: 4px;
+    flex-shrink: 0;
+}
 
 /* AI Loading */
 .bg-ai-loading {
@@ -1084,4 +1255,38 @@ select:focus {
 /* Make variables accessible */
 :root {
     --accent: var(--accent-primary);
+}
+/* ===== Eyedropper: active button + magnifier loupe ===== */
+#bgEyedropperBtn.active {
+    background: var(--accent-primary);
+    color: #fff;
+    border-color: var(--accent-primary);
+}
+
+.eyedropper-loupe {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    background: rgba(15, 15, 25, 0.9);
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    text-align: center;
+}
+
+.eyedropper-loupe canvas {
+    display: block;
+    border-radius: 8px;
+    image-rendering: pixelated;
+}
+
+.loupe-hex {
+    margin-top: 6px;
+    padding: 3px 6px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    font-family: 'Courier New', monospace;
 }

@@ -143,6 +143,7 @@
                 originalHeight = img.naturalHeight;
                 aspectRatio = originalWidth / originalHeight;
                 previewImage.src = e.target.result;
+                document.dispatchEvent(new CustomEvent('app:newimage'));
                 showEditor(file);
             };
             img.src = e.target.result;
@@ -206,6 +207,9 @@
             tabContents.forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
             document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+            // Notify other modules (e.g. BG remove) that the active tab changed,
+            // so tools like eyedropper/lasso can safely deactivate themselves.
+            document.dispatchEvent(new CustomEvent('app:tabchange', { detail: btn.dataset.tab }));
         });
     });
 
@@ -831,10 +835,32 @@
         const bgLassoHint     = document.getElementById('bgLassoHint');
         const bgLassoCanvas   = document.getElementById('bgLassoCanvas');
 
+        const bgCloneCanvas       = document.getElementById('bgCloneCanvas');
+        const cloneBrushSize      = document.getElementById('cloneBrushSize');
+        const cloneBrushSizeVal   = document.getElementById('cloneBrushSizeVal');
+        const cloneHardness       = document.getElementById('cloneHardness');
+        const cloneHardnessVal    = document.getElementById('cloneHardnessVal');
+        const cloneHint           = document.getElementById('cloneHint');
+        const cloneStatus         = document.getElementById('cloneStatus');
+        const cloneStartBtn       = document.getElementById('cloneStartBtn');
+        const cloneActionBtns     = document.getElementById('cloneActionBtns');
+        const cloneResetSourceBtn = document.getElementById('cloneResetSourceBtn');
+        const cloneApplyBtn       = document.getElementById('cloneApplyBtn');
+        const cloneCancelBtn      = document.getElementById('cloneCancelBtn');
+
+        const paintFillColor    = document.getElementById('paintFillColor');
+        const paintTolerance    = document.getElementById('paintTolerance');
+        const paintToleranceVal = document.getElementById('paintToleranceVal');
+        const paintContiguous   = document.getElementById('paintContiguous');
+        const paintStatus       = document.getElementById('paintStatus');
+        const paintBucketBtn    = document.getElementById('paintBucketBtn');
+
         let lassoMode = 'free'; // 'free' or 'poly'
         let lassoPoints = [];
         let isDrawingLasso = false;
         let isEyedropperActive = false;
+        let isCloneActive = false;
+        let isPaintBucketActive = false;
         let animFrame = null;
 
         // Restore saved API key
@@ -842,6 +868,33 @@
         bgApiKey.addEventListener('change', () => {
             localStorage.setItem('removebg_api_key', bgApiKey.value.trim());
         });
+
+        // Copy the Remove.bg signup link to the clipboard
+        const copyApiLinkBtn = document.getElementById('copyApiLinkBtn');
+        if (copyApiLinkBtn) {
+            copyApiLinkBtn.addEventListener('click', async () => {
+                const link = 'https://www.remove.bg/api';
+                try {
+                    await navigator.clipboard.writeText(link);
+                    showToast('✅ লিংক কপি হয়েছে', 'success');
+                } catch (err) {
+                    // Fallback for browsers/contexts without Clipboard API access
+                    const tmp = document.createElement('textarea');
+                    tmp.value = link;
+                    tmp.style.position = 'fixed';
+                    tmp.style.opacity = '0';
+                    document.body.appendChild(tmp);
+                    tmp.select();
+                    try {
+                        document.execCommand('copy');
+                        showToast('✅ লিংক কপি হয়েছে', 'success');
+                    } catch (e2) {
+                        showToast('❌ কপি করা যায়নি, লিংকে ক্লিক করুন', 'error');
+                    }
+                    document.body.removeChild(tmp);
+                }
+            });
+        }
 
         // Slider live display
         bgTolerance.addEventListener('input', () => bgToleranceVal.textContent = bgTolerance.value);
@@ -901,6 +954,19 @@
                 const resultBlob = await response.blob();
                 processedBlob = resultBlob;
                 const url = URL.createObjectURL(resultBlob);
+
+                // IMPORTANT: keep `originalImage` in sync with the new pixels.
+                // Previously only previewImage.src was updated here, so the
+                // eyedropper / color-eraser / lasso tools kept sampling the
+                // OLD (pre-AI-remove) image afterwards, silently corrupting
+                // every edit made after an AI removal.
+                await new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => { originalImage = img; resolve(); };
+                    img.onerror = reject;
+                    img.src = url;
+                });
+
                 previewImage.src = url;
                 downloadSection.style.display = 'block';
                 // Make download use PNG
@@ -918,46 +984,169 @@
         // METHOD 2: Color Tolerance Eraser
         // ──────────────────────────────────────────
 
-        // Eyedropper: pick colour from the displayed image
+        // Eyedropper: pick colour from the displayed image, with a
+        // Photoshop-style zoomed loupe for pixel-accurate picking.
+        const loupe       = document.getElementById('eyedropperLoupe');
+        const loupeCanvas = document.getElementById('loupeCanvas');
+        const loupeCtx    = loupeCanvas ? loupeCanvas.getContext('2d') : null;
+        const loupeHex    = document.getElementById('loupeHex');
+
+        let pickCanvas = null, pickCtx = null; // cached full-res copy of the current image
+        let lastPick = null; // {px, py, hex} from the most recent mousemove
+
         bgEyedropperBtn.addEventListener('click', () => {
-            if (!originalImage) { showToast('প্রথমে ছবি আপলোড করুন', 'error'); return; }
+            if (!originalImage || !originalImage.naturalWidth) {
+                showToast('প্রথমে ছবি আপলোড করুন', 'error');
+                return;
+            }
             isEyedropperActive = !isEyedropperActive;
             if (isEyedropperActive) {
-                bgEyedropperStatus.textContent = '👆 ছবিতে ক্লিক করুন';
-                bgEyedropperBtn.style.outline = '2px solid var(--accent)';
-                previewImage.style.cursor = 'crosshair';
-                previewImage.addEventListener('click', pickColour, { once: false });
+                activateEyedropper();
             } else {
                 deactivateEyedropper();
             }
         });
 
-        function pickColour(e) {
-            // Draw image to off-screen canvas and read pixel
-            const tmpCanvas = document.createElement('canvas');
-            tmpCanvas.width  = originalImage.naturalWidth  || canvas.width;
-            tmpCanvas.height = originalImage.naturalHeight || canvas.height;
-            const tmpCtx = tmpCanvas.getContext('2d');
-            tmpCtx.drawImage(originalImage, 0, 0);
-
-            const rect   = previewImage.getBoundingClientRect();
-            const scaleX = tmpCanvas.width  / rect.width;
-            const scaleY = tmpCanvas.height / rect.height;
-            const px = Math.floor((e.clientX - rect.left) * scaleX);
-            const py = Math.floor((e.clientY - rect.top)  * scaleY);
-            const pixel = tmpCtx.getImageData(px, py, 1, 1).data;
-            const hex = '#' + [pixel[0], pixel[1], pixel[2]].map(v => v.toString(16).padStart(2, '0')).join('');
-            bgTargetColor.value = hex;
-            showToast(`✅ রঙ নির্বাচিত: ${hex}`);
-            deactivateEyedropper();
+        function activateEyedropper() {
+            ensurePickCanvas();
+            bgEyedropperStatus.textContent = '👆 ছবিতে ক্লিক করুন (নিখুঁত পিক্সেলের জন্য জুম দেখুন)';
+            bgEyedropperBtn.classList.add('active');
+            bgEyedropperBtn.style.outline = '2px solid var(--accent)';
+            previewImage.style.cursor = 'crosshair';
+            previewImage.addEventListener('mousemove', onEyedropperMove);
+            previewImage.addEventListener('click', onEyedropperClick);
+            document.addEventListener('keydown', onEyedropperEscape);
         }
 
         function deactivateEyedropper() {
             isEyedropperActive = false;
             bgEyedropperStatus.textContent = '';
+            bgEyedropperBtn.classList.remove('active');
             bgEyedropperBtn.style.outline = '';
             previewImage.style.cursor = '';
-            previewImage.removeEventListener('click', pickColour);
+            previewImage.removeEventListener('mousemove', onEyedropperMove);
+            previewImage.removeEventListener('click', onEyedropperClick);
+            document.removeEventListener('keydown', onEyedropperEscape);
+            if (loupe) loupe.style.display = 'none';
+            lastPick = null;
+        }
+
+        function onEyedropperEscape(e) {
+            if (e.key === 'Escape') deactivateEyedropper();
+        }
+
+        // Redraw the cached sample canvas from whatever image is current.
+        // Always call this right before a picking session starts so we
+        // never sample stale pixels (e.g. from before an AI/color/lasso edit).
+        function ensurePickCanvas() {
+            if (!pickCanvas) {
+                pickCanvas = document.createElement('canvas');
+                pickCtx = pickCanvas.getContext('2d');
+            }
+            const w = originalImage.naturalWidth  || canvas.width;
+            const h = originalImage.naturalHeight || canvas.height;
+            pickCanvas.width  = w;
+            pickCanvas.height = h;
+            pickCtx.clearRect(0, 0, w, h);
+            pickCtx.drawImage(originalImage, 0, 0, w, h);
+        }
+
+        // Map a client (viewport) point to a clamped pixel coordinate on
+        // the full-resolution image, based on the image's own rendered box.
+        function clientPointToPixel(clientX, clientY) {
+            const rect = previewImage.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return null;
+            let xRatio = (clientX - rect.left) / rect.width;
+            let yRatio = (clientY - rect.top)  / rect.height;
+            xRatio = Math.min(1, Math.max(0, xRatio));
+            yRatio = Math.min(1, Math.max(0, yRatio));
+            const px = Math.min(pickCanvas.width  - 1, Math.floor(xRatio * pickCanvas.width));
+            const py = Math.min(pickCanvas.height - 1, Math.floor(yRatio * pickCanvas.height));
+            return { px, py };
+        }
+
+        function rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+        }
+
+        function onEyedropperMove(e) {
+            const pt = clientPointToPixel(e.clientX, e.clientY);
+            if (!pt) return;
+            const pixel = pickCtx.getImageData(pt.px, pt.py, 1, 1).data;
+            const hex = rgbToHex(pixel[0], pixel[1], pixel[2]);
+            lastPick = { px: pt.px, py: pt.py, hex };
+            updateLoupe(pt.px, pt.py, hex, e.clientX, e.clientY);
+        }
+
+        function onEyedropperClick(e) {
+            const pt = clientPointToPixel(e.clientX, e.clientY);
+            if (!pt) { showToast('ছবির উপরে ক্লিক করুন', 'error'); return; }
+            const pixel = pickCtx.getImageData(pt.px, pt.py, 1, 1).data;
+            const hex = rgbToHex(pixel[0], pixel[1], pixel[2]);
+            bgTargetColor.value = hex;
+            showToast(`✅ রঙ নির্বাচিত: ${hex}`, 'success');
+            deactivateEyedropper();
+        }
+
+        function updateLoupe(px, py, hex, clientX, clientY) {
+            if (!loupe || !loupeCtx) return;
+            const GRID = 9;              // 9x9 source pixels shown
+            const CELL = loupeCanvas.width / GRID;
+
+            loupeCtx.imageSmoothingEnabled = false;
+            loupeCtx.clearRect(0, 0, loupeCanvas.width, loupeCanvas.height);
+
+            const half = Math.floor(GRID / 2);
+            const sx = Math.max(0, Math.min(pickCanvas.width  - GRID, px - half));
+            const sy = Math.max(0, Math.min(pickCanvas.height - GRID, py - half));
+            const sw = Math.min(GRID, pickCanvas.width);
+            const sh = Math.min(GRID, pickCanvas.height);
+
+            loupeCtx.drawImage(pickCanvas, sx, sy, sw, sh, 0, 0, sw * CELL, sh * CELL);
+
+            // Grid lines
+            loupeCtx.strokeStyle = 'rgba(0,0,0,0.25)';
+            loupeCtx.lineWidth = 1;
+            for (let i = 0; i <= GRID; i++) {
+                loupeCtx.beginPath();
+                loupeCtx.moveTo(i * CELL, 0);
+                loupeCtx.lineTo(i * CELL, loupeCanvas.height);
+                loupeCtx.stroke();
+                loupeCtx.beginPath();
+                loupeCtx.moveTo(0, i * CELL);
+                loupeCtx.lineTo(loupeCanvas.width, i * CELL);
+                loupeCtx.stroke();
+            }
+
+            // Highlight the exact centre pixel being picked
+            const cx = (px - sx) * CELL;
+            const cy = (py - sy) * CELL;
+            loupeCtx.strokeStyle = '#ffffff';
+            loupeCtx.lineWidth = 2;
+            loupeCtx.strokeRect(cx + 1, cy + 1, CELL - 2, CELL - 2);
+            loupeCtx.strokeStyle = '#2563eb';
+            loupeCtx.lineWidth = 1;
+            loupeCtx.strokeRect(cx + 1, cy + 1, CELL - 2, CELL - 2);
+
+            if (loupeHex) {
+                loupeHex.textContent = hex.toUpperCase();
+                loupeHex.style.background = hex;
+                // Pick readable text colour for the swatch
+                const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+                const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+                loupeHex.style.color = luminance > 150 ? '#000' : '#fff';
+            }
+
+            // Position the loupe near the cursor, offset so the fingertip
+            // never blocks the view, and clamped to stay on-screen.
+            const OFFSET = 24, SIZE = 132;
+            let left = clientX + OFFSET;
+            let top  = clientY - SIZE - OFFSET;
+            if (left + SIZE > window.innerWidth)  left = clientX - SIZE - OFFSET;
+            if (top < 0) top = clientY + OFFSET;
+            loupe.style.left = left + 'px';
+            loupe.style.top  = top + 'px';
+            loupe.style.display = 'block';
         }
 
         bgColorRemoveBtn.addEventListener('click', () => {
@@ -1049,11 +1238,81 @@
 
         let lassoCtx = bgLassoCanvas.getContext('2d');
 
-        function syncLassoCanvasSize() {
-            // Match pixel size of the preview image
-            bgLassoCanvas.width  = previewImage.offsetWidth  || 400;
-            bgLassoCanvas.height = previewImage.offsetHeight || 300;
+        // Compute the image's actual rendered box relative to its wrapper.
+        // Because the wrapper centers the image with flexbox (object-fit
+        // style letterboxing), the <img> element usually does NOT fill the
+        // whole wrapper — so the overlay canvas must be positioned/sized to
+        // match the IMAGE, not the wrapper, or drawing will be stretched
+        // and misaligned with the cursor (this was the root cause of the
+        // "can't drag-select" bug).
+        function getImageDisplayRect() {
+            const wrapper = previewImage.parentElement;
+            const imgRect = previewImage.getBoundingClientRect();
+            const wrapRect = wrapper.getBoundingClientRect();
+            return {
+                left: imgRect.left - wrapRect.left,
+                top: imgRect.top - wrapRect.top,
+                width: imgRect.width,
+                height: imgRect.height
+            };
         }
+
+        function syncLassoCanvasSize() {
+            const rect = getImageDisplayRect();
+            const w = Math.max(1, Math.round(rect.width));
+            const h = Math.max(1, Math.round(rect.height));
+            // Position & CSS size exactly over the visible image...
+            bgLassoCanvas.style.left   = rect.left + 'px';
+            bgLassoCanvas.style.top    = rect.top + 'px';
+            bgLassoCanvas.style.width  = w + 'px';
+            bgLassoCanvas.style.height = h + 'px';
+            // ...and make the drawing buffer match 1:1 so nothing is
+            // stretched/warped between the canvas pixels and screen pixels.
+            bgLassoCanvas.width  = w;
+            bgLassoCanvas.height = h;
+        }
+
+        // If the window resizes while a lasso session is open, the overlay
+        // position/size and all recorded points would go stale — safest is
+        // to cancel the in-progress selection rather than silently corrupt it.
+        window.addEventListener('resize', () => {
+            if (bgLassoCanvas.style.display !== 'none') {
+                showToast('উইন্ডো সাইজ পরিবর্তনের কারণে সিলেকশন বাতিল হয়েছে, আবার আঁকুন', 'error');
+                bgCancelLasso.click();
+            }
+            // Unlike the lasso overlay, the clone canvas's drawing buffer is
+            // fixed at the image's full resolution (not the display size),
+            // so a resize only needs to reposition/resize the CSS box —
+            // nothing painted so far is lost.
+            if (isCloneActive) syncCloneCanvasBox();
+        });
+
+        // Leaving the BG-remove tab mid-selection (or mid-eyedropper/clone) should
+        // not leave stray listeners/overlays behind.
+        document.addEventListener('app:tabchange', (e) => {
+            if (e.detail !== 'bgremove') {
+                if (isEyedropperActive) deactivateEyedropper();
+                if (bgLassoCanvas.style.display !== 'none') bgCancelLasso.click();
+                if (isCloneActive) endCloneSession(false);
+                if (isPaintBucketActive) deactivatePaintBucket();
+            }
+        });
+
+        // Phase 2: the preview panel can now float, zoom, and get dragged
+        // or resized — any of those change previewImage's on-screen box,
+        // so the lasso overlay (which is positioned to match that box
+        // exactly, see getImageDisplayRect() above) needs to be resynced
+        // whenever that happens. Reusing the same event the floating/zoom
+        // module dispatches keeps this in one place instead of scattering
+        // resize listeners everywhere.
+        document.addEventListener('app:previewlayoutchange', () => {
+            if (bgLassoCanvas.style.display !== 'none') {
+                syncLassoCanvasSize();
+            }
+            if (isCloneActive) {
+                syncCloneCanvasBox();
+            }
+        });
 
         bgStartLassoBtn.addEventListener('click', () => {
             if (!originalImage) { showToast('প্রথমে ছবি আপলোড করুন', 'error'); return; }
@@ -1302,6 +1561,594 @@
             bgLassoHint.textContent = 'প্রথমে নিচের বোতামে ক্লিক করুন, তারপর ছবির উপর আঁকুন।';
         });
 
+        // ──────────────────────────────────────────
+        // METHOD 4: Clone Stamp Tool
+        // ──────────────────────────────────────────
+        // Design: bgCloneCanvas sits directly over previewImage (same
+        // wrapper, same box via getImageDisplayRect() — reusing the exact
+        // helper the lasso overlay uses). Unlike the lasso overlay though,
+        // its DRAWING BUFFER is the image's full resolution, not the
+        // on-screen display size — so cloned pixels stay full quality and
+        // window/zoom/float changes never need to touch the buffer, only
+        // the CSS box (see syncCloneCanvasBox()).
+        //
+        // Alt/Option + click sets the source point. The offset between
+        // source and destination locks the moment painting starts (the
+        // first non-Alt mousedown) and stays fixed across the whole
+        // session ("aligned" mode, Photoshop's default) until the user
+        // resets it or Alt-clicks a new source.
+
+        const cloneCtx = bgCloneCanvas.getContext('2d');
+        let cloneSourcePoint = null;   // {x,y} in full-res image pixels
+        let cloneOffset = null;        // {dx,dy} locked once painting starts
+        let isPainting = false;
+        let lastPaintPoint = null;
+
+        // Cached brush + patch canvases so every stamp doesn't allocate new
+        // ones — only rebuilt when the brush size/hardness actually change.
+        const cloneBrushCanvas = document.createElement('canvas');
+        const cloneBrushCtx    = cloneBrushCanvas.getContext('2d');
+        const clonePatchCanvas = document.createElement('canvas');
+        const clonePatchCtx    = clonePatchCanvas.getContext('2d');
+        let lastBrushRadius = -1, lastBrushHardness = -1;
+
+        cloneBrushSize.addEventListener('input', () => cloneBrushSizeVal.textContent = cloneBrushSize.value);
+        cloneHardness.addEventListener('input',  () => cloneHardnessVal.textContent  = cloneHardness.value);
+
+        cloneStartBtn.addEventListener('click', () => {
+            if (!originalImage) { showToast('প্রথমে ছবি আপলোড করুন', 'error'); return; }
+            startCloneSession();
+        });
+
+        function startCloneSession() {
+            isCloneActive = true;
+            cloneSourcePoint = null;
+            cloneOffset = null;
+            isPainting = false;
+            lastPaintPoint = null;
+
+            const w = originalImage.naturalWidth  || originalWidth;
+            const h = originalImage.naturalHeight || originalHeight;
+            bgCloneCanvas.width  = w;
+            bgCloneCanvas.height = h;
+            cloneCtx.clearRect(0, 0, w, h);
+            cloneCtx.drawImage(originalImage, 0, 0, w, h);
+
+            syncCloneCanvasBox();
+            bgCloneCanvas.style.display = 'block';
+            previewImage.style.visibility = 'hidden'; // canvas overlays the exact same box
+            cloneActionBtns.style.display = 'flex';
+            cloneStartBtn.style.display = 'none';
+            updateCloneStatus();
+
+            bgCloneCanvas.addEventListener('mousedown', onCloneMouseDown);
+            bgCloneCanvas.addEventListener('mousemove', onCloneMouseMove);
+            document.addEventListener('mouseup', onCloneMouseUp);
+            bgCloneCanvas.addEventListener('touchstart', onCloneTouchStart, { passive: false });
+            bgCloneCanvas.addEventListener('touchmove',  onCloneTouchMove,  { passive: false });
+            document.addEventListener('touchend', onCloneMouseUp);
+        }
+
+        function endCloneSession(apply) {
+            if (!isCloneActive) return;
+            bgCloneCanvas.removeEventListener('mousedown', onCloneMouseDown);
+            bgCloneCanvas.removeEventListener('mousemove', onCloneMouseMove);
+            document.removeEventListener('mouseup', onCloneMouseUp);
+            bgCloneCanvas.removeEventListener('touchstart', onCloneTouchStart);
+            bgCloneCanvas.removeEventListener('touchmove',  onCloneTouchMove);
+            document.removeEventListener('touchend', onCloneMouseUp);
+
+            if (apply) {
+                bgCloneCanvas.toBlob(blob => {
+                    processedBlob = blob;
+                    const url = URL.createObjectURL(blob);
+                    originalImage = new Image();
+                    originalImage.src = url;
+                    previewImage.src = url;
+                    downloadSection.style.display = 'block';
+                    downloadBtn.setAttribute('data-ext', 'png');
+                    showToast('✅ ক্লোন স্ট্যাম্প প্রয়োগ হয়েছে! PNG হিসেবে ডাউনলোড করুন।', 'success');
+                }, 'image/png');
+            }
+
+            isCloneActive = false;
+            isPainting = false;
+            lastPaintPoint = null;
+            cloneSourcePoint = null;
+            cloneOffset = null;
+            bgCloneCanvas.style.display = 'none';
+            previewImage.style.visibility = '';
+            cloneActionBtns.style.display = 'none';
+            cloneStartBtn.style.display = '';
+            cloneStatus.textContent = '';
+            cloneHint.textContent = 'প্রথমে নিচের বোতামে ক্লিক করুন, তারপর ছবিতে Alt/Option + ক্লিক করে সোর্স বাছাই করুন।';
+        }
+
+        cloneApplyBtn.addEventListener('click', () => endCloneSession(true));
+        cloneCancelBtn.addEventListener('click', () => endCloneSession(false));
+        cloneResetSourceBtn.addEventListener('click', () => {
+            if (!isCloneActive) return;
+            cloneSourcePoint = null;
+            cloneOffset = null;
+            updateCloneStatus();
+            showToast('সোর্স রিসেট হয়েছে — Alt/Option + ক্লিক করে নতুন সোর্স বাছাই করুন', '');
+        });
+
+        function updateCloneStatus() {
+            if (!cloneSourcePoint) {
+                cloneStatus.textContent = '⚪ সোর্স নেই — ছবিতে Alt/Option + ক্লিক করে সোর্স বাছাই করুন';
+            } else if (!cloneOffset) {
+                cloneStatus.textContent = `🟢 সোর্স সেট হয়েছে (${cloneSourcePoint.x}, ${cloneSourcePoint.y}) — এখন ব্রাশ দিয়ে টানুন`;
+            } else {
+                cloneStatus.textContent = '🖌️ ক্লোনিং চলছে — নতুন সোর্সের জন্য আবার Alt+ক্লিক করুন অথবা রিসেট করুন';
+            }
+        }
+
+        // CSS box only — reuses the same "match the image's rendered box"
+        // logic as the lasso overlay (getImageDisplayRect(), defined above).
+        function syncCloneCanvasBox() {
+            const rect = getImageDisplayRect();
+            bgCloneCanvas.style.left   = rect.left + 'px';
+            bgCloneCanvas.style.top    = rect.top + 'px';
+            bgCloneCanvas.style.width  = Math.max(1, Math.round(rect.width))  + 'px';
+            bgCloneCanvas.style.height = Math.max(1, Math.round(rect.height)) + 'px';
+        }
+
+        // Client (viewport) point → full-res pixel coordinate on bgCloneCanvas,
+        // same ratio-based mapping style as clientPointToPixel() above.
+        function clonePointFromClient(clientX, clientY) {
+            const rect = bgCloneCanvas.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) return null;
+            let xRatio = (clientX - rect.left) / rect.width;
+            let yRatio = (clientY - rect.top)  / rect.height;
+            xRatio = Math.min(1, Math.max(0, xRatio));
+            yRatio = Math.min(1, Math.max(0, yRatio));
+            const x = Math.min(bgCloneCanvas.width  - 1, Math.floor(xRatio * bgCloneCanvas.width));
+            const y = Math.min(bgCloneCanvas.height - 1, Math.floor(yRatio * bgCloneCanvas.height));
+            return { x, y };
+        }
+
+        function onCloneMouseDown(e) {
+            if (!isCloneActive) return;
+            const pt = clonePointFromClient(e.clientX, e.clientY);
+            if (!pt) return;
+
+            if (e.altKey) {
+                cloneSourcePoint = pt;
+                cloneOffset = null; // a new source re-locks the offset on the next stroke
+                updateCloneStatus();
+                return;
+            }
+
+            if (!cloneSourcePoint) {
+                showToast('আগে Alt/Option + ক্লিক করে সোর্স বাছাই করুন', 'error');
+                return;
+            }
+
+            if (!cloneOffset) {
+                cloneOffset = { dx: cloneSourcePoint.x - pt.x, dy: cloneSourcePoint.y - pt.y };
+            }
+
+            isPainting = true;
+            lastPaintPoint = pt;
+            stampAt(pt.x, pt.y);
+            updateCloneStatus();
+        }
+
+        function onCloneMouseMove(e) {
+            if (!isCloneActive || !isPainting || !cloneOffset) return;
+            const pt = clonePointFromClient(e.clientX, e.clientY);
+            if (!pt) return;
+            strokeTo(pt);
+        }
+
+        function onCloneMouseUp() {
+            isPainting = false;
+            lastPaintPoint = null;
+        }
+
+        function onCloneTouchStart(e) { e.preventDefault(); onCloneMouseDown(e.touches[0]); }
+        function onCloneTouchMove(e)  { e.preventDefault(); onCloneMouseMove(e.touches[0]); }
+
+        // Soft radial brush shape (hardness 100 = solid disc, 0 = fully
+        // feathered from centre to edge), cached until size/hardness change.
+        function rebuildBrush(radius, hardnessPct) {
+            if (radius === lastBrushRadius && hardnessPct === lastBrushHardness) return;
+            lastBrushRadius = radius;
+            lastBrushHardness = hardnessPct;
+
+            const size = Math.max(2, Math.round(radius * 2));
+            cloneBrushCanvas.width  = clonePatchCanvas.width  = size;
+            cloneBrushCanvas.height = clonePatchCanvas.height = size;
+            cloneBrushCtx.clearRect(0, 0, size, size);
+
+            const cx = size / 2, cy = size / 2;
+            const inner = Math.max(0, (hardnessPct / 100) * radius);
+            const grad = cloneBrushCtx.createRadialGradient(cx, cy, inner, cx, cy, radius);
+            grad.addColorStop(0, 'rgba(0,0,0,1)');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            cloneBrushCtx.fillStyle = grad;
+            cloneBrushCtx.beginPath();
+            cloneBrushCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+            cloneBrushCtx.fill();
+        }
+
+        // Copy a brush-shaped patch of pixels from (destX+offset) to (destX),
+        // masked by the soft brush shape so edges blend instead of hard-cutting.
+        function stampAt(destX, destY) {
+            const radius = parseInt(cloneBrushSize.value, 10) / 2;
+            rebuildBrush(radius, parseInt(cloneHardness.value, 10));
+
+            const srcX = destX + cloneOffset.dx;
+            const srcY = destY + cloneOffset.dy;
+            if (srcX < 0 || srcY < 0 || srcX >= bgCloneCanvas.width || srcY >= bgCloneCanvas.height) return;
+
+            const size = cloneBrushCanvas.width;
+            clonePatchCtx.clearRect(0, 0, size, size);
+            clonePatchCtx.globalCompositeOperation = 'source-over';
+            clonePatchCtx.drawImage(bgCloneCanvas, srcX - size / 2, srcY - size / 2, size, size, 0, 0, size, size);
+            clonePatchCtx.globalCompositeOperation = 'destination-in';
+            clonePatchCtx.drawImage(cloneBrushCanvas, 0, 0);
+
+            cloneCtx.drawImage(clonePatchCanvas, destX - size / 2, destY - size / 2);
+        }
+
+        // Interpolate along the drag path so fast mouse movement doesn't
+        // leave gaps between individual brush stamps.
+        function strokeTo(pt) {
+            const radius = parseInt(cloneBrushSize.value, 10) / 2;
+            const spacing = Math.max(2, radius / 4);
+            const from = lastPaintPoint || pt;
+            const dx = pt.x - from.x, dy = pt.y - from.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const steps = Math.max(1, Math.floor(dist / spacing));
+            for (let i = 1; i <= steps; i++) {
+                const ix = from.x + (dx * i) / steps;
+                const iy = from.y + (dy * i) / steps;
+                stampAt(Math.round(ix), Math.round(iy));
+            }
+            lastPaintPoint = pt;
+        }
+
+        // ──────────────────────────────────────────
+        // METHOD 5: Paint Bucket / Flood Fill
+        // ──────────────────────────────────────────
+        // Design: click-to-activate, same activate/deactivate pattern as
+        // Method 2's eyedropper (reuses its ensurePickCanvas() /
+        // clientPointToPixel() helpers directly — no new coordinate-mapping
+        // code needed here).
+        //
+        // floodFillMask() is a pure function of a flat RGBA array + width/
+        // height — no canvas/DOM inside it — so it can be lifted out and
+        // unit-tested in plain Node the same way Method 4's offset-lock/
+        // interpolation math was (see README "What's tested").
+        //
+        // Two modes via the "শুধু সংযুক্ত এলাকা" checkbox:
+        //  - Contiguous (default, real paint-bucket behaviour): iterative
+        //    stack-based flood fill outward from the clicked pixel — only
+        //    the connected region of similar colour gets painted.
+        //  - Non-contiguous: the same threshold test applied to every pixel
+        //    in the image regardless of position — this is removeByColor()'s
+        //    scan, painting a colour in instead of zeroing alpha out (the
+        //    plan's "reverse version of removeByColor()").
+
+        function floodFillMask(data, w, h, startX, startY, threshold, contiguous) {
+            const total = w * h;
+            const mask = new Uint8Array(total);
+            const startIdx = startY * w + startX;
+            const tr = data[startIdx * 4];
+            const tg = data[startIdx * 4 + 1];
+            const tb = data[startIdx * 4 + 2];
+
+            if (!contiguous) {
+                for (let i = 0; i < total; i++) {
+                    const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2];
+                    if (colorDistance(r, g, b, tr, tg, tb) <= threshold) mask[i] = 1;
+                }
+                return mask;
+            }
+
+            // Iterative (not recursive) stack-based flood fill — avoids
+            // call-stack overflow on large images that recursion would hit.
+            const visited = new Uint8Array(total);
+            const stack = [startIdx];
+            visited[startIdx] = 1;
+            while (stack.length) {
+                const idx = stack.pop();
+                const r = data[idx * 4], g = data[idx * 4 + 1], b = data[idx * 4 + 2];
+                if (colorDistance(r, g, b, tr, tg, tb) > threshold) continue;
+                mask[idx] = 1;
+                const x = idx % w;
+                const y = (idx - x) / w;
+                if (x > 0)     { const n = idx - 1; if (!visited[n]) { visited[n] = 1; stack.push(n); } }
+                if (x < w - 1) { const n = idx + 1; if (!visited[n]) { visited[n] = 1; stack.push(n); } }
+                if (y > 0)     { const n = idx - w; if (!visited[n]) { visited[n] = 1; stack.push(n); } }
+                if (y < h - 1) { const n = idx + w; if (!visited[n]) { visited[n] = 1; stack.push(n); } }
+            }
+            return mask;
+        }
+
+        function paintBucketFill(px, py) {
+            const w = originalImage.naturalWidth  || originalWidth;
+            const h = originalImage.naturalHeight || originalHeight;
+            canvas.width  = w;
+            canvas.height = h;
+            ctx.clearRect(0, 0, w, h);
+            ctx.drawImage(originalImage, 0, 0, w, h);
+
+            const imageData = ctx.getImageData(0, 0, w, h);
+            const data = imageData.data;
+            const threshold  = (parseInt(paintTolerance.value, 10) / 100) * 441.67;
+            const contiguous = paintContiguous.checked;
+            const mask = floodFillMask(data, w, h, px, py, threshold, contiguous);
+            const fill = hexToRgb(paintFillColor.value);
+
+            let filledCount = 0;
+            for (let i = 0; i < w * h; i++) {
+                if (mask[i]) {
+                    data[i * 4]     = fill.r;
+                    data[i * 4 + 1] = fill.g;
+                    data[i * 4 + 2] = fill.b;
+                    data[i * 4 + 3] = 255;
+                    filledCount++;
+                }
+            }
+
+            if (filledCount === 0) {
+                showToast('কোনো পিক্সেল ভরাট হয়নি — টলারেন্স বাড়িয়ে দেখুন', 'error');
+                return;
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+            canvas.toBlob(blob => {
+                processedBlob = blob;
+                const url = URL.createObjectURL(blob);
+                originalImage = new Image();
+                originalImage.src = url;
+                previewImage.src = url;
+                downloadSection.style.display = 'block';
+                downloadBtn.setAttribute('data-ext', 'png');
+                showToast('✅ পেইন্ট বাকেট প্রয়োগ হয়েছে! PNG হিসেবে ডাউনলোড করুন।', 'success');
+            }, 'image/png');
+        }
+
+        paintTolerance.addEventListener('input', () => paintToleranceVal.textContent = paintTolerance.value);
+
+        function activatePaintBucket() {
+            ensurePickCanvas();
+            isPaintBucketActive = true;
+            paintBucketBtn.classList.add('active');
+            paintBucketBtn.style.outline = '2px solid var(--accent)';
+            paintStatus.textContent = '👆 ছবিতে ক্লিক করুন যেখানে রঙ ঢালতে চান (আবার বোতাম চাপলে বন্ধ হবে)';
+            previewImage.style.cursor = 'crosshair';
+            previewImage.addEventListener('click', onPaintBucketClick);
+            document.addEventListener('keydown', onPaintBucketEscape);
+        }
+
+        function deactivatePaintBucket() {
+            isPaintBucketActive = false;
+            paintBucketBtn.classList.remove('active');
+            paintBucketBtn.style.outline = '';
+            paintStatus.textContent = '';
+            previewImage.style.cursor = '';
+            previewImage.removeEventListener('click', onPaintBucketClick);
+            document.removeEventListener('keydown', onPaintBucketEscape);
+        }
+
+        function onPaintBucketEscape(e) {
+            if (e.key === 'Escape') deactivatePaintBucket();
+        }
+
+        function onPaintBucketClick(e) {
+            const pt = clientPointToPixel(e.clientX, e.clientY);
+            if (!pt) { showToast('ছবির উপরে ক্লিক করুন', 'error'); return; }
+            paintBucketFill(pt.px, pt.py);
+        }
+
+        paintBucketBtn.addEventListener('click', () => {
+            if (!originalImage) { showToast('প্রথমে ছবি আপলোড করুন', 'error'); return; }
+            if (isPaintBucketActive) deactivatePaintBucket();
+            else activatePaintBucket();
+        });
+
     })(); // end initBgRemoveModule
+
+    // ================================================================
+    // Phase 2 — Preview: bigger/flexible layout, zoom controls, and a
+    // draggable + resizable floating preview window.
+    // See photo-editor/PLAN_BG_Remove_Advanced.md → "Phase 2".
+    // ================================================================
+    (function initPreviewZoomFloatModule() {
+
+        const previewCard        = document.getElementById('previewCard');
+        const previewHeader      = document.getElementById('previewHeader');
+        const previewPlaceholder = document.getElementById('previewPlaceholder');
+        const previewImageWrapper = document.getElementById('previewImageWrapper');
+        const previewFloatBtn    = document.getElementById('previewFloatBtn');
+        const previewDockBtn     = document.getElementById('previewDockBtn');
+
+        const zoomInBtn   = document.getElementById('zoomInBtn');
+        const zoomOutBtn  = document.getElementById('zoomOutBtn');
+        const zoomFitBtn  = document.getElementById('zoomFitBtn');
+        const zoom100Btn  = document.getElementById('zoom100Btn');
+        const zoomLevelLabel = document.getElementById('zoomLevelLabel');
+
+        const ZOOM_MIN = 25;
+        const ZOOM_MAX = 400;
+        const ZOOM_STEP = 25;
+
+        let zoomMode = 'fit';   // 'fit' | 'percent'
+        let zoomPercent = 100;
+        let isFloating = false;
+
+        function notifyLayoutChange() {
+            document.dispatchEvent(new CustomEvent('app:previewlayoutchange'));
+        }
+
+        // ---------- Zoom ----------
+        function applyZoom() {
+            if (zoomMode === 'fit' || !previewImage.naturalWidth) {
+                previewImage.classList.remove('zoomed');
+                previewImageWrapper.classList.remove('zoomed');
+                previewImage.style.width = '';
+                previewImage.style.height = '';
+                zoomLevelLabel.textContent = 'ফিট';
+            } else {
+                const targetWidth = Math.round(previewImage.naturalWidth * (zoomPercent / 100));
+                previewImage.classList.add('zoomed');
+                previewImageWrapper.classList.add('zoomed');
+                previewImage.style.width = targetWidth + 'px';
+                previewImage.style.height = 'auto';
+                zoomLevelLabel.textContent = zoomPercent + '%';
+            }
+            notifyLayoutChange();
+        }
+
+        zoomInBtn.addEventListener('click', () => {
+            zoomPercent = Math.min(ZOOM_MAX, (zoomMode === 'percent' ? zoomPercent : 100) + ZOOM_STEP);
+            zoomMode = 'percent';
+            applyZoom();
+        });
+
+        zoomOutBtn.addEventListener('click', () => {
+            zoomPercent = Math.max(ZOOM_MIN, (zoomMode === 'percent' ? zoomPercent : 100) - ZOOM_STEP);
+            zoomMode = 'percent';
+            applyZoom();
+        });
+
+        zoomFitBtn.addEventListener('click', () => {
+            zoomMode = 'fit';
+            applyZoom();
+        });
+
+        zoom100Btn.addEventListener('click', () => {
+            zoomMode = 'percent';
+            zoomPercent = 100;
+            applyZoom();
+        });
+
+        // Reset to "fit" whenever a genuinely new photo is uploaded, so an
+        // old zoom level from a previous image doesn't carry over and look
+        // broken/oversized on the new one. Edits on the SAME image (crop,
+        // bg-remove, resize preview, etc.) intentionally keep the current
+        // zoom, since those just swap previewImage.src in place.
+        document.addEventListener('app:newimage', () => {
+            zoomMode = 'fit';
+            zoomPercent = 100;
+            applyZoom();
+        });
+
+        // Re-apply the current zoom whenever a new src finishes loading
+        // (dimensions may differ from before, e.g. after a crop/resize).
+        previewImage.addEventListener('load', () => {
+            if (zoomMode === 'percent') applyZoom();
+        });
+
+        // ---------- Floating window ----------
+        function setFloating(on) {
+            isFloating = on;
+            previewCard.classList.toggle('floating', on);
+            previewFloatBtn.classList.toggle('active', on);
+            previewPlaceholder.style.display = on ? 'flex' : 'none';
+
+            if (on) {
+                previewFloatBtn.title = 'প্যানেলে ফিরিয়ে আনুন';
+                // First time floating: drop it near the top-right corner
+                // instead of wherever the CSS defaults would put it, then
+                // keep whatever position/size the user leaves it at.
+                if (!previewCard.dataset.positioned) {
+                    previewCard.style.top = '90px';
+                    previewCard.style.left = (window.innerWidth - 420 - 24) + 'px';
+                    previewCard.dataset.positioned = '1';
+                }
+            } else {
+                previewFloatBtn.title = 'ফ্লোটিং উইন্ডো হিসেবে খুলুন';
+            }
+            // Layout just changed size/visibility — let dependent overlays
+            // (lasso canvas) resync, and let the resize-observer below
+            // pick up the card's new box on the next frame.
+            requestAnimationFrame(notifyLayoutChange);
+        }
+
+        previewFloatBtn.addEventListener('click', () => setFloating(!isFloating));
+        previewDockBtn.addEventListener('click', () => setFloating(false));
+
+        // Dragging: only active while floating, and only when grabbing the
+        // header (not the buttons inside it).
+        let dragOffsetX = 0, dragOffsetY = 0, isDragging = false;
+
+        function startDrag(clientX, clientY) {
+            if (!isFloating) return;
+            isDragging = true;
+            const rect = previewCard.getBoundingClientRect();
+            dragOffsetX = clientX - rect.left;
+            dragOffsetY = clientY - rect.top;
+            previewCard.classList.add('dragging');
+        }
+
+        function moveDrag(clientX, clientY) {
+            if (!isDragging) return;
+            const rect = previewCard.getBoundingClientRect();
+            let left = clientX - dragOffsetX;
+            let top = clientY - dragOffsetY;
+            // Keep the header grabbable within the viewport at all times.
+            left = Math.min(Math.max(left, -rect.width + 80), window.innerWidth - 80);
+            top = Math.min(Math.max(top, 0), window.innerHeight - 40);
+            previewCard.style.left = left + 'px';
+            previewCard.style.top = top + 'px';
+            previewCard.style.right = 'auto';
+            notifyLayoutChange();
+        }
+
+        function endDrag() {
+            if (!isDragging) return;
+            isDragging = false;
+            previewCard.classList.remove('dragging');
+        }
+
+        previewHeader.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button')) return; // don't drag when clicking header buttons
+            startDrag(e.clientX, e.clientY);
+        });
+        document.addEventListener('mousemove', (e) => moveDrag(e.clientX, e.clientY));
+        document.addEventListener('mouseup', endDrag);
+
+        previewHeader.addEventListener('touchstart', (e) => {
+            if (e.target.closest('button')) return;
+            const t = e.touches[0];
+            startDrag(t.clientX, t.clientY);
+        }, { passive: true });
+        document.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            const t = e.touches[0];
+            moveDrag(t.clientX, t.clientY);
+        }, { passive: true });
+        document.addEventListener('touchend', endDrag);
+
+        // Resizing uses the browser's native `resize: both` handle (see
+        // .preview-card.floating in style.css) — simplest, accessible, and
+        // consistent with how the user already resizes native windows.
+        // We just need to know when it happens so the lasso overlay stays
+        // in sync while the user drags the corner.
+        if (window.ResizeObserver) {
+            const ro = new ResizeObserver(() => {
+                if (isFloating) notifyLayoutChange();
+            });
+            ro.observe(previewCard);
+        }
+
+        // Keep the floating panel from being stranded off-screen if the
+        // browser window is resized.
+        window.addEventListener('resize', () => {
+            if (!isFloating) return;
+            const rect = previewCard.getBoundingClientRect();
+            let left = Math.min(rect.left, window.innerWidth - 80);
+            let top = Math.min(rect.top, window.innerHeight - 40);
+            previewCard.style.left = Math.max(left, -rect.width + 80) + 'px';
+            previewCard.style.top = Math.max(top, 0) + 'px';
+            notifyLayoutChange();
+        });
+
+    })(); // end initPreviewZoomFloatModule
 
 })();
