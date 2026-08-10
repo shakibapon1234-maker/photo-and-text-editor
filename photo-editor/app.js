@@ -92,10 +92,18 @@
     // Toast
     const toast = document.getElementById('toast');
 
-    // Undo/Redo/Compare (Phase 6)
+    // Undo/Redo/Compare/History/Reset
     const undoBtn = document.getElementById('undoBtn');
     const redoBtn = document.getElementById('redoBtn');
     const compareBtn = document.getElementById('compareBtn');
+    const historyToggleBtn = document.getElementById('historyToggleBtn');
+    const historyModalOverlay = document.getElementById('historyModalOverlay');
+    const historyList = document.getElementById('historyList');
+    const historyCloseBtn = document.getElementById('historyCloseBtn');
+    const historyDoneBtn = document.getElementById('historyDoneBtn');
+    const revertOriginalBtn = document.getElementById('revertOriginalBtn');
+    const resetSessionBtn = document.getElementById('resetSessionBtn');
+    const undoPaintBucketBtn = document.getElementById('undoPaintBucketBtn');
 
     // ============================================
     // Upload & File Handling
@@ -292,7 +300,7 @@
                     newFileSize.textContent = formatBytes(blob.size);
                     downloadSection.style.display = 'block';
                     updatePreview(blob);
-                    pushHistory(blob);
+                    pushHistory(blob, `ফাইল সাইজ → ${targetKB}KB`);
                     applyFileSize.classList.remove('loading');
                     showToast('✅ ফাইল সাইজ সফলভাবে পরিবর্তন হয়েছে!', 'success');
                 });
@@ -307,7 +315,7 @@
                     newFileSize.textContent = formatBytes(blob.size);
                     downloadSection.style.display = 'block';
                     updatePreview(blob);
-                    pushHistory(blob);
+                    pushHistory(blob, 'কোয়ালিটি পরিবর্তন');
                     applyFileSize.classList.remove('loading');
                     showToast('✅ কোয়ালিটি সফলভাবে পরিবর্তন হয়েছে!', 'success');
                 }, format, quality);
@@ -427,7 +435,7 @@
                 newPixelDimension.textContent = `${newW} × ${newH} (${formatPixels(newW * newH)})`;
                 downloadSection.style.display = 'block';
                 updatePreview(blob);
-                pushHistory(blob);
+                pushHistory(blob, `পিক্সেল রিসাইজ → ${newW}×${newH}`);
                 applyPixel.classList.remove('loading');
                 showToast('✅ পিক্সেল সফলভাবে পরিবর্তন হয়েছে!', 'success');
             }, 'image/png');
@@ -498,7 +506,7 @@
                 newDimension.textContent = `${w} × ${h}`;
                 downloadSection.style.display = 'block';
                 updatePreview(blob);
-                pushHistory(blob);
+                pushHistory(blob, `ডাইমেনশন → ${w}×${h}`);
                 applyDimension.classList.remove('loading');
                 showToast('✅ ডাইমেনশন সফলভাবে পরিবর্তন হয়েছে!', 'success');
             }, 'image/png');
@@ -566,7 +574,7 @@
                 newBrightness.textContent = `B:${brightnessSlider.value}% C:${contrastSlider.value}% S:${saturationSlider.value}%`;
                 downloadSection.style.display = 'block';
                 updatePreview(blob);
-                pushHistory(blob);
+                pushHistory(blob, `ব্রাইটনেস/কন্ট্রাস্ট/স্যাচুরেশন পরিবর্তন`);
                 applyBrightness.classList.remove('loading');
                 showToast('✅ ব্রাইটনেস সফলভাবে পরিবর্তন হয়েছে!', 'success');
             }, 'image/png');
@@ -797,7 +805,7 @@
                 newCropDimension.textContent = `${cw} × ${ch}`;
                 downloadSection.style.display = 'block';
                 updatePreview(blob);
-                pushHistory(blob);
+                pushHistory(blob, `ক্রপ → ${cw}×${ch}`);
                 applyCrop.classList.remove('loading');
                 showToast('✅ ক্রপ সফলভাবে সম্পন্ন হয়েছে!', 'success');
             }, 'image/png');
@@ -875,37 +883,130 @@
     const MAX_HISTORY = 30;
     let isRestoringHistory = false; // guards against a restore re-pushing itself
 
-    function resetHistory(urlOrBlob) {
+    // ============================================
+    // INDEXEDDB AUTO-SAVE & SESSION PERSISTENCE
+    // ============================================
+    const DB_NAME = 'PhotoEditorSessionDB';
+    const DB_STORE = 'editorState';
+
+    function openSessionDB() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(DB_NAME, 1);
+            req.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(DB_STORE)) {
+                    db.createObjectStore(DB_STORE, { keyPath: 'id' });
+                }
+            };
+            req.onsuccess = (e) => resolve(e.target.result);
+            req.onerror = (e) => reject(e.target.error);
+        });
+    }
+
+    async function saveSessionToDB() {
+        if (!historyStack || historyStack.length === 0) return;
+        try {
+            const db = await openSessionDB();
+            const items = [];
+            for (const h of historyStack) {
+                let blob = h.blob;
+                if (!blob && h.url) {
+                    try { blob = await fetch(h.url).then(r => r.blob()); } catch (e) {}
+                }
+                if (blob) items.push({ label: h.label || 'এডিট ধাপ', blob });
+            }
+            if (items.length > 0) {
+                const tx = db.transaction(DB_STORE, 'readwrite');
+                tx.objectStore(DB_STORE).put({
+                    id: 'active_session',
+                    timestamp: Date.now(),
+                    historyIndex: Math.min(historyIndex, items.length - 1),
+                    items,
+                    fileName: (originalFile && originalFile.name) || 'edited_photo.png'
+                });
+            }
+        } catch (err) {
+            console.warn('Session save error:', err);
+        }
+    }
+
+    async function restoreSessionFromDB() {
+        try {
+            const db = await openSessionDB();
+            const tx = db.transaction(DB_STORE, 'readonly');
+            const req = tx.objectStore(DB_STORE).get('active_session');
+            req.onsuccess = async () => {
+                const data = req.result;
+                if (!data || !data.items || data.items.length === 0) return;
+
+                historyStack.forEach(h => { if (h.revoke) URL.revokeObjectURL(h.url); });
+                historyStack = [];
+                historyIndex = -1;
+
+                for (const item of data.items) {
+                    const url = URL.createObjectURL(item.blob);
+                    historyStack.push({ url, blob: item.blob, revoke: true, label: item.label });
+                }
+                historyIndex = Math.min(data.historyIndex, historyStack.length - 1);
+                if (historyIndex < 0) historyIndex = 0;
+
+                await restoreHistoryAt(historyIndex, true);
+                uploadSection.style.display = 'none';
+                editorSection.style.display = 'grid';
+                showToast('💾 আপনার পূর্বের সংরক্ষিত সেশন স্বয়ংক্রিয়ভাবে উদ্ধার করা হয়েছে!', 'info');
+            };
+        } catch (err) {
+            console.warn('Session restore error:', err);
+        }
+    }
+
+    async function clearSessionDB() {
+        try {
+            const db = await openSessionDB();
+            const tx = db.transaction(DB_STORE, 'readwrite');
+            tx.objectStore(DB_STORE).delete('active_session');
+        } catch (err) {}
+    }
+
+    // Auto-restore saved session when browser loads or refreshes
+    // (app.js runs at end of body so DOM is already ready)
+    setTimeout(restoreSessionFromDB, 400);
+
+    function resetHistory(urlOrBlob, label = '১. মূল ফটো আপলোড') {
         historyStack.forEach(h => { if (h.revoke) URL.revokeObjectURL(h.url); });
         historyStack = [];
         historyIndex = -1;
-        pushHistory(urlOrBlob);
+        pushHistory(urlOrBlob, label);
     }
 
-    function pushHistory(urlOrBlob) {
+    function pushHistory(urlOrBlob, label = 'এডিট ধাপ') {
         if (isRestoringHistory || !urlOrBlob) return;
-        let url, revoke;
+        let url, revoke, blob;
         if (urlOrBlob instanceof Blob) {
+            blob = urlOrBlob;
             url = URL.createObjectURL(urlOrBlob);
             revoke = true;
         } else {
-            url = urlOrBlob; // data: URL (from FileReader) — nothing to revoke
+            url = urlOrBlob;
             revoke = false;
         }
-        // A fresh edit after undoing a few steps discards the redo branch,
-        // same as any normal undo/redo stack (Photoshop, text editors, etc.)
+
         if (historyIndex < historyStack.length - 1) {
             historyStack.slice(historyIndex + 1).forEach(h => { if (h.revoke) URL.revokeObjectURL(h.url); });
             historyStack = historyStack.slice(0, historyIndex + 1);
         }
-        historyStack.push({ url, revoke });
+
+        historyStack.push({ url, blob, revoke, label });
         historyIndex++;
+
         if (historyStack.length > MAX_HISTORY) {
             const removed = historyStack.shift();
             if (removed.revoke) URL.revokeObjectURL(removed.url);
             historyIndex--;
         }
+
         updateHistoryButtons();
+        saveSessionToDB();
     }
 
     function loadImageFromUrl(url) {
@@ -917,7 +1018,7 @@
         });
     }
 
-    async function restoreHistoryAt(index) {
+    async function restoreHistoryAt(index, isAutoRestore = false) {
         if (index < 0 || index >= historyStack.length) return;
         const entry = historyStack[index];
         isRestoringHistory = true;
@@ -928,17 +1029,19 @@
             originalHeight = img.naturalHeight;
             aspectRatio = originalWidth / originalHeight;
             previewImage.src = entry.url;
-            // Keep the Download button working against whatever state the
-            // user is currently looking at, not a stale earlier blob.
-            processedBlob = await fetch(entry.url).then(r => r.blob());
+            processedBlob = entry.blob || await fetch(entry.url).then(r => r.blob());
             downloadSection.style.display = 'block';
             historyIndex = index;
             document.dispatchEvent(new CustomEvent('app:historyrestored'));
+            if (!isAutoRestore) {
+                showToast(`↩️ ধাপ: ${entry.label || 'পূর্বে ফিরানো হয়েছে'}`, 'info');
+            }
         } catch (err) {
             showToast('❌ পূর্বাবস্থায় ফেরানো যায়নি', 'error');
         } finally {
             isRestoringHistory = false;
             updateHistoryButtons();
+            if (!isAutoRestore) saveSessionToDB();
         }
     }
 
@@ -952,6 +1055,82 @@
         restoreHistoryAt(historyIndex + 1);
     }
 
+    function renderHistoryList() {
+        if (!historyList) return;
+        historyList.innerHTML = '';
+        historyStack.forEach((entry, idx) => {
+            const li = document.createElement('li');
+            li.className = 'history-item' + (idx === historyIndex ? ' active' : '');
+            li.innerHTML = `
+                <div class="history-item-label">
+                    <span>${idx + 1}.</span>
+                    <span>${entry.label || 'এডিট ধাপ'}</span>
+                </div>
+                <span class="history-item-badge">${idx === historyIndex ? 'বর্তমান' : (idx === 0 ? 'মূল ফটো' : 'ধাপ ' + (idx + 1))}</span>
+            `;
+            li.addEventListener('click', () => {
+                restoreHistoryAt(idx);
+                renderHistoryList();
+            });
+            historyList.appendChild(li);
+        });
+    }
+
+    function openHistoryModal() {
+        renderHistoryList();
+        if (historyModalOverlay) historyModalOverlay.style.display = 'flex';
+    }
+
+    function closeHistoryModal() {
+        if (historyModalOverlay) historyModalOverlay.style.display = 'none';
+    }
+
+    if (historyToggleBtn) historyToggleBtn.addEventListener('click', openHistoryModal);
+    if (historyCloseBtn) historyCloseBtn.addEventListener('click', closeHistoryModal);
+    if (historyDoneBtn) historyDoneBtn.addEventListener('click', closeHistoryModal);
+    if (historyModalOverlay) {
+        historyModalOverlay.addEventListener('click', (e) => {
+            if (e.target === historyModalOverlay) closeHistoryModal();
+        });
+    }
+
+    if (revertOriginalBtn) {
+        revertOriginalBtn.addEventListener('click', () => {
+            restoreHistoryAt(0);
+            renderHistoryList();
+            showToast('⏪ মূল আপলোডকৃত ছবিতে ফিরিয়ে নেওয়া হয়েছে', 'info');
+        });
+    }
+
+    if (resetSessionBtn) {
+        resetSessionBtn.addEventListener('click', async () => {
+            if (confirm('আপনি কি নিশ্চিত যে বর্তমান ফটো সেশন মুছে নতুন করে শুরু করতে চান?')) {
+                await clearSessionDB();
+                historyStack.forEach(h => { if (h.revoke) URL.revokeObjectURL(h.url); });
+                historyStack = [];
+                historyIndex = -1;
+                originalImage = null;
+                processedBlob = null;
+                previewImage.src = '';
+                fileInput.value = '';
+                editorSection.style.display = 'none';
+                uploadSection.style.display = 'block';
+                showToast('🗑️ সেশন মুছে ফেলা হয়েছে। নতুন ফটো আপলোড করুন।', 'info');
+            }
+        });
+    }
+
+    if (undoPaintBucketBtn) {
+        undoPaintBucketBtn.addEventListener('click', () => {
+            if (historyIndex <= 0) {
+                showToast('বাতিল করার মতো কোনো পেইন্ট ফিল নেই', 'error');
+                return;
+            }
+            undoEdit();
+            showToast('↩️ পেইন্ট বাকেট ফিল বাতিল করা হয়েছে', 'info');
+        });
+    }
+
     function updateHistoryButtons() {
         if (undoBtn) undoBtn.disabled = historyIndex <= 0;
         if (redoBtn) redoBtn.disabled = historyIndex >= historyStack.length - 1;
@@ -961,8 +1140,7 @@
     undoBtn.addEventListener('click', undoEdit);
     redoBtn.addEventListener('click', redoEdit);
 
-    // Global keyboard shortcuts for undo/redo — active editor-wide (not just
-    // inside the BG-remove tab), but never while typing in a text field.
+    // Global keyboard shortcuts for undo/redo
     document.addEventListener('keydown', (e) => {
         const tag = (e.target.tagName || '').toLowerCase();
         if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
@@ -2255,7 +2433,7 @@
                 previewImage.src = url;
                 downloadSection.style.display = 'block';
                 downloadBtn.setAttribute('data-ext', 'png');
-                pushHistory(blob);
+                pushHistory(blob, 'Paint Bucket Fill');
                 showToast('✅ পেইন্ট বাকেট প্রয়োগ হয়েছে! PNG হিসেবে ডাউনলোড করুন।', 'success');
             }, 'image/png');
         }

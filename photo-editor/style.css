@@ -1056,6 +1056,11 @@ select:focus {
     background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), var(--bg-card));
 }
 
+.toast.info {
+    border-color: rgba(59, 130, 246, 0.4);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), var(--bg-card));
+}
+
 /* ===== Floating Preview Window (Phase 2) ===== */
 .preview-placeholder {
     display: flex;
@@ -1660,4 +1665,118 @@ kbd {
 #eraseStartBtn.active,
 #wandBtn.active {
     outline: 2px solid var(--accent);
+}
+
+/* ===== History Modal & Drawer ===== */
+.history-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(5px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.history-modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    width: 500px;
+    max-width: 92vw;
+    max-height: 82vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+.history-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+.history-modal-header h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.history-close-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 24px;
+    cursor: pointer;
+    line-height: 1;
+}
+.history-close-btn:hover {
+    color: var(--text-primary);
+}
+.history-modal-body {
+    padding: 16px 20px;
+    flex: 1;
+    overflow-y: auto;
+}
+.history-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+.history-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: var(--transition);
+}
+.history-item:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--accent-primary);
+}
+.history-item.active {
+    background: rgba(230, 149, 33, 0.18);
+    border-color: var(--accent-primary);
+    font-weight: 600;
+}
+.history-item-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+.history-item-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+}
+.history-item.active .history-item-badge {
+    background: var(--accent-primary);
+    color: #000;
+    font-weight: 700;
+}
+.history-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-secondary);
 }
