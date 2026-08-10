@@ -20229,6 +20229,13 @@ var Scene = class extends Object3D {
     return data;
   }
 };
+var CanvasTexture = class extends Texture {
+  constructor(canvas2, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy) {
+    super(canvas2, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy);
+    this.isCanvasTexture = true;
+    this.needsUpdate = true;
+  }
+};
 var Curve = class {
   constructor() {
     this.type = "Curve";
@@ -24939,6 +24946,65 @@ var ANIMATION_PRESETS = {
       const wag = Math.sin(t * TAU * 3) * decay * 0.35;
       return { pos: [0, 0, 0], rot: [0, 0, wag], scaleMul: 1, opacityMul: 1 };
     }
+  },
+  // ---- Added in the animation-list finalization pass ----
+  zoomBlast: {
+    // Starts big (as if flying toward camera) and settles to scale 1 — the
+    // opposite read from popIn (which starts from nothing).
+    label: "Zoom Blast (\u0995\u09BE\u099B \u09A5\u09C7\u0995\u09C7)",
+    apply: (t) => ({ pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 1 + 2 * (1 - t), opacityMul: 1 })
+  },
+  riseUp: {
+    label: "Rise Up (\u09A8\u09BF\u099A \u09A5\u09C7\u0995\u09C7)",
+    apply: (t) => ({ pos: [0, -220 * (1 - t), 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: 1 })
+  },
+  flipInY: {
+    // Vertical-axis flip, distinct from flipIn's horizontal-axis (X) flip.
+    label: "Flip In (\u0989\u09B2\u09CD\u09B2\u09AE\u09CD\u09AC)",
+    apply: (t) => ({ pos: [0, 0, 0], rot: [0, Math.PI * (1 - t), 0], scaleMul: 1, opacityMul: 1 })
+  },
+  rotateInReverse: {
+    // Same idea as rotateIn but spins the opposite direction — kept as a
+    // separate preset (not a "reverse" checkbox) so it stays a single-click
+    // choice like every other preset.
+    label: "Rotate In (\u0989\u09B2\u09CD\u099F\u09CB \u09A6\u09BF\u0995\u09C7)",
+    apply: (t) => ({ pos: [0, 0, 0], rot: [0, -TAU * (1 - t), 0], scaleMul: 1, opacityMul: 1 })
+  },
+  spinPop: {
+    // Combo preset: two full spins while scaling up from nothing.
+    label: "Spin + Pop",
+    apply: (t) => ({ pos: [0, 0, 0], rot: [0, TAU * 2 * (1 - t), 0], scaleMul: t, opacityMul: 1 })
+  },
+  swingIn: {
+    // Pendulum-style decaying tilt on the X axis (front/back), distinct from
+    // wobble's Z-axis (roll) wiggle. Starts at a wide swing and settles flat.
+    label: "Swing In (\u09A6\u09CB\u09B2\u09A8\u09BE)",
+    apply: (t) => {
+      const decay = Math.max(0, 1 - t);
+      const swing = Math.sin((1 - t) * TAU * 1.5) * decay * 0.5;
+      return { pos: [0, 0, 0], rot: [swing, 0, 0], scaleMul: 1, opacityMul: 1 };
+    }
+  },
+  diagonalIn: {
+    // Slides in from the top-left corner (combined X+Y offset) rather than a
+    // single axis like slideInLeft/dropIn.
+    label: "Diagonal In (\u0995\u09CB\u09A3 \u09A5\u09C7\u0995\u09C7)",
+    apply: (t) => ({ pos: [-200 * (1 - t), 150 * (1 - t), 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: 1 })
+  },
+  squashDrop: {
+    // Drop In with a squash-and-stretch landing: falls from above, and right
+    // as it lands the scale briefly squashes (wide/short) before settling to
+    // exactly 1 — a cheap but effective "weight" cue. `landPhase` is clamped
+    // to [0,1] and the squash uses sin(landPhase * PI), which is exactly 0
+    // at both landPhase=0 (still falling) and landPhase=1 (t=1, landed) —
+    // no floating-point residue to worry about at the t=1 neutral check.
+    label: "Drop In (\u09B8\u09CD\u0995\u09CB\u09AF\u09BC\u09BE\u09B6 \u09B8\u09B9)",
+    apply: (t) => {
+      const fall = 220 * (1 - t);
+      const landPhase = Math.min(1, Math.max(0, (t - 0.85) / 0.15));
+      const squash = t >= 1 ? 0 : Math.sin(landPhase * Math.PI) * 0.25;
+      return { pos: [0, fall, 0], rot: [0, 0, 0], scaleMul: 1 + squash, opacityMul: 1 };
+    }
   }
 };
 
@@ -25068,7 +25134,14 @@ async function exportPngSequence(deps, opts, callbacks = {}) {
 var statusNote = document.getElementById("statusNote");
 var canvas = document.getElementById("scene-canvas");
 var viewportEl = document.getElementById("viewport");
+var contentModeGrid = document.getElementById("contentModeGrid");
+var textContentSection = document.getElementById("textContentSection");
+var imageContentSection = document.getElementById("imageContentSection");
 var textInput = document.getElementById("textInput");
+var textModeNote = document.getElementById("textModeNote");
+var imageFileInput = document.getElementById("imageFileInput");
+var imagePreviewThumb = document.getElementById("imagePreviewThumb");
+var imageNote = document.getElementById("imageNote");
 var depthRange = document.getElementById("depthRange");
 var depthValue = document.getElementById("depthValue");
 var sizeRange = document.getElementById("sizeRange");
@@ -25216,6 +25289,10 @@ function buildLightingPreset(preset) {
 var font = null;
 var textMesh = null;
 var state = {
+  contentMode: "text",
+  // §8.2: 'text' | 'image' — mutually exclusive, one active object at a time
+  imageElement: null,
+  // HTMLImageElement of the uploaded photo, null until one is chosen
   text: textInput.value,
   depth: Number(depthRange.value),
   size: Number(sizeRange.value),
@@ -25304,28 +25381,118 @@ function buildMaterial(type, colorHex) {
       return new MeshStandardMaterial({ color });
   }
 }
-function rebuildTextMesh() {
-  if (!font) return;
-  if (textMesh) {
-    scene.remove(textMesh);
-    textMesh.traverse((child) => {
-      if (child.isMesh) {
-        if (child.geometry) child.geometry.dispose();
-        if (child.material) {
-          if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
-          else child.material.dispose();
-        }
-      }
-    });
-    textMesh = null;
+var BANGLA_RANGE = /[\u0980-\u09FF]/;
+function isBanglaText(str) {
+  return BANGLA_RANGE.test(str) || /[^\x00-\x7F]/.test(str);
+}
+var CANVAS_TEXT_FONT_STACK = '"Noto Sans Bengali","Nirmala UI","Vrinda UI","Vrinda","Kalpurush","Siyam Rupali","Bangla Sans UI","Segoe UI",sans-serif';
+var CANVAS_TEXT_FONT_PX = 220;
+var CANVAS_TEXT_LINE_HEIGHT_PX = CANVAS_TEXT_FONT_PX * 1.35;
+var CANVAS_TEXT_PAD_PX = CANVAS_TEXT_FONT_PX * 0.35;
+function drawCanvasTextTexture(lines) {
+  const measureCtx = document.createElement("canvas").getContext("2d");
+  measureCtx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${CANVAS_TEXT_FONT_STACK}`;
+  const maxWidthPx = Math.max(1, ...lines.map((l) => measureCtx.measureText(l).width));
+  const canvasW = Math.ceil(maxWidthPx + CANVAS_TEXT_PAD_PX * 2);
+  const canvasH = Math.ceil(CANVAS_TEXT_LINE_HEIGHT_PX * lines.length + CANVAS_TEXT_PAD_PX * 2);
+  const canvas2 = document.createElement("canvas");
+  canvas2.width = canvasW;
+  canvas2.height = canvasH;
+  const ctx = canvas2.getContext("2d");
+  ctx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${CANVAS_TEXT_FONT_STACK}`;
+  ctx.fillStyle = "#ffffff";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  lines.forEach((line, i) => {
+    const y = CANVAS_TEXT_PAD_PX + CANVAS_TEXT_LINE_HEIGHT_PX * i + CANVAS_TEXT_LINE_HEIGHT_PX / 2;
+    ctx.fillText(line, canvasW / 2, y);
+  });
+  return { canvas: canvas2, aspect: canvasW / canvasH };
+}
+function makeCardTexture(canvas2, mirrored) {
+  const tex = new CanvasTexture(canvas2);
+  tex.colorSpace = SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  if (mirrored) {
+    tex.wrapS = RepeatWrapping;
+    tex.repeat.x = -1;
+    tex.offset.x = 1;
   }
-  const rawContent = state.text || " ";
-  const lines = rawContent.split(/\r?\n/);
+  tex.needsUpdate = true;
+  return tex;
+}
+function buildCanvasCardMaterials(frontTex, backTex, isImage = false) {
+  const sideMat = buildMaterial(state.materialType, state.color);
+  const faceColor = isImage ? "#ffffff" : state.color;
+  const frontMat = buildMaterial(state.materialType, faceColor);
+  frontMat.map = frontTex;
+  frontMat.transparent = true;
+  frontMat.alphaTest = isImage ? 0.05 : 0.4;
+  frontMat.needsUpdate = true;
+  const backMat = buildMaterial(state.materialType, faceColor);
+  backMat.map = backTex;
+  backMat.transparent = true;
+  backMat.alphaTest = isImage ? 0.05 : 0.4;
+  backMat.needsUpdate = true;
+  return [sideMat, sideMat, sideMat, sideMat, frontMat, backMat];
+}
+var IMAGE_TEXTURE_MAX_PX = { low: 512, medium: 1024, high: 2048 };
+function drawImageCardCanvas(img) {
+  const srcW = img.naturalWidth || img.width || 1;
+  const srcH = img.naturalHeight || img.height || 1;
+  const maxDim = IMAGE_TEXTURE_MAX_PX[state.quality] || IMAGE_TEXTURE_MAX_PX.medium;
+  const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+  const canvas2 = document.createElement("canvas");
+  canvas2.width = Math.max(1, Math.round(srcW * scale));
+  canvas2.height = Math.max(1, Math.round(srcH * scale));
+  const ctx = canvas2.getContext("2d");
+  ctx.drawImage(img, 0, 0, canvas2.width, canvas2.height);
+  return { canvas: canvas2, aspect: srcW / srcH };
+}
+function buildImageCardMesh(img) {
+  const { canvas: canvas2, aspect: aspect2 } = drawImageCardCanvas(img);
+  const frontTex = makeCardTexture(canvas2, false);
+  const backTex = makeCardTexture(canvas2, false);
+  const worldHeight = state.size * 1.6;
+  const worldWidth = worldHeight * aspect2;
+  const depth = Math.max(1, state.depth);
+  const geometry = new BoxGeometry(worldWidth, worldHeight, depth);
+  const materials = buildCanvasCardMaterials(frontTex, backTex, true);
+  const mesh = new Mesh(geometry, materials);
+  mesh.castShadow = state.shadowsOn;
+  mesh.receiveShadow = state.shadowsOn;
+  const group = new Group();
+  group.add(mesh);
+  group.userData.frontTex = frontTex;
+  group.userData.backTex = backTex;
+  renderMode = "canvas";
+  textMesh = group;
+  textMesh.material = materials;
+}
+var renderMode = "vector";
+function disposeTextMesh() {
+  if (!textMesh) return;
+  scene.remove(textMesh);
+  if (textMesh.userData) {
+    if (textMesh.userData.frontTex) textMesh.userData.frontTex.dispose();
+    if (textMesh.userData.backTex) textMesh.userData.backTex.dispose();
+  }
+  textMesh.traverse((child) => {
+    if (child.isMesh) {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose());
+        else child.material.dispose();
+      }
+    }
+  });
+  textMesh = null;
+}
+function buildVectorTextMesh(validLines) {
   const q = QUALITY_PRESETS[state.quality];
   const lineHeight = state.size * 1.35;
   const group = new Group();
   const material = buildMaterial(state.materialType, state.color);
-  const validLines = lines.map((l) => l.length > 0 ? l : " ");
   const totalLinesHeight = (validLines.length - 1) * lineHeight;
   validLines.forEach((lineStr, idx) => {
     const hasText = lineStr.trim().length > 0;
@@ -25350,11 +25517,60 @@ function rebuildTextMesh() {
     lineMesh.position.y = totalLinesHeight / 2 - idx * lineHeight;
     group.add(lineMesh);
   });
+  renderMode = "vector";
   textMesh = group;
   textMesh.material = material;
+}
+function buildCanvasCardTextMesh(validLines) {
+  const { canvas: canvas2, aspect: aspect2 } = drawCanvasTextTexture(validLines);
+  const frontTex = makeCardTexture(canvas2, false);
+  const backTex = makeCardTexture(canvas2, true);
+  const lineHeight = state.size * 1.35;
+  const worldHeight = lineHeight * validLines.length + state.size * 0.5;
+  const worldWidth = worldHeight * aspect2;
+  const depth = Math.max(1, state.depth);
+  const geometry = new BoxGeometry(worldWidth, worldHeight, depth);
+  const materials = buildCanvasCardMaterials(frontTex, backTex, false);
+  const mesh = new Mesh(geometry, materials);
+  mesh.castShadow = state.shadowsOn;
+  mesh.receiveShadow = state.shadowsOn;
+  const group = new Group();
+  group.add(mesh);
+  group.userData.frontTex = frontTex;
+  group.userData.backTex = backTex;
+  renderMode = "canvas";
+  textMesh = group;
+  textMesh.material = materials;
+}
+function rebuildTextMesh() {
+  if (state.contentMode === "image") {
+    disposeTextMesh();
+    if (!state.imageElement) {
+      updateQualityNote();
+      updateTextModeNote(false);
+      return;
+    }
+    buildImageCardMesh(state.imageElement);
+    applyRotation();
+    scene.add(textMesh);
+    updateQualityNote();
+    updateTextModeNote(false);
+    return;
+  }
+  if (!font) return;
+  disposeTextMesh();
+  const rawContent = state.text || " ";
+  const lines = rawContent.split(/\r?\n/);
+  const validLines = lines.map((l) => l.length > 0 ? l : " ");
+  if (isBanglaText(rawContent)) {
+    buildCanvasCardTextMesh(validLines);
+  } else {
+    buildVectorTextMesh(validLines);
+  }
   applyRotation();
   scene.add(textMesh);
   updateQualityNote();
+  updateTextModeNote(isBanglaText(rawContent));
 }
 function applyQuality() {
   const q = QUALITY_PRESETS[state.quality];
@@ -25378,6 +25594,11 @@ function updateQualityNote() {
   const triLabel = triCount > 0 ? triCount.toLocaleString("bn-BD") : "\u2014";
   qualityNote.textContent = `\u09AC\u09B0\u09CD\u09A4\u09AE\u09BE\u09A8: ~${triLabel} \u099F\u09CD\u09B0\u09BE\u09AF\u09BC\u09BE\u0999\u09CD\u0997\u09C7\u09B2, \u09AA\u09BF\u0995\u09CD\u09B8\u09C7\u09B2-\u09B0\u09C7\u09B6\u09BF\u0993 \u09B8\u09B0\u09CD\u09AC\u09CB\u099A\u09CD\u099A ${q.pixelRatioCap}x, \u09B6\u09CD\u09AF\u09BE\u09A1\u09CB \u09AE\u09CD\u09AF\u09BE\u09AA ${q.shadowMapSize}px\u0964 \u09B2\u09CB-\u098F\u09A8\u09CD\u09A1 \u09A1\u09BF\u09AD\u09BE\u0987\u09B8/\u0995\u09AE-\u09B6\u0995\u09CD\u09A4\u09BF\u09B0 \u09AA\u09BF\u09B8\u09BF\u09A4\u09C7 \u09B2\u09CD\u09AF\u09BE\u0997 \u09B9\u09B2\u09C7 "Low" \u09AC\u09C7\u099B\u09C7 \u09A8\u09BF\u09A8\u0964`;
 }
+function updateTextModeNote(isBangla) {
+  if (!textModeNote) return;
+  textModeNote.textContent = isBangla ? "\u09AC\u09BE\u0982\u09B2\u09BE \u09B2\u09C7\u0996\u09BE \u09B6\u09A8\u09BE\u0995\u09CD\u09A4 \u09B9\u09AF\u09BC\u09C7\u099B\u09C7 \u2014 \u099B\u09AC\u09BF-\u099F\u09C7\u0995\u09CD\u09B8\u099A\u09BE\u09B0 \u0995\u09BE\u09B0\u09CD\u09A1 \u09AE\u09CB\u09A1\u09C7 \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7 (\u09AC\u09CD\u09B0\u09BE\u0989\u099C\u09BE\u09B0\u09C7\u09B0 \u09A8\u09BF\u099C\u09B8\u09CD\u09AC \u09AC\u09BE\u0982\u09B2\u09BE \u09AB\u09A8\u09CD\u099F/\u09B6\u09C7\u09AA\u09BF\u0982 \u09AC\u09CD\u09AF\u09AC\u09B9\u09BE\u09B0 \u0995\u09B0\u09C7, \u09A4\u09BE\u0987 \u09AF\u09C1\u0995\u09CD\u09A4\u09BE\u0995\u09CD\u09B7\u09B0/\u09AE\u09BE\u09A4\u09CD\u09B0\u09BE \u09A0\u09BF\u0995\u09AD\u09BE\u09AC\u09C7 \u09AC\u09B8\u09C7), \u09AC\u09BE\u0995\u09CD\u09AF\u09C7\u09B0 \u09AA\u09CD\u09B0\u09BE\u09A8\u09CD\u09A4 \u09A5\u09C7\u0995\u09C7 \u0997\u09AD\u09C0\u09B0\u09A4\u09BE \u09AC\u09C7\u09B0 \u09B9\u09AF\u09BC \u2014 \u0986\u09B2\u09BE\u09A6\u09BE \u0986\u09B2\u09BE\u09A6\u09BE \u0985\u0995\u09CD\u09B7\u09B0\u09C7\u09B0 \u0995\u09BF\u09A8\u09BE\u09B0\u09BE \u09A5\u09C7\u0995\u09C7 \u09A8\u09BE\u0964" : "";
+  textModeNote.hidden = !isBangla;
+}
 function applyRotation() {
   if (!textMesh) return;
   textMesh.rotation.set(
@@ -25388,6 +25609,16 @@ function applyRotation() {
 }
 function applyMaterial() {
   if (!textMesh) return;
+  if (renderMode === "canvas") {
+    const mesh = textMesh.children[0];
+    if (!mesh) return;
+    const old = mesh.material;
+    const materials = buildCanvasCardMaterials(textMesh.userData.frontTex, textMesh.userData.backTex, state.contentMode === "image");
+    mesh.material = materials;
+    textMesh.material = materials;
+    if (Array.isArray(old)) old.forEach((m) => m.dispose());
+    return;
+  }
   const newMat = buildMaterial(state.materialType, state.color);
   textMesh.material = newMat;
   textMesh.traverse((child) => {
@@ -25432,8 +25663,11 @@ function applyPresetOffset(preset, t) {
   const finalOpacity = Math.min(1, Math.max(0, opacityMul)) * baseOpacity;
   textMesh.traverse((child) => {
     if (child.isMesh && child.material) {
-      child.material.transparent = true;
-      child.material.opacity = finalOpacity;
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      materials.forEach((m) => {
+        m.transparent = true;
+        m.opacity = finalOpacity;
+      });
     }
   });
 }
@@ -25445,8 +25679,11 @@ function resetMeshToBaseTransform() {
   const baseOpacity = getBaseOpacity();
   textMesh.traverse((child) => {
     if (child.isMesh && child.material) {
-      child.material.transparent = state.materialType === "glass";
-      child.material.opacity = baseOpacity;
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      materials.forEach((m) => {
+        m.transparent = m.map ? true : state.materialType === "glass";
+        m.opacity = baseOpacity;
+      });
     }
   });
 }
@@ -25519,6 +25756,45 @@ function scheduleRebuild() {
 textInput.addEventListener("input", () => {
   state.text = textInput.value;
   scheduleRebuild();
+});
+contentModeGrid.addEventListener("click", (e) => {
+  const btn = e.target.closest(".preset-btn");
+  if (!btn) return;
+  state.contentMode = btn.dataset.content;
+  setActivePreset(contentModeGrid, "content", state.contentMode);
+  textContentSection.hidden = state.contentMode !== "text";
+  imageContentSection.hidden = state.contentMode !== "image";
+  stopAnimation();
+  rebuildTextMesh();
+  updateExportSourceNote();
+});
+imageFileInput.addEventListener("change", () => {
+  const file = imageFileInput.files && imageFileInput.files[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    imageNote.textContent = "\u09B6\u09C1\u09A7\u09C1 \u0987\u09AE\u09C7\u099C \u09AB\u09BE\u0987\u09B2 \u09B8\u09BE\u09AA\u09CB\u09B0\u09CD\u099F\u09C7\u09A1 (JPG/PNG/WebP \u0987\u09A4\u09CD\u09AF\u09BE\u09A6\u09BF)\u0964";
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      state.imageElement = img;
+      imagePreviewThumb.src = reader.result;
+      imagePreviewThumb.hidden = false;
+      const capPx = IMAGE_TEXTURE_MAX_PX[state.quality];
+      imageNote.textContent = `${file.name} \u2014 \u09AE\u09C2\u09B2 ${img.naturalWidth}\xD7${img.naturalHeight}px, \u09AC\u09B0\u09CD\u09A4\u09AE\u09BE\u09A8 \u0995\u09CB\u09AF\u09BC\u09BE\u09B2\u09BF\u099F\u09BF \u09AA\u09CD\u09B0\u09BF\u09B8\u09C7\u099F \u0985\u09A8\u09C1\u09AF\u09BE\u09AF\u09BC\u09C0 \u099F\u09C7\u0995\u09CD\u09B8\u099A\u09BE\u09B0 \u09B8\u09B0\u09CD\u09AC\u09CB\u099A\u09CD\u099A ${capPx}px-\u098F \u09AC\u09CD\u09AF\u09AC\u09B9\u09BE\u09B0 \u09B9\u09AC\u09C7\u0964`;
+      rebuildTextMesh();
+    };
+    img.onerror = () => {
+      imageNote.textContent = "\u099B\u09AC\u09BF\u099F\u09BE \u09B2\u09CB\u09A1 \u0995\u09B0\u09BE \u09AF\u09BE\u09AF\u09BC\u09A8\u09BF \u2014 \u09AB\u09BE\u0987\u09B2\u099F\u09BE \u0995\u09BF \u09A0\u09BF\u0995 \u0986\u099B\u09C7 \u09A6\u09C7\u0996\u09C1\u09A8\u0964";
+    };
+    img.src = reader.result;
+  };
+  reader.onerror = () => {
+    imageNote.textContent = "\u09AB\u09BE\u0987\u09B2\u099F\u09BE \u09AA\u09A1\u09BC\u09BE \u09AF\u09BE\u09AF\u09BC\u09A8\u09BF\u0964";
+  };
+  reader.readAsDataURL(file);
 });
 depthRange.addEventListener("input", () => {
   state.depth = Number(depthRange.value);
@@ -25736,6 +26012,10 @@ turntableLengthRange.addEventListener("input", () => {
   updateExportSourceNote();
 });
 exportBtn.addEventListener("click", async () => {
+  if (!textMesh) {
+    updateExportProgress(0, "\u0995\u09CB\u09A8\u09CB \u0985\u09CD\u09AF\u09BE\u0995\u09CD\u099F\u09BF\u09AD \u0985\u09AC\u099C\u09C7\u0995\u09CD\u099F \u09A8\u09C7\u0987 \u2014 \u0986\u0997\u09C7 \u099F\u09C7\u0995\u09CD\u09B8\u099F \u09B2\u09BF\u0996\u09C1\u09A8 \u09AC\u09BE \u099B\u09AC\u09BF \u0986\u09AA\u09B2\u09CB\u09A1 \u0995\u09B0\u09C1\u09A8\u0964");
+    return;
+  }
   stopAnimation();
   if (lastExportUrl) {
     URL.revokeObjectURL(lastExportUrl);
@@ -25803,6 +26083,7 @@ exportBtn.addEventListener("click", async () => {
     document.body.classList.remove("is-exporting");
   }
 });
+setActivePreset(contentModeGrid, "content", state.contentMode);
 setActivePreset(materialPresetGrid, "material", state.materialType);
 setActivePreset(lightingPresetGrid, "lighting", state.lightingPreset);
 setActivePreset(animPresetGrid, "anim", animState.presetId);

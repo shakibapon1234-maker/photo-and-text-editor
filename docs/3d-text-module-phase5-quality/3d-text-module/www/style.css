@@ -197,6 +197,26 @@ body { display: flex; flex-direction: column; }
   color: var(--accent);
 }
 
+/* ---------- image content (§8.2) ---------- */
+.file-field input[type="file"] {
+  flex: 1 1 auto;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.image-preview-thumb {
+  display: block;
+  width: 100%;
+  max-height: 140px;
+  object-fit: contain;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin: 8px 0;
+}
+.image-preview-thumb[hidden] {
+  display: none;
+}
+
 /* ---------- preset buttons (Phase 2) ---------- */
 .preset-grid {
   display: grid;

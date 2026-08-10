@@ -361,7 +361,8 @@ function buildMaterial(type, colorHex) {
 // original per-glyph TextGeometry path.
 const BANGLA_RANGE = /[\u0980-\u09FF]/;
 function isBanglaText(str) {
-  return BANGLA_RANGE.test(str);
+  // Checks if string contains Bengali Unicode range or any non-ASCII character not present in Latin Helvetiker font
+  return BANGLA_RANGE.test(str) || /[^\x00-\x7F]/.test(str);
 }
 
 const CANVAS_TEXT_FONT_STACK =
@@ -419,19 +420,23 @@ function makeCardTexture(canvas, mirrored) {
 // with alphaTest so background pixels are fully discarded (no
 // transparency-sorting artifacts); the 4 side slots get a plain material of
 // the current preset, standing in for the card's extruded edge.
-function buildCanvasCardMaterials(frontTex, backTex) {
+function buildCanvasCardMaterials(frontTex, backTex, isImage = false) {
   const sideMat = buildMaterial(state.materialType, state.color);
 
-  const frontMat = buildMaterial(state.materialType, state.color);
+  // For text card, font glyphs are white and get tinted by state.color.
+  // For photo/image card, texture contains full-color photo pixels, so front/back color should be white (#ffffff) to preserve photo colors!
+  const faceColor = isImage ? '#ffffff' : state.color;
+
+  const frontMat = buildMaterial(state.materialType, faceColor);
   frontMat.map = frontTex;
   frontMat.transparent = true;
-  frontMat.alphaTest = 0.4;
+  frontMat.alphaTest = isImage ? 0.05 : 0.4;
   frontMat.needsUpdate = true;
 
-  const backMat = buildMaterial(state.materialType, state.color);
+  const backMat = buildMaterial(state.materialType, faceColor);
   backMat.map = backTex;
   backMat.transparent = true;
-  backMat.alphaTest = 0.4;
+  backMat.alphaTest = isImage ? 0.05 : 0.4;
   backMat.needsUpdate = true;
 
   return [sideMat, sideMat, sideMat, sideMat, frontMat, backMat];
@@ -483,7 +488,7 @@ function buildImageCardMesh(img) {
   const depth = Math.max(1, state.depth);
 
   const geometry = new THREE.BoxGeometry(worldWidth, worldHeight, depth);
-  const materials = buildCanvasCardMaterials(frontTex, backTex);
+  const materials = buildCanvasCardMaterials(frontTex, backTex, true);
   const mesh = new THREE.Mesh(geometry, materials);
   mesh.castShadow = state.shadowsOn;
   mesh.receiveShadow = state.shadowsOn;
@@ -580,7 +585,7 @@ function buildCanvasCardTextMesh(validLines) {
   const depth = Math.max(1, state.depth);
 
   const geometry = new THREE.BoxGeometry(worldWidth, worldHeight, depth);
-  const materials = buildCanvasCardMaterials(frontTex, backTex);
+  const materials = buildCanvasCardMaterials(frontTex, backTex, false);
   const mesh = new THREE.Mesh(geometry, materials);
   mesh.castShadow = state.shadowsOn;
   mesh.receiveShadow = state.shadowsOn;
@@ -695,7 +700,7 @@ function applyMaterial() {
     const mesh = textMesh.children[0];
     if (!mesh) return;
     const old = mesh.material;
-    const materials = buildCanvasCardMaterials(textMesh.userData.frontTex, textMesh.userData.backTex);
+    const materials = buildCanvasCardMaterials(textMesh.userData.frontTex, textMesh.userData.backTex, state.contentMode === 'image');
     mesh.material = materials;
     textMesh.material = materials;
     if (Array.isArray(old)) old.forEach((m) => m.dispose());
