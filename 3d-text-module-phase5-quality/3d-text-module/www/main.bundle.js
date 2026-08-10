@@ -26463,7 +26463,9 @@ var STICKER_SHAPE_SIZING = {
   stamp: { square: true, padMul: 1.08 },
   ribbon: { square: false, padMul: 1.15, pointExtraW: 0.22 },
   speech: { square: false, padMul: 1, tailRatio: 0.22 },
-  radiant: { square: true, padMul: 1.7 }
+  radiant: { square: true, padMul: 1.7 },
+  starSpray: { square: true, padMul: 1.85 },
+  letterBlocks: { square: false, padMul: 1.2 }
 };
 function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = { curveIntensity: 0 }, borderOpts = {}) {
   const { borderWidth = 0, borderColor = "#ffffff", shadow = false } = borderOpts;
@@ -26481,7 +26483,8 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
   const textBlockH = lineHeightPx * lines.length + maxBulge * 2;
   const sizing = STICKER_SHAPE_SIZING[shape] || STICKER_SHAPE_SIZING.circle;
   const extraPadding = (borderWidth || 0) * 2 + (shadow ? 24 : 0);
-  const padPx = Math.max(textMaxWidthPx, textBlockH) * STICKER_PAD_RATIO * sizing.padMul + extraPadding;
+  let padPx = Math.max(textMaxWidthPx, textBlockH) * STICKER_PAD_RATIO * sizing.padMul + extraPadding;
+  if (shape === "speech") padPx += STICKER_FONT_PX * 0.8;
   let canvasW;
   let bodyH;
   if (sizing.square) {
@@ -26489,7 +26492,7 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
     canvasW = diameter;
     bodyH = diameter;
   } else {
-    canvasW = Math.ceil(textMaxWidthPx + padPx * 2 + (sizing.pointExtraW || 0) * textMaxWidthPx);
+    canvasW = Math.ceil(textMaxWidthPx + padPx * 2.2 + (sizing.pointExtraW || 0) * textMaxWidthPx);
     bodyH = Math.ceil(textBlockH + padPx * 1.4);
   }
   const tailPx = sizing.tailRatio ? Math.round(bodyH * sizing.tailRatio) : 0;
@@ -26507,9 +26510,10 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
   ctx.fillStyle = textColor;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+  const textCenterX = shape === "speech" ? canvasW / 2 + Math.min(canvasW, bodyH) * 0.08 : canvasW / 2;
   const startY = bodyH / 2 - textBlockH / 2 + maxBulge + lineHeightPx / 2;
   perLine.forEach(({ clusters, layout }, i) => {
-    drawCurvedLine(ctx, clusters, layout, canvasW / 2, startY + lineHeightPx * i);
+    drawCurvedLine(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i);
   });
   ctx.restore();
   return { canvas: canvas2, aspect: canvasW / canvasH };
@@ -26581,6 +26585,127 @@ function drawConfettiStars(ctx, cx, cy, outerR, color) {
   }
   ctx.restore();
 }
+function drawPeeledStickerCorner(ctx, cx, cy, r) {
+  ctx.save();
+  const foldX = cx + r * 0.45;
+  const foldY = cy + r * 0.45;
+  const tipX = cx + r * 0.88;
+  const tipY = cy + r * 0.88;
+  ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+  ctx.shadowBlur = 12;
+  ctx.shadowOffsetX = -4;
+  ctx.shadowOffsetY = -4;
+  ctx.fillStyle = "#f0f0f0";
+  ctx.beginPath();
+  ctx.moveTo(cx + r * 0.42, cy + r * 0.95);
+  ctx.lineTo(tipX, tipY);
+  ctx.lineTo(cx + r * 0.95, cy + r * 0.42);
+  ctx.closePath();
+  ctx.fill();
+  const grad = ctx.createLinearGradient(foldX, foldY, tipX, tipY);
+  grad.addColorStop(0, "#ffffff");
+  grad.addColorStop(1, "#d6d6d6");
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.moveTo(cx + r * 0.48, cy + r * 0.9);
+  ctx.lineTo(foldX, foldY);
+  ctx.lineTo(cx + r * 0.9, cy + r * 0.48);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+function drawRubberStampFrame(ctx, w, h, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(5, Math.min(w, h) * 0.05);
+  ctx.lineJoin = "miter";
+  ctx.strokeRect(4, 4, w - 8, h - 8);
+  ctx.lineWidth = Math.max(2, Math.min(w, h) * 0.02);
+  const inset = Math.max(10, Math.min(w, h) * 0.08);
+  ctx.strokeRect(inset, inset, w - inset * 2, h - inset * 2);
+  ctx.restore();
+}
+function drawAlarmClockIcon(ctx, x, y, size, color) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(2, size * 0.08);
+  const r = size * 0.36;
+  const cx = x + size / 2;
+  const cy = y + size / 2 + size * 0.06;
+  ctx.beginPath();
+  ctx.arc(cx - r * 0.7, cy - r * 0.7, r * 0.32, Math.PI * 0.8, Math.PI * 1.8);
+  ctx.arc(cx + r * 0.7, cy - r * 0.7, r * 0.32, Math.PI * 1.2, Math.PI * 0.2);
+  ctx.stroke();
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx - r * 0.4, cy - r * 0.4);
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + r * 0.5, cy - r * 0.3);
+  ctx.stroke();
+  ctx.restore();
+}
+function drawStarClusterSpray(ctx, cx, cy, outerR) {
+  ctx.save();
+  const starColors = ["#4caf50", "#ffeb3b", "#ff9800", "#00bcd4", "#e91e63", "#9c27b0"];
+  const starCount = 8;
+  for (let i = 0; i < starCount; i++) {
+    const angle = i / starCount * Math.PI * 2 - Math.PI / 2;
+    const dist = outerR * (0.85 + i % 3 * 0.08);
+    const starR = outerR * (0.16 + i % 2 * 0.05);
+    const sx = cx + Math.cos(angle) * dist;
+    const sy = cy + Math.sin(angle) * dist;
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    drawStarPolygonPath(ctx, sx + 2, sy + 2, starR, starR * 0.45, 5);
+    ctx.fill();
+    ctx.fillStyle = starColors[i % starColors.length];
+    drawStarPolygonPath(ctx, sx, sy, starR, starR * 0.45, 5);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+function drawCelebrationRays(ctx, cx, cy, outerR) {
+  ctx.save();
+  const rayCount = 14;
+  for (let i = 0; i < rayCount; i++) {
+    const angle = i / rayCount * Math.PI * 2;
+    const len = outerR * (0.82 + i % 2 * 0.18);
+    ctx.strokeStyle = i % 2 === 0 ? "#ffd700" : "#d0d0d0";
+    ctx.lineWidth = Math.max(3, outerR * 0.04);
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(angle) * (outerR * 0.35), cy + Math.sin(angle) * (outerR * 0.35));
+    ctx.lineTo(cx + Math.cos(angle) * len, cy + Math.sin(angle) * len);
+    ctx.stroke();
+    if (i % 2 === 0) {
+      ctx.fillStyle = "#ffb300";
+      drawStarPolygonPath(ctx, cx + Math.cos(angle) * len, cy + Math.sin(angle) * len, outerR * 0.08, outerR * 0.04, 4);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+function drawLetterBlocksBackground(ctx, w, h, color) {
+  ctx.save();
+  const pad = Math.max(6, Math.min(w, h) * 0.06);
+  const blockR = Math.max(8, Math.min(w, h) * 0.08);
+  ctx.fillStyle = color === "#e5484d" ? "#fbc02d" : color;
+  drawRoundedRectPath(ctx, pad, pad, w - pad * 2, h - pad * 2, blockR);
+  ctx.fill();
+  ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+  ctx.beginPath();
+  ctx.moveTo(pad, h - pad - blockR);
+  ctx.lineTo(pad + 6, h - pad);
+  ctx.lineTo(w - pad - 6, h - pad);
+  ctx.lineTo(w - pad, h - pad - blockR);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
 function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, borderColor = "#ffffff", shadow = false) {
   const cx = w / 2;
   const cy = bodyH / 2;
@@ -26598,12 +26723,16 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
       ctx.fill();
       break;
     case "starburst":
-      drawStarPolygonPath(ctx, cx, cy, outerR, outerR * 0.72, 12);
+      drawStarPolygonPath(ctx, cx, cy, outerR, outerR * 0.72, 14);
       ctx.fill();
+      ctx.lineWidth = Math.max(3, outerR * 0.05);
+      ctx.strokeStyle = "#111111";
+      ctx.stroke();
       break;
     case "stamp":
       drawScallopedCirclePath(ctx, cx, cy, outerR, outerR * 0.92, 20);
       ctx.fill();
+      drawRubberStampFrame(ctx, w, bodyH, color === "#e5484d" ? "#c62828" : color);
       break;
     case "ribbon":
       drawRibbonPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.28);
@@ -26612,16 +26741,31 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
     case "speech":
       drawSpeechBubblePath(ctx, 0, 0, w, bodyH, tailPx, Math.min(w, bodyH) * 0.18);
       ctx.fill();
+      drawAlarmClockIcon(ctx, Math.min(w, bodyH) * 0.04, Math.min(w, bodyH) * 0.06, Math.min(w, bodyH) * 0.22, "#d32f2f");
       break;
     case "radiant": {
-      const coreR = outerR * 0.55;
-      drawStarPolygonPath(ctx, cx, cy, outerR, coreR * 0.98, 20);
+      drawCelebrationRays(ctx, cx, cy, outerR);
+      const coreW = w * 0.75;
+      const coreH = bodyH * 0.55;
+      ctx.fillStyle = "#ffffff";
+      drawRoundedRectPath(ctx, (w - coreW) / 2, (bodyH - coreH) / 2, coreW, coreH, 8);
+      ctx.fill();
+      drawConfettiStars(ctx, cx, cy, outerR, color);
+      break;
+    }
+    case "starSpray": {
+      drawStarClusterSpray(ctx, cx, cy, outerR);
+      const coreR = outerR * 0.65;
+      drawStarPolygonPath(ctx, cx, cy, outerR * 0.85, coreR, 16);
       ctx.fill();
       ctx.beginPath();
       ctx.ellipse(cx, cy, coreR, coreR, 0, 0, Math.PI * 2);
       ctx.closePath();
       ctx.fill();
-      drawConfettiStars(ctx, cx, cy, outerR, color);
+      break;
+    }
+    case "letterBlocks": {
+      drawLetterBlocksBackground(ctx, w, bodyH, color);
       break;
     }
     case "circle":
@@ -26630,6 +26774,7 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
       ctx.ellipse(cx, cy, w / 2, bodyH / 2, 0, 0, Math.PI * 2);
       ctx.closePath();
       ctx.fill();
+      drawPeeledStickerCorner(ctx, cx, cy, outerR);
       break;
   }
   ctx.restore();
@@ -26641,11 +26786,12 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
     ctx.lineCap = "round";
     switch (shape) {
       case "roundedRect":
+      case "letterBlocks":
         drawRoundedRectPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.16);
         ctx.stroke();
         break;
       case "starburst":
-        drawStarPolygonPath(ctx, cx, cy, outerR, outerR * 0.72, 12);
+        drawStarPolygonPath(ctx, cx, cy, outerR, outerR * 0.72, 14);
         ctx.stroke();
         break;
       case "stamp":
@@ -26660,7 +26806,8 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
         drawSpeechBubblePath(ctx, 0, 0, w, bodyH, tailPx, Math.min(w, bodyH) * 0.18);
         ctx.stroke();
         break;
-      case "radiant": {
+      case "radiant":
+      case "starSpray": {
         const coreR = outerR * 0.55;
         drawStarPolygonPath(ctx, cx, cy, outerR, coreR * 0.98, 20);
         ctx.stroke();
