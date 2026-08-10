@@ -211,17 +211,56 @@
     // Tab Navigation
     // ============================================
 
+    const toolPanels = document.getElementById('toolPanels');
+
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             tabBtns.forEach(b => b.classList.remove('active'));
             tabContents.forEach(c => c.classList.remove('active'));
             btn.classList.add('active');
             document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+            // Switching tools should always start at the top of that tool's
+            // content, not wherever the previous tool happened to be scrolled to.
+            if (toolPanels) toolPanels.scrollTop = 0;
             // Notify other modules (e.g. BG remove) that the active tab changed,
             // so tools like eyedropper/lasso can safely deactivate themselves.
             document.dispatchEvent(new CustomEvent('app:tabchange', { detail: btn.dataset.tab }));
         });
     });
+
+    // ============================================
+    // BG Remove: Accordion (one method open at a time)
+    // ============================================
+    // The BG-remove tab used to stack all 7 methods open at once, which made
+    // it by far the longest scroll in the app. Now each method's header is a
+    // toggle: opening one closes the others, so only one method's controls
+    // are visible (and taking up scroll space) at a time.
+    (function initBgMethodAccordion() {
+        const cards = document.querySelectorAll('#tab-bgremove .bg-method-card');
+        if (!cards.length) return;
+
+        cards.forEach(card => {
+            const header = card.querySelector('.bg-method-header');
+            if (!header) return;
+            header.addEventListener('click', () => {
+                const isOpen = card.classList.contains('open');
+                cards.forEach(c => {
+                    c.classList.remove('open');
+                    const h = c.querySelector('.bg-method-header');
+                    if (h) h.setAttribute('aria-expanded', 'false');
+                });
+                if (!isOpen) {
+                    card.classList.add('open');
+                    header.setAttribute('aria-expanded', 'true');
+                    // Bring the opened method into view within the scrollable
+                    // panel (not the whole page) once it's rendered.
+                    requestAnimationFrame(() => {
+                        card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                    });
+                }
+            });
+        });
+    })();
 
     // ============================================
     // Tool 1: File Size

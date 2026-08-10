@@ -232,6 +232,33 @@ body {
     }
 }
 
+/* ===== Tools Panel (Photoshop-style dock + scrollable pane) =====
+   Sticky like the preview card, but capped to the viewport height with
+   internal scrolling, so a long tool (BG remove, with 7 methods) never
+   forces the whole page to grow — only this card's own content scrolls. */
+.tools-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: sticky;
+    top: 20px;
+    max-height: calc(100vh - 40px);
+}
+
+.tools-panel-body {
+    display: flex;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+}
+
+/* Download button sits outside the scrollable pane, at the panel's fixed
+   footer, so it's always reachable without scrolling through a tool. */
+.tools-panel .download-section {
+    flex-shrink: 0;
+}
+
 /* ===== Preview Panel ===== */
 .preview-card {
     background: rgba(28, 29, 32, 0.6);
@@ -398,23 +425,23 @@ body {
 }
 
 /* ===== Tool Tabs =====
-   A wrapping grid of icon-over-label buttons (Photoshop/Premiere tool-dock
-   style), not a flex row forced onto one line. The previous version used
-   `display:flex` + `flex:1` + `white-space:nowrap` on every tab: flex items
-   don't shrink below their own text's natural width by default, so with six
-   Bangla labels + icons the row's total width regularly exceeded the panel
-   and tabs spilled past the card edge on desktop. A wrapping grid with
-   min-width:0 on each cell fixes that structurally instead of hiding labels
-   below 800px and hoping it never overflows above that. */
+   Photoshop-style tool dock: a vertical icon rail that stays put while only
+   the panel beside it scrolls, so switching tools never sends the person
+   back to the top of a long page. (Collapses to a horizontal strip on
+   narrow screens — see the responsive block below.) */
 .tool-tabs {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+    grid-auto-flow: row;
+    grid-template-columns: 1fr;
     gap: 4px;
     background: rgba(16, 17, 19, 0.6);
-    padding: 4px;
+    padding: 6px;
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
-    margin-bottom: 20px;
+    flex-shrink: 0;
+    width: 84px;
+    align-content: flex-start;
+    overflow-y: auto;
 }
 
 .tab-btn {
@@ -424,13 +451,13 @@ body {
     align-items: center;
     justify-content: center;
     gap: 5px;
-    padding: 10px 6px;
+    padding: 10px 4px;
     background: transparent;
     border: none;
     border-radius: var(--radius-sm);
     color: var(--text-secondary);
     font-family: 'Inter', sans-serif;
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 500;
     line-height: 1.2;
     cursor: pointer;
@@ -456,6 +483,33 @@ body {
 
 .tab-btn svg {
     flex-shrink: 0;
+}
+
+/* The scrollable pane next to the tool dock. Only this area scrolls when a
+   tool's content is tall (e.g. BG remove) — the dock and the rest of the
+   page stay where they are. */
+.tool-panels {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-active) transparent;
+}
+
+.tool-panels::-webkit-scrollbar {
+    width: 6px;
+}
+
+.tool-panels::-webkit-scrollbar-thumb {
+    background: rgba(230, 149, 33, 0.3);
+    border-radius: 3px;
+}
+
+.tool-panels::-webkit-scrollbar-thumb:hover {
+    background: rgba(230, 149, 33, 0.5);
 }
 
 /* ===== Tool Content ===== */
@@ -624,6 +678,50 @@ select:focus {
     font-size: 11px;
     color: var(--text-muted);
     margin-top: 6px;
+}
+
+/* ===== Compact / coordinated rows =====
+   Pairs related controls (e.g. two sliders) side by side instead of
+   stacking every field full-width, so wide panels don't turn into a
+   long, sparse vertical strip. */
+.form-row-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.form-row-2col .form-group {
+    margin-bottom: 0;
+}
+
+@media (max-width: 620px) {
+    .form-row-2col {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+}
+
+.color-target-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.color-swatch-input {
+    width: 44px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    background: none;
+    flex-shrink: 0;
+}
+
+.eyedropper-status {
+    font-size: 12px;
+    color: var(--accent-primary);
 }
 
 /* ===== Presets ===== */
@@ -1024,10 +1122,6 @@ select:focus {
         position: static;
     }
 
-    .tool-tabs {
-        grid-template-columns: repeat(3, 1fr);
-    }
-
     .pixel-presets,
     .preset-grid {
         grid-template-columns: repeat(3, 1fr);
@@ -1047,6 +1141,46 @@ select:focus {
     .link-icon {
         align-self: center;
         transform: rotate(90deg);
+    }
+
+    /* Tools panel on mobile: the vertical icon dock (great for wide screens)
+       would eat too much of a narrow screen's width, so it becomes a
+       horizontal, sticky-at-top icon strip instead — Photoshop's tool dock
+       turns into a mobile toolbar rather than disappearing. The panel below
+       it is no longer pinned to the viewport (that reads oddly once the
+       preview image is scrolled past), but it keeps its own capped height +
+       internal scroll, so a long tool like BG remove still doesn't balloon
+       the page — you scroll the panel once, not the whole page over and
+       over. */
+    .tools-panel {
+        position: static;
+        max-height: none;
+    }
+
+    .tools-panel-body {
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .tool-tabs {
+        width: auto;
+        display: flex;
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: visible;
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: var(--bg-primary);
+    }
+
+    .tab-btn {
+        flex: 0 0 auto;
+        min-width: 76px;
+    }
+
+    .tool-panels {
+        max-height: 62vh;
     }
 }
 
@@ -1106,21 +1240,80 @@ select:focus {
     gap: 16px;
 }
 
+#tab-bgremove {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Accordion: each method is a card whose header is a full-width button.
+   Only one body is visible at a time (state applied via .open by JS), so
+   the tallest tab in the app (7 methods) no longer forces one long scroll —
+   picking a method collapses the rest out of the way. */
 .bg-method-card {
+    padding: 0;
+    overflow: hidden;
     border-left: 3px solid var(--accent-primary);
     transition: var(--transition);
 }
 
 .bg-method-card:hover {
     border-left-color: var(--accent-secondary);
-    transform: translateX(2px);
+}
+
+.bg-method-card.open {
+    box-shadow: inset 0 0 0 1px var(--border-active);
 }
 
 .bg-method-header {
+    width: 100%;
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    margin-bottom: 14px;
+    padding: 16px 18px;
+    margin-bottom: 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    color: inherit;
+    transition: var(--transition);
+}
+
+.bg-method-header:hover {
+    background: rgba(230, 149, 33, 0.06);
+}
+
+.bg-method-title {
+    flex: 1;
+    min-width: 0;
+}
+
+.bg-method-title .tool-desc {
+    margin-bottom: 0;
+}
+
+.bg-method-chevron {
+    flex-shrink: 0;
+    margin-top: 3px;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.bg-method-card.open .bg-method-chevron {
+    transform: rotate(180deg);
+    color: var(--accent-primary);
+}
+
+.bg-method-body {
+    display: none;
+    padding: 0 18px 20px;
+}
+
+.bg-method-card.open .bg-method-body {
+    display: block;
+    animation: fadeIn 0.2s ease;
 }
 
 .bg-method-icon {

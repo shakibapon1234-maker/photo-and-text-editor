@@ -3,39 +3,55 @@
    =========================== */
 
 :root {
-    --bg-primary: #0f0f1a;
-    --bg-secondary: #1a1a2e;
-    --bg-card: #16213e;
-    --bg-card-hover: #1c2a4a;
-    --bg-input: #0d1b2a;
-    --accent-primary: #6c63ff;
-    --accent-secondary: #a78bfa;
-    --accent-gradient: linear-gradient(135deg, #6c63ff 0%, #a78bfa 50%, #c084fc 100%);
-    --accent-glow: rgba(108, 99, 255, 0.3);
-    --text-primary: #f1f5f9;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
-    --border-color: rgba(108, 99, 255, 0.15);
-    --border-active: rgba(108, 99, 255, 0.5);
-    --success: #10b981;
-    --success-bg: rgba(16, 185, 129, 0.1);
-    --warning: #f59e0b;
-    --danger: #ef4444;
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-    --radius-xl: 20px;
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
-    --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.4);
-    --shadow-glow: 0 0 30px rgba(108, 99, 255, 0.15);
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Graphite workspace, brushed-metal panels, one warm instrument-amber
+       accent (like a light-meter needle or a recording LED) — a photo/optics
+       studio palette, not a generic dark-purple-gradient app shell. */
+    --bg-primary: #121316;
+    --bg-secondary: #191a1d;
+    --bg-card: #1c1d20;
+    --bg-card-hover: #222327;
+    --bg-input: #101113;
+    --accent-primary: #e69521;
+    --accent-secondary: #ffc778;
+    --accent-gradient: linear-gradient(135deg, #e69521 0%, #f0a934 55%, #ffc778 100%);
+    --accent-glow: rgba(230, 149, 33, 0.28);
+    --text-primary: #eef0f2;
+    --text-secondary: #999ba1;
+    --text-muted: #66686d;
+    --border-color: rgba(255, 255, 255, 0.09);
+    --border-active: rgba(230, 149, 33, 0.55);
+    --success: #2fb87f;
+    --success-bg: rgba(47, 184, 127, 0.1);
+    --warning: #e69521;
+    --danger: #e2534d;
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 10px;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 3px 14px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 10px 32px rgba(0, 0, 0, 0.55);
+    --shadow-glow: 0 0 22px rgba(230, 149, 33, 0.14);
+    --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+    --transition: all 0.15s ease;
 }
 
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    min-width: 0; /* flex/grid children default to min-width:auto, which lets
+                     long unbroken text (filenames, labels) push siblings
+                     past their container instead of wrapping — this was the
+                     structural cause of text spilling outside panels. */
+}
+
+img, svg, canvas {
+    min-width: initial; /* the reset above must not stop intrinsic sizing */
+}
+
+.tool-card, .tool-desc, .form-group label, .info-value, .api-key-input {
+    overflow-wrap: break-word;
 }
 
 body {
@@ -45,68 +61,57 @@ body {
     min-height: 100vh;
     overflow-x: hidden;
     background-image:
-        radial-gradient(ellipse at 20% 50%, rgba(108, 99, 255, 0.06) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 20%, rgba(167, 139, 250, 0.05) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 80%, rgba(192, 132, 252, 0.04) 0%, transparent 50%);
+        radial-gradient(ellipse at 20% 50%, rgba(230, 149, 33, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(255, 199, 120, 0.05) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(255, 213, 158, 0.04) 0%, transparent 50%);
 }
 
-/* ===== Header ===== */
+/* ===== Header =====
+   A compact instrument-panel title bar, not a centered marketing hero —
+   pro tools (Lightroom, Resolve, Figma) put their identity in a thin top
+   strip and give the screen back to the work. */
 .app-header {
-    text-align: center;
-    padding: 40px 20px 30px;
-    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px 20px;
+    text-align: left;
+    padding: 16px 4px;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 8px;
 }
 
 .logo {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 14px;
-    margin-bottom: 10px;
+    gap: 12px;
 }
 
 .logo-icon {
-    width: 50px;
-    height: 50px;
-    background: var(--accent-gradient);
-    border-radius: var(--radius-md);
+    width: 34px;
+    height: 34px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
-    box-shadow: 0 4px 15px rgba(108, 99, 255, 0.4);
-    animation: logoPulse 3s ease-in-out infinite;
-}
-
-@keyframes logoPulse {
-
-    0%,
-    100% {
-        transform: scale(1);
-        box-shadow: 0 4px 15px rgba(108, 99, 255, 0.4);
-    }
-
-    50% {
-        transform: scale(1.05);
-        box-shadow: 0 6px 25px rgba(108, 99, 255, 0.6);
-    }
+    color: var(--accent-primary);
 }
 
 .logo h1 {
-    font-size: 28px;
-    font-weight: 800;
-    background: var(--accent-gradient);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: -0.5px;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.2px;
 }
 
 .tagline {
-    color: var(--text-secondary);
-    font-size: 14px;
+    color: var(--text-muted);
+    font-size: 12px;
     font-weight: 400;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
 }
 
 /* ===== App Container ===== */
@@ -128,7 +133,7 @@ body {
     text-align: center;
     cursor: pointer;
     transition: var(--transition);
-    background: rgba(22, 33, 62, 0.5);
+    background: rgba(28, 29, 32, 0.5);
     backdrop-filter: blur(10px);
     position: relative;
     overflow: hidden;
@@ -145,7 +150,7 @@ body {
 
 .upload-area:hover {
     border-color: var(--accent-primary);
-    background: rgba(22, 33, 62, 0.8);
+    background: rgba(28, 29, 32, 0.8);
     transform: translateY(-2px);
     box-shadow: var(--shadow-glow);
 }
@@ -156,7 +161,7 @@ body {
 
 .upload-area.drag-over {
     border-color: var(--accent-primary);
-    background: rgba(108, 99, 255, 0.08);
+    background: rgba(230, 149, 33, 0.08);
     transform: scale(1.01);
 }
 
@@ -206,9 +211,13 @@ body {
 /* ===== Editor Section ===== */
 .editor-section {
     display: grid;
-    grid-template-columns: 380px 1fr;
+    /* Phase 2: preview column is now flexible instead of a fixed 380px
+       sidebar, so the preview can breathe on wide screens while the
+       tools panel keeps a sane minimum width. */
+    grid-template-columns: minmax(360px, 1.15fr) minmax(380px, 1fr);
     gap: 24px;
     animation: fadeInUp 0.5s ease;
+    align-items: start;
 }
 
 @keyframes fadeInUp {
@@ -225,7 +234,7 @@ body {
 
 /* ===== Preview Panel ===== */
 .preview-card {
-    background: rgba(22, 33, 62, 0.6);
+    background: rgba(28, 29, 32, 0.6);
     backdrop-filter: blur(15px);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
@@ -247,9 +256,82 @@ body {
     font-weight: 600;
 }
 
+.preview-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#previewFloatBtn.active {
+    color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.12);
+}
+
+/* ===== Zoom Toolbar (Phase 2) ===== */
+.zoom-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+    padding: 6px 8px;
+    background: rgba(16, 17, 19, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-sm);
+    width: fit-content;
+}
+
+.zoom-btn {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.zoom-btn:hover {
+    color: var(--text-primary);
+    background: rgba(230, 149, 33, 0.12);
+}
+
+.zoom-btn-text {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.zoom-level {
+    min-width: 44px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    user-select: none;
+}
+
+.zoom-divider {
+    width: 1px;
+    height: 18px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 0 2px;
+}
+
 .preview-image-wrapper {
     width: 100%;
-    aspect-ratio: 4/3;
+    /* Phase 2: fixed 4:3 cap removed — height now follows the image's own
+       proportions (up to a sane viewport-relative cap) instead of forcing
+       every photo into a letterboxed 4:3 box. */
+    min-height: 220px;
+    max-height: min(70vh, 640px);
+    height: auto;
     border-radius: var(--radius-md);
     overflow: hidden;
     background: var(--bg-primary);
@@ -266,6 +348,25 @@ body {
     object-fit: contain;
 }
 
+/* When zoomed beyond "fit", the wrapper becomes a scroll/pan viewport and
+   the image is drawn at its explicit pixel width instead of being capped. */
+.preview-image-wrapper.zoomed {
+    overflow: auto;
+    justify-content: flex-start;
+    align-items: flex-start;
+    cursor: grab;
+}
+
+.preview-image-wrapper.zoomed:active {
+    cursor: grabbing;
+}
+
+.preview-image-wrapper img.zoomed {
+    max-width: none;
+    max-height: none;
+    object-fit: unset;
+}
+
 .image-info {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -273,7 +374,7 @@ body {
 }
 
 .info-item {
-    background: rgba(13, 27, 42, 0.6);
+    background: rgba(16, 17, 19, 0.6);
     padding: 10px 12px;
     border-radius: var(--radius-sm);
     border: 1px solid rgba(255, 255, 255, 0.03);
@@ -289,52 +390,68 @@ body {
 }
 
 .info-value {
-    font-size: 13px;
-    font-weight: 600;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
     color: var(--text-primary);
-    word-break: break-all;
+    overflow-wrap: anywhere;
 }
 
-/* ===== Tool Tabs ===== */
+/* ===== Tool Tabs =====
+   A wrapping grid of icon-over-label buttons (Photoshop/Premiere tool-dock
+   style), not a flex row forced onto one line. The previous version used
+   `display:flex` + `flex:1` + `white-space:nowrap` on every tab: flex items
+   don't shrink below their own text's natural width by default, so with six
+   Bangla labels + icons the row's total width regularly exceeded the panel
+   and tabs spilled past the card edge on desktop. A wrapping grid with
+   min-width:0 on each cell fixes that structurally instead of hiding labels
+   below 800px and hoping it never overflows above that. */
 .tool-tabs {
-    display: flex;
-    gap: 6px;
-    background: rgba(22, 33, 62, 0.6);
-    backdrop-filter: blur(15px);
-    padding: 6px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+    gap: 4px;
+    background: rgba(16, 17, 19, 0.6);
+    padding: 4px;
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
     margin-bottom: 20px;
 }
 
 .tab-btn {
-    flex: 1;
+    min-width: 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 12px 16px;
+    gap: 5px;
+    padding: 10px 6px;
     background: transparent;
     border: none;
     border-radius: var(--radius-sm);
     color: var(--text-secondary);
     font-family: 'Inter', sans-serif;
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 500;
+    line-height: 1.2;
     cursor: pointer;
     transition: var(--transition);
-    white-space: nowrap;
+    text-align: center;
+}
+
+.tab-btn span {
+    max-width: 100%;
+    overflow-wrap: break-word;
 }
 
 .tab-btn:hover {
     color: var(--text-primary);
-    background: rgba(108, 99, 255, 0.08);
+    background: rgba(230, 149, 33, 0.08);
 }
 
 .tab-btn.active {
-    background: var(--accent-gradient);
-    color: white;
-    box-shadow: 0 4px 15px rgba(108, 99, 255, 0.3);
+    background: var(--bg-card-hover);
+    color: var(--accent-primary);
+    box-shadow: inset 0 0 0 1px var(--border-active);
 }
 
 .tab-btn svg {
@@ -362,7 +479,7 @@ body {
 }
 
 .tool-card {
-    background: rgba(22, 33, 62, 0.6);
+    background: rgba(28, 29, 32, 0.6);
     backdrop-filter: blur(15px);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
@@ -408,7 +525,7 @@ body {
 
 .input-with-unit:focus-within {
     border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.15);
+    box-shadow: 0 0 0 3px rgba(230, 149, 33, 0.15);
 }
 
 .input-with-unit input {
@@ -428,7 +545,7 @@ body {
 
 .input-with-unit .unit {
     padding: 12px 14px;
-    background: rgba(108, 99, 255, 0.08);
+    background: rgba(230, 149, 33, 0.08);
     color: var(--accent-secondary);
     font-size: 13px;
     font-weight: 600;
@@ -460,7 +577,7 @@ select option {
 
 select:focus {
     border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.15);
+    box-shadow: 0 0 0 3px rgba(230, 149, 33, 0.15);
 }
 
 /* ===== Range Slider ===== */
@@ -509,6 +626,50 @@ select:focus {
     margin-top: 6px;
 }
 
+/* ===== Compact / coordinated rows =====
+   Pairs related controls (e.g. two sliders) side by side instead of
+   stacking every field full-width, so wide panels don't turn into a
+   long, sparse vertical strip. */
+.form-row-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.form-row-2col .form-group {
+    margin-bottom: 0;
+}
+
+@media (max-width: 620px) {
+    .form-row-2col {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+}
+
+.color-target-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.color-swatch-input {
+    width: 44px;
+    height: 40px;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    background: none;
+    flex-shrink: 0;
+}
+
+.eyedropper-status {
+    font-size: 12px;
+    color: var(--accent-primary);
+}
+
 /* ===== Presets ===== */
 .pixel-presets,
 .preset-grid {
@@ -552,7 +713,7 @@ select:focus {
 .preset-btn-bright:hover,
 .preset-btn-crop:hover {
     border-color: var(--accent-primary);
-    background: rgba(108, 99, 255, 0.1);
+    background: rgba(230, 149, 33, 0.1);
     transform: translateY(-1px);
 }
 
@@ -561,8 +722,8 @@ select:focus {
 .preset-btn-bright.active,
 .preset-btn-crop.active {
     border-color: var(--accent-primary);
-    background: rgba(108, 99, 255, 0.15);
-    box-shadow: 0 0 10px rgba(108, 99, 255, 0.2);
+    background: rgba(230, 149, 33, 0.15);
+    box-shadow: 0 0 10px rgba(230, 149, 33, 0.2);
 }
 
 .dimension-presets {
@@ -644,14 +805,14 @@ select:focus {
     justify-content: center;
     cursor: pointer;
     color: var(--accent-primary);
-    background: rgba(108, 99, 255, 0.1);
+    background: rgba(230, 149, 33, 0.1);
     border: 1px solid var(--border-color);
     transition: var(--transition);
     flex-shrink: 0;
 }
 
 .link-icon:hover {
-    background: rgba(108, 99, 255, 0.2);
+    background: rgba(230, 149, 33, 0.2);
 }
 
 .link-icon.unlocked {
@@ -664,7 +825,7 @@ select:focus {
     display: flex;
     align-items: center;
     gap: 10px;
-    background: rgba(108, 99, 255, 0.06);
+    background: rgba(230, 149, 33, 0.06);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
     padding: 12px 16px;
@@ -727,19 +888,19 @@ select:focus {
 
 .btn-ghost:hover {
     color: var(--accent-primary);
-    background: rgba(108, 99, 255, 0.08);
+    background: rgba(230, 149, 33, 0.08);
 }
 
 .btn-primary {
     background: var(--accent-gradient);
     color: white;
     padding: 14px 28px;
-    box-shadow: 0 4px 15px rgba(108, 99, 255, 0.3);
+    box-shadow: 0 4px 15px rgba(230, 149, 33, 0.3);
 }
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 25px rgba(108, 99, 255, 0.45);
+    box-shadow: 0 6px 25px rgba(230, 149, 33, 0.45);
 }
 
 .btn-primary:active {
@@ -841,6 +1002,62 @@ select:focus {
     background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), var(--bg-card));
 }
 
+/* ===== Floating Preview Window (Phase 2) ===== */
+.preview-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 220px;
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius-lg);
+    background: rgba(28, 29, 32, 0.3);
+    color: var(--text-muted);
+    font-size: 13px;
+    text-align: center;
+    padding: 24px;
+}
+
+.preview-card.floating {
+    position: fixed;
+    top: 90px;
+    right: 24px;
+    left: auto;
+    z-index: 500;
+    width: 420px;
+    min-width: 300px;
+    min-height: 320px;
+    max-width: 92vw;
+    max-height: 88vh;
+    resize: both;
+    overflow: auto;
+    box-shadow: var(--shadow-lg), 0 0 0 1px var(--border-active);
+    margin-bottom: 0;
+}
+
+.preview-card.floating .preview-image-wrapper {
+    max-height: none;
+}
+
+.preview-card.floating .preview-header {
+    cursor: move;
+    user-select: none;
+    position: sticky;
+    top: 0;
+    background: rgba(28, 29, 32, 0.95);
+    z-index: 1;
+    margin: -20px -20px 16px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border-color);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.preview-card.floating.dragging {
+    box-shadow: var(--shadow-lg), 0 0 0 2px var(--accent-primary);
+    transition: none;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 800px) {
     .editor-section {
@@ -852,21 +1069,18 @@ select:focus {
     }
 
     .tool-tabs {
-        flex-wrap: wrap;
-    }
-
-    .tab-btn {
-        font-size: 12px;
-        padding: 10px 12px;
-    }
-
-    .tab-btn span {
-        display: none;
+        grid-template-columns: repeat(3, 1fr);
     }
 
     .pixel-presets,
     .preset-grid {
         grid-template-columns: repeat(3, 1fr);
+    }
+
+    .preview-card.floating {
+        width: 92vw;
+        right: 4vw;
+        top: 70px;
     }
 
     .dimension-inputs {
@@ -1017,7 +1231,7 @@ select:focus {
     gap: 10px;
     margin-top: 12px;
     padding: 10px 14px;
-    background: rgba(108, 99, 255, 0.08);
+    background: rgba(230, 149, 33, 0.08);
     border-radius: var(--radius-sm);
     border: 1px solid var(--border-color);
     color: var(--accent-secondary);
@@ -1027,7 +1241,7 @@ select:focus {
 .bg-ai-loading .spinner {
     width: 18px;
     height: 18px;
-    border: 2px solid rgba(108, 99, 255, 0.3);
+    border: 2px solid rgba(230, 149, 33, 0.3);
     border-top-color: var(--accent-primary);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
@@ -1055,7 +1269,7 @@ select:focus {
 }
 
 .lasso-mode-btn.active {
-    background: rgba(108, 99, 255, 0.15);
+    background: rgba(230, 149, 33, 0.15);
     border-color: var(--accent-primary);
     color: var(--accent-secondary);
     font-weight: 600;
@@ -1132,4 +1346,169 @@ select:focus {
     font-weight: 700;
     letter-spacing: 0.5px;
     font-family: 'Courier New', monospace;
+}
+
+/* ===== Clone Stamp: touch-device long-press source-selection ring =====
+   Fixed-positioned at the finger's touch point (same "fixed + JS sets
+   left/top" pattern as .eyedropper-loupe above). The ring-fill circle's
+   stroke-dashoffset animates from full (empty) to 0 (full circle) over
+   the long-press duration, via a CSS transition whose duration JS sets
+   inline to match CLONE_LONG_PRESS_MS — so the fill IS the progress
+   feedback, no separate percentage readout needed. */
+.clone-longpress-ring {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+}
+
+.clone-longpress-ring svg {
+    display: block;
+    transform: rotate(-90deg);
+}
+
+.clone-longpress-ring .ring-track {
+    fill: rgba(15, 15, 25, 0.55);
+    stroke: rgba(255, 255, 255, 0.28);
+    stroke-width: 3;
+}
+
+.clone-longpress-ring .ring-fill {
+    fill: none;
+    stroke: var(--accent-primary);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 125.6;
+    stroke-dashoffset: 125.6;
+    transition-property: stroke-dashoffset;
+    transition-timing-function: linear;
+}
+
+.clone-longpress-ring.filling .ring-fill {
+    stroke-dashoffset: 0;
+}
+
+/* Brief green flash the instant the long-press fires and the source
+   point locks in, so touch users get the same "it worked" confirmation
+   desktop users get from the cloneStatus text updating instantly. */
+.clone-longpress-ring.fired .ring-fill {
+    stroke: #22c55e;
+    transition-duration: 150ms;
+}
+
+/* ===== Phase 6: Checkerboard transparency pattern =====
+   Sits behind previewImage at all times. Fully covered (invisible) for
+   opaque JPG/etc photos; shows through wherever the current image has
+   transparent pixels (after AI/color/lasso/wand background removal), so
+   the transparent area is unambiguous instead of matching the wrapper's
+   solid --bg-primary colour. */
+.preview-image-wrapper {
+    background-image:
+        linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%, rgba(255, 255, 255, 0.06)),
+        linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.06) 75%, rgba(255, 255, 255, 0.06));
+    background-size: 20px 20px;
+    background-position: 0 0, 10px 10px;
+}
+
+/* ===== Phase 6: Undo/Redo/Compare header buttons ===== */
+#undoBtn:disabled,
+#redoBtn:disabled,
+#compareBtn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+#compareBtn.active {
+    color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.12);
+}
+
+/* ===== Phase 6: Before/After comparison overlay =====
+   baBeforeImg and previewImage are both sized to fill the wrapper via
+   object-fit:contain (same rule previewImage already uses), so they line
+   up without any JS box-matching — only the divider position is tracked
+   in JS as a 0-100% split. */
+.before-after-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    pointer-events: none;
+}
+.before-after-overlay img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    clip-path: inset(0 50% 0 0);
+}
+.ba-divider {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    margin-left: -1px;
+    background: #fff;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+    cursor: ew-resize;
+    pointer-events: auto;
+}
+.ba-divider::after {
+    content: '⇔';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #fff;
+    color: #111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.ba-label {
+    position: absolute;
+    top: 8px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    pointer-events: none;
+}
+.ba-label-before { left: 8px; }
+.ba-label-after  { right: 8px; }
+
+/* ===== Phase 6: secondary button + keyboard-shortcut hint style ===== */
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.14);
+    transform: translateY(-1px);
+}
+kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+}
+
+/* ===== Phase 6: Erase/Restore brush + Magic Wand active button state ===== */
+#eraseStartBtn.active,
+#wandBtn.active {
+    outline: 2px solid var(--accent);
 }
