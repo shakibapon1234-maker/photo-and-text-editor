@@ -25772,6 +25772,10 @@ var stickerTextInput = document.getElementById("stickerTextInput");
 var stickerShapeGrid = document.getElementById("stickerShapeGrid");
 var stickerBgColorPicker = document.getElementById("stickerBgColorPicker");
 var stickerTextColorPicker = document.getElementById("stickerTextColorPicker");
+var stickerBorderWidthRange = document.getElementById("stickerBorderWidthRange");
+var stickerBorderWidthValue = document.getElementById("stickerBorderWidthValue");
+var stickerBorderColorPicker = document.getElementById("stickerBorderColorPicker");
+var stickerShadowCheckbox = document.getElementById("stickerShadowCheckbox");
 var curveSection = document.getElementById("curveSection");
 var curveIntensityRange = document.getElementById("curveIntensityRange");
 var curveIntensityValue = document.getElementById("curveIntensityValue");
@@ -25962,6 +25966,9 @@ var state = {
   // PLAN_3 §2.1: 'circle' | 'roundedRect' (Phase A1) | 'starburst' | 'stamp' | 'ribbon' | 'speech' | 'radiant' (Phase A2)
   stickerBgColor: stickerBgColorPicker.value,
   stickerTextColor: stickerTextColorPicker.value,
+  stickerBorderWidth: parseInt(stickerBorderWidthRange?.value || "0", 10),
+  stickerBorderColor: stickerBorderColorPicker?.value || "#ffffff",
+  stickerShadow: stickerShadowCheckbox?.checked || false,
   // PLAN_3 §3: curved text — shared by Text and Sticker/Badge content modes
   // (§3.2), read directly by drawCanvasTextTexture/drawStickerCanvasTexture.
   curveIntensity: Number(curveIntensityRange.value),
@@ -26126,6 +26133,43 @@ function makeCardTexture(canvas2, mirrored) {
   }
   tex.needsUpdate = true;
   return tex;
+}
+function registerBundledCanvasFont() {
+  try {
+    const fontUrl = "./assets/fonts/NotoSansBengali-Regular.ttf";
+    const face = new FontFace("Noto Sans Bengali", `url(${fontUrl})`);
+    face.load().then((loaded) => {
+      try {
+        document.fonts.add(loaded);
+        console.log("Bundled Bengali font registered:", fontUrl);
+        if (state && state.contentMode === "text" && isBanglaText(state.text)) {
+          scheduleRebuild();
+        }
+      } catch (err) {
+        console.warn("Failed to add bundled Bengali font to document.fonts", err);
+      }
+    }).catch(async (err) => {
+      console.warn("Bundled Bengali font not found or failed to load:", fontUrl, err);
+      try {
+        const gfHref = "https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600&display=swap";
+        if (!document.querySelector(`link[href="${gfHref}"]`)) {
+          const l = document.createElement("link");
+          l.rel = "stylesheet";
+          l.href = gfHref;
+          document.head.appendChild(l);
+        }
+        await document.fonts.load('600 220px "Noto Sans Bengali"');
+        console.log("Google Fonts Noto Sans Bengali loaded fallback");
+        if (state && state.contentMode === "text" && isBanglaText(state.text)) {
+          scheduleRebuild();
+        }
+      } catch (gerr) {
+        console.warn("Google Fonts fallback failed", gerr);
+      }
+    });
+  } catch (e) {
+    console.warn("registerBundledCanvasFont failed", e);
+  }
 }
 function buildCanvasCardMaterials(frontTex, backTex, isImage = false) {
   const sideMat = buildMaterial(state.materialType, state.color);
@@ -26421,7 +26465,8 @@ var STICKER_SHAPE_SIZING = {
   speech: { square: false, padMul: 1, tailRatio: 0.22 },
   radiant: { square: true, padMul: 1.7 }
 };
-function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = { curveIntensity: 0 }) {
+function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = { curveIntensity: 0 }, borderOpts = {}) {
+  const { borderWidth = 0, borderColor = "#ffffff", shadow = false } = borderOpts;
   const lines = (text || " ").split(/\r?\n/).map((l) => l.length > 0 ? l : " ");
   const measureCtx = document.createElement("canvas").getContext("2d");
   measureCtx.font = `700 ${STICKER_FONT_PX}px ${STICKER_FONT_STACK}`;
@@ -26435,7 +26480,8 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
   const lineHeightPx = STICKER_FONT_PX * 1.25;
   const textBlockH = lineHeightPx * lines.length + maxBulge * 2;
   const sizing = STICKER_SHAPE_SIZING[shape] || STICKER_SHAPE_SIZING.circle;
-  const padPx = Math.max(textMaxWidthPx, textBlockH) * STICKER_PAD_RATIO * sizing.padMul;
+  const extraPadding = (borderWidth || 0) * 2 + (shadow ? 24 : 0);
+  const padPx = Math.max(textMaxWidthPx, textBlockH) * STICKER_PAD_RATIO * sizing.padMul + extraPadding;
   let canvasW;
   let bodyH;
   if (sizing.square) {
@@ -26454,7 +26500,7 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
   const ctx = canvas2.getContext("2d");
   ctx.clearRect(0, 0, canvasW, canvasH);
   ctx.save();
-  drawStickerShape(ctx, shape, canvasW, bodyH, tailPx, bgColor);
+  drawStickerShape(ctx, shape, canvasW, bodyH, tailPx, bgColor, borderWidth, borderColor, shadow);
   ctx.restore();
   ctx.save();
   ctx.font = `700 ${STICKER_FONT_PX}px ${STICKER_FONT_STACK}`;
@@ -26535,11 +26581,17 @@ function drawConfettiStars(ctx, cx, cy, outerR, color) {
   }
   ctx.restore();
 }
-function drawStickerShape(ctx, shape, w, bodyH, tailPx, color) {
-  ctx.fillStyle = color;
+function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, borderColor = "#ffffff", shadow = false) {
   const cx = w / 2;
   const cy = bodyH / 2;
   const outerR = Math.min(w, bodyH) / 2;
+  ctx.save();
+  if (shadow) {
+    ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
+    ctx.shadowBlur = Math.max(10, Math.min(w, bodyH) * 0.08);
+    ctx.shadowOffsetY = Math.max(4, Math.min(w, bodyH) * 0.04);
+  }
+  ctx.fillStyle = color;
   switch (shape) {
     case "roundedRect":
       drawRoundedRectPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.16);
@@ -26580,9 +26632,53 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color) {
       ctx.fill();
       break;
   }
+  ctx.restore();
+  if (borderWidth > 0) {
+    ctx.save();
+    ctx.lineWidth = borderWidth;
+    ctx.strokeStyle = borderColor;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    switch (shape) {
+      case "roundedRect":
+        drawRoundedRectPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.16);
+        ctx.stroke();
+        break;
+      case "starburst":
+        drawStarPolygonPath(ctx, cx, cy, outerR, outerR * 0.72, 12);
+        ctx.stroke();
+        break;
+      case "stamp":
+        drawScallopedCirclePath(ctx, cx, cy, outerR, outerR * 0.92, 20);
+        ctx.stroke();
+        break;
+      case "ribbon":
+        drawRibbonPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.28);
+        ctx.stroke();
+        break;
+      case "speech":
+        drawSpeechBubblePath(ctx, 0, 0, w, bodyH, tailPx, Math.min(w, bodyH) * 0.18);
+        ctx.stroke();
+        break;
+      case "radiant": {
+        const coreR = outerR * 0.55;
+        drawStarPolygonPath(ctx, cx, cy, outerR, coreR * 0.98, 20);
+        ctx.stroke();
+        break;
+      }
+      case "circle":
+      default:
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, w / 2, bodyH / 2, 0, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.stroke();
+        break;
+    }
+    ctx.restore();
+  }
 }
-function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts) {
-  const { canvas: canvas2, aspect: aspect2 } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts);
+function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, borderOpts) {
+  const { canvas: canvas2, aspect: aspect2 } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts, borderOpts);
   const frontTex = makeCardTexture(canvas2, false);
   const backTex = makeCardTexture(canvas2, true);
   const worldHeight = state.size * 1.6;
@@ -26604,11 +26700,22 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts) {
 function rebuildTextMesh() {
   if (state.contentMode === "sticker") {
     disposeTextMesh();
-    buildStickerCardMesh(state.stickerText, state.stickerShape, state.stickerBgColor, state.stickerTextColor, {
-      curveIntensity: state.curveIntensity,
-      curveDirection: state.curveDirection,
-      curveSpacing: state.curveSpacing
-    });
+    buildStickerCardMesh(
+      state.stickerText,
+      state.stickerShape,
+      state.stickerBgColor,
+      state.stickerTextColor,
+      {
+        curveIntensity: state.curveIntensity,
+        curveDirection: state.curveDirection,
+        curveSpacing: state.curveSpacing
+      },
+      {
+        borderWidth: state.stickerBorderWidth,
+        borderColor: state.stickerBorderColor,
+        shadow: state.stickerShadow
+      }
+    );
     applyRotation();
     scene.add(textMesh);
     updateQualityNote();
@@ -26631,12 +26738,12 @@ function rebuildTextMesh() {
     updateShadowFrustum();
     return;
   }
-  if (!font) return;
-  disposeTextMesh();
   const rawContent = state.text || " ";
   const lines = rawContent.split(/\r?\n/);
   const validLines = lines.map((l) => l.length > 0 ? l : " ");
   const needsCanvasCard = isBanglaText(rawContent) || state.curveIntensity !== 0;
+  if (!needsCanvasCard && !font) return;
+  disposeTextMesh();
   if (needsCanvasCard) {
     buildCanvasCardTextMesh(validLines);
   } else {
@@ -26838,6 +26945,7 @@ function setActivePreset(grid, datasetKey, value) {
 var loader = new FontLoader();
 font = loader.parse(helvetiker_regular_typeface_default);
 statusNote.textContent = "\u09B0\u09C7\u09A1\u09BF";
+registerBundledCanvasFont();
 rebuildTextMesh();
 function handleResize() {
   const w = viewportEl.clientWidth;
@@ -26887,6 +26995,20 @@ stickerBgColorPicker.addEventListener("input", () => {
 });
 stickerTextColorPicker.addEventListener("input", () => {
   state.stickerTextColor = stickerTextColorPicker.value;
+  if (state.contentMode === "sticker") scheduleRebuild();
+});
+stickerBorderWidthRange.addEventListener("input", () => {
+  const val = parseInt(stickerBorderWidthRange.value, 10);
+  stickerBorderWidthValue.textContent = `${val}px`;
+  state.stickerBorderWidth = val;
+  if (state.contentMode === "sticker") scheduleRebuild();
+});
+stickerBorderColorPicker.addEventListener("input", () => {
+  state.stickerBorderColor = stickerBorderColorPicker.value;
+  if (state.contentMode === "sticker") scheduleRebuild();
+});
+stickerShadowCheckbox.addEventListener("change", () => {
+  state.stickerShadow = stickerShadowCheckbox.checked;
   if (state.contentMode === "sticker") scheduleRebuild();
 });
 curveIntensityRange.addEventListener("input", () => {

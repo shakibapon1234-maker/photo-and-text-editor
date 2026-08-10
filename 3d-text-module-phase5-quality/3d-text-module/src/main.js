@@ -50,6 +50,10 @@ const stickerTextInput = document.getElementById('stickerTextInput');
 const stickerShapeGrid = document.getElementById('stickerShapeGrid');
 const stickerBgColorPicker = document.getElementById('stickerBgColorPicker');
 const stickerTextColorPicker = document.getElementById('stickerTextColorPicker');
+const stickerBorderWidthRange = document.getElementById('stickerBorderWidthRange');
+const stickerBorderWidthValue = document.getElementById('stickerBorderWidthValue');
+const stickerBorderColorPicker = document.getElementById('stickerBorderColorPicker');
+const stickerShadowCheckbox = document.getElementById('stickerShadowCheckbox');
 const curveSection = document.getElementById('curveSection');
 const curveIntensityRange = document.getElementById('curveIntensityRange');
 const curveIntensityValue = document.getElementById('curveIntensityValue');
@@ -287,6 +291,9 @@ const state = {
   stickerShape: 'circle', // PLAN_3 §2.1: 'circle' | 'roundedRect' (Phase A1) | 'starburst' | 'stamp' | 'ribbon' | 'speech' | 'radiant' (Phase A2)
   stickerBgColor: stickerBgColorPicker.value,
   stickerTextColor: stickerTextColorPicker.value,
+  stickerBorderWidth: parseInt(stickerBorderWidthRange?.value || '0', 10),
+  stickerBorderColor: stickerBorderColorPicker?.value || '#ffffff',
+  stickerShadow: stickerShadowCheckbox?.checked || false,
   // PLAN_3 §3: curved text — shared by Text and Sticker/Badge content modes
   // (§3.2), read directly by drawCanvasTextTexture/drawStickerCanvasTexture.
   curveIntensity: Number(curveIntensityRange.value), // -100..100, 0 = straight
@@ -540,6 +547,57 @@ function makeCardTexture(canvas, mirrored) {
   }
   tex.needsUpdate = true;
   return tex;
+}
+
+// Attempt to register an optional bundled Bengali TTF for deterministic
+// canvas text rendering. If the file exists at
+// `www/assets/fonts/NotoSansBengali-Regular.ttf` (or copied there by the
+// user), this will load it into `document.fonts` under the family name
+// "Noto Sans Bengali" so the canvas drawing code above can rely on a
+// predictable font regardless of the host OS. This function is deliberately
+// best-effort: failure to find or load the font is non-fatal and only logs
+// a warning.
+function registerBundledCanvasFont() {
+  try {
+    const fontUrl = './assets/fonts/NotoSansBengali-Regular.ttf';
+    const face = new FontFace('Noto Sans Bengali', `url(${fontUrl})`);
+    face.load().then((loaded) => {
+      try {
+        document.fonts.add(loaded);
+        console.log('Bundled Bengali font registered:', fontUrl);
+        if (state && state.contentMode === 'text' && isBanglaText(state.text)) {
+          scheduleRebuild();
+        }
+      } catch (err) {
+        console.warn('Failed to add bundled Bengali font to document.fonts', err);
+      }
+    }).catch(async (err) => {
+      console.warn('Bundled Bengali font not found or failed to load:', fontUrl, err);
+      // Fallback: inject Google Fonts link for Noto Sans Bengali and wait
+      // for it to be available via `document.fonts.load`. This requires
+      // network but keeps behaviour deterministic if the user prefers not
+      // to add a TTF file manually.
+      try {
+        const gfHref = 'https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600&display=swap';
+        if (!document.querySelector(`link[href="${gfHref}"]`)) {
+          const l = document.createElement('link');
+          l.rel = 'stylesheet';
+          l.href = gfHref;
+          document.head.appendChild(l);
+        }
+        // Wait for the font to load (weight 600 used in canvas draws)
+        await document.fonts.load('600 220px "Noto Sans Bengali"');
+        console.log('Google Fonts Noto Sans Bengali loaded fallback');
+        if (state && state.contentMode === 'text' && isBanglaText(state.text)) {
+          scheduleRebuild();
+        }
+      } catch (gerr) {
+        console.warn('Google Fonts fallback failed', gerr);
+      }
+    });
+  } catch (e) {
+    console.warn('registerBundledCanvasFont failed', e);
+  }
 }
 
 // BoxGeometry material slot order is [+x, -x, +y, -y, +z, -z]. Front (+z,
@@ -977,7 +1035,18 @@ const STICKER_SHAPE_SIZING = {
 
 // curveOpts (PLAN_3 §3.2 — curve works *inside* badges too):
 // { curveIntensity, curveDirection, curveSpacing }.
-function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = { curveIntensity: 0 }) {
+// curveOpts (PLAN_3 §3.2 — curve works *inside* badges too):
+// { curveIntensity, curveDirection, curveSpacing }.
+// borderOpts (PLAN_3 §2.2 Phase A3): { borderWidth, borderColor, shadow }.
+function drawStickerCanvasTexture(
+  text,
+  shape,
+  bgColor,
+  textColor,
+  curveOpts = { curveIntensity: 0 },
+  borderOpts = {}
+) {
+  const { borderWidth = 0, borderColor = '#ffffff', shadow = false } = borderOpts;
   const lines = (text || ' ').split(/\r?\n/).map((l) => (l.length > 0 ? l : ' '));
 
   const measureCtx = document.createElement('canvas').getContext('2d');
@@ -990,22 +1059,14 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
   const { perLine, maxLineWidth, maxBulge } = layoutCurvedLines(measureCtx, lines, arcOpts);
   const textMaxWidthPx = maxLineWidth;
   const lineHeightPx = STICKER_FONT_PX * 1.25;
-  // maxBulge*2 (top+bottom headroom for curved glyphs) is folded into the
-  // text block height the shape sizes itself around, same reasoning as
-  // drawCanvasTextTexture above.
   const textBlockH = lineHeightPx * lines.length + maxBulge * 2;
 
   const sizing = STICKER_SHAPE_SIZING[shape] || STICKER_SHAPE_SIZING.circle;
-  // Shape is sized to comfortably fit the measured text block plus padding,
-  // widened per-shape by sizing.padMul so decorative bits (spikes, rays,
-  // ribbon points) land inside the canvas instead of getting clipped.
-  const padPx = Math.max(textMaxWidthPx, textBlockH) * STICKER_PAD_RATIO * sizing.padMul;
+  const extraPadding = (borderWidth || 0) * 2 + (shadow ? 24 : 0);
+  const padPx = Math.max(textMaxWidthPx, textBlockH) * STICKER_PAD_RATIO * sizing.padMul + extraPadding;
   let canvasW;
-  let bodyH; // the shape's own body height — text centers in this, NOT in canvasH (which may include a tail)
+  let bodyH;
   if (sizing.square) {
-    // Radial shapes (circle/starburst/stamp/radiant) need a square canvas,
-    // sized by the text's diagonal footprint so multi-line/long text
-    // doesn't spill outside the shape.
     const diameter = Math.ceil(Math.sqrt(textMaxWidthPx ** 2 + textBlockH ** 2) + padPx * 1.6);
     canvasW = diameter;
     bodyH = diameter;
@@ -1013,8 +1074,6 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
     canvasW = Math.ceil(textMaxWidthPx + padPx * 2 + (sizing.pointExtraW || 0) * textMaxWidthPx);
     bodyH = Math.ceil(textBlockH + padPx * 1.4);
   }
-  // Speech bubble's tail hangs below the body — extra canvas height that's
-  // explicitly excluded from where the text gets centered.
   const tailPx = sizing.tailRatio ? Math.round(bodyH * sizing.tailRatio) : 0;
   const canvasH = bodyH + tailPx;
 
@@ -1024,13 +1083,12 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvasW, canvasH);
 
-  // 1) background shape (each shape function does its own fillStyle/fill —
-  // some, like radiant, fill more than one sub-path in their own colors).
+  // 1) background shape
   ctx.save();
-  drawStickerShape(ctx, shape, canvasW, bodyH, tailPx, bgColor);
+  drawStickerShape(ctx, shape, canvasW, bodyH, tailPx, bgColor, borderWidth, borderColor, shadow);
   ctx.restore();
 
-  // 2) label text, centered within the body (never inside the tail)
+  // 2) label text, centered within the body
   ctx.save();
   ctx.font = `700 ${STICKER_FONT_PX}px ${STICKER_FONT_STACK}`;
   ctx.fillStyle = textColor;
@@ -1046,16 +1104,6 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
 }
 
 // ---------- PLAN_3 §2.1 (Phase A2): background-shape template functions ----------
-// Each draws (and fills) one badge/sticker background into `ctx`, confined
-// to a [0,0,w,bodyH] box (plus `tailPx` of extra height below the body for
-// the speech-bubble tail only). Kept as small, parametrized, self-contained
-// drawing functions — per plan §2.1's framing of a "generic rendering
-// engine" — so adding a template is "add one function + one grid button",
-// not a change to the sizing/mesh/export code around it.
-
-// Alternating outer/inner-radius polygon — the shared primitive behind both
-// the spiky starburst badge and the radiant burst's thin rays (they're the
-// same shape at different spike-count/inner-radius ratios).
 function drawStarPolygonPath(ctx, cx, cy, outerR, innerR, spikes) {
   ctx.beginPath();
   const step = Math.PI / spikes;
@@ -1071,9 +1119,6 @@ function drawStarPolygonPath(ctx, cx, cy, outerR, innerR, spikes) {
   ctx.closePath();
 }
 
-// A circle whose radius oscillates around its perimeter — approximates a
-// rubber-stamp/seal's distressed, scalloped edge without needing a real
-// perforation texture.
 function drawScallopedCirclePath(ctx, cx, cy, outerR, innerR, bumps) {
   ctx.beginPath();
   const amp = (outerR - innerR) / 2;
@@ -1090,8 +1135,6 @@ function drawScallopedCirclePath(ctx, cx, cy, outerR, innerR, bumps) {
   ctx.closePath();
 }
 
-// Hexagonal banner with pointed left/right tips — the "ribbon/tag label"
-// family (plan §2.1 #3).
 function drawRibbonPath(ctx, x, y, w, h, pointW) {
   const midY = y + h / 2;
   const pw = Math.min(pointW, w / 2 - 1);
@@ -1105,14 +1148,11 @@ function drawRibbonPath(ctx, x, y, w, h, pointW) {
   ctx.closePath();
 }
 
-// Rounded-rect bubble + a downward pointer tail — the "speech/alert bubble"
-// family (plan §2.1 #4). `tailPx` is the extra canvas height reserved below
-// the body for the tail to point into.
 function drawSpeechBubblePath(ctx, x, y, w, bodyH, tailPx, r) {
-  drawRoundedRectPath(ctx, x, y, w, bodyH, r); // begins+closes its own subpath
+  drawRoundedRectPath(ctx, x, y, w, bodyH, r);
   if (tailPx > 0) {
     const tailBaseW = Math.min(w * 0.22, bodyH * 0.5);
-    const tailCx = x + w * 0.28; // left-of-center, classic comic-bubble tail position
+    const tailCx = x + w * 0.28;
     ctx.moveTo(tailCx - tailBaseW / 2, y + bodyH - 2);
     ctx.lineTo(tailCx + tailBaseW / 2, y + bodyH - 2);
     ctx.lineTo(tailCx - tailBaseW * 0.15, y + bodyH + tailPx);
@@ -1120,15 +1160,13 @@ function drawSpeechBubblePath(ctx, x, y, w, bodyH, tailPx, r) {
   }
 }
 
-// Small 4-point stars scattered in a ring outside the radiant burst's rays —
-// the "confetti" half of the "radiant/confetti burst" family (plan §2.1 #5).
 function drawConfettiStars(ctx, cx, cy, outerR, color) {
   ctx.save();
   ctx.fillStyle = color;
   const count = 10;
   for (let i = 0; i < count; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const dist = outerR * (0.78 + Math.random() * 0.18); // just past the ray tips, still inside the canvas
+    const dist = outerR * (0.78 + Math.random() * 0.18);
     const dx = cx + Math.cos(angle) * dist;
     const dy = cy + Math.sin(angle) * dist;
     const starR = outerR * (0.035 + Math.random() * 0.025);
@@ -1138,25 +1176,29 @@ function drawConfettiStars(ctx, cx, cy, outerR, color) {
   ctx.restore();
 }
 
-// Dispatch: paints one shape (already fills itself in `color`) into
-// `ctx`'s [0,0,w,bodyH] box.
-function drawStickerShape(ctx, shape, w, bodyH, tailPx, color) {
-  ctx.fillStyle = color;
+function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, borderColor = '#ffffff', shadow = false) {
   const cx = w / 2;
   const cy = bodyH / 2;
   const outerR = Math.min(w, bodyH) / 2;
+
+  ctx.save();
+  if (shadow) {
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+    ctx.shadowBlur = Math.max(10, Math.min(w, bodyH) * 0.08);
+    ctx.shadowOffsetY = Math.max(4, Math.min(w, bodyH) * 0.04);
+  }
+
+  ctx.fillStyle = color;
   switch (shape) {
     case 'roundedRect':
       drawRoundedRectPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.16);
       ctx.fill();
       break;
     case 'starburst':
-      // Spiky badge (plan §2.1 #1) — a chunky 12-point star.
       drawStarPolygonPath(ctx, cx, cy, outerR, outerR * 0.72, 12);
       ctx.fill();
       break;
     case 'stamp':
-      // Rubber-stamp/seal outline (plan §2.1 #2) — scalloped circle edge.
       drawScallopedCirclePath(ctx, cx, cy, outerR, outerR * 0.92, 20);
       ctx.fill();
       break;
@@ -1169,9 +1211,6 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color) {
       ctx.fill();
       break;
     case 'radiant': {
-      // Radiant/confetti burst (plan §2.1 #5) — thin long rays, a solid
-      // core circle on top to give the text a clean background (hides the
-      // ray bases), plus a scatter of small confetti stars past the rays.
       const coreR = outerR * 0.55;
       drawStarPolygonPath(ctx, cx, cy, outerR, coreR * 0.98, 20);
       ctx.fill();
@@ -1190,10 +1229,55 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color) {
       ctx.fill();
       break;
   }
+  ctx.restore();
+
+  if (borderWidth > 0) {
+    ctx.save();
+    ctx.lineWidth = borderWidth;
+    ctx.strokeStyle = borderColor;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    switch (shape) {
+      case 'roundedRect':
+        drawRoundedRectPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.16);
+        ctx.stroke();
+        break;
+      case 'starburst':
+        drawStarPolygonPath(ctx, cx, cy, outerR, outerR * 0.72, 12);
+        ctx.stroke();
+        break;
+      case 'stamp':
+        drawScallopedCirclePath(ctx, cx, cy, outerR, outerR * 0.92, 20);
+        ctx.stroke();
+        break;
+      case 'ribbon':
+        drawRibbonPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.28);
+        ctx.stroke();
+        break;
+      case 'speech':
+        drawSpeechBubblePath(ctx, 0, 0, w, bodyH, tailPx, Math.min(w, bodyH) * 0.18);
+        ctx.stroke();
+        break;
+      case 'radiant': {
+        const coreR = outerR * 0.55;
+        drawStarPolygonPath(ctx, cx, cy, outerR, coreR * 0.98, 20);
+        ctx.stroke();
+        break;
+      }
+      case 'circle':
+      default:
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, w / 2, bodyH / 2, 0, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.stroke();
+        break;
+    }
+    ctx.restore();
+  }
 }
 
-function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts) {
-  const { canvas, aspect } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts);
+function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, borderOpts) {
+  const { canvas, aspect } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts, borderOpts);
   const frontTex = makeCardTexture(canvas, false);
   const backTex = makeCardTexture(canvas, true);
 
@@ -1202,12 +1286,6 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts) {
   const depth = Math.max(1, state.depth);
 
   const geometry = new THREE.BoxGeometry(worldWidth, worldHeight, depth);
-  // Pass isImage=true here on purpose: unlike the plain text card (white
-  // glyphs meant to be tinted by state.color), the sticker canvas already
-  // bakes its own final bgColor/textColor into the pixels, so the front/back
-  // face material must stay white (no multiply-tint) or the badge colors
-  // would shift. This also picks the looser 0.05 alphaTest, keeping the
-  // circle/rounded-rect edge smooth instead of jagged.
   const materials = buildCanvasCardMaterials(frontTex, backTex, true);
   const mesh = new THREE.Mesh(geometry, materials);
   mesh.castShadow = state.shadowsOn;
@@ -1224,18 +1302,24 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts) {
 }
 
 function rebuildTextMesh() {
-  // §8.2: image mode builds/rebuilds a photo card instead of a text mesh —
-  // completely separate branch from the text paths below, but converges on
-  // the same `textMesh` variable + applyRotation()/scene.add() tail, since
-  // that's the "current active object" every other panel (material, shadow,
-  // animation, export) already reads from.
   if (state.contentMode === 'sticker') {
     disposeTextMesh();
-    buildStickerCardMesh(state.stickerText, state.stickerShape, state.stickerBgColor, state.stickerTextColor, {
-      curveIntensity: state.curveIntensity,
-      curveDirection: state.curveDirection,
-      curveSpacing: state.curveSpacing,
-    });
+    buildStickerCardMesh(
+      state.stickerText,
+      state.stickerShape,
+      state.stickerBgColor,
+      state.stickerTextColor,
+      {
+        curveIntensity: state.curveIntensity,
+        curveDirection: state.curveDirection,
+        curveSpacing: state.curveSpacing,
+      },
+      {
+        borderWidth: state.stickerBorderWidth,
+        borderColor: state.stickerBorderColor,
+        shadow: state.stickerShadow,
+      }
+    );
     applyRotation();
     scene.add(textMesh);
     updateQualityNote();
@@ -1260,21 +1344,28 @@ function rebuildTextMesh() {
     return;
   }
 
-  if (!font) return; // font still loading
-
-  disposeTextMesh();
+  // Determine rendering path first: canvas-card (correct shaping, curved
+  // lines) vs. vector TextGeometry path. The canvas path must be allowed to
+  // run even when the vendored typeface-JSON `font` isn't loaded yet (the
+  // vendored JSON only applies to the vector/extrude path). Previously the
+  // function returned early if `font` was falsy which blocked canvas-based
+  // Bangla rendering until the JSON font parsed — that prevented using the
+  // bundled TTF for canvas draws. Compute the decision first and only
+  // require `font` when the vector path is selected.
 
   const rawContent = state.text || ' ';
   const lines = rawContent.split(/\r?\n/);
   const validLines = lines.map((l) => (l.length > 0 ? l : ' '));
 
-  // PLAN_3 §3.1: curved text is a canvas-card-only feature (per-character
-  // positioning isn't something the vector TextGeometry path can do without
-  // per-letter geometries — that's Phase B4, deferred). So when curve is
-  // active, route Latin/English text through the canvas-card path too, not
-  // just Bangla — matches the plan's "works for both scripts" framing for
-  // this feature, since both scripts end up on the same canvas-based draw.
   const needsCanvasCard = isBanglaText(rawContent) || state.curveIntensity !== 0;
+
+  // If vector geometry is required but the vendored JSON font isn't parsed
+  // yet, delay the rebuild until it is available. Canvas-card path does not
+  // need `font` and should proceed immediately.
+  if (!needsCanvasCard && !font) return;
+
+  disposeTextMesh();
+
   if (needsCanvasCard) {
     buildCanvasCardTextMesh(validLines);
   } else {
@@ -1541,6 +1632,10 @@ function setActivePreset(grid, datasetKey, value) {
 const loader = new FontLoader();
 font = loader.parse(helvetikerRegular);
 statusNote.textContent = 'রেডি';
+// Try to register an optional bundled Bengali TTF so canvas text draws are
+// deterministic across platforms. This is best-effort; if the file is not
+// present the page continues to work normally.
+registerBundledCanvasFont();
 rebuildTextMesh();
 
 // ---------- resize ----------
@@ -1603,6 +1698,23 @@ stickerBgColorPicker.addEventListener('input', () => {
 
 stickerTextColorPicker.addEventListener('input', () => {
   state.stickerTextColor = stickerTextColorPicker.value;
+  if (state.contentMode === 'sticker') scheduleRebuild();
+});
+
+stickerBorderWidthRange.addEventListener('input', () => {
+  const val = parseInt(stickerBorderWidthRange.value, 10);
+  stickerBorderWidthValue.textContent = `${val}px`;
+  state.stickerBorderWidth = val;
+  if (state.contentMode === 'sticker') scheduleRebuild();
+});
+
+stickerBorderColorPicker.addEventListener('input', () => {
+  state.stickerBorderColor = stickerBorderColorPicker.value;
+  if (state.contentMode === 'sticker') scheduleRebuild();
+});
+
+stickerShadowCheckbox.addEventListener('change', () => {
+  state.stickerShadow = stickerShadowCheckbox.checked;
   if (state.contentMode === 'sticker') scheduleRebuild();
 });
 
