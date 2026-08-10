@@ -20,7 +20,15 @@ import JSZip from 'jszip';
 
 import helvetikerRegular from '../assets/fonts/helvetiker_regular.typeface.json';
 import { EASINGS, ANIMATION_PRESETS } from './animations.js';
-import { exportWebM, exportPngSequence, isWebMExportSupported } from './export.js';
+import {
+  exportWebM,
+  exportPngSequence,
+  exportGif,
+  isWebMExportSupported,
+  estimateGifFrameCount,
+  estimateGifSizeBytes,
+} from './export.js';
+import { computeArcLayout, splitGraphemes } from './curve.js';
 
 const statusNote = document.getElementById('statusNote');
 
@@ -36,6 +44,18 @@ const textModeNote = document.getElementById('textModeNote');
 const imageFileInput = document.getElementById('imageFileInput');
 const imagePreviewThumb = document.getElementById('imagePreviewThumb');
 const imageNote = document.getElementById('imageNote');
+const pictureStyleGrid = document.getElementById('pictureStyleGrid');
+const stickerContentSection = document.getElementById('stickerContentSection');
+const stickerTextInput = document.getElementById('stickerTextInput');
+const stickerShapeGrid = document.getElementById('stickerShapeGrid');
+const stickerBgColorPicker = document.getElementById('stickerBgColorPicker');
+const stickerTextColorPicker = document.getElementById('stickerTextColorPicker');
+const curveSection = document.getElementById('curveSection');
+const curveIntensityRange = document.getElementById('curveIntensityRange');
+const curveIntensityValue = document.getElementById('curveIntensityValue');
+const curveDirectionGrid = document.getElementById('curveDirectionGrid');
+const curveSpacingRange = document.getElementById('curveSpacingRange');
+const curveSpacingValue = document.getElementById('curveSpacingValue');
 const depthRange = document.getElementById('depthRange');
 const depthValue = document.getElementById('depthValue');
 const sizeRange = document.getElementById('sizeRange');
@@ -101,6 +121,15 @@ const exportResult = document.getElementById('exportResult');
 const exportResultInfo = document.getElementById('exportResultInfo');
 const exportDownloadLink = document.getElementById('exportDownloadLink');
 
+// PLAN_3 §4 (Phase C1-C6): GIF export panel
+const gifOptionsGroup = document.getElementById('gifOptionsGroup');
+const gifTransparentToggle = document.getElementById('gifTransparentToggle');
+const gifBackgroundColorField = document.getElementById('gifBackgroundColorField');
+const gifBackgroundColorPicker = document.getElementById('gifBackgroundColorPicker');
+const gifLoopToggle = document.getElementById('gifLoopToggle');
+const gifQualitySelect = document.getElementById('gifQualitySelect');
+const gifSizeEstimateNote = document.getElementById('gifSizeEstimateNote');
+
 // ---------- Three.js core setup ----------
 const scene = new THREE.Scene();
 scene.background = null; // transparent — export pipeline (Phase 4) will rely on this
@@ -147,6 +176,34 @@ controls.target.set(0, 0, 0);
 // vendored font below.
 const pmremGenerator = new THREE.PMREMGenerator(renderer);
 const envTexture = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+
+// ---------- Bug fix: shadow camera frustum was hardcoded-tiny ----------
+// DirectionalLight's shadow camera defaults to an orthographic frustum of
+// only ±5 world units (three.js default). This project's text/image mesh
+// can be 100+ units wide (sizeRange goes up to 140), so almost the entire
+// mesh fell outside the shadow camera's view — only a razor-thin sliver
+// near the origin actually cast a shadow onto the ground plane, which is
+// why the shadow looked "barely visible" even at max intensity. This
+// function recomputes the frustum from the current mesh's real bounding
+// box every time the mesh or lighting rig changes, so the whole object is
+// always inside the shadow camera's view.
+function updateShadowFrustum() {
+  if (!textMesh) return;
+  const box = new THREE.Box3().setFromObject(textMesh);
+  if (box.isEmpty()) return;
+  const size = box.getSize(new THREE.Vector3());
+  const half = Math.max(60, (Math.max(size.x, size.y, size.z) / 2) * 1.4);
+  for (const l of lights.children) {
+    if (l.isDirectionalLight && l.shadow) {
+      const cam = l.shadow.camera;
+      cam.left = -half;
+      cam.right = half;
+      cam.top = half;
+      cam.bottom = -half;
+      cam.updateProjectionMatrix();
+    }
+  }
+}
 
 // ---------- ground plane (shadow catcher only, not visible directly) ----------
 const groundGeo = new THREE.PlaneGeometry(2000, 2000);
@@ -216,14 +273,25 @@ function buildLightingPreset(preset) {
 
   // Re-apply the current shadow toggle to whatever lights this preset just made.
   applyShadowToggle();
+  updateShadowFrustum();
 }
 
 // ---------- state ----------
 let font = null;
 let textMesh = null;
 const state = {
-  contentMode: 'text', // §8.2: 'text' | 'image' — mutually exclusive, one active object at a time
+  contentMode: 'text', // PLAN_3 §1: 'text' | 'image' | 'sticker' — mutually exclusive, one active object at a time
   imageElement: null, // HTMLImageElement of the uploaded photo, null until one is chosen
+  pictureStyle: 'none', // §8.2 follow-up: id into PICTURE_STYLES, image mode only
+  stickerText: stickerTextInput.value, // PLAN_3 §2: sticker/badge mode only
+  stickerShape: 'circle', // PLAN_3 §2.1: 'circle' | 'roundedRect' (Phase A1) | 'starburst' | 'stamp' | 'ribbon' | 'speech' | 'radiant' (Phase A2)
+  stickerBgColor: stickerBgColorPicker.value,
+  stickerTextColor: stickerTextColorPicker.value,
+  // PLAN_3 §3: curved text — shared by Text and Sticker/Badge content modes
+  // (§3.2), read directly by drawCanvasTextTexture/drawStickerCanvasTexture.
+  curveIntensity: Number(curveIntensityRange.value), // -100..100, 0 = straight
+  curveDirection: 'up', // 'up' (⌣ smile) | 'down' (⌢ dome)
+  curveSpacing: Number(curveSpacingRange.value) / 100, // slider is a %, state stores the multiplier
   text: textInput.value,
   depth: Number(depthRange.value),
   size: Number(sizeRange.value),
@@ -371,18 +439,77 @@ const CANVAS_TEXT_FONT_PX = 220; // supersampled resolution, independent of worl
 const CANVAS_TEXT_LINE_HEIGHT_PX = CANVAS_TEXT_FONT_PX * 1.35;
 const CANVAS_TEXT_PAD_PX = CANVAS_TEXT_FONT_PX * 0.35;
 
+// ---------- PLAN_3 §3, Phase B2: curved-text canvas rendering ----------
+// Shared by both the plain text card (drawCanvasTextTexture) and the
+// Sticker/Badge card (drawStickerCanvasTexture) — plan §3.2 explicitly asks
+// for curve inside badge text too, and both already go through this same
+// canvas-card pipeline, so one helper covers both call sites.
+//
+// Measures each line with the *real* ctx.font (grapheme-cluster by
+// grapheme-cluster, see curve.js's splitGraphemes for why cluster and not
+// code point), runs it through curve.js's pure computeArcLayout, and returns
+// per-line draw instructions plus the overall bounding box the caller needs
+// to size its canvas so curved glyphs don't get clipped.
+//
+// When curveIntensity is 0 this still routes through here (for a single
+// code path) but computeArcLayout's straight-line fallback makes it an exact
+// no-op vs. the old plain ctx.fillText(line, ...) layout — same positions,
+// zero rotation.
+function layoutCurvedLines(ctx, lines, curveOpts) {
+  const perLine = lines.map((line) => {
+    const clusters = splitGraphemes(line);
+    const widths = clusters.map((c) => ctx.measureText(c).width);
+    const layout = computeArcLayout(widths, curveOpts);
+    return { clusters, layout };
+  });
+  const maxLineWidth = Math.max(1, ...perLine.map((l) => l.layout.width));
+  const maxBulge = Math.max(0, ...perLine.map((l) => l.layout.height));
+  return { perLine, maxLineWidth, maxBulge };
+}
+
+// Draws one already-laid-out line, centered at (centerX, baselineY), onto
+// ctx. `layout.chars[i]` offsets are relative to the line's own center, so
+// this just re-centers them at the caller's chosen position.
+function drawCurvedLine(ctx, clusters, layout, centerX, baselineY) {
+  clusters.forEach((cluster, i) => {
+    const c = layout.chars[i];
+    if (!c) return; // defensive: clusters/layout length must match, but a mismatched font mid-measure shouldn't hard-crash the draw
+    ctx.save();
+    ctx.translate(centerX + c.x, baselineY + c.y);
+    ctx.rotate(c.rotation);
+    ctx.fillText(cluster, 0, 0);
+    ctx.restore();
+  });
+}
+
 // Draws all lines onto one offscreen canvas (white glyphs on a transparent
 // background) and returns it plus its aspect ratio. Using the *real* browser
 // text-layout engine here is the entire point — it's what makes Bangla
 // (or Arabic, Devanagari, emoji, anything) come out correctly shaped without
 // this module needing to know anything about any specific script.
-function drawCanvasTextTexture(lines) {
+//
+// curveOpts (PLAN_3 §3): { curveIntensity, curveDirection, curveSpacing }.
+// At curveIntensity 0 this draws exactly like the pre-curve version (one
+// ctx.fillText(line, ...) per line) via layoutCurvedLines's straight-line
+// fallback — curve OFF is a guaranteed no-op, not an approximation.
+function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
   const measureCtx = document.createElement('canvas').getContext('2d');
   measureCtx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${CANVAS_TEXT_FONT_STACK}`;
-  const maxWidthPx = Math.max(1, ...lines.map((l) => measureCtx.measureText(l).width));
+  const arcOpts = {
+    curveIntensity: curveOpts.curveIntensity,
+    direction: curveOpts.curveDirection,
+    spacing: curveOpts.curveSpacing,
+  };
+  const { perLine, maxLineWidth, maxBulge } = layoutCurvedLines(measureCtx, lines, arcOpts);
 
-  const canvasW = Math.ceil(maxWidthPx + CANVAS_TEXT_PAD_PX * 2);
-  const canvasH = Math.ceil(CANVAS_TEXT_LINE_HEIGHT_PX * lines.length + CANVAS_TEXT_PAD_PX * 2);
+  const canvasW = Math.ceil(maxLineWidth + CANVAS_TEXT_PAD_PX * 2);
+  // maxBulge (the arc's extra vertical reach beyond a straight line, 0 when
+  // curve is off) is added as uniform top+bottom headroom so curved glyphs
+  // — which can swing above/below the line's normal slot — don't clip
+  // against the canvas edge.
+  const canvasH = Math.ceil(
+    CANVAS_TEXT_LINE_HEIGHT_PX * lines.length + CANVAS_TEXT_PAD_PX * 2 + maxBulge * 2
+  );
 
   const canvas = document.createElement('canvas');
   canvas.width = canvasW;
@@ -392,9 +519,9 @@ function drawCanvasTextTexture(lines) {
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  lines.forEach((line, i) => {
-    const y = CANVAS_TEXT_PAD_PX + CANVAS_TEXT_LINE_HEIGHT_PX * i + CANVAS_TEXT_LINE_HEIGHT_PX / 2;
-    ctx.fillText(line, canvasW / 2, y);
+  perLine.forEach(({ clusters, layout }, i) => {
+    const y = maxBulge + CANVAS_TEXT_PAD_PX + CANVAS_TEXT_LINE_HEIGHT_PX * i + CANVAS_TEXT_LINE_HEIGHT_PX / 2;
+    drawCurvedLine(ctx, clusters, layout, canvasW / 2, y);
   });
 
   return { canvas, aspect: canvasW / canvasH };
@@ -459,23 +586,201 @@ function buildCanvasCardMaterials(frontTex, backTex, isImage = false) {
 // active object is text or an image.
 const IMAGE_TEXTURE_MAX_PX = { low: 512, medium: 1024, high: 2048 };
 
-function drawImageCardCanvas(img) {
+// ---------- Picture Style Gallery (MS Word "Picture Styles" ribbon, §৮.২ follow-up) ----------
+// Each entry describes how to draw the frame/border directly onto the same
+// offscreen <canvas> that becomes the front/back texture — this is the same
+// technique Word itself uses (a picture style is a 2D compositing effect,
+// not a different 3D geometry), so it slots into the existing canvas-texture
+// card pipeline without touching materials/export/animation at all.
+//
+// Trade-off (documented up front): for 'rounded'/'oval' shapes the silhouette
+// is cut with an alpha mask on the BoxGeometry's front/back faces (exactly
+// like the existing Bangla-text alpha-masked card), NOT a true rounded/oval
+// 3D extrusion. That keeps the change low-risk and reuses the proven alpha
+// pipeline, but it means the box's 4 side ("depth") faces stay rectangular —
+// visible as a thin rectangular edge peeking past the rounded/oval corners
+// at grazing viewing angles. To keep this subtle, Depth is auto-capped for
+// these two shapes. Straight-on or lightly-rotated views (the vast majority
+// of use) look correct either way.
+const PICTURE_STYLES = [
+  { id: 'none', label: 'কোনো ফ্রেম না' },
+  { id: 'simpleWhite', label: 'সাদা বর্ডার', border: { color: '#ffffff', widthRatio: 0.028 } },
+  { id: 'simpleBlack', label: 'কালো বর্ডার', border: { color: '#111111', widthRatio: 0.045 } },
+  { id: 'thinLine', label: 'পাতলা লাইন', border: { color: '#242424', widthRatio: 0.01 } },
+  { id: 'doubleFrame', label: 'ডাবল ফ্রেম', border: { color: '#141414', widthRatio: 0.014, double: true } },
+  { id: 'rounded', label: 'গোলাকার কোণা', shape: 'rounded', cornerRatio: 0.1, border: { color: '#ffffff', widthRatio: 0.02 } },
+  { id: 'softRounded', label: 'নরম কোণা (Soft Edge)', shape: 'rounded', cornerRatio: 0.12, soft: true },
+  { id: 'oval', label: 'ডিম্বাকার (Oval)', shape: 'oval', border: { color: '#ffffff', widthRatio: 0.02 } },
+  { id: 'softOval', label: 'নরম ডিম্বাকার', shape: 'oval', soft: true },
+  { id: 'bevel', label: 'বেভেল ফ্রেম', border: { color: '#eaeaea', widthRatio: 0.038 }, bevel: true },
+  { id: 'dropShadow', label: 'ড্রপ-শ্যাডো ফ্রেম', border: { color: '#ffffff', widthRatio: 0.022 }, dropShadow: true },
+  { id: 'metal', label: 'মেটাল ফ্রেম', border: { color: 'metal', widthRatio: 0.052 } },
+  { id: 'reflected', label: 'রিফ্লেকশন ফ্রেম', border: { color: '#ffffff', widthRatio: 0.016 }, reflection: true },
+  { id: 'polaroid', label: 'পোলারয়েড (ঘোরানো)', border: { color: '#fbfbfb', widthRatio: 0.055, bottomExtraRatio: 0.18 }, tiltZ: -5 },
+];
+
+function getPictureStyle(id) {
+  return PICTURE_STYLES.find((s) => s.id === id) || PICTURE_STYLES[0];
+}
+
+function drawRoundedRectPath(ctx, x, y, w, h, r) {
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.lineTo(x + w - rr, y);
+  ctx.arcTo(x + w, y, x + w, y + rr, rr);
+  ctx.lineTo(x + w, y + h - rr);
+  ctx.arcTo(x + w, y + h, x + w - rr, y + h, rr);
+  ctx.lineTo(x + rr, y + h);
+  ctx.arcTo(x, y + h, x, y + h - rr, rr);
+  ctx.lineTo(x, y + rr);
+  ctx.arcTo(x, y, x + rr, y, rr);
+  ctx.closePath();
+}
+
+function drawShapePath(ctx, shape, x, y, w, h, cornerRatio) {
+  if (shape === 'oval') {
+    ctx.beginPath();
+    ctx.ellipse(x + w / 2, y + h / 2, Math.max(0.01, w / 2), Math.max(0.01, h / 2), 0, 0, Math.PI * 2);
+    ctx.closePath();
+  } else if (shape === 'rounded') {
+    drawRoundedRectPath(ctx, x, y, w, h, Math.min(w, h) * (cornerRatio || 0.1));
+  } else {
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.closePath();
+  }
+}
+
+// Draws the uploaded photo onto an offscreen canvas, framed per the chosen
+// PICTURE_STYLES entry, and returns everything buildImageCardMesh() needs.
+function drawImageCardCanvas(img, style) {
   const srcW = img.naturalWidth || img.width || 1;
   const srcH = img.naturalHeight || img.height || 1;
   const maxDim = IMAGE_TEXTURE_MAX_PX[state.quality] || IMAGE_TEXTURE_MAX_PX.medium;
   const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+  const photoW = Math.max(1, Math.round(srcW * scale));
+  const photoH = Math.max(1, Math.round(srcH * scale));
+
+  const shape = style.shape || 'rect';
+  const cornerRatio = style.cornerRatio || 0.1;
+  const borderPx = style.border ? Math.round(Math.min(photoW, photoH) * style.border.widthRatio) : 0;
+  const bottomExtraPx = style.border && style.border.bottomExtraRatio
+    ? Math.round(photoH * style.border.bottomExtraRatio)
+    : 0;
+  const shadowMarginPx = style.dropShadow ? Math.round(Math.min(photoW, photoH) * 0.09) : 0;
+
+  const pad = borderPx + shadowMarginPx;
+  const canvasW = photoW + pad * 2;
+  const canvasH = photoH + pad * 2 + bottomExtraPx;
 
   const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(srcW * scale));
-  canvas.height = Math.max(1, Math.round(srcH * scale));
+  canvas.width = canvasW;
+  canvas.height = canvasH;
   const ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, canvasW, canvasH);
 
-  return { canvas, aspect: srcW / srcH };
+  const frameX = shadowMarginPx;
+  const frameY = shadowMarginPx;
+  const frameW = canvasW - shadowMarginPx * 2;
+  const frameH = photoH + borderPx * 2;
+
+  // 1) baked drop shadow, sitting behind the frame on the same texture
+  if (style.dropShadow) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = shadowMarginPx * 0.9;
+    ctx.shadowOffsetX = shadowMarginPx * 0.35;
+    ctx.shadowOffsetY = shadowMarginPx * 0.45;
+    ctx.fillStyle = '#000000';
+    drawShapePath(ctx, shape, frameX, frameY, frameW, frameH, cornerRatio);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // 2) frame/border fill (solid, metal gradient, or double-line)
+  if (style.border) {
+    ctx.save();
+    drawShapePath(ctx, shape, frameX, frameY, frameW, frameH, cornerRatio);
+    if (style.border.color === 'metal') {
+      const grad = ctx.createLinearGradient(frameX, frameY, frameX, frameY + frameH);
+      grad.addColorStop(0, '#f4f4f4');
+      grad.addColorStop(0.15, '#cbcbd0');
+      grad.addColorStop(0.35, '#8d8e94');
+      grad.addColorStop(0.5, '#eaeaee');
+      grad.addColorStop(0.65, '#7c7d83');
+      grad.addColorStop(0.85, '#d7d7db');
+      grad.addColorStop(1, '#4a4a4e');
+      ctx.fillStyle = grad;
+    } else {
+      ctx.fillStyle = style.border.color;
+    }
+    ctx.fill();
+    ctx.restore();
+
+    if (style.border.double) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = Math.max(1, borderPx * 0.18);
+      const inset = borderPx * 0.45;
+      drawShapePath(ctx, shape, frameX + inset, frameY + inset, frameW - inset * 2, frameH - inset * 2, cornerRatio);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (style.bevel) {
+      ctx.save();
+      const inset = borderPx * 0.5;
+      drawShapePath(ctx, shape, frameX + inset, frameY + inset, frameW - inset * 2, frameH - inset * 2, cornerRatio);
+      const bevelGrad = ctx.createLinearGradient(frameX, frameY, frameX + frameW, frameY + frameH);
+      bevelGrad.addColorStop(0, 'rgba(255,255,255,0.95)');
+      bevelGrad.addColorStop(0.5, 'rgba(255,255,255,0)');
+      bevelGrad.addColorStop(1, 'rgba(0,0,0,0.6)');
+      ctx.strokeStyle = bevelGrad;
+      ctx.lineWidth = Math.max(2, borderPx * 0.55);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // 3) clip to the inner (photo) area and draw the photo, cover-fit
+  ctx.save();
+  drawShapePath(ctx, shape, frameX + borderPx, frameY + borderPx, photoW, photoH, cornerRatio);
+  ctx.clip();
+  ctx.drawImage(img, frameX + borderPx, frameY + borderPx, photoW, photoH);
+  ctx.restore();
+
+  // 4) soft feather edge for the 'soft' shapes — blur an alpha mask, then
+  //    punch it through the drawn content with destination-in compositing.
+  if (style.soft) {
+    const featherPx = Math.max(4, Math.min(photoW, photoH) * 0.06);
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = canvasW;
+    maskCanvas.height = canvasH;
+    const mctx = maskCanvas.getContext('2d');
+    mctx.filter = `blur(${featherPx}px)`;
+    mctx.fillStyle = '#ffffff';
+    drawShapePath(mctx, shape, frameX + borderPx, frameY + borderPx, photoW, photoH, cornerRatio);
+    mctx.fill();
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.drawImage(maskCanvas, 0, 0);
+    ctx.restore();
+  }
+
+  return {
+    canvas,
+    aspect: canvasW / canvasH,
+    shape,
+    tiltZ: style.tiltZ || 0,
+    reflection: !!style.reflection,
+  };
 }
 
 function buildImageCardMesh(img) {
-  const { canvas, aspect } = drawImageCardCanvas(img);
+  const style = getPictureStyle(state.pictureStyle);
+  const { canvas, aspect, shape, tiltZ, reflection } = drawImageCardCanvas(img, style);
   // Unlike the Bangla text card, an uploaded photo reads the same forwards
   // or mirrored (there's no glyph direction to preserve), so both faces use
   // the same un-mirrored texture — cheaper than the text path's two
@@ -485,7 +790,10 @@ function buildImageCardMesh(img) {
 
   const worldHeight = state.size * 1.6; // roughly matches a single line of 3D text at the same `size`
   const worldWidth = worldHeight * aspect;
-  const depth = Math.max(1, state.depth);
+  // See the PICTURE_STYLES comment above: rounded/oval shapes are an alpha
+  // mask on a rectangular box, so depth is capped to keep the rectangular
+  // edge from peeking past the rounded/oval silhouette at an angle.
+  const depth = shape === 'rect' ? Math.max(1, state.depth) : Math.max(1, Math.min(state.depth, 4));
 
   const geometry = new THREE.BoxGeometry(worldWidth, worldHeight, depth);
   const materials = buildCanvasCardMaterials(frontTex, backTex, true);
@@ -497,6 +805,30 @@ function buildImageCardMesh(img) {
   group.add(mesh);
   group.userData.frontTex = frontTex;
   group.userData.backTex = backTex;
+  group.userData.styleTiltZ = tiltZ;
+
+  // "রিফ্লেকশন ফ্রেম" style: a second, vertically-flipped copy of the same
+  // mesh sitting just below the original with reduced opacity — the classic
+  // Word "Reflection" picture style. Geometry/textures are shared (not
+  // cloned) since Three.js dispose() is safe to call twice; only the
+  // materials are cloned so the opacity fade doesn't affect the main mesh.
+  if (reflection) {
+    const reflMaterials = materials.map((m) => {
+      const clone = m.clone();
+      clone.transparent = true;
+      clone.opacity = 0.32;
+      clone.depthWrite = false;
+      return clone;
+    });
+    const reflMesh = new THREE.Mesh(geometry, reflMaterials);
+    reflMesh.scale.y = -1;
+    reflMesh.position.y = -worldHeight - depth * 0.5;
+    reflMesh.castShadow = false;
+    reflMesh.receiveShadow = false;
+    reflMesh.renderOrder = -1;
+    group.add(reflMesh);
+    group.userData.reflMaterials = reflMaterials;
+  }
 
   // Reuses the 'canvas' renderMode tag (not a new 'image' tag) — applyMaterial()
   // only needs to know "is this mesh's `.material` an array of 6 [side,side,
@@ -575,7 +907,11 @@ function buildVectorTextMesh(validLines) {
 }
 
 function buildCanvasCardTextMesh(validLines) {
-  const { canvas, aspect } = drawCanvasTextTexture(validLines);
+  const { canvas, aspect } = drawCanvasTextTexture(validLines, {
+    curveIntensity: state.curveIntensity,
+    curveDirection: state.curveDirection,
+    curveSpacing: state.curveSpacing,
+  });
   const frontTex = makeCardTexture(canvas, false);
   const backTex = makeCardTexture(canvas, true);
 
@@ -600,12 +936,314 @@ function buildCanvasCardTextMesh(validLines) {
   textMesh.material = materials;
 }
 
+// ---------- PLAN_3 §2: Sticker/Badge text mode ----------
+// Reuses the exact canvas-texture-card pipeline §8.1 built for Bangla text
+// (drawCanvasTextTexture → makeCardTexture → buildCanvasCardMaterials → a
+// BoxGeometry with 6 materials): instead of drawing just glyphs, first paint
+// a background shape (circle / rounded-rect for Phase A1's "Simple Sticker"
+// base case, plus the 5 more §2.1 template families added in Phase A2 —
+// starburst, stamp/seal, ribbon/tag, speech/alert bubble, radiant/confetti
+// burst), then draw the label text centered on top, both in their own chosen
+// colors baked directly into the texture (not tinted via state.color/
+// material, since a badge's colors are part of its content, not its
+// "material"). Because the result is again just a Group with a textured
+// BoxGeometry, every existing Rotate/Material/Shadow/Reflection/Animation/
+// Export code path keeps working unmodified — Phase A2 only had to touch the
+// shape-drawing step below, nothing else in the pipeline.
+const STICKER_FONT_STACK = CANVAS_TEXT_FONT_STACK;
+const STICKER_FONT_PX = 200; // supersampled resolution, independent of world-space size
+const STICKER_PAD_RATIO = 0.28; // base padding between shape edge and text, relative to shape size
+
+// Phase A2: per-shape sizing knobs, layered on top of STICKER_PAD_RATIO.
+// `square: true` shapes (radial: circle/starburst/stamp/radiant) get a
+// square canvas sized off the text's diagonal footprint, same reasoning as
+// the original circle case. `square: false` shapes (banner-like: rect/
+// ribbon/speech) size width/height independently. `padMul` scales the base
+// padding up for shapes whose decoration (spikes/rays/points) needs extra
+// room *outside* the text-fitting circle/rect so tips don't get clipped by
+// the canvas edge. `pointExtraW`/`tailRatio` add shape-specific extra room
+// (ribbon's pointed tips eat into width; speech's tail needs bottom
+// headroom that must NOT be treated as part of the "body" the text centers
+// in).
+const STICKER_SHAPE_SIZING = {
+  circle: { square: true, padMul: 1.0 },
+  roundedRect: { square: false, padMul: 1.0 },
+  starburst: { square: true, padMul: 1.15 },
+  stamp: { square: true, padMul: 1.08 },
+  ribbon: { square: false, padMul: 1.15, pointExtraW: 0.22 },
+  speech: { square: false, padMul: 1.0, tailRatio: 0.22 },
+  radiant: { square: true, padMul: 1.7 },
+};
+
+// curveOpts (PLAN_3 §3.2 — curve works *inside* badges too):
+// { curveIntensity, curveDirection, curveSpacing }.
+function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = { curveIntensity: 0 }) {
+  const lines = (text || ' ').split(/\r?\n/).map((l) => (l.length > 0 ? l : ' '));
+
+  const measureCtx = document.createElement('canvas').getContext('2d');
+  measureCtx.font = `700 ${STICKER_FONT_PX}px ${STICKER_FONT_STACK}`;
+  const arcOpts = {
+    curveIntensity: curveOpts.curveIntensity,
+    direction: curveOpts.curveDirection,
+    spacing: curveOpts.curveSpacing,
+  };
+  const { perLine, maxLineWidth, maxBulge } = layoutCurvedLines(measureCtx, lines, arcOpts);
+  const textMaxWidthPx = maxLineWidth;
+  const lineHeightPx = STICKER_FONT_PX * 1.25;
+  // maxBulge*2 (top+bottom headroom for curved glyphs) is folded into the
+  // text block height the shape sizes itself around, same reasoning as
+  // drawCanvasTextTexture above.
+  const textBlockH = lineHeightPx * lines.length + maxBulge * 2;
+
+  const sizing = STICKER_SHAPE_SIZING[shape] || STICKER_SHAPE_SIZING.circle;
+  // Shape is sized to comfortably fit the measured text block plus padding,
+  // widened per-shape by sizing.padMul so decorative bits (spikes, rays,
+  // ribbon points) land inside the canvas instead of getting clipped.
+  const padPx = Math.max(textMaxWidthPx, textBlockH) * STICKER_PAD_RATIO * sizing.padMul;
+  let canvasW;
+  let bodyH; // the shape's own body height — text centers in this, NOT in canvasH (which may include a tail)
+  if (sizing.square) {
+    // Radial shapes (circle/starburst/stamp/radiant) need a square canvas,
+    // sized by the text's diagonal footprint so multi-line/long text
+    // doesn't spill outside the shape.
+    const diameter = Math.ceil(Math.sqrt(textMaxWidthPx ** 2 + textBlockH ** 2) + padPx * 1.6);
+    canvasW = diameter;
+    bodyH = diameter;
+  } else {
+    canvasW = Math.ceil(textMaxWidthPx + padPx * 2 + (sizing.pointExtraW || 0) * textMaxWidthPx);
+    bodyH = Math.ceil(textBlockH + padPx * 1.4);
+  }
+  // Speech bubble's tail hangs below the body — extra canvas height that's
+  // explicitly excluded from where the text gets centered.
+  const tailPx = sizing.tailRatio ? Math.round(bodyH * sizing.tailRatio) : 0;
+  const canvasH = bodyH + tailPx;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvasW, canvasH);
+
+  // 1) background shape (each shape function does its own fillStyle/fill —
+  // some, like radiant, fill more than one sub-path in their own colors).
+  ctx.save();
+  drawStickerShape(ctx, shape, canvasW, bodyH, tailPx, bgColor);
+  ctx.restore();
+
+  // 2) label text, centered within the body (never inside the tail)
+  ctx.save();
+  ctx.font = `700 ${STICKER_FONT_PX}px ${STICKER_FONT_STACK}`;
+  ctx.fillStyle = textColor;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const startY = bodyH / 2 - textBlockH / 2 + maxBulge + lineHeightPx / 2;
+  perLine.forEach(({ clusters, layout }, i) => {
+    drawCurvedLine(ctx, clusters, layout, canvasW / 2, startY + lineHeightPx * i);
+  });
+  ctx.restore();
+
+  return { canvas, aspect: canvasW / canvasH };
+}
+
+// ---------- PLAN_3 §2.1 (Phase A2): background-shape template functions ----------
+// Each draws (and fills) one badge/sticker background into `ctx`, confined
+// to a [0,0,w,bodyH] box (plus `tailPx` of extra height below the body for
+// the speech-bubble tail only). Kept as small, parametrized, self-contained
+// drawing functions — per plan §2.1's framing of a "generic rendering
+// engine" — so adding a template is "add one function + one grid button",
+// not a change to the sizing/mesh/export code around it.
+
+// Alternating outer/inner-radius polygon — the shared primitive behind both
+// the spiky starburst badge and the radiant burst's thin rays (they're the
+// same shape at different spike-count/inner-radius ratios).
+function drawStarPolygonPath(ctx, cx, cy, outerR, innerR, spikes) {
+  ctx.beginPath();
+  const step = Math.PI / spikes;
+  let angle = -Math.PI / 2;
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+    angle += step;
+  }
+  ctx.closePath();
+}
+
+// A circle whose radius oscillates around its perimeter — approximates a
+// rubber-stamp/seal's distressed, scalloped edge without needing a real
+// perforation texture.
+function drawScallopedCirclePath(ctx, cx, cy, outerR, innerR, bumps) {
+  ctx.beginPath();
+  const amp = (outerR - innerR) / 2;
+  const baseR = (outerR + innerR) / 2;
+  const steps = bumps * 8;
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * Math.PI * 2;
+    const r = baseR + amp * Math.cos(t * bumps);
+    const x = cx + Math.cos(t) * r;
+    const y = cy + Math.sin(t) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
+
+// Hexagonal banner with pointed left/right tips — the "ribbon/tag label"
+// family (plan §2.1 #3).
+function drawRibbonPath(ctx, x, y, w, h, pointW) {
+  const midY = y + h / 2;
+  const pw = Math.min(pointW, w / 2 - 1);
+  ctx.beginPath();
+  ctx.moveTo(x + pw, y);
+  ctx.lineTo(x + w - pw, y);
+  ctx.lineTo(x + w, midY);
+  ctx.lineTo(x + w - pw, y + h);
+  ctx.lineTo(x + pw, y + h);
+  ctx.lineTo(x, midY);
+  ctx.closePath();
+}
+
+// Rounded-rect bubble + a downward pointer tail — the "speech/alert bubble"
+// family (plan §2.1 #4). `tailPx` is the extra canvas height reserved below
+// the body for the tail to point into.
+function drawSpeechBubblePath(ctx, x, y, w, bodyH, tailPx, r) {
+  drawRoundedRectPath(ctx, x, y, w, bodyH, r); // begins+closes its own subpath
+  if (tailPx > 0) {
+    const tailBaseW = Math.min(w * 0.22, bodyH * 0.5);
+    const tailCx = x + w * 0.28; // left-of-center, classic comic-bubble tail position
+    ctx.moveTo(tailCx - tailBaseW / 2, y + bodyH - 2);
+    ctx.lineTo(tailCx + tailBaseW / 2, y + bodyH - 2);
+    ctx.lineTo(tailCx - tailBaseW * 0.15, y + bodyH + tailPx);
+    ctx.closePath();
+  }
+}
+
+// Small 4-point stars scattered in a ring outside the radiant burst's rays —
+// the "confetti" half of the "radiant/confetti burst" family (plan §2.1 #5).
+function drawConfettiStars(ctx, cx, cy, outerR, color) {
+  ctx.save();
+  ctx.fillStyle = color;
+  const count = 10;
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = outerR * (0.78 + Math.random() * 0.18); // just past the ray tips, still inside the canvas
+    const dx = cx + Math.cos(angle) * dist;
+    const dy = cy + Math.sin(angle) * dist;
+    const starR = outerR * (0.035 + Math.random() * 0.025);
+    drawStarPolygonPath(ctx, dx, dy, starR, starR * 0.45, 4);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+// Dispatch: paints one shape (already fills itself in `color`) into
+// `ctx`'s [0,0,w,bodyH] box.
+function drawStickerShape(ctx, shape, w, bodyH, tailPx, color) {
+  ctx.fillStyle = color;
+  const cx = w / 2;
+  const cy = bodyH / 2;
+  const outerR = Math.min(w, bodyH) / 2;
+  switch (shape) {
+    case 'roundedRect':
+      drawRoundedRectPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.16);
+      ctx.fill();
+      break;
+    case 'starburst':
+      // Spiky badge (plan §2.1 #1) — a chunky 12-point star.
+      drawStarPolygonPath(ctx, cx, cy, outerR, outerR * 0.72, 12);
+      ctx.fill();
+      break;
+    case 'stamp':
+      // Rubber-stamp/seal outline (plan §2.1 #2) — scalloped circle edge.
+      drawScallopedCirclePath(ctx, cx, cy, outerR, outerR * 0.92, 20);
+      ctx.fill();
+      break;
+    case 'ribbon':
+      drawRibbonPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.28);
+      ctx.fill();
+      break;
+    case 'speech':
+      drawSpeechBubblePath(ctx, 0, 0, w, bodyH, tailPx, Math.min(w, bodyH) * 0.18);
+      ctx.fill();
+      break;
+    case 'radiant': {
+      // Radiant/confetti burst (plan §2.1 #5) — thin long rays, a solid
+      // core circle on top to give the text a clean background (hides the
+      // ray bases), plus a scatter of small confetti stars past the rays.
+      const coreR = outerR * 0.55;
+      drawStarPolygonPath(ctx, cx, cy, outerR, coreR * 0.98, 20);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, coreR, coreR, 0, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fill();
+      drawConfettiStars(ctx, cx, cy, outerR, color);
+      break;
+    }
+    case 'circle':
+    default:
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, w / 2, bodyH / 2, 0, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fill();
+      break;
+  }
+}
+
+function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts) {
+  const { canvas, aspect } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts);
+  const frontTex = makeCardTexture(canvas, false);
+  const backTex = makeCardTexture(canvas, true);
+
+  const worldHeight = state.size * 1.6; // badges read a bit larger than plain text at the same "সাইজ" value
+  const worldWidth = worldHeight * aspect;
+  const depth = Math.max(1, state.depth);
+
+  const geometry = new THREE.BoxGeometry(worldWidth, worldHeight, depth);
+  // Pass isImage=true here on purpose: unlike the plain text card (white
+  // glyphs meant to be tinted by state.color), the sticker canvas already
+  // bakes its own final bgColor/textColor into the pixels, so the front/back
+  // face material must stay white (no multiply-tint) or the badge colors
+  // would shift. This also picks the looser 0.05 alphaTest, keeping the
+  // circle/rounded-rect edge smooth instead of jagged.
+  const materials = buildCanvasCardMaterials(frontTex, backTex, true);
+  const mesh = new THREE.Mesh(geometry, materials);
+  mesh.castShadow = state.shadowsOn;
+  mesh.receiveShadow = state.shadowsOn;
+
+  const group = new THREE.Group();
+  group.add(mesh);
+  group.userData.frontTex = frontTex;
+  group.userData.backTex = backTex;
+
+  renderMode = 'canvas';
+  textMesh = group;
+  textMesh.material = materials;
+}
+
 function rebuildTextMesh() {
   // §8.2: image mode builds/rebuilds a photo card instead of a text mesh —
   // completely separate branch from the text paths below, but converges on
   // the same `textMesh` variable + applyRotation()/scene.add() tail, since
   // that's the "current active object" every other panel (material, shadow,
   // animation, export) already reads from.
+  if (state.contentMode === 'sticker') {
+    disposeTextMesh();
+    buildStickerCardMesh(state.stickerText, state.stickerShape, state.stickerBgColor, state.stickerTextColor, {
+      curveIntensity: state.curveIntensity,
+      curveDirection: state.curveDirection,
+      curveSpacing: state.curveSpacing,
+    });
+    applyRotation();
+    scene.add(textMesh);
+    updateQualityNote();
+    updateTextModeNote(false);
+    updateShadowFrustum();
+    return;
+  }
+
   if (state.contentMode === 'image') {
     disposeTextMesh();
     if (!state.imageElement) {
@@ -618,6 +1256,7 @@ function rebuildTextMesh() {
     scene.add(textMesh);
     updateQualityNote();
     updateTextModeNote(false);
+    updateShadowFrustum();
     return;
   }
 
@@ -629,7 +1268,14 @@ function rebuildTextMesh() {
   const lines = rawContent.split(/\r?\n/);
   const validLines = lines.map((l) => (l.length > 0 ? l : ' '));
 
-  if (isBanglaText(rawContent)) {
+  // PLAN_3 §3.1: curved text is a canvas-card-only feature (per-character
+  // positioning isn't something the vector TextGeometry path can do without
+  // per-letter geometries — that's Phase B4, deferred). So when curve is
+  // active, route Latin/English text through the canvas-card path too, not
+  // just Bangla — matches the plan's "works for both scripts" framing for
+  // this feature, since both scripts end up on the same canvas-based draw.
+  const needsCanvasCard = isBanglaText(rawContent) || state.curveIntensity !== 0;
+  if (needsCanvasCard) {
     buildCanvasCardTextMesh(validLines);
   } else {
     buildVectorTextMesh(validLines);
@@ -638,7 +1284,8 @@ function rebuildTextMesh() {
   applyRotation();
   scene.add(textMesh);
   updateQualityNote();
-  updateTextModeNote(isBanglaText(rawContent));
+  updateTextModeNote(isBanglaText(rawContent), state.curveIntensity !== 0);
+  updateShadowFrustum();
 }
 
 // ---------- Phase 5: quality preset apply + readout ----------
@@ -672,20 +1319,39 @@ function updateQualityNote() {
     `লো-এন্ড ডিভাইস/কম-শক্তির পিসিতে ল্যাগ হলে "Low" বেছে নিন।`;
 }
 
-function updateTextModeNote(isBangla) {
+function updateTextModeNote(isBangla, curveOn = false) {
   if (!textModeNote) return;
-  textModeNote.textContent = isBangla
-    ? 'বাংলা লেখা শনাক্ত হয়েছে — ছবি-টেক্সচার কার্ড মোডে রেন্ডার হচ্ছে (ব্রাউজারের নিজস্ব বাংলা ফন্ট/শেপিং ব্যবহার করে, তাই যুক্তাক্ষর/মাত্রা ঠিকভাবে বসে), বাক্যের প্রান্ত থেকে গভীরতা বের হয় — আলাদা আলাদা অক্ষরের কিনারা থেকে না।'
-    : '';
-  textModeNote.hidden = !isBangla;
+  if (isBangla && curveOn) {
+    // PLAN_3 §3, Phase B2 caveat: curve draws one grapheme cluster at a
+    // time (see curve.js splitGraphemes), which keeps a single conjunct
+    // (ক্ষ ইত্যাদি) intact but can't do cross-cluster shaping the way one
+    // whole-line fillText() call does — worth surfacing, not silently
+    // shipping a subtly different Bangla render than the straight case.
+    textModeNote.textContent =
+      'বাংলা লেখা শনাক্ত হয়েছে — ছবি-টেক্সচার কার্ড মোডে রেন্ডার হচ্ছে। কার্ভ চালু থাকায় প্রতিটা অক্ষর/যুক্তাক্ষর আলাদাভাবে বসানো হচ্ছে (একসাথে পুরো লাইন শেপ করা হচ্ছে না) — জটিল যুক্তাক্ষরে সামান্য পার্থক্য দেখা যেতে পারে সোজা টেক্সটের তুলনায়।';
+  } else if (isBangla) {
+    textModeNote.textContent =
+      'বাংলা লেখা শনাক্ত হয়েছে — ছবি-টেক্সচার কার্ড মোডে রেন্ডার হচ্ছে (ব্রাউজারের নিজস্ব বাংলা ফন্ট/শেপিং ব্যবহার করে, তাই যুক্তাক্ষর/মাত্রা ঠিকভাবে বসে), বাক্যের প্রান্ত থেকে গভীরতা বের হয় — আলাদা আলাদা অক্ষরের কিনারা থেকে না।';
+  } else if (curveOn) {
+    textModeNote.textContent =
+      'কার্ভ চালু থাকায় ছবি-টেক্সচার কার্ড মোডে রেন্ডার হচ্ছে (ভেক্টর ৩ডি এক্সট্রুশনের বদলে) — বাক্যের প্রান্ত থেকে গভীরতা বের হয়, আলাদা আলাদা অক্ষরের কিনারা থেকে না।';
+  } else {
+    textModeNote.textContent = '';
+  }
+  textModeNote.hidden = !(isBangla || curveOn);
 }
 
 function applyRotation() {
   if (!textMesh) return;
+  // §৮.২ picture styles: some frames (e.g. "পোলারয়েড") bake in a fixed extra
+  // tilt on top of whatever the user's Rotate/Tilt sliders say, exactly like
+  // Word's "Rotated, White Frame" style. Defaults to 0 for text and for
+  // every non-tilted picture style, so this is a no-op everywhere else.
+  const styleTiltZ = (textMesh.userData && textMesh.userData.styleTiltZ) || 0;
   textMesh.rotation.set(
     THREE.MathUtils.degToRad(state.rotX),
     THREE.MathUtils.degToRad(state.rotY),
-    THREE.MathUtils.degToRad(state.rotZ)
+    THREE.MathUtils.degToRad(state.rotZ + styleTiltZ)
   );
 }
 
@@ -700,10 +1366,27 @@ function applyMaterial() {
     const mesh = textMesh.children[0];
     if (!mesh) return;
     const old = mesh.material;
-    const materials = buildCanvasCardMaterials(textMesh.userData.frontTex, textMesh.userData.backTex, state.contentMode === 'image');
+    const materials = buildCanvasCardMaterials(textMesh.userData.frontTex, textMesh.userData.backTex, state.contentMode === 'image' || state.contentMode === 'sticker');
     mesh.material = materials;
     textMesh.material = materials;
     if (Array.isArray(old)) old.forEach((m) => m.dispose());
+
+    // Keep the "রিফ্লেকশন ফ্রেম" copy (if this image has one) in sync with
+    // whatever material/color the main mesh just switched to.
+    const reflMesh = textMesh.children[1];
+    if (reflMesh && reflMesh.isMesh) {
+      const oldRefl = reflMesh.material;
+      const reflMaterials = materials.map((m) => {
+        const clone = m.clone();
+        clone.transparent = true;
+        clone.opacity = 0.32;
+        clone.depthWrite = false;
+        return clone;
+      });
+      reflMesh.material = reflMaterials;
+      textMesh.userData.reflMaterials = reflMaterials;
+      if (Array.isArray(oldRefl)) oldRefl.forEach((m) => m.dispose());
+    }
     return;
   }
 
@@ -732,6 +1415,7 @@ function applyShadowToggle() {
   for (const l of lights.children) {
     if (l.isDirectionalLight) l.castShadow = state.shadowsOn;
   }
+  updateShadowFrustum();
 }
 
 function applyReflectionToggle() {
@@ -890,9 +1574,61 @@ contentModeGrid.addEventListener('click', (e) => {
   setActivePreset(contentModeGrid, 'content', state.contentMode);
   textContentSection.hidden = state.contentMode !== 'text';
   imageContentSection.hidden = state.contentMode !== 'image';
+  stickerContentSection.hidden = state.contentMode !== 'sticker';
+  // PLAN_3 §3.2: curve control is shared by Text and Sticker, hidden for Image.
+  curveSection.hidden = state.contentMode === 'image';
   stopAnimation(); // switching the active object mid-playback would animate a stale mesh
   rebuildTextMesh();
   updateExportSourceNote();
+});
+
+// ---------- PLAN_3 §2: sticker/badge text wiring ----------
+stickerTextInput.addEventListener('input', () => {
+  state.stickerText = stickerTextInput.value;
+  scheduleRebuild();
+});
+
+stickerShapeGrid.addEventListener('click', (e) => {
+  const btn = e.target.closest('.preset-btn');
+  if (!btn) return;
+  state.stickerShape = btn.dataset.stickerShape;
+  setActivePreset(stickerShapeGrid, 'stickerShape', state.stickerShape);
+  if (state.contentMode === 'sticker') rebuildTextMesh();
+});
+
+stickerBgColorPicker.addEventListener('input', () => {
+  state.stickerBgColor = stickerBgColorPicker.value;
+  if (state.contentMode === 'sticker') scheduleRebuild();
+});
+
+stickerTextColorPicker.addEventListener('input', () => {
+  state.stickerTextColor = stickerTextColorPicker.value;
+  if (state.contentMode === 'sticker') scheduleRebuild();
+});
+
+// ---------- PLAN_3 §3: curved text wiring (Phase B3) ----------
+// Shared by Text and Sticker content modes — rebuildTextMesh() itself reads
+// state.contentMode to decide which mesh to (re)build, so a single
+// scheduleRebuild() here is correct for whichever of the two is active.
+curveIntensityRange.addEventListener('input', () => {
+  state.curveIntensity = Number(curveIntensityRange.value);
+  curveIntensityValue.textContent = state.curveIntensity;
+  if (state.contentMode === 'text' || state.contentMode === 'sticker') scheduleRebuild();
+});
+
+curveDirectionGrid.addEventListener('click', (e) => {
+  const btn = e.target.closest('.preset-btn');
+  if (!btn) return;
+  state.curveDirection = btn.dataset.curveDirection;
+  setActivePreset(curveDirectionGrid, 'curveDirection', state.curveDirection);
+  if (state.contentMode === 'text' || state.contentMode === 'sticker') scheduleRebuild();
+});
+
+curveSpacingRange.addEventListener('input', () => {
+  const pct = Number(curveSpacingRange.value);
+  state.curveSpacing = pct / 100;
+  curveSpacingValue.textContent = `${pct}%`;
+  if (state.contentMode === 'text' || state.contentMode === 'sticker') scheduleRebuild();
 });
 
 // ---------- §8.2: image upload ----------
@@ -927,6 +1663,15 @@ imageFileInput.addEventListener('change', () => {
     imageNote.textContent = 'ফাইলটা পড়া যায়নি।';
   };
   reader.readAsDataURL(file);
+});
+
+// ---------- §8.2 follow-up: picture style gallery (image mode only) ----------
+pictureStyleGrid.addEventListener('click', (e) => {
+  const btn = e.target.closest('.preset-btn');
+  if (!btn) return;
+  state.pictureStyle = btn.dataset.pictureStyle;
+  setActivePreset(pictureStyleGrid, 'pictureStyle', state.pictureStyle);
+  if (state.contentMode === 'image' && state.imageElement) rebuildTextMesh();
 });
 
 depthRange.addEventListener('input', () => {
@@ -1156,15 +1901,45 @@ function updateExportSourceNote() {
     exportSourceNote.textContent = `সোর্স: অটো-রোটেট টার্নটেবল (৩৬০°, ${totalS}s)`;
   } else if (exportFormatSelect.value === 'png') {
     exportSourceNote.textContent = 'সোর্স: স্থির (কোনো অ্যানিমেশন/অটো-রোটেট নেই) — ১টা PNG ফ্রেম এক্সপোর্ট হবে';
+  } else if (exportFormatSelect.value === 'gif') {
+    exportSourceNote.textContent = 'সোর্স: স্থির (কোনো অ্যানিমেশন/অটো-রোটেট নেই) — ১-ফ্রেমের স্থির GIF এক্সপোর্ট হবে';
   } else {
     exportSourceNote.textContent = `সোর্স: স্থির (কোনো অ্যানিমেশন/অটো-রোটেট নেই) — ${(STATIC_WEBM_MS / 1000).toFixed(1)}s-এর স্থির ভিডিও এক্সপোর্ট হবে`;
   }
+
+  updateGifSizeEstimate();
 }
 
 function updateWebmSupportNote() {
   const supported = isWebMExportSupported();
   webmSupportNote.hidden = supported || exportFormatSelect.value !== 'webm';
   exportBtn.disabled = exportFormatSelect.value === 'webm' && !supported;
+}
+
+// PLAN_3 §4.4 Phase C6: rough pre-export size estimate + guardrail note.
+function updateGifSizeEstimate() {
+  const isGif = exportFormatSelect.value === 'gif';
+  gifOptionsGroup.hidden = !isGif;
+  if (!isGif) return;
+
+  const mode = currentExportSourceMode();
+  const [width, height] = exportResolutionSelect.value.split('x').map(Number);
+  const fps = Number(exportFpsSelect.value);
+  const totalMs =
+    mode === 'animated'
+      ? animState.delayMs + animState.durationMs
+      : mode === 'turntable'
+        ? Number(turntableLengthRange.value)
+        : 0;
+  const frameCount = estimateGifFrameCount(totalMs, fps, mode !== 'static');
+  const estBytes = estimateGifSizeBytes(width, height, frameCount);
+  const sizeLabel = formatBytes(estBytes);
+
+  gifSizeEstimateNote.textContent = `আনুমানিক সাইজ: ~${sizeLabel} (${frameCount}টা ফ্রেম, ${width}×${height}) — এটা একটা মোটামুটি ধারণা, আসল সাইজ কম-বেশি হতে পারে।`;
+  gifSizeEstimateNote.classList.toggle('field-note-warning', estBytes > 15 * 1024 * 1024);
+  if (estBytes > 15 * 1024 * 1024) {
+    gifSizeEstimateNote.textContent += ' ⚠️ বেশ বড় ফাইল হতে পারে — রেজলিউশন/FPS/দৈর্ঘ্য কমানোর কথা ভাবুন।';
+  }
 }
 
 function updateExportProgress(t, label) {
@@ -1185,6 +1960,14 @@ exportFormatSelect.addEventListener('change', () => {
 turntableLengthRange.addEventListener('input', () => {
   turntableLengthValue.textContent = `${(Number(turntableLengthRange.value) / 1000).toFixed(1)}s`;
   updateExportSourceNote();
+});
+
+exportResolutionSelect.addEventListener('change', updateGifSizeEstimate);
+exportFpsSelect.addEventListener('change', updateGifSizeEstimate);
+gifQualitySelect.addEventListener('change', updateGifSizeEstimate);
+
+gifTransparentToggle.addEventListener('change', () => {
+  gifBackgroundColorField.hidden = gifTransparentToggle.checked;
 });
 
 exportBtn.addEventListener('click', async () => {
@@ -1231,6 +2014,11 @@ exportBtn.addEventListener('click', async () => {
         : format === 'webm'
           ? STATIC_WEBM_MS
           : 0,
+    // GIF-only fields (harmless/ignored by the WebM and PNG export paths):
+    quality: Number(gifQualitySelect.value),
+    loop: gifLoopToggle.checked,
+    transparentBg: gifTransparentToggle.checked,
+    backgroundColor: gifBackgroundColorPicker.value,
   };
 
   const deps = {
@@ -1261,9 +2049,11 @@ exportBtn.addEventListener('click', async () => {
     const result =
       format === 'webm'
         ? await exportWebM(deps, opts, callbacks)
-        : await exportPngSequence(deps, opts, callbacks);
+        : format === 'gif'
+          ? await exportGif(deps, opts, callbacks)
+          : await exportPngSequence(deps, opts, callbacks);
 
-    const ext = format === 'webm' ? 'webm' : 'zip';
+    const ext = format === 'webm' ? 'webm' : format === 'gif' ? 'gif' : 'zip';
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `3d-text-export-${stamp}.${ext}`;
 
@@ -1293,10 +2083,12 @@ exportBtn.addEventListener('click', async () => {
 
 // ---------- initial preset UI state ----------
 setActivePreset(contentModeGrid, 'content', state.contentMode);
+setActivePreset(curveDirectionGrid, 'curveDirection', state.curveDirection);
 setActivePreset(materialPresetGrid, 'material', state.materialType);
 setActivePreset(lightingPresetGrid, 'lighting', state.lightingPreset);
 setActivePreset(animPresetGrid, 'anim', animState.presetId);
 setActivePreset(qualityPresetGrid, 'quality', state.quality);
+setActivePreset(pictureStyleGrid, 'pictureStyle', state.pictureStyle);
 animPlayBtn.disabled = animState.presetId === 'none';
 buildLightingPreset(state.lightingPreset);
 scene.environment = state.reflectionsOn ? envTexture : null;

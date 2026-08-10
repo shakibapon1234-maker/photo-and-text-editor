@@ -197,6 +197,10 @@ body { display: flex; flex-direction: column; }
   margin: 4px 0 0;
 }
 
+.field-note-warning {
+  color: var(--danger);
+}
+
 .btn-secondary {
   width: 100%;
   background: var(--surface-raised);

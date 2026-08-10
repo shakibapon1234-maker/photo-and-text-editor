@@ -423,9 +423,175 @@ this feature either — you'll need `npm install && npm run build` to see both t
 - Export (WebM/PNG) of an image card, and that switching content-type mid-preview/mid-export
   resets state cleanly.
 
+## Sticker/Badge text (PLAN_3 §2, Phase A1 — carried over, previously undocumented here)
+
+A third content mode alongside টেক্সট/ছবি: স্টিকার/ব্যাজ. Reuses the §8.1 canvas-texture-card
+pipeline again — `drawStickerCanvasTexture()` paints a background shape then the label text
+on top, both colors baked directly into the texture rather than tinted via the Material
+panel (a badge's colors are its content, not its material). `buildStickerCardMesh()` wraps
+that into the same 6-material `BoxGeometry` card as text/image, so it's a third
+`state.contentMode` branch in `rebuildTextMesh()` — Rotate/Material/Shadow/Animation/Export
+all already work on it unmodified.
+
+## Sticker/Badge template library (this session, per PLAN_3 §2.1, Phase A2)
+
+> ⚠️ **Build status:** this sandbox had **no npm registry access** this session
+> (`npm ping` → `403`, same `host_not_allowed` block as some earlier sessions) — so unlike
+> the Phase 4/curved-text sessions, `www/main.bundle.js` shipped in this zip is **not**
+> rebuilt and does **not** yet contain Phase A2 (confirmed: `grep starburst
+> www/main.bundle.js` matches nothing). Only `src/main.js` and `www/index.html` (the 5 new
+> "ব্যাজ শেপ" grid buttons) have the Phase A2 changes. Run `npm install && npm run build`
+> before `npm run serve` to actually see the 5 new shapes in the browser — `npm run serve`
+> alone will still show the old (Phase A1-only) bundle.
+
+Phase A1 only shipped the "Simple Sticker" base case (circle / rounded-rect). This session
+added the other 5 template families §2.1 called out, as five more `drawStickerShape()`
+cases alongside circle/roundedRect — same dispatcher, same sizing/text-centering code path,
+so nothing outside the shape-drawing step had to change (Rotate/Material/Shadow/Animation/
+Export/curve-inside-badge all keep working unmodified, per the plan §1 architecture bet):
+
+- **Starburst** (§2.1 #1) — chunky 12-point spiky badge (`drawStarPolygonPath`, alternating
+  outer/inner radius around the circle).
+- **Stamp/Seal** (§2.1 #2) — a circle whose radius oscillates around its perimeter
+  (`drawScallopedCirclePath`), approximating a rubber-stamp's distressed/scalloped edge.
+- **Ribbon/Tag** (§2.1 #3) — hexagonal banner with pointed left/right tips
+  (`drawRibbonPath`).
+- **Speech/Alert bubble** (§2.1 #4) — rounded-rect body + a downward pointer tail
+  (`drawSpeechBubblePath`); the only family needing a canvas-sizing change — `tailPx` extra
+  height below the "body" the shape/text are centered in, so the tail doesn't push the
+  label off-center.
+- **Radiant/Confetti burst** (§2.1 #5) — thin 20-ray sunburst (`drawStarPolygonPath` again,
+  just a different spike-count/inner-radius ratio than Starburst) with a solid core circle
+  on top (hides the ray bases, gives the text a clean background) plus a scatter of small
+  4-point confetti stars just past the ray tips (`drawConfettiStars`).
+
+`STICKER_SHAPE_SIZING` gives each family its own padding multiplier (`padMul`) so
+spikes/rays/points/scallops land inside the canvas instead of clipping at the edge — radiant
+needs the most headroom (rays + confetti reach furthest from the text), ribbon/speech size
+width/height independently instead of forcing a square canvas. The §2.1 "12+ templates"
+suggestion list (banner ribbon, highlight marker, comic POW/BOOM, price-tag, gradient pill,
+neon frame, torn-paper corner) is explicitly framed by the plan as variations/color-swaps of
+these same 5 families rather than needing new engines, so it's left for a future pass rather
+than done here.
+
+**What was tested this session — no browser/canvas available in this sandbox** (same
+`node --check` + logic-only limitation as prior curve/GIF sessions, see their sections
+below/above for the same caveat): `node --check src/main.js` (syntax valid); the path-math
+for the 4 new custom-geometry shapes (star-polygon, scalloped-circle, ribbon) was extracted
+into a standalone script and run under plain `node` — confirmed starburst/radiant ray tips
+land exactly on the expected outer radius (no clipping), the stamp's scallop oscillates
+within its intended min/max radius band, ribbon points stay inside its `[0,w]×[0,h]` box
+including the narrow-width clamp edge case (`pointW` clamped to `w/2 - 1` so tips can't
+invert past each other). The actual pixel-level *look* of each shape (spike sharpness,
+scallop density, ribbon proportions, confetti scatter density) is unverified — a real
+`npm install && npm run build && npm run serve` + eyeballing each of the 5 new "ব্যাজ শেপ"
+grid buttons is the concrete next step, same as the still-open curve/Bangla/image checks
+below. Also not yet done from §2.3's Phase A2 checklist: no new thumbnails were added to
+the শেপ grid buttons (they're still plain text labels, like the two Phase A1 ones) — the
+plan's "থাম্বনেইলসহ" (§2.2) UI polish is left for Phase A3.
+
+## Curved text (this session, per PLAN_3 §3, Phase B1-B3)
+
+Curve Intensity slider (-100..100) + Arc Up ⌣ / Arc Down ⌢ direction toggle + a
+character-spacing slider, available in both Text and Sticker/Badge content modes (curve
+works on a badge's inner label too, per plan §3.2) — hidden in Image mode, where it doesn't
+apply.
+
+**Phase B1 — arc math (`src/curve.js`, new):** `computeArcLayout(charWidths, opts)`,
+deliberately framework-agnostic like `animations.js` — a pure function of plain numbers, no
+`three`/canvas/DOM dependency, so it's `node`-checkable on its own. Characters are placed on
+a circular arc; `curveIntensity` sets how much of a (clamped ≤170°) circle the line sweeps,
+`direction` picks which way it bulges (`'up'`: line center is the low point, ends curve up,
+classic "smile"/logo-curve; `'down'`: center is the high point, ends dip, dome/stamp-arc
+look). At `curveIntensity === 0` the function takes an entirely different, trig-free code
+path that reproduces a plain centered left-to-right layout exactly — so "curve off" is a
+guaranteed no-op against the pre-existing straight-text render, not an approximation of one.
+Also exports `splitGraphemes()` (via `Intl.Segmenter` where available, `Array.from` as
+fallback) — curved text has to draw one cluster at a time to position/rotate it
+individually, and grapheme-cluster (not UTF-16 code point) is the smallest unit that keeps a
+Bangla conjunct like ক্ষ as one piece instead of shattering it into unjoined parts.
+
+**Phase B2 — canvas integration (`src/main.js`):** a new `layoutCurvedLines()` +
+`drawCurvedLine()` pair, shared by both `drawCanvasTextTexture()` (plain/Bangla text card)
+and `drawStickerCanvasTexture()` (badge card) — measures each line's grapheme clusters with
+the real `ctx.font`, runs them through `computeArcLayout`, and draws each cluster with its
+own `ctx.save()/translate()/rotate()/fillText()/restore()`. Both canvas-sizing functions now
+add the arc's extra vertical reach (`layout.height`, 0 when curve is off) as headroom so
+curved glyphs — which swing above/below the normal line slot — don't clip against the canvas
+edge; at curve=0 this reduces to the exact same canvas dimensions as before.
+
+Latin/English text now also routes through the canvas-card path (previously only Bangla did)
+whenever curve is active, since curve is a canvas-only capability — per-letter positioning
+isn't something the vector `TextGeometry` path can do without per-letter geometries (that's
+plan §3.3's Phase B4, deliberately deferred, open decision §7.3 unanswered). This matches the
+plan's framing that curve "works for both scripts" — both end up on the same canvas draw
+when curve is on. A `field-note` under the Text panel now explains this switch (reusing/
+extending the existing Bangla-mode note rather than adding a second, separate note element),
+and calls out the Bangla-conjunct caveat specifically when curve + Bangla are both active
+(single-cluster fillText calls keep one conjunct intact but can't cross-cluster-shape a
+whole line the way the straight path's single `fillText(wholeLine, ...)` does).
+
+**Phase B3 — UI controls:** Curve Intensity range input, a 2-button Arc Up/Down preset-grid
+(same `setActivePreset()` pattern as every other preset grid in this module), and a
+character-spacing range input (80%-250%, multiplies each character's measured advance width
+— tight curves need this or glyphs start overlapping). All three live-update through the
+existing debounced `scheduleRebuild()` path, same as every other text/sticker field, so
+dragging a slider redraws within ~120ms, matching every other live-preview control already
+in this module.
+
+**What was tested this session:**
+- `computeArcLayout`/`splitGraphemes` sanity-checked directly with plain `node` (no
+  bundler/browser needed, same reasoning as `animations.js`'s own tests): curve=0 reduces
+  exactly to a straight, unrotated, centered layout; a symmetric 5-character arc has its
+  center character at rotation≈0/y≈0 and its two end characters mirrored in `|y|` and
+  opposite in rotation sign; `'up'` puts the ends above center (negative y) and `'down'`
+  puts them below (positive y); `splitGraphemes('ক্ষমতা')` correctly keeps ক্ষ as one
+  cluster instead of splitting the virama out.
+- The actual canvas draw path (`layoutCurvedLines`/`drawCurvedLine`, copied verbatim into a
+  standalone script) was rendered for real using `node-canvas` (Cairo-backed 2D canvas —
+  not the same engine as a browser's, but close enough to validate the geometry/positioning
+  logic) and inspected as PNGs: a straight baseline render, Arc Up and Arc Down at the same
+  intensity (mirror images of each other, as expected), a tight high-intensity curve with
+  extra letter-spacing (matches the "SPECIAL" starburst-badge reference look from the plan's
+  screenshot analysis), and a Bangla phrase ("শুভ জন্মদিন") curved downward, confirming
+  conjuncts stay visually joined per-cluster while still following the arc.
+- `npm run build` (real esbuild bundle, this sandbox did have npm registry access this
+  session) completed with no errors; `www/main.bundle.js` and the `docs/` mirror are both
+  up to date with this feature.
+- Every new `getElementById()` call (`curveSection`, `curveIntensityRange`/`Value`,
+  `curveDirectionGrid`, `curveSpacingRange`/`Value`) cross-checked against the new
+  `www/index.html` markup.
+
+**What could NOT be tested this session — no real browser/GPU in this sandbox** (this
+sandbox could not get a headless Chromium running this time — network egress to fetch a
+`Chrome for Testing` build was blocked (`403`), so unlike Phase 4's session this one has no
+real end-to-end browser run):
+1. **You, next step:** `npm install && npm run build && npm run serve`, open the module,
+   switch Curve Intensity away from 0 with some text/sticker content, and confirm it looks
+   right live — both directions, with multi-line text (this session's own testing was
+   single-line; multi-line curved text uses one uniform `maxBulge` headroom across all
+   lines rather than per-line variable spacing, a deliberate simplification worth eyeballing
+   for anything with 2+ curved lines).
+2. Whether the vector→canvas-card switch (curve turned on with plain English/Latin text)
+   reads as an unexpected/jarring depth-style change (flat card edge vs. per-letter extruded
+   edge) — code-level this is the same canvas-card style Bangla text already uses, but
+   that's still itself browser-unverified this session, see §8.1 above.
+3. Export (WebM/PNG) of curved text/badges specifically — code-level it's unaffected (export
+   just captures whatever the live renderer shows), but worth a real check since curved text
+   is the first canvas-card content whose texture height varies per-render (via `maxBulge`)
+   rather than being fixed by line count alone.
+
 ## Next (per PLAN_2)
 
-0. **New, most urgent (this session's Bangla + image work — neither tested in a real
+0. **Newest, most urgent (this session's Phase A2 sticker templates — not built into
+   `www/main.bundle.js`, see the ⚠️ note above):** `npm install && npm run build && npm run
+   serve`, switch Content Mode to স্টিকার/ব্যাজ, and click through all 5 new "ব্যাজ শেপ"
+   buttons (Starburst, Stamp/Seal, Ribbon/Tag, Speech Bubble, Radiant Burst) with some
+   label text — confirm each looks right, text stays legible/centered (especially the
+   speech bubble's tail not overlapping the label), and that Export (WebM/PNG/GIF) works
+   on each. This session's own testing was logic-only (path math checked under plain
+   `node`, no real canvas/browser available), so this is genuinely unverified visually.
+1. **Also urgent (carried over, this session's Bangla + image work — neither tested in a real
    browser, see both sections above):** run `npm install && npm run build && npm run
    serve`, then (a) type Bangla text into the Content field and confirm it renders as a
    readable card, and (b) switch to "ছবি" and upload a photo and confirm the card looks

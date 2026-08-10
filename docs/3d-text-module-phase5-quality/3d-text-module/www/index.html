@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>3D Text Module — Phase 4 (+ ছবি)</title>
+<title>3D Text Module — Phase 4 (+ ছবি, স্টিকার/ব্যাজ, কার্ভড টেক্সট)</title>
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -12,7 +12,7 @@
     <div class="brand">
       <span class="brand-mark">◆</span>
       <span class="brand-name">3D Text Module</span>
-      <span class="phase-badge">Phase 4 — Export Pipeline (+ 3D ইমেজ, §৮.২)</span>
+      <span class="phase-badge">PLAN_3 — কার্ভড টেক্সট (Phase B1-B3)</span>
     </div>
     <div class="topbar-note" id="statusNote">মডেল/ফন্ট লোড হচ্ছে…</div>
   </div>
@@ -28,8 +28,9 @@
         <div class="preset-grid" id="contentModeGrid">
           <button type="button" class="preset-btn" data-content="text">টেক্সট</button>
           <button type="button" class="preset-btn" data-content="image">ছবি</button>
+          <button type="button" class="preset-btn" data-content="sticker">স্টিকার/ব্যাজ</button>
         </div>
-        <p class="field-note">টেক্সট বা ছবি — যেকোনো একটা একবারে অ্যাক্টিভ থাকে (একই Rotate/Material/Animation/Export প্যানেল দুটোতেই কাজ করে)।</p>
+        <p class="field-note">টেক্সট, ছবি বা স্টিকার/ব্যাজ — যেকোনো একটা একবারে অ্যাক্টিভ থাকে (একই Rotate/Material/Animation/Export প্যানেল সবগুলোতেই কাজ করে)।</p>
       </section>
 
       <section class="panel-section" id="textContentSection">
@@ -49,6 +50,76 @@
         </label>
         <img id="imagePreviewThumb" class="image-preview-thumb" alt="প্রিভিউ" hidden />
         <p class="field-note" id="imageNote">এখনো কোনো ছবি নির্বাচন করা হয়নি।</p>
+
+        <h3 style="margin-top:14px;">পিকচার স্টাইল (Word-এর মতো ফ্রেম)</h3>
+        <div class="preset-grid" id="pictureStyleGrid">
+          <button type="button" class="preset-btn active" data-picture-style="none">কোনো ফ্রেম না</button>
+          <button type="button" class="preset-btn" data-picture-style="simpleWhite">সাদা বর্ডার</button>
+          <button type="button" class="preset-btn" data-picture-style="simpleBlack">কালো বর্ডার</button>
+          <button type="button" class="preset-btn" data-picture-style="thinLine">পাতলা লাইন</button>
+          <button type="button" class="preset-btn" data-picture-style="doubleFrame">ডাবল ফ্রেম</button>
+          <button type="button" class="preset-btn" data-picture-style="rounded">গোলাকার কোণা</button>
+          <button type="button" class="preset-btn" data-picture-style="softRounded">নরম কোণা</button>
+          <button type="button" class="preset-btn" data-picture-style="oval">ডিম্বাকার</button>
+          <button type="button" class="preset-btn" data-picture-style="softOval">নরম ডিম্বাকার</button>
+          <button type="button" class="preset-btn" data-picture-style="bevel">বেভেল ফ্রেম</button>
+          <button type="button" class="preset-btn" data-picture-style="dropShadow">ড্রপ-শ্যাডো ফ্রেম</button>
+          <button type="button" class="preset-btn" data-picture-style="metal">মেটাল ফ্রেম</button>
+          <button type="button" class="preset-btn" data-picture-style="reflected">রিফ্লেকশন ফ্রেম</button>
+          <button type="button" class="preset-btn" data-picture-style="polaroid">পোলারয়েড (ঘোরানো)</button>
+        </div>
+        <p class="field-note">
+          গোলাকার/ডিম্বাকার স্টাইলে Depth স্বয়ংক্রিয়ভাবে কম রাখা হয় (কার্ডের কিনারা
+          চৌকো থেকে যায় বলে)। রিফ্লেকশন ফ্রেম আসল ছবির নিচে একটা ফিকে, উল্টানো কপি বসায়।
+        </p>
+      </section>
+
+      <section class="panel-section" id="stickerContentSection" hidden>
+        <h3>স্টিকার/ব্যাজ টেক্সট</h3>
+        <label class="field" style="align-items: flex-start;">
+          <span style="margin-top: 6px;">কন্টেন্ট</span>
+          <textarea id="stickerTextInput" rows="2" placeholder="ব্যাজের ভিতরের লেখা" style="resize: vertical; min-height: 52px; font-family: inherit;">yes!</textarea>
+        </label>
+
+        <h3 style="margin-top:14px;">ব্যাজ শেপ</h3>
+        <div class="preset-grid" id="stickerShapeGrid">
+          <button type="button" class="preset-btn active" data-sticker-shape="circle">গোল স্টিকার</button>
+          <button type="button" class="preset-btn" data-sticker-shape="roundedRect">রাউন্ড-রেক্ট ব্যাজ</button>
+          <button type="button" class="preset-btn" data-sticker-shape="starburst">Starburst</button>
+          <button type="button" class="preset-btn" data-sticker-shape="stamp">Stamp/Seal</button>
+          <button type="button" class="preset-btn" data-sticker-shape="ribbon">Ribbon/Tag</button>
+          <button type="button" class="preset-btn" data-sticker-shape="speech">Speech Bubble</button>
+          <button type="button" class="preset-btn" data-sticker-shape="radiant">Radiant Burst</button>
+        </div>
+
+        <label class="field" style="margin-top:10px;">
+          <span>ব্যাজ কালার</span>
+          <input type="color" id="stickerBgColorPicker" value="#e5484d" />
+        </label>
+        <label class="field">
+          <span>টেক্সট কালার</span>
+          <input type="color" id="stickerTextColorPicker" value="#ffffff" />
+        </label>
+        <p class="field-note">সাইজ ও গভীরতা নিচের "সাইজ ও গভীরতা" প্যানেল থেকে, আর হালকা ৩ডি টিল্ট/লাইটিং/শ্যাডো "Rotate / Tilt" ও অন্যান্য প্যানেল থেকেই কন্ট্রোল হয় — এখানে আলাদা করে দিতে হয় না।</p>
+      </section>
+
+      <section class="panel-section" id="curveSection">
+        <h3>কার্ভড (বাঁকা) টেক্সট</h3>
+        <label class="field">
+          <span>Curve Intensity</span>
+          <input type="range" id="curveIntensityRange" min="-100" max="100" step="1" value="0" />
+          <span class="field-value" id="curveIntensityValue">0</span>
+        </label>
+        <div class="preset-grid" id="curveDirectionGrid">
+          <button type="button" class="preset-btn active" data-curve-direction="up">Arc Up ⌣</button>
+          <button type="button" class="preset-btn" data-curve-direction="down">Arc Down ⌢</button>
+        </div>
+        <label class="field" style="margin-top:10px;">
+          <span>অক্ষর-স্পেসিং</span>
+          <input type="range" id="curveSpacingRange" min="80" max="250" step="5" value="100" />
+          <span class="field-value" id="curveSpacingValue">100%</span>
+        </label>
+        <p class="field-note">Curve Intensity ০ রাখলে টেক্সট সোজা থাকবে। বেশি বাঁকে অক্ষরগুলো একটার সাথে একটা লেগে যেতে পারে — তখন স্পেসিং বাড়িয়ে দিন। টেক্সট ও স্টিকার/ব্যাজ — দুই মোডেই কাজ করে (ব্যাজের ভিতরের লেখাও বাঁকানো যায়)।</p>
       </section>
 
       <section class="panel-section">
@@ -234,12 +305,46 @@
           <select id="exportFormatSelect">
             <option value="webm">Transparent WebM (ভিডিও)</option>
             <option value="png">PNG Sequence (ZIP)</option>
+            <option value="gif">GIF (অ্যানিমেটেড ছবি)</option>
           </select>
         </label>
         <p class="field-note" id="webmSupportNote" hidden>
           ⚠️ এই ব্রাউজার/ডিভাইসে transparent WebM রেকর্ডিং সাপোর্টেড না মনে হচ্ছে
           (Chrome/Edge-এ ভালো কাজ করে)। এর বদলে PNG Sequence ব্যবহার করুন।
         </p>
+
+        <div id="gifOptionsGroup" hidden>
+          <label class="field checkbox-field">
+            <input type="checkbox" id="gifTransparentToggle" checked />
+            <span>স্বচ্ছ (transparent) ব্যাকগ্রাউন্ড</span>
+          </label>
+          <p class="field-note">
+            GIF-এ শুধু সম্পূর্ণ-স্বচ্ছ বা সম্পূর্ণ-অস্বচ্ছ সাপোর্ট আছে (soft edge না) —
+            তাই কিনারা কিছুটা খসখসে দেখাতে পারে PNG/WebM-এর তুলনায়।
+          </p>
+          <label class="field" id="gifBackgroundColorField" hidden>
+            <span>ব্যাকগ্রাউন্ড রং</span>
+            <input type="color" id="gifBackgroundColorPicker" value="#ffffff" />
+          </label>
+          <label class="field checkbox-field">
+            <input type="checkbox" id="gifLoopToggle" checked />
+            <span>ইনফিনিট লুপ</span>
+          </label>
+          <label class="field">
+            <span>কোয়ালিটি</span>
+            <select id="gifQualitySelect">
+              <option value="20">দ্রুত (ছোট ফাইল, কম কোয়ালিটি)</option>
+              <option value="10" selected>সাধারণ</option>
+              <option value="4">উচ্চ কোয়ালিটি (ধীর, বড় ফাইল)</option>
+            </select>
+          </label>
+          <p class="field-note">
+            GIF-এ প্রতি ফ্রেমে সর্বোচ্চ ২৫৬টা রং সাপোর্ট আছে — গ্র্যাডিয়েন্ট/মেটালিক
+            ম্যাটেরিয়াল বা ছবিতে (Image মোড) কিছুটা ব্যান্ডিং দেখা যেতে পারে। উচ্চ FPS/রেজলিউশনে
+            GIF ফাইল WebM-এর তুলনায় বড় হয় — নিচে একটা আনুমানিক সাইজ দেখানো হচ্ছে।
+          </p>
+          <p class="field-note" id="gifSizeEstimateNote"></p>
+        </div>
 
         <label class="field">
           <span>রেজলিউশন</span>
@@ -291,6 +396,6 @@
     </aside>
   </div>
 
-  <script type="module" src="main.bundle.js?v=1786348543873"></script>
+  <script type="module" src="main.bundle.js?v=1786363180623"></script>
 </body>
 </html>

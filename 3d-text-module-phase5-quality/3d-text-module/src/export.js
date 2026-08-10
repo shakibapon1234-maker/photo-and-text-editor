@@ -22,9 +22,28 @@
 //     render WebGL + canvas.toBlob('image/png') can produce it (alpha in a
 //     PNG is universally supported, unlike alpha in WebM).
 //
+//   - exportGif: also NOT real time — reuses the exact same virtual-clock
+//     frame loop as exportPngSequence (frame i -> t = i/fps), but feeds each
+//     frame into a `gif.js` GIF encoder (Web Worker-based, runs entirely
+//     client-side, no server) instead of zipping PNGs. See PLAN_3 §4.
+//     GIF has no real alpha channel — a pixel is either fully opaque or
+//     fully transparent (1-bit), never soft/anti-aliased like PNG/WebM
+//     (PLAN_3 §4.3). So instead of feeding gif.js the renderer's raw
+//     transparent canvas (which it would just flatten to opaque black),
+//     every frame is first composited onto a solid "key color" backing
+//     canvas, and — when transparency is requested — that exact key color
+//     is registered with gif.js as the one transparent palette index
+//     (chroma-key transparency, the standard technique for this format).
+//     When transparency is *not* requested, the same compositing step is
+//     reused with a user-chosen visible background color instead (PLAN_3
+//     §7 open decision 4 — both options are offered, chroma-key transparent
+//     is the default).
+//
 // Both temporarily resize the existing canvas/renderer to the requested
 // export resolution, capture, then restore the on-screen size — see
 // `withExportResolution` at the bottom.
+
+import GIF from 'gif.js';
 
 function supportedWebmMimeType() {
   if (typeof window === 'undefined' || !window.MediaRecorder) return null;
@@ -207,4 +226,128 @@ export async function exportPngSequence(deps, opts, callbacks = {}) {
   });
 
   return { blob: zipBlob, frameCount, width: opts.width, height: opts.height };
+}
+
+// ---------- GIF frame-count / size guardrail (PLAN_3 §4.4 Phase C6) ----------
+// A rough, cheap-to-compute estimate shown in the UI *before* the (slow,
+// worker-based) encode starts, so a person can back off resolution/fps/
+// duration first rather than discover a huge file only after waiting. Not a
+// hard cap — GIF has no fixed compression ratio to predict exactly, so this
+// is intentionally a same-order-of-magnitude estimate, not a promise.
+export function estimateGifFrameCount(totalMs, fps, isAnimatedOrTurntable) {
+  return isAnimatedOrTurntable ? Math.max(1, Math.round((totalMs / 1000) * fps)) : 1;
+}
+
+// Very rough bytes-per-frame heuristic (empirically GIFs of typical
+// text/badge content — a few flat-ish colors, not photographic — tend to
+// land in this ballpark at quality 10). Deliberately conservative
+// (over-estimates a little) since warning too early is a much smaller
+// annoyance than promising a small file and delivering a big one.
+export function estimateGifSizeBytes(width, height, frameCount) {
+  return Math.round(width * height * 0.28 * frameCount);
+}
+
+// ---------- GIF (deterministic virtual clock, reuses PNG's frame loop) ----------
+// deps: same shape as exportPngSequence's deps (renderer, camera, scene,
+//       canvas, state, getTextMesh, ANIMATION_PRESETS, EASINGS,
+//       applyPresetOffset, resetMeshToBaseTransform, handleResize)
+// opts: { width, height, fps, presetId, durationMs, delayMs, easing,
+//         autoRotate, noPresetDurationMs, quality, loop, transparentBg,
+//         backgroundColor, workerScript }
+export async function exportGif(deps, opts, callbacks = {}) {
+  const { onProgress, onStatus } = callbacks;
+  const { renderer, camera, scene, canvas } = deps;
+
+  beginExportResolution(deps, opts.width, opts.height);
+
+  const isAnimated = opts.presetId !== 'none';
+  const isTurntable = !isAnimated && opts.autoRotate;
+  const totalMs = isAnimated ? opts.durationMs + opts.delayMs : opts.noPresetDurationMs;
+  const frameCount = estimateGifFrameCount(totalMs, opts.fps, isAnimated || isTurntable);
+
+  const preset = deps.ANIMATION_PRESETS[opts.presetId] || deps.ANIMATION_PRESETS.none;
+  const easingFn = deps.EASINGS[opts.easing] || deps.EASINGS.linear;
+  const baseRotYRad = (deps.state.rotY * Math.PI) / 180;
+
+  // Chroma-key backing color for hard-edge transparency (see file-header
+  // comment). Picked to be extremely unlikely to appear in a real render
+  // (materials/text colors are user-chosen, but this exact magenta is not
+  // offered anywhere in the color pickers) rather than hard-coding pure
+  // black/white, which *are* common badge/text colors and would wrongly
+  // punch holes in the output.
+  const KEY_COLOR = '#ff00fe';
+  const backgroundColor = opts.transparentBg ? KEY_COLOR : (opts.backgroundColor || '#ffffff');
+
+  // Composite canvas: same size as the export resolution, opaque, reused
+  // every frame (avoids allocating a new canvas 1/frame).
+  const compositeCanvas = document.createElement('canvas');
+  compositeCanvas.width = opts.width;
+  compositeCanvas.height = opts.height;
+  const compositeCtx = compositeCanvas.getContext('2d', { willReadFrequently: true });
+
+  const gif = new GIF({
+    workers: 2,
+    workerScript: opts.workerScript || 'gif.worker.js',
+    quality: opts.quality || 10,
+    width: opts.width,
+    height: opts.height,
+    repeat: opts.loop ? 0 : -1, // 0 = infinite loop, -1 = play once
+    background: backgroundColor,
+    transparent: opts.transparentBg ? KEY_COLOR : null,
+    dither: false,
+  });
+
+  const delayMsPerFrame = Math.max(20, Math.round(1000 / opts.fps)); // most GIF decoders floor below ~20ms
+
+  for (let i = 0; i < frameCount; i++) {
+    const tMs = frameCount > 1 ? (i / (frameCount - 1)) * totalMs : totalMs;
+
+    if (isAnimated) {
+      const elapsed = tMs - opts.delayMs;
+      const rawT = elapsed < 0 ? 0 : Math.min(1, opts.durationMs > 0 ? elapsed / opts.durationMs : 1);
+      deps.applyPresetOffset(preset, easingFn(rawT));
+    } else if (isTurntable) {
+      const mesh = deps.getTextMesh();
+      if (mesh) {
+        const frac = totalMs > 0 ? tMs / totalMs : 0;
+        mesh.rotation.y = baseRotYRad + frac * Math.PI * 2;
+      }
+    }
+
+    renderer.render(scene, camera);
+
+    // Flatten the renderer's transparent canvas onto the opaque backing
+    // color first — gif.js/its worker has no concept of alpha, it only
+    // ever sees solid RGB pixels (plus the one registered transparent
+    // palette index), so skipping this step would silently turn every
+    // transparent pixel black instead of either see-through or the chosen
+    // background color.
+    compositeCtx.fillStyle = backgroundColor;
+    compositeCtx.fillRect(0, 0, opts.width, opts.height);
+    compositeCtx.drawImage(canvas, 0, 0, opts.width, opts.height);
+
+    gif.addFrame(compositeCtx, { copy: true, delay: delayMsPerFrame });
+
+    onProgress?.(((i + 1) / frameCount) * 0.5); // rendering frames = first half of progress
+    onStatus?.(`ফ্রেম ${i + 1}/${frameCount} রেন্ডার হচ্ছে…`);
+  }
+
+  deps.resetMeshToBaseTransform();
+  endExportResolution(deps);
+
+  onStatus?.('GIF এনকোড হচ্ছে (এতে কিছুটা সময় লাগতে পারে)…');
+  const blob = await new Promise((resolve, reject) => {
+    gif.on('progress', (p) => {
+      onProgress?.(0.5 + p * 0.5); // encoding = second half of progress
+    });
+    gif.on('finished', (encodedBlob) => resolve(encodedBlob));
+    gif.on('abort', () => reject(new Error('GIF এনকোডিং বাতিল হয়েছে')));
+    try {
+      gif.render();
+    } catch (err) {
+      reject(err);
+    }
+  });
+
+  return { blob, frameCount, width: opts.width, height: opts.height };
 }

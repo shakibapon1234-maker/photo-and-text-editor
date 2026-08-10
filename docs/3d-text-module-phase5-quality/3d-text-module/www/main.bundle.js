@@ -2400,6 +2400,509 @@ var require_jszip_min = __commonJS({
   }
 });
 
+// node_modules/gif.js/dist/gif.js
+var require_gif = __commonJS({
+  "node_modules/gif.js/dist/gif.js"(exports, module) {
+    (function(f) {
+      if (typeof exports === "object" && typeof module !== "undefined") {
+        module.exports = f();
+      } else if (typeof define === "function" && define.amd) {
+        define([], f);
+      } else {
+        var g;
+        if (typeof window !== "undefined") {
+          g = window;
+        } else if (typeof global !== "undefined") {
+          g = global;
+        } else if (typeof self !== "undefined") {
+          g = self;
+        } else {
+          g = this;
+        }
+        g.GIF = f();
+      }
+    })(function() {
+      var define2, module2, exports2;
+      return (function e(t, n, r) {
+        function s(o2, u) {
+          if (!n[o2]) {
+            if (!t[o2]) {
+              var a = typeof __require == "function" && __require;
+              if (!u && a) return a(o2, true);
+              if (i) return i(o2, true);
+              var f = new Error("Cannot find module '" + o2 + "'");
+              throw f.code = "MODULE_NOT_FOUND", f;
+            }
+            var l = n[o2] = { exports: {} };
+            t[o2][0].call(l.exports, function(e2) {
+              var n2 = t[o2][1][e2];
+              return s(n2 ? n2 : e2);
+            }, l, l.exports, e, t, n, r);
+          }
+          return n[o2].exports;
+        }
+        var i = typeof __require == "function" && __require;
+        for (var o = 0; o < r.length; o++) s(r[o]);
+        return s;
+      })({ 1: [function(require2, module3, exports3) {
+        function EventEmitter() {
+          this._events = this._events || {};
+          this._maxListeners = this._maxListeners || void 0;
+        }
+        module3.exports = EventEmitter;
+        EventEmitter.EventEmitter = EventEmitter;
+        EventEmitter.prototype._events = void 0;
+        EventEmitter.prototype._maxListeners = void 0;
+        EventEmitter.defaultMaxListeners = 10;
+        EventEmitter.prototype.setMaxListeners = function(n) {
+          if (!isNumber(n) || n < 0 || isNaN(n)) throw TypeError("n must be a positive number");
+          this._maxListeners = n;
+          return this;
+        };
+        EventEmitter.prototype.emit = function(type) {
+          var er, handler, len, args, i, listeners;
+          if (!this._events) this._events = {};
+          if (type === "error") {
+            if (!this._events.error || isObject(this._events.error) && !this._events.error.length) {
+              er = arguments[1];
+              if (er instanceof Error) {
+                throw er;
+              } else {
+                var err = new Error('Uncaught, unspecified "error" event. (' + er + ")");
+                err.context = er;
+                throw err;
+              }
+            }
+          }
+          handler = this._events[type];
+          if (isUndefined(handler)) return false;
+          if (isFunction(handler)) {
+            switch (arguments.length) {
+              case 1:
+                handler.call(this);
+                break;
+              case 2:
+                handler.call(this, arguments[1]);
+                break;
+              case 3:
+                handler.call(this, arguments[1], arguments[2]);
+                break;
+              default:
+                args = Array.prototype.slice.call(arguments, 1);
+                handler.apply(this, args);
+            }
+          } else if (isObject(handler)) {
+            args = Array.prototype.slice.call(arguments, 1);
+            listeners = handler.slice();
+            len = listeners.length;
+            for (i = 0; i < len; i++) listeners[i].apply(this, args);
+          }
+          return true;
+        };
+        EventEmitter.prototype.addListener = function(type, listener) {
+          var m;
+          if (!isFunction(listener)) throw TypeError("listener must be a function");
+          if (!this._events) this._events = {};
+          if (this._events.newListener) this.emit("newListener", type, isFunction(listener.listener) ? listener.listener : listener);
+          if (!this._events[type]) this._events[type] = listener;
+          else if (isObject(this._events[type])) this._events[type].push(listener);
+          else this._events[type] = [this._events[type], listener];
+          if (isObject(this._events[type]) && !this._events[type].warned) {
+            if (!isUndefined(this._maxListeners)) {
+              m = this._maxListeners;
+            } else {
+              m = EventEmitter.defaultMaxListeners;
+            }
+            if (m && m > 0 && this._events[type].length > m) {
+              this._events[type].warned = true;
+              console.error("(node) warning: possible EventEmitter memory leak detected. %d listeners added. Use emitter.setMaxListeners() to increase limit.", this._events[type].length);
+              if (typeof console.trace === "function") {
+                console.trace();
+              }
+            }
+          }
+          return this;
+        };
+        EventEmitter.prototype.on = EventEmitter.prototype.addListener;
+        EventEmitter.prototype.once = function(type, listener) {
+          if (!isFunction(listener)) throw TypeError("listener must be a function");
+          var fired = false;
+          function g() {
+            this.removeListener(type, g);
+            if (!fired) {
+              fired = true;
+              listener.apply(this, arguments);
+            }
+          }
+          g.listener = listener;
+          this.on(type, g);
+          return this;
+        };
+        EventEmitter.prototype.removeListener = function(type, listener) {
+          var list, position, length, i;
+          if (!isFunction(listener)) throw TypeError("listener must be a function");
+          if (!this._events || !this._events[type]) return this;
+          list = this._events[type];
+          length = list.length;
+          position = -1;
+          if (list === listener || isFunction(list.listener) && list.listener === listener) {
+            delete this._events[type];
+            if (this._events.removeListener) this.emit("removeListener", type, listener);
+          } else if (isObject(list)) {
+            for (i = length; i-- > 0; ) {
+              if (list[i] === listener || list[i].listener && list[i].listener === listener) {
+                position = i;
+                break;
+              }
+            }
+            if (position < 0) return this;
+            if (list.length === 1) {
+              list.length = 0;
+              delete this._events[type];
+            } else {
+              list.splice(position, 1);
+            }
+            if (this._events.removeListener) this.emit("removeListener", type, listener);
+          }
+          return this;
+        };
+        EventEmitter.prototype.removeAllListeners = function(type) {
+          var key, listeners;
+          if (!this._events) return this;
+          if (!this._events.removeListener) {
+            if (arguments.length === 0) this._events = {};
+            else if (this._events[type]) delete this._events[type];
+            return this;
+          }
+          if (arguments.length === 0) {
+            for (key in this._events) {
+              if (key === "removeListener") continue;
+              this.removeAllListeners(key);
+            }
+            this.removeAllListeners("removeListener");
+            this._events = {};
+            return this;
+          }
+          listeners = this._events[type];
+          if (isFunction(listeners)) {
+            this.removeListener(type, listeners);
+          } else if (listeners) {
+            while (listeners.length) this.removeListener(type, listeners[listeners.length - 1]);
+          }
+          delete this._events[type];
+          return this;
+        };
+        EventEmitter.prototype.listeners = function(type) {
+          var ret;
+          if (!this._events || !this._events[type]) ret = [];
+          else if (isFunction(this._events[type])) ret = [this._events[type]];
+          else ret = this._events[type].slice();
+          return ret;
+        };
+        EventEmitter.prototype.listenerCount = function(type) {
+          if (this._events) {
+            var evlistener = this._events[type];
+            if (isFunction(evlistener)) return 1;
+            else if (evlistener) return evlistener.length;
+          }
+          return 0;
+        };
+        EventEmitter.listenerCount = function(emitter, type) {
+          return emitter.listenerCount(type);
+        };
+        function isFunction(arg) {
+          return typeof arg === "function";
+        }
+        function isNumber(arg) {
+          return typeof arg === "number";
+        }
+        function isObject(arg) {
+          return typeof arg === "object" && arg !== null;
+        }
+        function isUndefined(arg) {
+          return arg === void 0;
+        }
+      }, {}], 2: [function(require2, module3, exports3) {
+        var UA, browser, mode, platform, ua;
+        ua = navigator.userAgent.toLowerCase();
+        platform = navigator.platform.toLowerCase();
+        UA = ua.match(/(opera|ie|firefox|chrome|version)[\s\/:]([\w\d\.]+)?.*?(safari|version[\s\/:]([\w\d\.]+)|$)/) || [null, "unknown", 0];
+        mode = UA[1] === "ie" && document.documentMode;
+        browser = { name: UA[1] === "version" ? UA[3] : UA[1], version: mode || parseFloat(UA[1] === "opera" && UA[4] ? UA[4] : UA[2]), platform: { name: ua.match(/ip(?:ad|od|hone)/) ? "ios" : (ua.match(/(?:webos|android)/) || platform.match(/mac|win|linux/) || ["other"])[0] } };
+        browser[browser.name] = true;
+        browser[browser.name + parseInt(browser.version, 10)] = true;
+        browser.platform[browser.platform.name] = true;
+        module3.exports = browser;
+      }, {}], 3: [function(require2, module3, exports3) {
+        var EventEmitter, GIF2, browser, extend = function(child, parent) {
+          for (var key in parent) {
+            if (hasProp.call(parent, key)) child[key] = parent[key];
+          }
+          function ctor() {
+            this.constructor = child;
+          }
+          ctor.prototype = parent.prototype;
+          child.prototype = new ctor();
+          child.__super__ = parent.prototype;
+          return child;
+        }, hasProp = {}.hasOwnProperty, indexOf = [].indexOf || function(item) {
+          for (var i = 0, l = this.length; i < l; i++) {
+            if (i in this && this[i] === item) return i;
+          }
+          return -1;
+        }, slice = [].slice;
+        EventEmitter = require2("events").EventEmitter;
+        browser = require2("./browser.coffee");
+        GIF2 = (function(superClass) {
+          var defaults, frameDefaults;
+          extend(GIF3, superClass);
+          defaults = { workerScript: "gif.worker.js", workers: 2, repeat: 0, background: "#fff", quality: 10, width: null, height: null, transparent: null, debug: false, dither: false };
+          frameDefaults = { delay: 500, copy: false };
+          function GIF3(options) {
+            var base, key, value;
+            this.running = false;
+            this.options = {};
+            this.frames = [];
+            this.freeWorkers = [];
+            this.activeWorkers = [];
+            this.setOptions(options);
+            for (key in defaults) {
+              value = defaults[key];
+              if ((base = this.options)[key] == null) {
+                base[key] = value;
+              }
+            }
+          }
+          GIF3.prototype.setOption = function(key, value) {
+            this.options[key] = value;
+            if (this._canvas != null && (key === "width" || key === "height")) {
+              return this._canvas[key] = value;
+            }
+          };
+          GIF3.prototype.setOptions = function(options) {
+            var key, results, value;
+            results = [];
+            for (key in options) {
+              if (!hasProp.call(options, key)) continue;
+              value = options[key];
+              results.push(this.setOption(key, value));
+            }
+            return results;
+          };
+          GIF3.prototype.addFrame = function(image, options) {
+            var frame, key;
+            if (options == null) {
+              options = {};
+            }
+            frame = {};
+            frame.transparent = this.options.transparent;
+            for (key in frameDefaults) {
+              frame[key] = options[key] || frameDefaults[key];
+            }
+            if (this.options.width == null) {
+              this.setOption("width", image.width);
+            }
+            if (this.options.height == null) {
+              this.setOption("height", image.height);
+            }
+            if (typeof ImageData !== "undefined" && ImageData !== null && image instanceof ImageData) {
+              frame.data = image.data;
+            } else if (typeof CanvasRenderingContext2D !== "undefined" && CanvasRenderingContext2D !== null && image instanceof CanvasRenderingContext2D || typeof WebGLRenderingContext !== "undefined" && WebGLRenderingContext !== null && image instanceof WebGLRenderingContext) {
+              if (options.copy) {
+                frame.data = this.getContextData(image);
+              } else {
+                frame.context = image;
+              }
+            } else if (image.childNodes != null) {
+              if (options.copy) {
+                frame.data = this.getImageData(image);
+              } else {
+                frame.image = image;
+              }
+            } else {
+              throw new Error("Invalid image");
+            }
+            return this.frames.push(frame);
+          };
+          GIF3.prototype.render = function() {
+            var i, j, numWorkers, ref;
+            if (this.running) {
+              throw new Error("Already running");
+            }
+            if (this.options.width == null || this.options.height == null) {
+              throw new Error("Width and height must be set prior to rendering");
+            }
+            this.running = true;
+            this.nextFrame = 0;
+            this.finishedFrames = 0;
+            this.imageParts = function() {
+              var j2, ref2, results;
+              results = [];
+              for (i = j2 = 0, ref2 = this.frames.length; 0 <= ref2 ? j2 < ref2 : j2 > ref2; i = 0 <= ref2 ? ++j2 : --j2) {
+                results.push(null);
+              }
+              return results;
+            }.call(this);
+            numWorkers = this.spawnWorkers();
+            if (this.options.globalPalette === true) {
+              this.renderNextFrame();
+            } else {
+              for (i = j = 0, ref = numWorkers; 0 <= ref ? j < ref : j > ref; i = 0 <= ref ? ++j : --j) {
+                this.renderNextFrame();
+              }
+            }
+            this.emit("start");
+            return this.emit("progress", 0);
+          };
+          GIF3.prototype.abort = function() {
+            var worker;
+            while (true) {
+              worker = this.activeWorkers.shift();
+              if (worker == null) {
+                break;
+              }
+              this.log("killing active worker");
+              worker.terminate();
+            }
+            this.running = false;
+            return this.emit("abort");
+          };
+          GIF3.prototype.spawnWorkers = function() {
+            var j, numWorkers, ref, results;
+            numWorkers = Math.min(this.options.workers, this.frames.length);
+            (function() {
+              results = [];
+              for (var j2 = ref = this.freeWorkers.length; ref <= numWorkers ? j2 < numWorkers : j2 > numWorkers; ref <= numWorkers ? j2++ : j2--) {
+                results.push(j2);
+              }
+              return results;
+            }).apply(this).forEach(/* @__PURE__ */ (function(_this) {
+              return function(i) {
+                var worker;
+                _this.log("spawning worker " + i);
+                worker = new Worker(_this.options.workerScript);
+                worker.onmessage = function(event) {
+                  _this.activeWorkers.splice(_this.activeWorkers.indexOf(worker), 1);
+                  _this.freeWorkers.push(worker);
+                  return _this.frameFinished(event.data);
+                };
+                return _this.freeWorkers.push(worker);
+              };
+            })(this));
+            return numWorkers;
+          };
+          GIF3.prototype.frameFinished = function(frame) {
+            var i, j, ref;
+            this.log("frame " + frame.index + " finished - " + this.activeWorkers.length + " active");
+            this.finishedFrames++;
+            this.emit("progress", this.finishedFrames / this.frames.length);
+            this.imageParts[frame.index] = frame;
+            if (this.options.globalPalette === true) {
+              this.options.globalPalette = frame.globalPalette;
+              this.log("global palette analyzed");
+              if (this.frames.length > 2) {
+                for (i = j = 1, ref = this.freeWorkers.length; 1 <= ref ? j < ref : j > ref; i = 1 <= ref ? ++j : --j) {
+                  this.renderNextFrame();
+                }
+              }
+            }
+            if (indexOf.call(this.imageParts, null) >= 0) {
+              return this.renderNextFrame();
+            } else {
+              return this.finishRendering();
+            }
+          };
+          GIF3.prototype.finishRendering = function() {
+            var data, frame, i, image, j, k, l, len, len1, len2, len3, offset, page, ref, ref1, ref2;
+            len = 0;
+            ref = this.imageParts;
+            for (j = 0, len1 = ref.length; j < len1; j++) {
+              frame = ref[j];
+              len += (frame.data.length - 1) * frame.pageSize + frame.cursor;
+            }
+            len += frame.pageSize - frame.cursor;
+            this.log("rendering finished - filesize " + Math.round(len / 1e3) + "kb");
+            data = new Uint8Array(len);
+            offset = 0;
+            ref1 = this.imageParts;
+            for (k = 0, len2 = ref1.length; k < len2; k++) {
+              frame = ref1[k];
+              ref2 = frame.data;
+              for (i = l = 0, len3 = ref2.length; l < len3; i = ++l) {
+                page = ref2[i];
+                data.set(page, offset);
+                if (i === frame.data.length - 1) {
+                  offset += frame.cursor;
+                } else {
+                  offset += frame.pageSize;
+                }
+              }
+            }
+            image = new Blob([data], { type: "image/gif" });
+            return this.emit("finished", image, data);
+          };
+          GIF3.prototype.renderNextFrame = function() {
+            var frame, task, worker;
+            if (this.freeWorkers.length === 0) {
+              throw new Error("No free workers");
+            }
+            if (this.nextFrame >= this.frames.length) {
+              return;
+            }
+            frame = this.frames[this.nextFrame++];
+            worker = this.freeWorkers.shift();
+            task = this.getTask(frame);
+            this.log("starting frame " + (task.index + 1) + " of " + this.frames.length);
+            this.activeWorkers.push(worker);
+            return worker.postMessage(task);
+          };
+          GIF3.prototype.getContextData = function(ctx) {
+            return ctx.getImageData(0, 0, this.options.width, this.options.height).data;
+          };
+          GIF3.prototype.getImageData = function(image) {
+            var ctx;
+            if (this._canvas == null) {
+              this._canvas = document.createElement("canvas");
+              this._canvas.width = this.options.width;
+              this._canvas.height = this.options.height;
+            }
+            ctx = this._canvas.getContext("2d");
+            ctx.setFill = this.options.background;
+            ctx.fillRect(0, 0, this.options.width, this.options.height);
+            ctx.drawImage(image, 0, 0);
+            return this.getContextData(ctx);
+          };
+          GIF3.prototype.getTask = function(frame) {
+            var index, task;
+            index = this.frames.indexOf(frame);
+            task = { index, last: index === this.frames.length - 1, delay: frame.delay, transparent: frame.transparent, width: this.options.width, height: this.options.height, quality: this.options.quality, dither: this.options.dither, globalPalette: this.options.globalPalette, repeat: this.options.repeat, canTransfer: browser.name === "chrome" };
+            if (frame.data != null) {
+              task.data = frame.data;
+            } else if (frame.context != null) {
+              task.data = this.getContextData(frame.context);
+            } else if (frame.image != null) {
+              task.data = this.getImageData(frame.image);
+            } else {
+              throw new Error("Invalid frame");
+            }
+            return task;
+          };
+          GIF3.prototype.log = function() {
+            var args;
+            args = 1 <= arguments.length ? slice.call(arguments, 0) : [];
+            if (!this.options.debug) {
+              return;
+            }
+            return console.log.apply(console, args);
+          };
+          return GIF3;
+        })(EventEmitter);
+        module3.exports = GIF2;
+      }, { "./browser.coffee": 2, events: 1 }] }, {}, [3])(3);
+    });
+  }
+});
+
 // node_modules/three/build/three.module.js
 var REVISION = "160";
 var MOUSE = { LEFT: 0, MIDDLE: 1, RIGHT: 2, ROTATE: 0, DOLLY: 1, PAN: 2 };
@@ -25009,6 +25512,7 @@ var ANIMATION_PRESETS = {
 };
 
 // src/export.js
+var import_gif = __toESM(require_gif());
 function supportedWebmMimeType() {
   if (typeof window === "undefined" || !window.MediaRecorder) return null;
   const candidates = [
@@ -25129,6 +25633,126 @@ async function exportPngSequence(deps, opts, callbacks = {}) {
   });
   return { blob: zipBlob, frameCount, width: opts.width, height: opts.height };
 }
+function estimateGifFrameCount(totalMs, fps, isAnimatedOrTurntable) {
+  return isAnimatedOrTurntable ? Math.max(1, Math.round(totalMs / 1e3 * fps)) : 1;
+}
+function estimateGifSizeBytes(width, height, frameCount) {
+  return Math.round(width * height * 0.28 * frameCount);
+}
+async function exportGif(deps, opts, callbacks = {}) {
+  const { onProgress, onStatus } = callbacks;
+  const { renderer: renderer2, camera: camera2, scene: scene2, canvas: canvas2 } = deps;
+  beginExportResolution(deps, opts.width, opts.height);
+  const isAnimated = opts.presetId !== "none";
+  const isTurntable = !isAnimated && opts.autoRotate;
+  const totalMs = isAnimated ? opts.durationMs + opts.delayMs : opts.noPresetDurationMs;
+  const frameCount = estimateGifFrameCount(totalMs, opts.fps, isAnimated || isTurntable);
+  const preset = deps.ANIMATION_PRESETS[opts.presetId] || deps.ANIMATION_PRESETS.none;
+  const easingFn = deps.EASINGS[opts.easing] || deps.EASINGS.linear;
+  const baseRotYRad = deps.state.rotY * Math.PI / 180;
+  const KEY_COLOR = "#ff00fe";
+  const backgroundColor = opts.transparentBg ? KEY_COLOR : opts.backgroundColor || "#ffffff";
+  const compositeCanvas = document.createElement("canvas");
+  compositeCanvas.width = opts.width;
+  compositeCanvas.height = opts.height;
+  const compositeCtx = compositeCanvas.getContext("2d", { willReadFrequently: true });
+  const gif = new import_gif.default({
+    workers: 2,
+    workerScript: opts.workerScript || "gif.worker.js",
+    quality: opts.quality || 10,
+    width: opts.width,
+    height: opts.height,
+    repeat: opts.loop ? 0 : -1,
+    // 0 = infinite loop, -1 = play once
+    background: backgroundColor,
+    transparent: opts.transparentBg ? KEY_COLOR : null,
+    dither: false
+  });
+  const delayMsPerFrame = Math.max(20, Math.round(1e3 / opts.fps));
+  for (let i = 0; i < frameCount; i++) {
+    const tMs = frameCount > 1 ? i / (frameCount - 1) * totalMs : totalMs;
+    if (isAnimated) {
+      const elapsed = tMs - opts.delayMs;
+      const rawT = elapsed < 0 ? 0 : Math.min(1, opts.durationMs > 0 ? elapsed / opts.durationMs : 1);
+      deps.applyPresetOffset(preset, easingFn(rawT));
+    } else if (isTurntable) {
+      const mesh = deps.getTextMesh();
+      if (mesh) {
+        const frac = totalMs > 0 ? tMs / totalMs : 0;
+        mesh.rotation.y = baseRotYRad + frac * Math.PI * 2;
+      }
+    }
+    renderer2.render(scene2, camera2);
+    compositeCtx.fillStyle = backgroundColor;
+    compositeCtx.fillRect(0, 0, opts.width, opts.height);
+    compositeCtx.drawImage(canvas2, 0, 0, opts.width, opts.height);
+    gif.addFrame(compositeCtx, { copy: true, delay: delayMsPerFrame });
+    onProgress?.((i + 1) / frameCount * 0.5);
+    onStatus?.(`\u09AB\u09CD\u09B0\u09C7\u09AE ${i + 1}/${frameCount} \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7\u2026`);
+  }
+  deps.resetMeshToBaseTransform();
+  endExportResolution(deps);
+  onStatus?.("GIF \u098F\u09A8\u0995\u09CB\u09A1 \u09B9\u099A\u09CD\u099B\u09C7 (\u098F\u09A4\u09C7 \u0995\u09BF\u099B\u09C1\u099F\u09BE \u09B8\u09AE\u09AF\u09BC \u09B2\u09BE\u0997\u09A4\u09C7 \u09AA\u09BE\u09B0\u09C7)\u2026");
+  const blob = await new Promise((resolve, reject) => {
+    gif.on("progress", (p) => {
+      onProgress?.(0.5 + p * 0.5);
+    });
+    gif.on("finished", (encodedBlob) => resolve(encodedBlob));
+    gif.on("abort", () => reject(new Error("GIF \u098F\u09A8\u0995\u09CB\u09A1\u09BF\u0982 \u09AC\u09BE\u09A4\u09BF\u09B2 \u09B9\u09AF\u09BC\u09C7\u099B\u09C7")));
+    try {
+      gif.render();
+    } catch (err) {
+      reject(err);
+    }
+  });
+  return { blob, frameCount, width: opts.width, height: opts.height };
+}
+
+// src/curve.js
+var MAX_SWEEP_DEG = 170;
+function computeArcLayout(charWidths, { curveIntensity = 0, direction = "up", spacing = 1 } = {}) {
+  const spacingMul = Math.max(0, spacing);
+  const widths = charWidths.map((w) => Math.max(0, w) * spacingMul);
+  const totalWidth = widths.reduce((a, b) => a + b, 0);
+  if (!totalWidth || !curveIntensity) {
+    let x = -totalWidth / 2;
+    const chars2 = widths.map((w) => {
+      const cx = x + w / 2;
+      x += w;
+      return { x: cx, y: 0, rotation: 0 };
+    });
+    return { chars: chars2, width: totalWidth, height: 0 };
+  }
+  const clampedIntensity = Math.max(-100, Math.min(100, curveIntensity));
+  const sweepRad = Math.abs(clampedIntensity) / 100 * (MAX_SWEEP_DEG * Math.PI) / 180;
+  const radius = totalWidth / sweepRad;
+  const bulgeSign = direction === "down" ? 1 : -1;
+  let cumulative = 0;
+  const chars = widths.map((w) => {
+    const centerArcLen = cumulative + w / 2;
+    cumulative += w;
+    const theta = (centerArcLen / totalWidth - 0.5) * sweepRad;
+    const x = radius * Math.sin(theta);
+    const y = bulgeSign * radius * (1 - Math.cos(theta));
+    const rotation = direction === "down" ? theta : -theta;
+    return { x, y, rotation };
+  });
+  const xs = chars.map((c) => c.x);
+  const ys = chars.map((c) => c.y);
+  const lastW = widths[widths.length - 1] || 0;
+  return {
+    chars,
+    width: Math.max(...xs) - Math.min(...xs) + lastW,
+    height: Math.max(...ys) - Math.min(...ys)
+  };
+}
+function splitGraphemes(line) {
+  if (typeof Intl !== "undefined" && typeof Intl.Segmenter === "function") {
+    const seg = new Intl.Segmenter(void 0, { granularity: "grapheme" });
+    return Array.from(seg.segment(line), (s) => s.segment);
+  }
+  return Array.from(line);
+}
 
 // src/main.js
 var statusNote = document.getElementById("statusNote");
@@ -25142,6 +25766,18 @@ var textModeNote = document.getElementById("textModeNote");
 var imageFileInput = document.getElementById("imageFileInput");
 var imagePreviewThumb = document.getElementById("imagePreviewThumb");
 var imageNote = document.getElementById("imageNote");
+var pictureStyleGrid = document.getElementById("pictureStyleGrid");
+var stickerContentSection = document.getElementById("stickerContentSection");
+var stickerTextInput = document.getElementById("stickerTextInput");
+var stickerShapeGrid = document.getElementById("stickerShapeGrid");
+var stickerBgColorPicker = document.getElementById("stickerBgColorPicker");
+var stickerTextColorPicker = document.getElementById("stickerTextColorPicker");
+var curveSection = document.getElementById("curveSection");
+var curveIntensityRange = document.getElementById("curveIntensityRange");
+var curveIntensityValue = document.getElementById("curveIntensityValue");
+var curveDirectionGrid = document.getElementById("curveDirectionGrid");
+var curveSpacingRange = document.getElementById("curveSpacingRange");
+var curveSpacingValue = document.getElementById("curveSpacingValue");
 var depthRange = document.getElementById("depthRange");
 var depthValue = document.getElementById("depthValue");
 var sizeRange = document.getElementById("sizeRange");
@@ -25197,6 +25833,13 @@ var exportStatusLabel = document.getElementById("exportStatusLabel");
 var exportResult = document.getElementById("exportResult");
 var exportResultInfo = document.getElementById("exportResultInfo");
 var exportDownloadLink = document.getElementById("exportDownloadLink");
+var gifOptionsGroup = document.getElementById("gifOptionsGroup");
+var gifTransparentToggle = document.getElementById("gifTransparentToggle");
+var gifBackgroundColorField = document.getElementById("gifBackgroundColorField");
+var gifBackgroundColorPicker = document.getElementById("gifBackgroundColorPicker");
+var gifLoopToggle = document.getElementById("gifLoopToggle");
+var gifQualitySelect = document.getElementById("gifQualitySelect");
+var gifSizeEstimateNote = document.getElementById("gifSizeEstimateNote");
 var scene = new Scene();
 scene.background = null;
 var camera = new PerspectiveCamera(
@@ -25230,6 +25873,23 @@ controls.dampingFactor = 0.08;
 controls.target.set(0, 0, 0);
 var pmremGenerator = new PMREMGenerator(renderer);
 var envTexture = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+function updateShadowFrustum() {
+  if (!textMesh) return;
+  const box = new Box3().setFromObject(textMesh);
+  if (box.isEmpty()) return;
+  const size = box.getSize(new Vector3());
+  const half = Math.max(60, Math.max(size.x, size.y, size.z) / 2 * 1.4);
+  for (const l of lights.children) {
+    if (l.isDirectionalLight && l.shadow) {
+      const cam = l.shadow.camera;
+      cam.left = -half;
+      cam.right = half;
+      cam.top = half;
+      cam.bottom = -half;
+      cam.updateProjectionMatrix();
+    }
+  }
+}
 var groundGeo = new PlaneGeometry(2e3, 2e3);
 var groundMat = new ShadowMaterial({ opacity: 0.35 });
 var ground = new Mesh(groundGeo, groundMat);
@@ -25285,14 +25945,31 @@ function buildLightingPreset(preset) {
     lights.add(hemi, fillA, fillB);
   }
   applyShadowToggle();
+  updateShadowFrustum();
 }
 var font = null;
 var textMesh = null;
 var state = {
   contentMode: "text",
-  // §8.2: 'text' | 'image' — mutually exclusive, one active object at a time
+  // PLAN_3 §1: 'text' | 'image' | 'sticker' — mutually exclusive, one active object at a time
   imageElement: null,
   // HTMLImageElement of the uploaded photo, null until one is chosen
+  pictureStyle: "none",
+  // §8.2 follow-up: id into PICTURE_STYLES, image mode only
+  stickerText: stickerTextInput.value,
+  // PLAN_3 §2: sticker/badge mode only
+  stickerShape: "circle",
+  // PLAN_3 §2.1: 'circle' | 'roundedRect' (Phase A1) | 'starburst' | 'stamp' | 'ribbon' | 'speech' | 'radiant' (Phase A2)
+  stickerBgColor: stickerBgColorPicker.value,
+  stickerTextColor: stickerTextColorPicker.value,
+  // PLAN_3 §3: curved text — shared by Text and Sticker/Badge content modes
+  // (§3.2), read directly by drawCanvasTextTexture/drawStickerCanvasTexture.
+  curveIntensity: Number(curveIntensityRange.value),
+  // -100..100, 0 = straight
+  curveDirection: "up",
+  // 'up' (⌣ smile) | 'down' (⌢ dome)
+  curveSpacing: Number(curveSpacingRange.value) / 100,
+  // slider is a %, state stores the multiplier
   text: textInput.value,
   depth: Number(depthRange.value),
   size: Number(sizeRange.value),
@@ -25389,12 +26066,41 @@ var CANVAS_TEXT_FONT_STACK = '"Noto Sans Bengali","Nirmala UI","Vrinda UI","Vrin
 var CANVAS_TEXT_FONT_PX = 220;
 var CANVAS_TEXT_LINE_HEIGHT_PX = CANVAS_TEXT_FONT_PX * 1.35;
 var CANVAS_TEXT_PAD_PX = CANVAS_TEXT_FONT_PX * 0.35;
-function drawCanvasTextTexture(lines) {
+function layoutCurvedLines(ctx, lines, curveOpts) {
+  const perLine = lines.map((line) => {
+    const clusters = splitGraphemes(line);
+    const widths = clusters.map((c) => ctx.measureText(c).width);
+    const layout = computeArcLayout(widths, curveOpts);
+    return { clusters, layout };
+  });
+  const maxLineWidth = Math.max(1, ...perLine.map((l) => l.layout.width));
+  const maxBulge = Math.max(0, ...perLine.map((l) => l.layout.height));
+  return { perLine, maxLineWidth, maxBulge };
+}
+function drawCurvedLine(ctx, clusters, layout, centerX, baselineY) {
+  clusters.forEach((cluster, i) => {
+    const c = layout.chars[i];
+    if (!c) return;
+    ctx.save();
+    ctx.translate(centerX + c.x, baselineY + c.y);
+    ctx.rotate(c.rotation);
+    ctx.fillText(cluster, 0, 0);
+    ctx.restore();
+  });
+}
+function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
   const measureCtx = document.createElement("canvas").getContext("2d");
   measureCtx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${CANVAS_TEXT_FONT_STACK}`;
-  const maxWidthPx = Math.max(1, ...lines.map((l) => measureCtx.measureText(l).width));
-  const canvasW = Math.ceil(maxWidthPx + CANVAS_TEXT_PAD_PX * 2);
-  const canvasH = Math.ceil(CANVAS_TEXT_LINE_HEIGHT_PX * lines.length + CANVAS_TEXT_PAD_PX * 2);
+  const arcOpts = {
+    curveIntensity: curveOpts.curveIntensity,
+    direction: curveOpts.curveDirection,
+    spacing: curveOpts.curveSpacing
+  };
+  const { perLine, maxLineWidth, maxBulge } = layoutCurvedLines(measureCtx, lines, arcOpts);
+  const canvasW = Math.ceil(maxLineWidth + CANVAS_TEXT_PAD_PX * 2);
+  const canvasH = Math.ceil(
+    CANVAS_TEXT_LINE_HEIGHT_PX * lines.length + CANVAS_TEXT_PAD_PX * 2 + maxBulge * 2
+  );
   const canvas2 = document.createElement("canvas");
   canvas2.width = canvasW;
   canvas2.height = canvasH;
@@ -25403,9 +26109,9 @@ function drawCanvasTextTexture(lines) {
   ctx.fillStyle = "#ffffff";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  lines.forEach((line, i) => {
-    const y = CANVAS_TEXT_PAD_PX + CANVAS_TEXT_LINE_HEIGHT_PX * i + CANVAS_TEXT_LINE_HEIGHT_PX / 2;
-    ctx.fillText(line, canvasW / 2, y);
+  perLine.forEach(({ clusters, layout }, i) => {
+    const y = maxBulge + CANVAS_TEXT_PAD_PX + CANVAS_TEXT_LINE_HEIGHT_PX * i + CANVAS_TEXT_LINE_HEIGHT_PX / 2;
+    drawCurvedLine(ctx, clusters, layout, canvasW / 2, y);
   });
   return { canvas: canvas2, aspect: canvasW / canvasH };
 }
@@ -25437,25 +26143,164 @@ function buildCanvasCardMaterials(frontTex, backTex, isImage = false) {
   return [sideMat, sideMat, sideMat, sideMat, frontMat, backMat];
 }
 var IMAGE_TEXTURE_MAX_PX = { low: 512, medium: 1024, high: 2048 };
-function drawImageCardCanvas(img) {
+var PICTURE_STYLES = [
+  { id: "none", label: "\u0995\u09CB\u09A8\u09CB \u09AB\u09CD\u09B0\u09C7\u09AE \u09A8\u09BE" },
+  { id: "simpleWhite", label: "\u09B8\u09BE\u09A6\u09BE \u09AC\u09B0\u09CD\u09A1\u09BE\u09B0", border: { color: "#ffffff", widthRatio: 0.028 } },
+  { id: "simpleBlack", label: "\u0995\u09BE\u09B2\u09CB \u09AC\u09B0\u09CD\u09A1\u09BE\u09B0", border: { color: "#111111", widthRatio: 0.045 } },
+  { id: "thinLine", label: "\u09AA\u09BE\u09A4\u09B2\u09BE \u09B2\u09BE\u0987\u09A8", border: { color: "#242424", widthRatio: 0.01 } },
+  { id: "doubleFrame", label: "\u09A1\u09BE\u09AC\u09B2 \u09AB\u09CD\u09B0\u09C7\u09AE", border: { color: "#141414", widthRatio: 0.014, double: true } },
+  { id: "rounded", label: "\u0997\u09CB\u09B2\u09BE\u0995\u09BE\u09B0 \u0995\u09CB\u09A3\u09BE", shape: "rounded", cornerRatio: 0.1, border: { color: "#ffffff", widthRatio: 0.02 } },
+  { id: "softRounded", label: "\u09A8\u09B0\u09AE \u0995\u09CB\u09A3\u09BE (Soft Edge)", shape: "rounded", cornerRatio: 0.12, soft: true },
+  { id: "oval", label: "\u09A1\u09BF\u09AE\u09CD\u09AC\u09BE\u0995\u09BE\u09B0 (Oval)", shape: "oval", border: { color: "#ffffff", widthRatio: 0.02 } },
+  { id: "softOval", label: "\u09A8\u09B0\u09AE \u09A1\u09BF\u09AE\u09CD\u09AC\u09BE\u0995\u09BE\u09B0", shape: "oval", soft: true },
+  { id: "bevel", label: "\u09AC\u09C7\u09AD\u09C7\u09B2 \u09AB\u09CD\u09B0\u09C7\u09AE", border: { color: "#eaeaea", widthRatio: 0.038 }, bevel: true },
+  { id: "dropShadow", label: "\u09A1\u09CD\u09B0\u09AA-\u09B6\u09CD\u09AF\u09BE\u09A1\u09CB \u09AB\u09CD\u09B0\u09C7\u09AE", border: { color: "#ffffff", widthRatio: 0.022 }, dropShadow: true },
+  { id: "metal", label: "\u09AE\u09C7\u099F\u09BE\u09B2 \u09AB\u09CD\u09B0\u09C7\u09AE", border: { color: "metal", widthRatio: 0.052 } },
+  { id: "reflected", label: "\u09B0\u09BF\u09AB\u09CD\u09B2\u09C7\u0995\u09B6\u09A8 \u09AB\u09CD\u09B0\u09C7\u09AE", border: { color: "#ffffff", widthRatio: 0.016 }, reflection: true },
+  { id: "polaroid", label: "\u09AA\u09CB\u09B2\u09BE\u09B0\u09AF\u09BC\u09C7\u09A1 (\u0998\u09CB\u09B0\u09BE\u09A8\u09CB)", border: { color: "#fbfbfb", widthRatio: 0.055, bottomExtraRatio: 0.18 }, tiltZ: -5 }
+];
+function getPictureStyle(id) {
+  return PICTURE_STYLES.find((s) => s.id === id) || PICTURE_STYLES[0];
+}
+function drawRoundedRectPath(ctx, x, y, w, h, r) {
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.lineTo(x + w - rr, y);
+  ctx.arcTo(x + w, y, x + w, y + rr, rr);
+  ctx.lineTo(x + w, y + h - rr);
+  ctx.arcTo(x + w, y + h, x + w - rr, y + h, rr);
+  ctx.lineTo(x + rr, y + h);
+  ctx.arcTo(x, y + h, x, y + h - rr, rr);
+  ctx.lineTo(x, y + rr);
+  ctx.arcTo(x, y, x + rr, y, rr);
+  ctx.closePath();
+}
+function drawShapePath(ctx, shape, x, y, w, h, cornerRatio) {
+  if (shape === "oval") {
+    ctx.beginPath();
+    ctx.ellipse(x + w / 2, y + h / 2, Math.max(0.01, w / 2), Math.max(0.01, h / 2), 0, 0, Math.PI * 2);
+    ctx.closePath();
+  } else if (shape === "rounded") {
+    drawRoundedRectPath(ctx, x, y, w, h, Math.min(w, h) * (cornerRatio || 0.1));
+  } else {
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.closePath();
+  }
+}
+function drawImageCardCanvas(img, style) {
   const srcW = img.naturalWidth || img.width || 1;
   const srcH = img.naturalHeight || img.height || 1;
   const maxDim = IMAGE_TEXTURE_MAX_PX[state.quality] || IMAGE_TEXTURE_MAX_PX.medium;
   const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+  const photoW = Math.max(1, Math.round(srcW * scale));
+  const photoH = Math.max(1, Math.round(srcH * scale));
+  const shape = style.shape || "rect";
+  const cornerRatio = style.cornerRatio || 0.1;
+  const borderPx = style.border ? Math.round(Math.min(photoW, photoH) * style.border.widthRatio) : 0;
+  const bottomExtraPx = style.border && style.border.bottomExtraRatio ? Math.round(photoH * style.border.bottomExtraRatio) : 0;
+  const shadowMarginPx = style.dropShadow ? Math.round(Math.min(photoW, photoH) * 0.09) : 0;
+  const pad = borderPx + shadowMarginPx;
+  const canvasW = photoW + pad * 2;
+  const canvasH = photoH + pad * 2 + bottomExtraPx;
   const canvas2 = document.createElement("canvas");
-  canvas2.width = Math.max(1, Math.round(srcW * scale));
-  canvas2.height = Math.max(1, Math.round(srcH * scale));
+  canvas2.width = canvasW;
+  canvas2.height = canvasH;
   const ctx = canvas2.getContext("2d");
-  ctx.drawImage(img, 0, 0, canvas2.width, canvas2.height);
-  return { canvas: canvas2, aspect: srcW / srcH };
+  ctx.clearRect(0, 0, canvasW, canvasH);
+  const frameX = shadowMarginPx;
+  const frameY = shadowMarginPx;
+  const frameW = canvasW - shadowMarginPx * 2;
+  const frameH = photoH + borderPx * 2;
+  if (style.dropShadow) {
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.55)";
+    ctx.shadowBlur = shadowMarginPx * 0.9;
+    ctx.shadowOffsetX = shadowMarginPx * 0.35;
+    ctx.shadowOffsetY = shadowMarginPx * 0.45;
+    ctx.fillStyle = "#000000";
+    drawShapePath(ctx, shape, frameX, frameY, frameW, frameH, cornerRatio);
+    ctx.fill();
+    ctx.restore();
+  }
+  if (style.border) {
+    ctx.save();
+    drawShapePath(ctx, shape, frameX, frameY, frameW, frameH, cornerRatio);
+    if (style.border.color === "metal") {
+      const grad = ctx.createLinearGradient(frameX, frameY, frameX, frameY + frameH);
+      grad.addColorStop(0, "#f4f4f4");
+      grad.addColorStop(0.15, "#cbcbd0");
+      grad.addColorStop(0.35, "#8d8e94");
+      grad.addColorStop(0.5, "#eaeaee");
+      grad.addColorStop(0.65, "#7c7d83");
+      grad.addColorStop(0.85, "#d7d7db");
+      grad.addColorStop(1, "#4a4a4e");
+      ctx.fillStyle = grad;
+    } else {
+      ctx.fillStyle = style.border.color;
+    }
+    ctx.fill();
+    ctx.restore();
+    if (style.border.double) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(255,255,255,0.85)";
+      ctx.lineWidth = Math.max(1, borderPx * 0.18);
+      const inset = borderPx * 0.45;
+      drawShapePath(ctx, shape, frameX + inset, frameY + inset, frameW - inset * 2, frameH - inset * 2, cornerRatio);
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (style.bevel) {
+      ctx.save();
+      const inset = borderPx * 0.5;
+      drawShapePath(ctx, shape, frameX + inset, frameY + inset, frameW - inset * 2, frameH - inset * 2, cornerRatio);
+      const bevelGrad = ctx.createLinearGradient(frameX, frameY, frameX + frameW, frameY + frameH);
+      bevelGrad.addColorStop(0, "rgba(255,255,255,0.95)");
+      bevelGrad.addColorStop(0.5, "rgba(255,255,255,0)");
+      bevelGrad.addColorStop(1, "rgba(0,0,0,0.6)");
+      ctx.strokeStyle = bevelGrad;
+      ctx.lineWidth = Math.max(2, borderPx * 0.55);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+  ctx.save();
+  drawShapePath(ctx, shape, frameX + borderPx, frameY + borderPx, photoW, photoH, cornerRatio);
+  ctx.clip();
+  ctx.drawImage(img, frameX + borderPx, frameY + borderPx, photoW, photoH);
+  ctx.restore();
+  if (style.soft) {
+    const featherPx = Math.max(4, Math.min(photoW, photoH) * 0.06);
+    const maskCanvas = document.createElement("canvas");
+    maskCanvas.width = canvasW;
+    maskCanvas.height = canvasH;
+    const mctx = maskCanvas.getContext("2d");
+    mctx.filter = `blur(${featherPx}px)`;
+    mctx.fillStyle = "#ffffff";
+    drawShapePath(mctx, shape, frameX + borderPx, frameY + borderPx, photoW, photoH, cornerRatio);
+    mctx.fill();
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-in";
+    ctx.drawImage(maskCanvas, 0, 0);
+    ctx.restore();
+  }
+  return {
+    canvas: canvas2,
+    aspect: canvasW / canvasH,
+    shape,
+    tiltZ: style.tiltZ || 0,
+    reflection: !!style.reflection
+  };
 }
 function buildImageCardMesh(img) {
-  const { canvas: canvas2, aspect: aspect2 } = drawImageCardCanvas(img);
+  const style = getPictureStyle(state.pictureStyle);
+  const { canvas: canvas2, aspect: aspect2, shape, tiltZ, reflection } = drawImageCardCanvas(img, style);
   const frontTex = makeCardTexture(canvas2, false);
   const backTex = makeCardTexture(canvas2, false);
   const worldHeight = state.size * 1.6;
   const worldWidth = worldHeight * aspect2;
-  const depth = Math.max(1, state.depth);
+  const depth = shape === "rect" ? Math.max(1, state.depth) : Math.max(1, Math.min(state.depth, 4));
   const geometry = new BoxGeometry(worldWidth, worldHeight, depth);
   const materials = buildCanvasCardMaterials(frontTex, backTex, true);
   const mesh = new Mesh(geometry, materials);
@@ -25465,6 +26310,24 @@ function buildImageCardMesh(img) {
   group.add(mesh);
   group.userData.frontTex = frontTex;
   group.userData.backTex = backTex;
+  group.userData.styleTiltZ = tiltZ;
+  if (reflection) {
+    const reflMaterials = materials.map((m) => {
+      const clone = m.clone();
+      clone.transparent = true;
+      clone.opacity = 0.32;
+      clone.depthWrite = false;
+      return clone;
+    });
+    const reflMesh = new Mesh(geometry, reflMaterials);
+    reflMesh.scale.y = -1;
+    reflMesh.position.y = -worldHeight - depth * 0.5;
+    reflMesh.castShadow = false;
+    reflMesh.receiveShadow = false;
+    reflMesh.renderOrder = -1;
+    group.add(reflMesh);
+    group.userData.reflMaterials = reflMaterials;
+  }
   renderMode = "canvas";
   textMesh = group;
   textMesh.material = materials;
@@ -25522,7 +26385,11 @@ function buildVectorTextMesh(validLines) {
   textMesh.material = material;
 }
 function buildCanvasCardTextMesh(validLines) {
-  const { canvas: canvas2, aspect: aspect2 } = drawCanvasTextTexture(validLines);
+  const { canvas: canvas2, aspect: aspect2 } = drawCanvasTextTexture(validLines, {
+    curveIntensity: state.curveIntensity,
+    curveDirection: state.curveDirection,
+    curveSpacing: state.curveSpacing
+  });
   const frontTex = makeCardTexture(canvas2, false);
   const backTex = makeCardTexture(canvas2, true);
   const lineHeight = state.size * 1.35;
@@ -25542,7 +26409,213 @@ function buildCanvasCardTextMesh(validLines) {
   textMesh = group;
   textMesh.material = materials;
 }
+var STICKER_FONT_STACK = CANVAS_TEXT_FONT_STACK;
+var STICKER_FONT_PX = 200;
+var STICKER_PAD_RATIO = 0.28;
+var STICKER_SHAPE_SIZING = {
+  circle: { square: true, padMul: 1 },
+  roundedRect: { square: false, padMul: 1 },
+  starburst: { square: true, padMul: 1.15 },
+  stamp: { square: true, padMul: 1.08 },
+  ribbon: { square: false, padMul: 1.15, pointExtraW: 0.22 },
+  speech: { square: false, padMul: 1, tailRatio: 0.22 },
+  radiant: { square: true, padMul: 1.7 }
+};
+function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = { curveIntensity: 0 }) {
+  const lines = (text || " ").split(/\r?\n/).map((l) => l.length > 0 ? l : " ");
+  const measureCtx = document.createElement("canvas").getContext("2d");
+  measureCtx.font = `700 ${STICKER_FONT_PX}px ${STICKER_FONT_STACK}`;
+  const arcOpts = {
+    curveIntensity: curveOpts.curveIntensity,
+    direction: curveOpts.curveDirection,
+    spacing: curveOpts.curveSpacing
+  };
+  const { perLine, maxLineWidth, maxBulge } = layoutCurvedLines(measureCtx, lines, arcOpts);
+  const textMaxWidthPx = maxLineWidth;
+  const lineHeightPx = STICKER_FONT_PX * 1.25;
+  const textBlockH = lineHeightPx * lines.length + maxBulge * 2;
+  const sizing = STICKER_SHAPE_SIZING[shape] || STICKER_SHAPE_SIZING.circle;
+  const padPx = Math.max(textMaxWidthPx, textBlockH) * STICKER_PAD_RATIO * sizing.padMul;
+  let canvasW;
+  let bodyH;
+  if (sizing.square) {
+    const diameter = Math.ceil(Math.sqrt(textMaxWidthPx ** 2 + textBlockH ** 2) + padPx * 1.6);
+    canvasW = diameter;
+    bodyH = diameter;
+  } else {
+    canvasW = Math.ceil(textMaxWidthPx + padPx * 2 + (sizing.pointExtraW || 0) * textMaxWidthPx);
+    bodyH = Math.ceil(textBlockH + padPx * 1.4);
+  }
+  const tailPx = sizing.tailRatio ? Math.round(bodyH * sizing.tailRatio) : 0;
+  const canvasH = bodyH + tailPx;
+  const canvas2 = document.createElement("canvas");
+  canvas2.width = canvasW;
+  canvas2.height = canvasH;
+  const ctx = canvas2.getContext("2d");
+  ctx.clearRect(0, 0, canvasW, canvasH);
+  ctx.save();
+  drawStickerShape(ctx, shape, canvasW, bodyH, tailPx, bgColor);
+  ctx.restore();
+  ctx.save();
+  ctx.font = `700 ${STICKER_FONT_PX}px ${STICKER_FONT_STACK}`;
+  ctx.fillStyle = textColor;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const startY = bodyH / 2 - textBlockH / 2 + maxBulge + lineHeightPx / 2;
+  perLine.forEach(({ clusters, layout }, i) => {
+    drawCurvedLine(ctx, clusters, layout, canvasW / 2, startY + lineHeightPx * i);
+  });
+  ctx.restore();
+  return { canvas: canvas2, aspect: canvasW / canvasH };
+}
+function drawStarPolygonPath(ctx, cx, cy, outerR, innerR, spikes) {
+  ctx.beginPath();
+  const step = Math.PI / spikes;
+  let angle = -Math.PI / 2;
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 === 0 ? outerR : innerR;
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + Math.sin(angle) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+    angle += step;
+  }
+  ctx.closePath();
+}
+function drawScallopedCirclePath(ctx, cx, cy, outerR, innerR, bumps) {
+  ctx.beginPath();
+  const amp = (outerR - innerR) / 2;
+  const baseR = (outerR + innerR) / 2;
+  const steps = bumps * 8;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps * Math.PI * 2;
+    const r = baseR + amp * Math.cos(t * bumps);
+    const x = cx + Math.cos(t) * r;
+    const y = cy + Math.sin(t) * r;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
+function drawRibbonPath(ctx, x, y, w, h, pointW) {
+  const midY = y + h / 2;
+  const pw = Math.min(pointW, w / 2 - 1);
+  ctx.beginPath();
+  ctx.moveTo(x + pw, y);
+  ctx.lineTo(x + w - pw, y);
+  ctx.lineTo(x + w, midY);
+  ctx.lineTo(x + w - pw, y + h);
+  ctx.lineTo(x + pw, y + h);
+  ctx.lineTo(x, midY);
+  ctx.closePath();
+}
+function drawSpeechBubblePath(ctx, x, y, w, bodyH, tailPx, r) {
+  drawRoundedRectPath(ctx, x, y, w, bodyH, r);
+  if (tailPx > 0) {
+    const tailBaseW = Math.min(w * 0.22, bodyH * 0.5);
+    const tailCx = x + w * 0.28;
+    ctx.moveTo(tailCx - tailBaseW / 2, y + bodyH - 2);
+    ctx.lineTo(tailCx + tailBaseW / 2, y + bodyH - 2);
+    ctx.lineTo(tailCx - tailBaseW * 0.15, y + bodyH + tailPx);
+    ctx.closePath();
+  }
+}
+function drawConfettiStars(ctx, cx, cy, outerR, color) {
+  ctx.save();
+  ctx.fillStyle = color;
+  const count = 10;
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = outerR * (0.78 + Math.random() * 0.18);
+    const dx = cx + Math.cos(angle) * dist;
+    const dy = cy + Math.sin(angle) * dist;
+    const starR = outerR * (0.035 + Math.random() * 0.025);
+    drawStarPolygonPath(ctx, dx, dy, starR, starR * 0.45, 4);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+function drawStickerShape(ctx, shape, w, bodyH, tailPx, color) {
+  ctx.fillStyle = color;
+  const cx = w / 2;
+  const cy = bodyH / 2;
+  const outerR = Math.min(w, bodyH) / 2;
+  switch (shape) {
+    case "roundedRect":
+      drawRoundedRectPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.16);
+      ctx.fill();
+      break;
+    case "starburst":
+      drawStarPolygonPath(ctx, cx, cy, outerR, outerR * 0.72, 12);
+      ctx.fill();
+      break;
+    case "stamp":
+      drawScallopedCirclePath(ctx, cx, cy, outerR, outerR * 0.92, 20);
+      ctx.fill();
+      break;
+    case "ribbon":
+      drawRibbonPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.28);
+      ctx.fill();
+      break;
+    case "speech":
+      drawSpeechBubblePath(ctx, 0, 0, w, bodyH, tailPx, Math.min(w, bodyH) * 0.18);
+      ctx.fill();
+      break;
+    case "radiant": {
+      const coreR = outerR * 0.55;
+      drawStarPolygonPath(ctx, cx, cy, outerR, coreR * 0.98, 20);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, coreR, coreR, 0, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fill();
+      drawConfettiStars(ctx, cx, cy, outerR, color);
+      break;
+    }
+    case "circle":
+    default:
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, w / 2, bodyH / 2, 0, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.fill();
+      break;
+  }
+}
+function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts) {
+  const { canvas: canvas2, aspect: aspect2 } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts);
+  const frontTex = makeCardTexture(canvas2, false);
+  const backTex = makeCardTexture(canvas2, true);
+  const worldHeight = state.size * 1.6;
+  const worldWidth = worldHeight * aspect2;
+  const depth = Math.max(1, state.depth);
+  const geometry = new BoxGeometry(worldWidth, worldHeight, depth);
+  const materials = buildCanvasCardMaterials(frontTex, backTex, true);
+  const mesh = new Mesh(geometry, materials);
+  mesh.castShadow = state.shadowsOn;
+  mesh.receiveShadow = state.shadowsOn;
+  const group = new Group();
+  group.add(mesh);
+  group.userData.frontTex = frontTex;
+  group.userData.backTex = backTex;
+  renderMode = "canvas";
+  textMesh = group;
+  textMesh.material = materials;
+}
 function rebuildTextMesh() {
+  if (state.contentMode === "sticker") {
+    disposeTextMesh();
+    buildStickerCardMesh(state.stickerText, state.stickerShape, state.stickerBgColor, state.stickerTextColor, {
+      curveIntensity: state.curveIntensity,
+      curveDirection: state.curveDirection,
+      curveSpacing: state.curveSpacing
+    });
+    applyRotation();
+    scene.add(textMesh);
+    updateQualityNote();
+    updateTextModeNote(false);
+    updateShadowFrustum();
+    return;
+  }
   if (state.contentMode === "image") {
     disposeTextMesh();
     if (!state.imageElement) {
@@ -25555,6 +26628,7 @@ function rebuildTextMesh() {
     scene.add(textMesh);
     updateQualityNote();
     updateTextModeNote(false);
+    updateShadowFrustum();
     return;
   }
   if (!font) return;
@@ -25562,7 +26636,8 @@ function rebuildTextMesh() {
   const rawContent = state.text || " ";
   const lines = rawContent.split(/\r?\n/);
   const validLines = lines.map((l) => l.length > 0 ? l : " ");
-  if (isBanglaText(rawContent)) {
+  const needsCanvasCard = isBanglaText(rawContent) || state.curveIntensity !== 0;
+  if (needsCanvasCard) {
     buildCanvasCardTextMesh(validLines);
   } else {
     buildVectorTextMesh(validLines);
@@ -25570,7 +26645,8 @@ function rebuildTextMesh() {
   applyRotation();
   scene.add(textMesh);
   updateQualityNote();
-  updateTextModeNote(isBanglaText(rawContent));
+  updateTextModeNote(isBanglaText(rawContent), state.curveIntensity !== 0);
+  updateShadowFrustum();
 }
 function applyQuality() {
   const q = QUALITY_PRESETS[state.quality];
@@ -25594,17 +26670,26 @@ function updateQualityNote() {
   const triLabel = triCount > 0 ? triCount.toLocaleString("bn-BD") : "\u2014";
   qualityNote.textContent = `\u09AC\u09B0\u09CD\u09A4\u09AE\u09BE\u09A8: ~${triLabel} \u099F\u09CD\u09B0\u09BE\u09AF\u09BC\u09BE\u0999\u09CD\u0997\u09C7\u09B2, \u09AA\u09BF\u0995\u09CD\u09B8\u09C7\u09B2-\u09B0\u09C7\u09B6\u09BF\u0993 \u09B8\u09B0\u09CD\u09AC\u09CB\u099A\u09CD\u099A ${q.pixelRatioCap}x, \u09B6\u09CD\u09AF\u09BE\u09A1\u09CB \u09AE\u09CD\u09AF\u09BE\u09AA ${q.shadowMapSize}px\u0964 \u09B2\u09CB-\u098F\u09A8\u09CD\u09A1 \u09A1\u09BF\u09AD\u09BE\u0987\u09B8/\u0995\u09AE-\u09B6\u0995\u09CD\u09A4\u09BF\u09B0 \u09AA\u09BF\u09B8\u09BF\u09A4\u09C7 \u09B2\u09CD\u09AF\u09BE\u0997 \u09B9\u09B2\u09C7 "Low" \u09AC\u09C7\u099B\u09C7 \u09A8\u09BF\u09A8\u0964`;
 }
-function updateTextModeNote(isBangla) {
+function updateTextModeNote(isBangla, curveOn = false) {
   if (!textModeNote) return;
-  textModeNote.textContent = isBangla ? "\u09AC\u09BE\u0982\u09B2\u09BE \u09B2\u09C7\u0996\u09BE \u09B6\u09A8\u09BE\u0995\u09CD\u09A4 \u09B9\u09AF\u09BC\u09C7\u099B\u09C7 \u2014 \u099B\u09AC\u09BF-\u099F\u09C7\u0995\u09CD\u09B8\u099A\u09BE\u09B0 \u0995\u09BE\u09B0\u09CD\u09A1 \u09AE\u09CB\u09A1\u09C7 \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7 (\u09AC\u09CD\u09B0\u09BE\u0989\u099C\u09BE\u09B0\u09C7\u09B0 \u09A8\u09BF\u099C\u09B8\u09CD\u09AC \u09AC\u09BE\u0982\u09B2\u09BE \u09AB\u09A8\u09CD\u099F/\u09B6\u09C7\u09AA\u09BF\u0982 \u09AC\u09CD\u09AF\u09AC\u09B9\u09BE\u09B0 \u0995\u09B0\u09C7, \u09A4\u09BE\u0987 \u09AF\u09C1\u0995\u09CD\u09A4\u09BE\u0995\u09CD\u09B7\u09B0/\u09AE\u09BE\u09A4\u09CD\u09B0\u09BE \u09A0\u09BF\u0995\u09AD\u09BE\u09AC\u09C7 \u09AC\u09B8\u09C7), \u09AC\u09BE\u0995\u09CD\u09AF\u09C7\u09B0 \u09AA\u09CD\u09B0\u09BE\u09A8\u09CD\u09A4 \u09A5\u09C7\u0995\u09C7 \u0997\u09AD\u09C0\u09B0\u09A4\u09BE \u09AC\u09C7\u09B0 \u09B9\u09AF\u09BC \u2014 \u0986\u09B2\u09BE\u09A6\u09BE \u0986\u09B2\u09BE\u09A6\u09BE \u0985\u0995\u09CD\u09B7\u09B0\u09C7\u09B0 \u0995\u09BF\u09A8\u09BE\u09B0\u09BE \u09A5\u09C7\u0995\u09C7 \u09A8\u09BE\u0964" : "";
-  textModeNote.hidden = !isBangla;
+  if (isBangla && curveOn) {
+    textModeNote.textContent = "\u09AC\u09BE\u0982\u09B2\u09BE \u09B2\u09C7\u0996\u09BE \u09B6\u09A8\u09BE\u0995\u09CD\u09A4 \u09B9\u09AF\u09BC\u09C7\u099B\u09C7 \u2014 \u099B\u09AC\u09BF-\u099F\u09C7\u0995\u09CD\u09B8\u099A\u09BE\u09B0 \u0995\u09BE\u09B0\u09CD\u09A1 \u09AE\u09CB\u09A1\u09C7 \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7\u0964 \u0995\u09BE\u09B0\u09CD\u09AD \u099A\u09BE\u09B2\u09C1 \u09A5\u09BE\u0995\u09BE\u09AF\u09BC \u09AA\u09CD\u09B0\u09A4\u09BF\u099F\u09BE \u0985\u0995\u09CD\u09B7\u09B0/\u09AF\u09C1\u0995\u09CD\u09A4\u09BE\u0995\u09CD\u09B7\u09B0 \u0986\u09B2\u09BE\u09A6\u09BE\u09AD\u09BE\u09AC\u09C7 \u09AC\u09B8\u09BE\u09A8\u09CB \u09B9\u099A\u09CD\u099B\u09C7 (\u098F\u0995\u09B8\u09BE\u09A5\u09C7 \u09AA\u09C1\u09B0\u09CB \u09B2\u09BE\u0987\u09A8 \u09B6\u09C7\u09AA \u0995\u09B0\u09BE \u09B9\u099A\u09CD\u099B\u09C7 \u09A8\u09BE) \u2014 \u099C\u099F\u09BF\u09B2 \u09AF\u09C1\u0995\u09CD\u09A4\u09BE\u0995\u09CD\u09B7\u09B0\u09C7 \u09B8\u09BE\u09AE\u09BE\u09A8\u09CD\u09AF \u09AA\u09BE\u09B0\u09CD\u09A5\u0995\u09CD\u09AF \u09A6\u09C7\u0996\u09BE \u09AF\u09C7\u09A4\u09C7 \u09AA\u09BE\u09B0\u09C7 \u09B8\u09CB\u099C\u09BE \u099F\u09C7\u0995\u09CD\u09B8\u099F\u09C7\u09B0 \u09A4\u09C1\u09B2\u09A8\u09BE\u09AF\u09BC\u0964";
+  } else if (isBangla) {
+    textModeNote.textContent = "\u09AC\u09BE\u0982\u09B2\u09BE \u09B2\u09C7\u0996\u09BE \u09B6\u09A8\u09BE\u0995\u09CD\u09A4 \u09B9\u09AF\u09BC\u09C7\u099B\u09C7 \u2014 \u099B\u09AC\u09BF-\u099F\u09C7\u0995\u09CD\u09B8\u099A\u09BE\u09B0 \u0995\u09BE\u09B0\u09CD\u09A1 \u09AE\u09CB\u09A1\u09C7 \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7 (\u09AC\u09CD\u09B0\u09BE\u0989\u099C\u09BE\u09B0\u09C7\u09B0 \u09A8\u09BF\u099C\u09B8\u09CD\u09AC \u09AC\u09BE\u0982\u09B2\u09BE \u09AB\u09A8\u09CD\u099F/\u09B6\u09C7\u09AA\u09BF\u0982 \u09AC\u09CD\u09AF\u09AC\u09B9\u09BE\u09B0 \u0995\u09B0\u09C7, \u09A4\u09BE\u0987 \u09AF\u09C1\u0995\u09CD\u09A4\u09BE\u0995\u09CD\u09B7\u09B0/\u09AE\u09BE\u09A4\u09CD\u09B0\u09BE \u09A0\u09BF\u0995\u09AD\u09BE\u09AC\u09C7 \u09AC\u09B8\u09C7), \u09AC\u09BE\u0995\u09CD\u09AF\u09C7\u09B0 \u09AA\u09CD\u09B0\u09BE\u09A8\u09CD\u09A4 \u09A5\u09C7\u0995\u09C7 \u0997\u09AD\u09C0\u09B0\u09A4\u09BE \u09AC\u09C7\u09B0 \u09B9\u09AF\u09BC \u2014 \u0986\u09B2\u09BE\u09A6\u09BE \u0986\u09B2\u09BE\u09A6\u09BE \u0985\u0995\u09CD\u09B7\u09B0\u09C7\u09B0 \u0995\u09BF\u09A8\u09BE\u09B0\u09BE \u09A5\u09C7\u0995\u09C7 \u09A8\u09BE\u0964";
+  } else if (curveOn) {
+    textModeNote.textContent = "\u0995\u09BE\u09B0\u09CD\u09AD \u099A\u09BE\u09B2\u09C1 \u09A5\u09BE\u0995\u09BE\u09AF\u09BC \u099B\u09AC\u09BF-\u099F\u09C7\u0995\u09CD\u09B8\u099A\u09BE\u09B0 \u0995\u09BE\u09B0\u09CD\u09A1 \u09AE\u09CB\u09A1\u09C7 \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7 (\u09AD\u09C7\u0995\u09CD\u099F\u09B0 \u09E9\u09A1\u09BF \u098F\u0995\u09CD\u09B8\u099F\u09CD\u09B0\u09C1\u09B6\u09A8\u09C7\u09B0 \u09AC\u09A6\u09B2\u09C7) \u2014 \u09AC\u09BE\u0995\u09CD\u09AF\u09C7\u09B0 \u09AA\u09CD\u09B0\u09BE\u09A8\u09CD\u09A4 \u09A5\u09C7\u0995\u09C7 \u0997\u09AD\u09C0\u09B0\u09A4\u09BE \u09AC\u09C7\u09B0 \u09B9\u09AF\u09BC, \u0986\u09B2\u09BE\u09A6\u09BE \u0986\u09B2\u09BE\u09A6\u09BE \u0985\u0995\u09CD\u09B7\u09B0\u09C7\u09B0 \u0995\u09BF\u09A8\u09BE\u09B0\u09BE \u09A5\u09C7\u0995\u09C7 \u09A8\u09BE\u0964";
+  } else {
+    textModeNote.textContent = "";
+  }
+  textModeNote.hidden = !(isBangla || curveOn);
 }
 function applyRotation() {
   if (!textMesh) return;
+  const styleTiltZ = textMesh.userData && textMesh.userData.styleTiltZ || 0;
   textMesh.rotation.set(
     MathUtils.degToRad(state.rotX),
     MathUtils.degToRad(state.rotY),
-    MathUtils.degToRad(state.rotZ)
+    MathUtils.degToRad(state.rotZ + styleTiltZ)
   );
 }
 function applyMaterial() {
@@ -25613,10 +26698,24 @@ function applyMaterial() {
     const mesh = textMesh.children[0];
     if (!mesh) return;
     const old = mesh.material;
-    const materials = buildCanvasCardMaterials(textMesh.userData.frontTex, textMesh.userData.backTex, state.contentMode === "image");
+    const materials = buildCanvasCardMaterials(textMesh.userData.frontTex, textMesh.userData.backTex, state.contentMode === "image" || state.contentMode === "sticker");
     mesh.material = materials;
     textMesh.material = materials;
     if (Array.isArray(old)) old.forEach((m) => m.dispose());
+    const reflMesh = textMesh.children[1];
+    if (reflMesh && reflMesh.isMesh) {
+      const oldRefl = reflMesh.material;
+      const reflMaterials = materials.map((m) => {
+        const clone = m.clone();
+        clone.transparent = true;
+        clone.opacity = 0.32;
+        clone.depthWrite = false;
+        return clone;
+      });
+      reflMesh.material = reflMaterials;
+      textMesh.userData.reflMaterials = reflMaterials;
+      if (Array.isArray(oldRefl)) oldRefl.forEach((m) => m.dispose());
+    }
     return;
   }
   const newMat = buildMaterial(state.materialType, state.color);
@@ -25643,6 +26742,7 @@ function applyShadowToggle() {
   for (const l of lights.children) {
     if (l.isDirectionalLight) l.castShadow = state.shadowsOn;
   }
+  updateShadowFrustum();
 }
 function applyReflectionToggle() {
   scene.environment = state.reflectionsOn ? envTexture : null;
@@ -25764,9 +26864,48 @@ contentModeGrid.addEventListener("click", (e) => {
   setActivePreset(contentModeGrid, "content", state.contentMode);
   textContentSection.hidden = state.contentMode !== "text";
   imageContentSection.hidden = state.contentMode !== "image";
+  stickerContentSection.hidden = state.contentMode !== "sticker";
+  curveSection.hidden = state.contentMode === "image";
   stopAnimation();
   rebuildTextMesh();
   updateExportSourceNote();
+});
+stickerTextInput.addEventListener("input", () => {
+  state.stickerText = stickerTextInput.value;
+  scheduleRebuild();
+});
+stickerShapeGrid.addEventListener("click", (e) => {
+  const btn = e.target.closest(".preset-btn");
+  if (!btn) return;
+  state.stickerShape = btn.dataset.stickerShape;
+  setActivePreset(stickerShapeGrid, "stickerShape", state.stickerShape);
+  if (state.contentMode === "sticker") rebuildTextMesh();
+});
+stickerBgColorPicker.addEventListener("input", () => {
+  state.stickerBgColor = stickerBgColorPicker.value;
+  if (state.contentMode === "sticker") scheduleRebuild();
+});
+stickerTextColorPicker.addEventListener("input", () => {
+  state.stickerTextColor = stickerTextColorPicker.value;
+  if (state.contentMode === "sticker") scheduleRebuild();
+});
+curveIntensityRange.addEventListener("input", () => {
+  state.curveIntensity = Number(curveIntensityRange.value);
+  curveIntensityValue.textContent = state.curveIntensity;
+  if (state.contentMode === "text" || state.contentMode === "sticker") scheduleRebuild();
+});
+curveDirectionGrid.addEventListener("click", (e) => {
+  const btn = e.target.closest(".preset-btn");
+  if (!btn) return;
+  state.curveDirection = btn.dataset.curveDirection;
+  setActivePreset(curveDirectionGrid, "curveDirection", state.curveDirection);
+  if (state.contentMode === "text" || state.contentMode === "sticker") scheduleRebuild();
+});
+curveSpacingRange.addEventListener("input", () => {
+  const pct = Number(curveSpacingRange.value);
+  state.curveSpacing = pct / 100;
+  curveSpacingValue.textContent = `${pct}%`;
+  if (state.contentMode === "text" || state.contentMode === "sticker") scheduleRebuild();
 });
 imageFileInput.addEventListener("change", () => {
   const file = imageFileInput.files && imageFileInput.files[0];
@@ -25795,6 +26934,13 @@ imageFileInput.addEventListener("change", () => {
     imageNote.textContent = "\u09AB\u09BE\u0987\u09B2\u099F\u09BE \u09AA\u09A1\u09BC\u09BE \u09AF\u09BE\u09AF\u09BC\u09A8\u09BF\u0964";
   };
   reader.readAsDataURL(file);
+});
+pictureStyleGrid.addEventListener("click", (e) => {
+  const btn = e.target.closest(".preset-btn");
+  if (!btn) return;
+  state.pictureStyle = btn.dataset.pictureStyle;
+  setActivePreset(pictureStyleGrid, "pictureStyle", state.pictureStyle);
+  if (state.contentMode === "image" && state.imageElement) rebuildTextMesh();
 });
 depthRange.addEventListener("input", () => {
   state.depth = Number(depthRange.value);
@@ -25986,14 +27132,34 @@ function updateExportSourceNote() {
     exportSourceNote.textContent = `\u09B8\u09CB\u09B0\u09CD\u09B8: \u0985\u099F\u09CB-\u09B0\u09CB\u099F\u09C7\u099F \u099F\u09BE\u09B0\u09CD\u09A8\u099F\u09C7\u09AC\u09B2 (\u09E9\u09EC\u09E6\xB0, ${totalS}s)`;
   } else if (exportFormatSelect.value === "png") {
     exportSourceNote.textContent = "\u09B8\u09CB\u09B0\u09CD\u09B8: \u09B8\u09CD\u09A5\u09BF\u09B0 (\u0995\u09CB\u09A8\u09CB \u0985\u09CD\u09AF\u09BE\u09A8\u09BF\u09AE\u09C7\u09B6\u09A8/\u0985\u099F\u09CB-\u09B0\u09CB\u099F\u09C7\u099F \u09A8\u09C7\u0987) \u2014 \u09E7\u099F\u09BE PNG \u09AB\u09CD\u09B0\u09C7\u09AE \u098F\u0995\u09CD\u09B8\u09AA\u09CB\u09B0\u09CD\u099F \u09B9\u09AC\u09C7";
+  } else if (exportFormatSelect.value === "gif") {
+    exportSourceNote.textContent = "\u09B8\u09CB\u09B0\u09CD\u09B8: \u09B8\u09CD\u09A5\u09BF\u09B0 (\u0995\u09CB\u09A8\u09CB \u0985\u09CD\u09AF\u09BE\u09A8\u09BF\u09AE\u09C7\u09B6\u09A8/\u0985\u099F\u09CB-\u09B0\u09CB\u099F\u09C7\u099F \u09A8\u09C7\u0987) \u2014 \u09E7-\u09AB\u09CD\u09B0\u09C7\u09AE\u09C7\u09B0 \u09B8\u09CD\u09A5\u09BF\u09B0 GIF \u098F\u0995\u09CD\u09B8\u09AA\u09CB\u09B0\u09CD\u099F \u09B9\u09AC\u09C7";
   } else {
     exportSourceNote.textContent = `\u09B8\u09CB\u09B0\u09CD\u09B8: \u09B8\u09CD\u09A5\u09BF\u09B0 (\u0995\u09CB\u09A8\u09CB \u0985\u09CD\u09AF\u09BE\u09A8\u09BF\u09AE\u09C7\u09B6\u09A8/\u0985\u099F\u09CB-\u09B0\u09CB\u099F\u09C7\u099F \u09A8\u09C7\u0987) \u2014 ${(STATIC_WEBM_MS / 1e3).toFixed(1)}s-\u098F\u09B0 \u09B8\u09CD\u09A5\u09BF\u09B0 \u09AD\u09BF\u09A1\u09BF\u0993 \u098F\u0995\u09CD\u09B8\u09AA\u09CB\u09B0\u09CD\u099F \u09B9\u09AC\u09C7`;
   }
+  updateGifSizeEstimate();
 }
 function updateWebmSupportNote() {
   const supported = isWebMExportSupported();
   webmSupportNote.hidden = supported || exportFormatSelect.value !== "webm";
   exportBtn.disabled = exportFormatSelect.value === "webm" && !supported;
+}
+function updateGifSizeEstimate() {
+  const isGif = exportFormatSelect.value === "gif";
+  gifOptionsGroup.hidden = !isGif;
+  if (!isGif) return;
+  const mode = currentExportSourceMode();
+  const [width, height] = exportResolutionSelect.value.split("x").map(Number);
+  const fps = Number(exportFpsSelect.value);
+  const totalMs = mode === "animated" ? animState.delayMs + animState.durationMs : mode === "turntable" ? Number(turntableLengthRange.value) : 0;
+  const frameCount = estimateGifFrameCount(totalMs, fps, mode !== "static");
+  const estBytes = estimateGifSizeBytes(width, height, frameCount);
+  const sizeLabel = formatBytes(estBytes);
+  gifSizeEstimateNote.textContent = `\u0986\u09A8\u09C1\u09AE\u09BE\u09A8\u09BF\u0995 \u09B8\u09BE\u0987\u099C: ~${sizeLabel} (${frameCount}\u099F\u09BE \u09AB\u09CD\u09B0\u09C7\u09AE, ${width}\xD7${height}) \u2014 \u098F\u099F\u09BE \u098F\u0995\u099F\u09BE \u09AE\u09CB\u099F\u09BE\u09AE\u09C1\u099F\u09BF \u09A7\u09BE\u09B0\u09A3\u09BE, \u0986\u09B8\u09B2 \u09B8\u09BE\u0987\u099C \u0995\u09AE-\u09AC\u09C7\u09B6\u09BF \u09B9\u09A4\u09C7 \u09AA\u09BE\u09B0\u09C7\u0964`;
+  gifSizeEstimateNote.classList.toggle("field-note-warning", estBytes > 15 * 1024 * 1024);
+  if (estBytes > 15 * 1024 * 1024) {
+    gifSizeEstimateNote.textContent += " \u26A0\uFE0F \u09AC\u09C7\u09B6 \u09AC\u09A1\u09BC \u09AB\u09BE\u0987\u09B2 \u09B9\u09A4\u09C7 \u09AA\u09BE\u09B0\u09C7 \u2014 \u09B0\u09C7\u099C\u09B2\u09BF\u0989\u09B6\u09A8/FPS/\u09A6\u09C8\u09B0\u09CD\u0998\u09CD\u09AF \u0995\u09AE\u09BE\u09A8\u09CB\u09B0 \u0995\u09A5\u09BE \u09AD\u09BE\u09AC\u09C1\u09A8\u0964";
+  }
 }
 function updateExportProgress(t, label) {
   exportProgressFill.style.width = `${Math.round(Math.min(1, Math.max(0, t)) * 100)}%`;
@@ -26010,6 +27176,12 @@ exportFormatSelect.addEventListener("change", () => {
 turntableLengthRange.addEventListener("input", () => {
   turntableLengthValue.textContent = `${(Number(turntableLengthRange.value) / 1e3).toFixed(1)}s`;
   updateExportSourceNote();
+});
+exportResolutionSelect.addEventListener("change", updateGifSizeEstimate);
+exportFpsSelect.addEventListener("change", updateGifSizeEstimate);
+gifQualitySelect.addEventListener("change", updateGifSizeEstimate);
+gifTransparentToggle.addEventListener("change", () => {
+  gifBackgroundColorField.hidden = gifTransparentToggle.checked;
 });
 exportBtn.addEventListener("click", async () => {
   if (!textMesh) {
@@ -26038,7 +27210,12 @@ exportBtn.addEventListener("click", async () => {
     delayMs: animState.delayMs,
     easing: animState.easing,
     autoRotate: mode === "turntable",
-    noPresetDurationMs: mode === "turntable" ? Number(turntableLengthRange.value) : format === "webm" ? STATIC_WEBM_MS : 0
+    noPresetDurationMs: mode === "turntable" ? Number(turntableLengthRange.value) : format === "webm" ? STATIC_WEBM_MS : 0,
+    // GIF-only fields (harmless/ignored by the WebM and PNG export paths):
+    quality: Number(gifQualitySelect.value),
+    loop: gifLoopToggle.checked,
+    transparentBg: gifTransparentToggle.checked,
+    backgroundColor: gifBackgroundColorPicker.value
   };
   const deps = {
     renderer,
@@ -26063,8 +27240,8 @@ exportBtn.addEventListener("click", async () => {
         label
       )
     };
-    const result = format === "webm" ? await exportWebM(deps, opts, callbacks) : await exportPngSequence(deps, opts, callbacks);
-    const ext = format === "webm" ? "webm" : "zip";
+    const result = format === "webm" ? await exportWebM(deps, opts, callbacks) : format === "gif" ? await exportGif(deps, opts, callbacks) : await exportPngSequence(deps, opts, callbacks);
+    const ext = format === "webm" ? "webm" : format === "gif" ? "gif" : "zip";
     const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
     const filename = `3d-text-export-${stamp}.${ext}`;
     lastExportUrl = URL.createObjectURL(result.blob);
@@ -26084,10 +27261,12 @@ exportBtn.addEventListener("click", async () => {
   }
 });
 setActivePreset(contentModeGrid, "content", state.contentMode);
+setActivePreset(curveDirectionGrid, "curveDirection", state.curveDirection);
 setActivePreset(materialPresetGrid, "material", state.materialType);
 setActivePreset(lightingPresetGrid, "lighting", state.lightingPreset);
 setActivePreset(animPresetGrid, "anim", animState.presetId);
 setActivePreset(qualityPresetGrid, "quality", state.quality);
+setActivePreset(pictureStyleGrid, "pictureStyle", state.pictureStyle);
 animPlayBtn.disabled = animState.presetId === "none";
 buildLightingPreset(state.lightingPreset);
 scene.environment = state.reflectionsOn ? envTexture : null;
