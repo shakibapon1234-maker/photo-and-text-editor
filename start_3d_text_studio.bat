@@ -20,9 +20,6 @@ echo.
 echo Opening browser...
 start http://localhost:8000
 
-python server.py
-if %ERRORLEVEL% NEQ 0 (
-    python3 server.py
-)
+node server.js
 
 pause
