@@ -25651,6 +25651,7 @@ async function exportGif(deps, opts, callbacks = {}) {
   const easingFn = deps.EASINGS[opts.easing] || deps.EASINGS.linear;
   const baseRotYRad = deps.state.rotY * Math.PI / 180;
   const KEY_COLOR = "#ff00fe";
+  const KEY_COLOR_NUM = 16711934;
   const backgroundColor = opts.transparentBg ? KEY_COLOR : opts.backgroundColor || "#ffffff";
   const compositeCanvas = document.createElement("canvas");
   compositeCanvas.width = opts.width;
@@ -25665,7 +25666,7 @@ async function exportGif(deps, opts, callbacks = {}) {
     repeat: opts.loop ? 0 : -1,
     // 0 = infinite loop, -1 = play once
     background: backgroundColor,
-    transparent: opts.transparentBg ? KEY_COLOR : null,
+    transparent: opts.transparentBg ? KEY_COLOR_NUM : null,
     dither: false
   });
   const delayMsPerFrame = Math.max(20, Math.round(1e3 / opts.fps));

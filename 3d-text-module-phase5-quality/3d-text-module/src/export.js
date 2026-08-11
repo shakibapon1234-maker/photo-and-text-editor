@@ -276,6 +276,7 @@ export async function exportGif(deps, opts, callbacks = {}) {
   // black/white, which *are* common badge/text colors and would wrongly
   // punch holes in the output.
   const KEY_COLOR = '#ff00fe';
+  const KEY_COLOR_NUM = 0xff00fe;
   const backgroundColor = opts.transparentBg ? KEY_COLOR : (opts.backgroundColor || '#ffffff');
 
   // Composite canvas: same size as the export resolution, opaque, reused
@@ -293,7 +294,7 @@ export async function exportGif(deps, opts, callbacks = {}) {
     height: opts.height,
     repeat: opts.loop ? 0 : -1, // 0 = infinite loop, -1 = play once
     background: backgroundColor,
-    transparent: opts.transparentBg ? KEY_COLOR : null,
+    transparent: opts.transparentBg ? KEY_COLOR_NUM : null,
     dither: false,
   });
 
