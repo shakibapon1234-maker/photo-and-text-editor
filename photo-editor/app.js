@@ -1281,8 +1281,8 @@
         if (compareBtn) compareBtn.disabled = historyStack.length === 0;
     }
 
-    undoBtn.addEventListener('click', undoEdit);
-    redoBtn.addEventListener('click', redoEdit);
+    if (undoBtn) undoBtn.addEventListener('click', undoEdit);
+    if (redoBtn) redoBtn.addEventListener('click', redoEdit);
 
     // Global keyboard shortcuts for undo/redo
     document.addEventListener('keydown', (e) => {
@@ -1491,7 +1491,7 @@
                 downloadSection.style.display = 'block';
                 // Make download use PNG
                 downloadBtn.setAttribute('data-ext', 'png');
-                pushHistory(resultBlob);
+                pushHistory(resultBlob, 'AI ব্যাকগ্রাউন্ড রিমুভ');
                 showToast('✅ AI ব্যাকগ্রাউন্ড সফলভাবে রিমুভ হয়েছে!', 'success');
             } catch (err) {
                 showToast(`❌ ত্রুটি: ${err.message}`, 'error');
@@ -1749,7 +1749,7 @@
                 previewImage.src = url;
                 downloadSection.style.display = 'block';
                 downloadBtn.setAttribute('data-ext', 'png');
-                pushHistory(blob);
+                pushHistory(blob, 'রঙ-ভিত্তিক BG রিমুভ');
                 showToast('✅ রঙ-ভিত্তিক রিমুভ সম্পন্ন! PNG হিসেবে ডাউনলোড করুন।', 'success');
             }, 'image/png');
         }
@@ -2079,7 +2079,7 @@
                 lassoPoints = [];
                 downloadSection.style.display = 'block';
                 downloadBtn.setAttribute('data-ext', 'png');
-                pushHistory(blob);
+                pushHistory(blob, 'লাসো সিলেকশন রিমুভ');
                 showToast('✅ লাসো রিমুভ সম্পন্ন! PNG ডাউনলোড করুন।', 'success');
             }, 'image/png');
         }
@@ -2201,7 +2201,7 @@
                     previewImage.src = url;
                     downloadSection.style.display = 'block';
                     downloadBtn.setAttribute('data-ext', 'png');
-                    pushHistory(blob);
+                    pushHistory(blob, 'ক্লোন স্ট্যাম্প');
                     showToast('✅ ক্লোন স্ট্যাম্প প্রয়োগ হয়েছে! PNG হিসেবে ডাউনলোড করুন।', 'success');
                 }, 'image/png');
             }
@@ -2741,7 +2741,7 @@
                     previewImage.src = url;
                     downloadSection.style.display = 'block';
                     downloadBtn.setAttribute('data-ext', 'png');
-                    pushHistory(blob);
+                    pushHistory(blob, 'ইরেজ/রিস্টোর ব্রাশ');
                     showToast('✅ ব্রাশ প্রয়োগ হয়েছে! PNG হিসেবে ডাউনলোড করুন।', 'success');
                 }, 'image/png');
             }
@@ -3000,7 +3000,7 @@
                 previewImage.src = url;
                 downloadSection.style.display = 'block';
                 downloadBtn.setAttribute('data-ext', 'png');
-                pushHistory(blob);
+                pushHistory(blob, mode === 'remove' ? 'ম্যাজিক ওয়ান্ড → রিমুভ' : 'ম্যাজিক ওয়ান্ড → রঙ ভরাট');
                 showToast(mode === 'remove'
                     ? '✅ সিলেকশন রিমুভ হয়েছে! PNG হিসেবে ডাউনলোড করুন।'
                     : '✅ সিলেকশনে রঙ ভরাট হয়েছে! PNG হিসেবে ডাউনলোড করুন।', 'success');
