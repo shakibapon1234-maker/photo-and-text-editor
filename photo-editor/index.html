@@ -28,6 +28,16 @@
                 <h1>Photo Editor by Shakib</h1>
             </div>
             <p class="tagline">ফটো সাইজ, পিক্সেল, ব্রাইটনেস এবং ক্রপ সহজেই এডিট করুন</p>
+            <button type="button" class="btn btn-bulk-open" id="bulkOpenBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+                🗂️ বাল্ক রিসাইজ
+            </button>
         </header>
 
         <!-- Upload Section -->
@@ -199,6 +209,15 @@
                             <path d="M1 6.13L16 6a2 2 0 0 1 2 2v15" />
                         </svg>
                         <span>ক্রপ</span>
+                    </button>
+                    <button class="tab-btn" data-tab="social">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="2" width="20" height="20" rx="4" />
+                            <circle cx="12" cy="12" r="3.2" />
+                            <path d="M17.2 6.8h.01" />
+                        </svg>
+                        <span>সোশ্যাল সাইজ</span>
                     </button>
                     <button class="tab-btn" data-tab="bgremove">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -533,6 +552,68 @@
                     </div>
                 </div>
 
+                <!-- Social Media Auto-Size Tool -->
+                <div class="tool-content" id="tab-social">
+                    <div class="tool-card">
+                        <h3>📱 সোশ্যাল মিডিয়া সাইজ</h3>
+                        <p class="tool-desc">ফেসবুক ফিড, রিলস/স্টোরি অথবা অ্যাডের জন্য একদম সঠিক সাইজ অটো সিলেক্ট
+                            করুন — যাতে বুস্ট/অ্যাড চালানোর সময় সাইড দিয়ে ছবি কেটে না যায়</p>
+
+                        <div class="form-group">
+                            <label>প্ল্যাটফর্ম প্রিসেট বাছাই করুন</label>
+                            <div class="social-preset-grid" id="socialPresetGrid">
+                                <!-- filled by app.js from SOCIAL_PRESETS -->
+                            </div>
+                        </div>
+
+                        <div class="form-group social-mode-group">
+                            <label>মোড</label>
+                            <div class="mode-toggle">
+                                <label class="mode-option">
+                                    <input type="radio" name="socialMode" value="fit" checked>
+                                    <span>🖼️ ফিট <small>(কিছুই কাটবে না)</small></span>
+                                </label>
+                                <label class="mode-option">
+                                    <input type="radio" name="socialMode" value="fill">
+                                    <span>✂️ ফিল <small>(ক্রপ করে ভরাট)</small></span>
+                                </label>
+                            </div>
+                            <p class="mode-hint" id="socialModeHint">"ফিট" মোডে পুরো ছবিটাই থাকবে, খালি জায়গা
+                                ব্লার ব্যাকগ্রাউন্ড দিয়ে ভরাট হবে — এটাই বুস্ট/অ্যাড চালানোর সময় সাইড কেটে যাওয়া
+                                বন্ধ করার আসল সমাধান।</p>
+                        </div>
+
+                        <div class="checkbox-group" id="safeZoneToggleWrap" style="display:none;">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="showSafeZone" checked>
+                                <span class="checkmark"></span>
+                                রিলস/স্টোরি সেফ জোন গাইড দেখান (উপরে-নিচে প্রোফাইল/বাটনের জায়গা)
+                            </label>
+                        </div>
+
+                        <div class="crop-preview-container">
+                            <div class="crop-canvas-wrapper">
+                                <canvas id="socialCanvas"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="result-preview" id="socialResult" style="display:none;">
+                            <div class="result-info">
+                                <span>নতুন সাইজ:</span>
+                                <strong id="newSocialDimension">-</strong>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="applySocial">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            অ্যাপ্লাই করুন
+                        </button>
+                    </div>
+                </div>
+
                 <!-- ===== Background Remove Tab ===== -->
                 <div class="tool-content" id="tab-bgremove">
 
@@ -857,7 +938,65 @@
         </div>
     </div>
 
+    <!-- Bulk Resize Modal -->
+    <div class="bulk-modal-overlay" id="bulkModalOverlay" style="display:none;">
+        <div class="bulk-modal">
+            <div class="history-modal-header">
+                <h3>🗂️ বাল্ক রিসাইজ — একসাথে অনেক ছবি</h3>
+                <button type="button" class="history-close-btn" id="bulkCloseBtn">&times;</button>
+            </div>
+            <div class="bulk-modal-body">
+                <p class="history-subtitle">৫-৭টি (বা তার বেশি) ছবি একসাথে আপলোড করুন, একটা সাইজ প্রিসেট বাছাই করুন,
+                    আর সব ছবি একইসাথে ওই সাইজে কনভার্ট হয়ে ZIP আকারে ডাউনলোড হবে।</p>
+
+                <div class="bulk-upload-area" id="bulkUploadArea">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <p>একাধিক ছবি সিলেক্ট করতে এখানে ক্লিক করুন অথবা টেনে আনুন</p>
+                    <input type="file" id="bulkFileInput" accept="image/*" multiple hidden>
+                </div>
+
+                <div class="bulk-thumbs" id="bulkThumbs"></div>
+
+                <div class="form-group" id="bulkPresetWrap" style="display:none;">
+                    <label>প্ল্যাটফর্ম প্রিসেট বাছাই করুন</label>
+                    <div class="social-preset-grid" id="bulkPresetGrid"></div>
+                </div>
+
+                <div class="form-group social-mode-group" id="bulkModeWrap" style="display:none;">
+                    <label>মোড</label>
+                    <div class="mode-toggle">
+                        <label class="mode-option">
+                            <input type="radio" name="bulkMode" value="fit" checked>
+                            <span>🖼️ ফিট <small>(কিছুই কাটবে না)</small></span>
+                        </label>
+                        <label class="mode-option">
+                            <input type="radio" name="bulkMode" value="fill">
+                            <span>✂️ ফিল <small>(ক্রপ করে ভরাট)</small></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="bulk-progress" id="bulkProgress" style="display:none;">
+                    <div class="bulk-progress-bar"><div class="bulk-progress-fill" id="bulkProgressFill"></div></div>
+                    <span id="bulkProgressLabel">প্রসেস হচ্ছে... 0 / 0</span>
+                </div>
+            </div>
+            <div class="history-modal-footer">
+                <button class="btn btn-secondary" id="bulkClearBtn">🗑️ সব মুছুন</button>
+                <button class="btn btn-primary" id="bulkProcessBtn" disabled>⬇️ প্রসেস করে ZIP ডাউনলোড করুন</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="social-presets.js"></script>
     <script src="app.js"></script>
+    <script src="bulk.js"></script>
 </body>
 
 </html>

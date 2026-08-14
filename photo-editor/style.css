@@ -1780,3 +1780,298 @@ kbd {
     border-top: 1px solid var(--border-color);
     background: var(--bg-secondary);
 }
+
+/* ================================================================
+   Social Media Auto-Size Tool
+   ================================================================ */
+.social-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.preset-btn-social {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 12px 12px;
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.preset-btn-social strong {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.preset-btn-social small {
+    font-size: 11px;
+    color: var(--accent-secondary, var(--accent-primary));
+    font-weight: 600;
+}
+
+.preset-btn-social em {
+    font-size: 11px;
+    font-style: normal;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.preset-btn-social:hover {
+    border-color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.1);
+    transform: translateY(-1px);
+}
+
+.preset-btn-social.active {
+    border-color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.15);
+    box-shadow: 0 0 10px rgba(230, 149, 33, 0.2);
+}
+
+.social-mode-group {
+    margin-top: 4px;
+}
+
+.mode-toggle {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.mode-option {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: var(--transition);
+    text-align: center;
+}
+
+.mode-option small {
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.mode-option input[type="radio"] {
+    display: none;
+}
+
+.mode-option.active,
+.mode-option:has(input:checked) {
+    border-color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.15);
+    color: var(--text-primary);
+}
+
+.mode-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* ================================================================
+   Bulk Resize
+   ================================================================ */
+.btn-bulk-open {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 10px 18px;
+    justify-content: center;
+    margin-left: auto;
+}
+
+@media (max-width: 720px) {
+    .app-header {
+        flex-wrap: wrap;
+        row-gap: 10px;
+    }
+    .btn-bulk-open {
+        margin-left: 0;
+        width: 100%;
+    }
+}
+
+.btn-bulk-open:hover {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.08);
+}
+
+.bulk-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(5px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.bulk-modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    width: 640px;
+    max-width: 96vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+
+.bulk-modal-body {
+    padding: 16px 20px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.bulk-upload-area {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 24px 16px;
+    text-align: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: var(--transition);
+    margin-bottom: 16px;
+}
+
+.bulk-upload-area:hover,
+.bulk-upload-area.drag-over {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.06);
+}
+
+.bulk-upload-area svg {
+    margin-bottom: 8px;
+}
+
+.bulk-upload-area p {
+    font-size: 13px;
+    margin: 0;
+}
+
+.bulk-thumbs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.bulk-thumb {
+    position: relative;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    aspect-ratio: 1 / 1;
+    background: var(--bg-input);
+}
+
+.bulk-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.bulk-thumb .bulk-thumb-remove {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bulk-thumb .bulk-thumb-name {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 9px;
+    padding: 2px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bulk-thumb .bulk-thumb-status {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 18px;
+}
+
+.bulk-thumb.done .bulk-thumb-status {
+    display: flex;
+}
+
+.bulk-progress {
+    margin-top: 10px;
+}
+
+.bulk-progress-bar {
+    width: 100%;
+    height: 8px;
+    border-radius: 6px;
+    background: var(--bg-input);
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    margin-bottom: 6px;
+}
+
+.bulk-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent-gradient);
+    transition: width 0.2s ease;
+}
+
+.bulk-progress span {
+    font-size: 12px;
+    color: var(--text-muted);
+}

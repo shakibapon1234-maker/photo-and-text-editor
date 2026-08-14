@@ -813,6 +813,150 @@
     });
 
     // ============================================
+    // Social Media Auto-Size Tool (Facebook Feed / Reels-Story)
+    // ============================================
+    const socialPresetGrid = document.getElementById('socialPresetGrid');
+    const socialCanvasPreview = document.getElementById('socialCanvas');
+    const socialCtxPreview = socialCanvasPreview ? socialCanvasPreview.getContext('2d') : null;
+    const applySocialBtn = document.getElementById('applySocial');
+    const socialResult = document.getElementById('socialResult');
+    const newSocialDimension = document.getElementById('newSocialDimension');
+    const safeZoneToggleWrap = document.getElementById('safeZoneToggleWrap');
+    const showSafeZone = document.getElementById('showSafeZone');
+    const socialModeHint = document.getElementById('socialModeHint');
+
+    let selectedSocialPreset = null;
+
+    function buildSocialPresetGrid() {
+        if (!socialPresetGrid) return;
+        socialPresetGrid.innerHTML = '';
+        (window.SOCIAL_PRESETS || []).forEach((p, idx) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'preset-btn-social';
+            btn.dataset.presetId = p.id;
+            btn.innerHTML = `<strong>${p.label}</strong><small>${p.w}×${p.h} · ${p.ratioLabel}</small><em>${p.note}</em>`;
+            btn.addEventListener('click', () => {
+                socialPresetGrid.querySelectorAll('.preset-btn-social').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedSocialPreset = p;
+                if (safeZoneToggleWrap) safeZoneToggleWrap.style.display = (p.id === 'fb_reels') ? 'block' : 'none';
+                drawSocialPreview();
+            });
+            if (idx === 0) {
+                btn.classList.add('active');
+                selectedSocialPreset = p;
+            }
+            socialPresetGrid.appendChild(btn);
+        });
+        if (safeZoneToggleWrap) {
+            safeZoneToggleWrap.style.display = (selectedSocialPreset && selectedSocialPreset.id === 'fb_reels') ? 'block' : 'none';
+        }
+    }
+
+    function getSocialMode() {
+        const el = document.querySelector('input[name="socialMode"]:checked');
+        return el ? el.value : 'fit';
+    }
+
+    function syncModeOptionClasses(name) {
+        document.querySelectorAll(`input[name="${name}"]`).forEach(r => {
+            const label = r.closest('.mode-option');
+            if (label) label.classList.toggle('active', r.checked);
+        });
+    }
+
+    document.querySelectorAll('input[name="socialMode"]').forEach(r => {
+        r.addEventListener('change', () => {
+            syncModeOptionClasses('socialMode');
+            if (socialModeHint) {
+                socialModeHint.textContent = getSocialMode() === 'fit'
+                    ? '"ফিট" মোডে পুরো ছবিটাই থাকবে, খালি জায়গা ব্লার ব্যাকগ্রাউন্ড দিয়ে ভরাট হবে — এটাই বুস্ট/অ্যাড চালানোর সময় সাইড কেটে যাওয়া বন্ধ করার আসল সমাধান।'
+                    : '"ফিল" মোডে ছবি পুরো ফ্রেম ভরাট করবে কিন্তু বাড়তি অংশ (সাধারণত দুই পাশ বা উপর-নিচ) ক্রপ হয়ে বাদ যাবে।';
+            }
+            drawSocialPreview();
+        });
+    });
+
+    if (showSafeZone) {
+        showSafeZone.addEventListener('change', drawSocialPreview);
+    }
+
+    function drawSocialPreview() {
+        if (!originalImage || !selectedSocialPreset || !socialCtxPreview || typeof window.renderSocialCanvas !== 'function') return;
+        const p = selectedSocialPreset;
+        const mode = getSocialMode();
+
+        const maxPreviewW = 320;
+        const scale = Math.min(1, maxPreviewW / p.w);
+        const pw = Math.round(p.w * scale);
+        const ph = Math.round(p.h * scale);
+
+        const rendered = window.renderSocialCanvas(originalImage, p.w, p.h, mode);
+
+        socialCanvasPreview.width = pw;
+        socialCanvasPreview.height = ph;
+        socialCtxPreview.clearRect(0, 0, pw, ph);
+        socialCtxPreview.drawImage(rendered, 0, 0, p.w, p.h, 0, 0, pw, ph);
+
+        if (p.id === 'fb_reels' && showSafeZone && showSafeZone.checked) {
+            const topSafe = ph * (250 / 1920);
+            const bottomSafe = ph * (340 / 1920);
+            socialCtxPreview.fillStyle = 'rgba(255, 0, 60, 0.28)';
+            socialCtxPreview.fillRect(0, 0, pw, topSafe);
+            socialCtxPreview.fillRect(0, ph - bottomSafe, pw, bottomSafe);
+            socialCtxPreview.strokeStyle = 'rgba(255,255,255,0.7)';
+            socialCtxPreview.setLineDash([4, 3]);
+            socialCtxPreview.strokeRect(pw * 0.06, topSafe, pw * 0.88, ph - topSafe - bottomSafe);
+            socialCtxPreview.setLineDash([]);
+        }
+    }
+
+    if (applySocialBtn) {
+        applySocialBtn.addEventListener('click', () => {
+            if (!originalImage) return;
+            if (!selectedSocialPreset || typeof window.renderSocialCanvas !== 'function') {
+                showToast('একটি প্রিসেট বাছাই করুন', 'error');
+                return;
+            }
+            const p = selectedSocialPreset;
+            const mode = getSocialMode();
+
+            applySocialBtn.classList.add('loading');
+            setTimeout(() => {
+                const rendered = window.renderSocialCanvas(originalImage, p.w, p.h, mode);
+                canvas.width = p.w;
+                canvas.height = p.h;
+                ctx.drawImage(rendered, 0, 0);
+
+                canvas.toBlob(blob => {
+                    processedBlob = blob;
+                    socialResult.style.display = 'block';
+                    newSocialDimension.textContent = `${p.w} × ${p.h} (${p.label})`;
+                    downloadSection.style.display = 'block';
+                    updatePreview(blob);
+                    pushHistory(blob, `সোশ্যাল সাইজ → ${p.label} ${p.w}×${p.h}`);
+                    applySocialBtn.classList.remove('loading');
+                    showToast('✅ সোশ্যাল মিডিয়া সাইজ তৈরি হয়েছে!', 'success');
+                }, 'image/png');
+            }, 100);
+        });
+    }
+
+    buildSocialPresetGrid();
+    syncModeOptionClasses('socialMode');
+
+    // Redraw the social preview whenever a new image loads, or when the
+    // user switches into the social tab (canvas needs real dimensions).
+    document.addEventListener('app:newimage', () => {
+        if (socialResult) socialResult.style.display = 'none';
+        drawSocialPreview();
+    });
+    document.addEventListener('app:tabchange', (e) => {
+        if (e.detail === 'social') drawSocialPreview();
+    });
+
+    // ============================================
     // Download
     // ============================================
 
