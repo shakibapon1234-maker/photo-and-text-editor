@@ -2601,12 +2601,15 @@ if (bgFileInput) {
       const img = new Image();
       img.onload = () => {
         state.bgImageElement = img;
+        state.bgMode = 'image';
+        if (bgModeSelect) bgModeSelect.value = 'image';
+        if (bgColorGroup) bgColorGroup.hidden = true;
         if (bgPreviewThumb) {
           bgPreviewThumb.src = reader.result;
           bgPreviewThumb.hidden = false;
         }
-        if (bgImageNote) bgImageNote.textContent = `আপলোড সম্পন্ন: ${file.name} (${img.naturalWidth}×${img.naturalHeight}px)`;
-        if (state.bgMode === 'image') updateSceneBackground();
+        if (bgImageNote) bgImageNote.textContent = `✓ ছবি যুক্ত হয়েছে: ${file.name} (${img.naturalWidth}×${img.naturalHeight}px)`;
+        updateSceneBackground();
       };
       img.src = reader.result;
     };

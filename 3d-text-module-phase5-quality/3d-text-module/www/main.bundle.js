@@ -27737,12 +27737,15 @@ if (bgFileInput) {
       const img = new Image();
       img.onload = () => {
         state.bgImageElement = img;
+        state.bgMode = "image";
+        if (bgModeSelect) bgModeSelect.value = "image";
+        if (bgColorGroup) bgColorGroup.hidden = true;
         if (bgPreviewThumb) {
           bgPreviewThumb.src = reader.result;
           bgPreviewThumb.hidden = false;
         }
-        if (bgImageNote) bgImageNote.textContent = `\u0986\u09AA\u09B2\u09CB\u09A1 \u09B8\u09AE\u09CD\u09AA\u09A8\u09CD\u09A8: ${file.name} (${img.naturalWidth}\xD7${img.naturalHeight}px)`;
-        if (state.bgMode === "image") updateSceneBackground();
+        if (bgImageNote) bgImageNote.textContent = `\u2713 \u099B\u09AC\u09BF \u09AF\u09C1\u0995\u09CD\u09A4 \u09B9\u09DF\u09C7\u099B\u09C7: ${file.name} (${img.naturalWidth}\xD7${img.naturalHeight}px)`;
+        updateSceneBackground();
       };
       img.src = reader.result;
     };

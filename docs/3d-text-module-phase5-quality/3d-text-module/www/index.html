@@ -278,14 +278,23 @@
 
       <section class="panel-section">
         <h3>ব্যাকগ্রাউন্ড ইমেজ ও থিম</h3>
+
+        <!-- Prominent Custom Upload -->
+        <label class="field file-field" style="background: var(--surface-raised); padding: 10px; border-radius: var(--radius); border: 1.5px dashed var(--accent); display: flex; flex-direction: column; align-items: flex-start; gap: 6px;">
+          <span style="font-weight: 700; color: #f3f4f6; font-size: 13px;">📁 নিজের ছবি আপলোড করুন:</span>
+          <input type="file" id="bgFileInput" accept="image/*" style="cursor: pointer; width: 100%;" />
+        </label>
+        <img id="bgPreviewThumb" class="image-preview-thumb" alt="আপলোডকৃত ব্যাকগ্রাউন্ড প্রিভিউ" hidden />
+        <p class="field-note" id="bgImageNote" style="margin-bottom: 10px;">আপনার নিজস্ব যেকোনো ছবি (JPG/PNG) আপলোড করলে ৩D লেখাটি সেই ছবির উপর সরাসরি ভেসে থাকবে।</p>
+
         <label class="field">
-          <span>ব্যাকগ্রাউন্ড</span>
+          <span>ব্যাকগ্রাউন্ড থিম</span>
           <select id="bgModeSelect">
+            <option value="image">🖼️ আমার আপলোডকৃত ছবি</option>
             <option value="darkBlue" selected>🌌 Dark Blue Studio ('Style' স্ক্রিনশট)</option>
             <option value="lightStudio">🏢 Studio Floor & Wall ('DESIGN' স্ক্রিনশট)</option>
             <option value="gradientDark">🖤 Dark Vignette</option>
             <option value="cyberpunk">🌆 Cyberpunk Neon</option>
-            <option value="image">🖼️ কাস্টম ইমেজ আপলোড</option>
             <option value="color">🎨 এক কালার (Solid Color)</option>
             <option value="none">✨ স্বচ্ছ (Transparent Export)</option>
           </select>
@@ -297,18 +306,6 @@
             <input type="color" id="bgColorPicker" value="#0a192f" />
           </label>
         </div>
-
-        <div id="bgImageGroup" hidden>
-          <label class="field file-field">
-            <span>ছবি আপলোড</span>
-            <input type="file" id="bgFileInput" accept="image/*" />
-          </label>
-          <img id="bgPreviewThumb" class="image-preview-thumb" alt="ব্যাকগ্রাউন্ড প্রিভিউ" hidden />
-          <p class="field-note" id="bgImageNote">কোনো ব্যাকগ্রাউন্ড ছবি সিলেক্ট করা হয়নি।</p>
-        </div>
-        <p class="field-note">
-          থ্রিডি লেখার পিছনে যেকোনো ছবি বা ব্যাকগ্রাউন্ড যোগ করতে পারবেন। এক্সপোর্ট করার সময় এই ব্যাকগ্রাউন্ডও সাথে সেভ হবে।
-        </p>
       </section>
 
       <section class="panel-section">
