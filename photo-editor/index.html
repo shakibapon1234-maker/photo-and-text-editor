@@ -1257,6 +1257,22 @@
 
                 <div class="bulk-thumbs" id="bulkThumbs"></div>
 
+                <div class="form-group" id="bulkBgRemoveWrap" style="display:none;">
+                    <label class="wm-toggle">
+                        <input type="checkbox" id="bulkApplyBgRemove">
+                        <span>🪄 প্রতিটি ছবি থেকে AI দিয়ে ব্যাকগ্রাউন্ড রিমুভ করুন</span>
+                    </label>
+                    <p class="wm-hint" id="bulkBgRemoveHint">"ব্যাকগ্রাউন্ড রিমুভ" ট্যাবে আগে Remove.bg API Key দিন, তারপর এখানে টিক দিন</p>
+                    <div class="form-group" id="bulkBgColorWrap" style="display:none; margin-top:10px;">
+                        <label class="wm-toggle">
+                            <input type="checkbox" id="bulkBgReplaceColor">
+                            <span>🎨 রিমুভের পর সলিড রঙ ব্যাকগ্রাউন্ড বসান</span>
+                        </label>
+                        <p class="wm-hint">চেক না করলে ছবি স্বচ্ছ (transparent) PNG হিসেবে থাকবে</p>
+                        <input type="color" id="bulkBgColor" value="#ffffff" style="margin-top:6px;">
+                    </div>
+                </div>
+
                 <div class="form-group" id="bulkPresetWrap" style="display:none;">
                     <label>প্ল্যাটফর্ম প্রিসেট বাছাই করুন</label>
                     <div class="social-preset-grid" id="bulkPresetGrid"></div>

@@ -1546,6 +1546,32 @@
             localStorage.setItem('removebg_api_key', bgApiKey.value.trim());
         });
 
+        // Phase 13: extracted so bulk.js can reuse the exact same network
+        // call (same pattern as window.drawWatermark / window.applyLocalUpscaleToCanvas
+        // being shared between the single-image tab and the bulk modal).
+        // Non-pure (does a fetch), so no standalone Node unit test — same
+        // limitation as the rest of the network-dependent BG-remove code.
+        async function removeBackgroundViaRemoveBg(imageBlob, apiKey) {
+            const formData = new FormData();
+            formData.append('image_file', imageBlob, 'image.png');
+            formData.append('size', 'auto');
+
+            const response = await fetch('https://api.remove.bg/v1.0/removebg', {
+                method: 'POST',
+                headers: { 'X-Api-Key': apiKey },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                const msg = errData?.errors?.[0]?.title || `HTTP ${response.status}`;
+                throw new Error(msg);
+            }
+
+            return response.blob();
+        }
+        window.removeBackgroundAI = removeBackgroundViaRemoveBg;
+
         // Copy the Remove.bg signup link to the clipboard
         const copyApiLinkBtn = document.getElementById('copyApiLinkBtn');
         if (copyApiLinkBtn) {
@@ -1617,23 +1643,7 @@
             try {
                 // Use the latest processed blob or fall back to original file
                 const blobToSend = processedBlob || originalFile;
-                const formData = new FormData();
-                formData.append('image_file', blobToSend, 'image.png');
-                formData.append('size', 'auto');
-
-                const response = await fetch('https://api.remove.bg/v1.0/removebg', {
-                    method: 'POST',
-                    headers: { 'X-Api-Key': apiKey },
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    const errData = await response.json().catch(() => ({}));
-                    const msg = errData?.errors?.[0]?.title || `HTTP ${response.status}`;
-                    throw new Error(msg);
-                }
-
-                const resultBlob = await response.blob();
+                const resultBlob = await removeBackgroundViaRemoveBg(blobToSend, apiKey);
                 processedBlob = resultBlob;
                 const url = URL.createObjectURL(resultBlob);
 

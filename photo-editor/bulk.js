@@ -12,6 +12,12 @@
     const bulkUploadArea = document.getElementById('bulkUploadArea');
     const bulkFileInput = document.getElementById('bulkFileInput');
     const bulkThumbs = document.getElementById('bulkThumbs');
+    const bulkBgRemoveWrap = document.getElementById('bulkBgRemoveWrap');
+    const bulkApplyBgRemove = document.getElementById('bulkApplyBgRemove');
+    const bulkBgRemoveHint = document.getElementById('bulkBgRemoveHint');
+    const bulkBgColorWrap = document.getElementById('bulkBgColorWrap');
+    const bulkBgReplaceColor = document.getElementById('bulkBgReplaceColor');
+    const bulkBgColor = document.getElementById('bulkBgColor');
     const bulkPresetWrap = document.getElementById('bulkPresetWrap');
     const bulkPresetGrid = document.getElementById('bulkPresetGrid');
     const bulkModeWrap = document.getElementById('bulkModeWrap');
@@ -39,6 +45,7 @@
         bulkModalOverlay.style.display = 'flex';
         refreshBulkWatermarkHint();
         refreshBulkUpscaleHint();
+        refreshBulkBgRemoveHint();
     }
     function closeModal() {
         bulkModalOverlay.style.display = 'none';
@@ -145,6 +152,10 @@
 
         bulkPresetWrap.style.display = 'block';
         bulkModeWrap.style.display = 'block';
+        if (bulkBgRemoveWrap) {
+            bulkBgRemoveWrap.style.display = 'block';
+            refreshBulkBgRemoveHint();
+        }
         if (bulkWatermarkWrap) {
             bulkWatermarkWrap.style.display = 'block';
             refreshBulkWatermarkHint();
@@ -177,12 +188,36 @@
         bulkThumbs.innerHTML = '';
         bulkPresetWrap.style.display = 'none';
         bulkModeWrap.style.display = 'none';
+        if (bulkBgRemoveWrap) bulkBgRemoveWrap.style.display = 'none';
         if (bulkWatermarkWrap) bulkWatermarkWrap.style.display = 'none';
         if (bulkUpscaleWrap) bulkUpscaleWrap.style.display = 'none';
         bulkProgress.style.display = 'none';
         updateProcessButtonState();
     }
     bulkClearBtn.addEventListener('click', clearAll);
+
+    // ---------- Phase 13: bulk BG-remove hint + nested solid-color toggle ----------
+    function refreshBulkBgRemoveHint() {
+        if (!bulkBgRemoveWrap || !bulkBgRemoveHint) return;
+        const apiKey = (localStorage.getItem('removebg_api_key') || '').trim();
+        if (!apiKey) {
+            bulkBgRemoveHint.textContent = '"ব্যাকগ্রাউন্ড রিমুভ" ট্যাবে আগে Remove.bg API Key দিন, তারপর এখানে টিক দিন';
+            if (bulkApplyBgRemove) {
+                bulkApplyBgRemove.checked = false;
+                bulkApplyBgRemove.disabled = true;
+            }
+        } else {
+            bulkBgRemoveHint.textContent = '⚠️ প্রতিটা ছবির জন্য Remove.bg-এর ১টা ক্রেডিট খরচ হবে — অনেক ছবি একসাথে করলে দ্রুত ক্রেডিট শেষ হতে পারে';
+            if (bulkApplyBgRemove) bulkApplyBgRemove.disabled = false;
+        }
+    }
+    if (bulkApplyBgRemove) {
+        bulkApplyBgRemove.addEventListener('change', () => {
+            if (bulkBgColorWrap) {
+                bulkBgColorWrap.style.display = bulkApplyBgRemove.checked ? 'block' : 'none';
+            }
+        });
+    }
 
     // Phase 9: reflect whether the "ওয়াটারমার্ক" tab actually has anything
     // configured, so the checkbox doesn't silently do nothing when checked.
@@ -240,6 +275,58 @@
 
     function blobFromCanvas(canvasEl, type, quality) {
         return new Promise(resolve => canvasEl.toBlob(resolve, type, quality));
+    }
+
+    // Phase 13: calls remove.bg (via window.removeBackgroundAI, same fetch
+    // logic the single-image "AI Remove" button uses) on the ORIGINAL file
+    // for this item (BG-remove is always the first pipeline step, so it
+    // always works from the freshest/most-detailed source). Returns
+    // { image, hasTransparency } — image is either the untouched <img>
+    // (no-op / on error) or the BG-removed result, optionally composited
+    // onto a solid-color background if bulkBgReplaceColor is checked.
+    // Any failure (network, bad key, quota) is caught per-item so one
+    // failed image doesn't abort the whole batch — it just falls back to
+    // the original (un-removed) image for that item.
+    async function applyBulkBgRemoveIfNeeded(item, img) {
+        if (!bulkApplyBgRemove || !bulkApplyBgRemove.checked) {
+            return { image: img, hasTransparency: false };
+        }
+        if (typeof window.removeBackgroundAI !== 'function') {
+            return { image: img, hasTransparency: false };
+        }
+        const apiKey = (localStorage.getItem('removebg_api_key') || '').trim();
+        if (!apiKey) {
+            return { image: img, hasTransparency: false };
+        }
+
+        try {
+            const resultBlob = await window.removeBackgroundAI(item.file, apiKey);
+            const removedImg = await new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(resultBlob);
+                const im = new Image();
+                im.onload = () => resolve(im);
+                im.onerror = reject;
+                im.src = url;
+            });
+
+            if (bulkBgReplaceColor && bulkBgReplaceColor.checked) {
+                const w = removedImg.naturalWidth || removedImg.width;
+                const h = removedImg.naturalHeight || removedImg.height;
+                const off = document.createElement('canvas');
+                off.width = w;
+                off.height = h;
+                const octx = off.getContext('2d');
+                octx.fillStyle = (bulkBgColor && bulkBgColor.value) || '#ffffff';
+                octx.fillRect(0, 0, w, h);
+                octx.drawImage(removedImg, 0, 0, w, h);
+                return { image: off, hasTransparency: false };
+            }
+
+            return { image: removedImg, hasTransparency: true };
+        } catch (err) {
+            showBulkError(`"${item.file.name}" থেকে ব্যাকগ্রাউন্ড রিমুভ করা যায়নি, মূল ছবি দিয়ে বাকি প্রসেস চলছে`);
+            return { image: img, hasTransparency: false };
+        }
     }
 
     // Phase 9: draws the currently-configured watermark onto a fresh
@@ -323,15 +410,21 @@
             const item = items[i];
             try {
                 const img = await waitForImage(item);
-                const preprocessed = preprocessBulkImage(img);
+                const bgResult = await applyBulkBgRemoveIfNeeded(item, img);
+                const preprocessed = preprocessBulkImage(bgResult.image);
                 const rendered = window.renderSocialCanvas(preprocessed, preset.w, preset.h, mode);
-                const blob = await blobFromCanvas(rendered, 'image/jpeg', 0.92);
+                // PNG (no transparency loss) when BG was removed and no solid
+                // color was composited underneath; JPEG otherwise (smaller files).
+                const outExt = bgResult.hasTransparency ? 'png' : 'jpg';
+                const blob = bgResult.hasTransparency
+                    ? await blobFromCanvas(rendered, 'image/png')
+                    : await blobFromCanvas(rendered, 'image/jpeg', 0.92);
 
                 let baseName = item.file.name.replace(/\.[^/.]+$/, '') || `image_${i + 1}`;
-                let fileName = `${baseName}_${preset.id}.jpg`;
+                let fileName = `${baseName}_${preset.id}.${outExt}`;
                 let dupeCount = 1;
                 while (usedNames.has(fileName)) {
-                    fileName = `${baseName}_${preset.id}_${dupeCount++}.jpg`;
+                    fileName = `${baseName}_${preset.id}_${dupeCount++}.${outExt}`;
                 }
                 usedNames.add(fileName);
 
