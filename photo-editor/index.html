@@ -9,6 +9,16 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+
+    <!-- PWA / অফলাইন সাপোর্ট -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#121316">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Photo Editor">
+    <meta name="mobile-web-app-capable" content="yes">
 </head>
 
 <body>
@@ -28,6 +38,15 @@
                 <h1>Photo Editor by Shakib</h1>
             </div>
             <p class="tagline">ফটো সাইজ, পিক্সেল, ব্রাইটনেস এবং ক্রপ সহজেই এডিট করুন</p>
+            <button type="button" class="btn btn-ghost btn-pwa-install" id="pwaInstallBtn" title="অ্যাপ হিসেবে ইনস্টল করুন">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                📲 ইনস্টল করুন
+            </button>
             <button type="button" class="btn btn-bulk-open" id="bulkOpenBtn">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                     stroke-linecap="round" stroke-linejoin="round">
@@ -241,6 +260,16 @@
                             <path d="M12 2.7s6 6.2 6 10.8a6 6 0 0 1-12 0c0-4.6 6-10.8 6-10.8z" />
                         </svg>
                         <span>ওয়াটারমার্ক</span>
+                    </button>
+                    <button class="tab-btn" data-tab="upscale">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M15 3h6v6" />
+                            <path d="M9 21H3v-6" />
+                            <path d="M21 3l-7 7" />
+                            <path d="M3 21l7-7" />
+                        </svg>
+                        <span>আপস্কেল</span>
                     </button>
                 </div>
 
@@ -1022,6 +1051,87 @@
                     </div>
                 </div>
 
+                <!-- Upscale Tool -->
+                <div class="tool-content" id="tab-upscale">
+
+                    <!-- METHOD 1: AI Upscale via DeepAI torch-srgan -->
+                    <div class="tool-card bg-method-card open" id="upcard-ai">
+                        <button type="button" class="bg-method-header" aria-expanded="true">
+                            <div class="bg-method-icon">🤖</div>
+                            <div class="bg-method-title">
+                                <h3>AI আপস্কেল (ক্লাউড)</h3>
+                                <p class="tool-desc">DeepAI Super Resolution API — রেজোলিউশন ৪x বাড়ায়, ডিটেইল যোগ করে। API key লাগবে।</p>
+                            </div>
+                            <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="bg-method-body">
+                        <div class="form-group">
+                            <label>DeepAI API Key</label>
+                            <div class="api-link-row">
+                                <a href="https://deepai.org/" target="_blank" rel="noopener noreferrer" class="api-link">→ বিনামূল্যে API Key পাবেন</a>
+                                <button type="button" class="btn btn-ghost btn-copy-link" id="copyUpscaleApiLinkBtn" title="লিংক কপি করুন">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    কপি
+                                </button>
+                            </div>
+                            <input type="password" id="upApiKey" placeholder="আপনার DeepAI API key" class="api-key-input">
+                            <small style="color:var(--text-secondary);margin-top:4px;display:block;">🔒 শুধুমাত্র আপনার ব্রাউজারে সংরক্ষিত থাকবে</small>
+                        </div>
+                        <button class="btn btn-primary btn-action" id="upAiBtn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm-1-5h2v2h-2zm0-8h2v6h-2z"/></svg>
+                            AI দিয়ে ৪x আপস্কেল করুন
+                        </button>
+                        <div class="bg-ai-loading" id="upAiLoading" style="display:none;">
+                            <div class="spinner"></div>
+                            <span>AI প্রসেস করছে... (কিছুটা সময় লাগতে পারে)</span>
+                        </div>
+                        </div>
+                    </div>
+
+                    <!-- METHOD 2: Local canvas-based upscale -->
+                    <div class="tool-card bg-method-card" id="upcard-local">
+                        <button type="button" class="bg-method-header" aria-expanded="false">
+                            <div class="bg-method-icon">🖼️</div>
+                            <div class="bg-method-title">
+                                <h3>লোকাল আপস্কেল</h3>
+                                <p class="tool-desc">কোনো API key বা ইন্টারনেট লাগে না — সম্পূর্ণ অফলাইনে, তাৎক্ষণিক কাজ করে।</p>
+                            </div>
+                            <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="bg-method-body">
+                        <div class="form-row-2col">
+                            <div class="form-group">
+                                <label>কতটুকু বড় করবেন</label>
+                                <select id="upFactor">
+                                    <option value="1.5">1.5x</option>
+                                    <option value="2" selected>2x</option>
+                                    <option value="3">3x</option>
+                                    <option value="4">4x</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>শার্পনেস: <strong id="upSharpenValue">20</strong></label>
+                                <input type="range" id="upSharpen" min="0" max="100" value="20" class="range-slider">
+                                <div class="range-labels"><span>নরম</span><span>তীক্ষ্ণ</span></div>
+                            </div>
+                        </div>
+                        <p class="tool-desc" style="margin-top:0;">বড় ছবিতে (৪x পর্যন্ত) কিছুটা সময় লাগতে পারে, ব্রাউজার রেসপন্স করবে কিছুক্ষণের জন্য ধীর।</p>
+                        <button class="btn btn-primary btn-action" id="upLocalBtn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            লোকাল আপস্কেল করুন
+                        </button>
+                        </div>
+                    </div>
+
+                    <div class="result-preview" id="upResult" style="display:none;">
+                        <div class="result-info">
+                            <span id="upResultText">-</span>
+                        </div>
+                    </div>
+                </div>
+
                 </div><!-- /.tool-panels -->
               </div><!-- /.tools-panel-body -->
 
@@ -1047,6 +1157,12 @@
 
     <!-- Toast Notification -->
     <div class="toast" id="toast"></div>
+
+    <!-- Phase 12: PWA — নতুন ভার্সন এলে দেখানোর ব্যানার -->
+    <div class="pwa-update-banner" id="pwaUpdateBanner">
+        <span>🔄 নতুন ভার্সন পাওয়া গেছে</span>
+        <button type="button" class="btn btn-primary" id="pwaUpdateReloadBtn">রিফ্রেশ করুন</button>
+    </div>
 
     <!-- Eyedropper Magnifier Loupe -->
     <div id="eyedropperLoupe" class="eyedropper-loupe" style="display:none;">
@@ -1131,6 +1247,14 @@
                         <span>💧 একই ওয়াটারমার্ক প্রয়োগ করুন</span>
                     </label>
                     <p class="wm-hint" id="bulkWatermarkHint">"ওয়াটারমার্ক" ট্যাবে যা সেট করা আছে, ঠিক সেটাই প্রতিটা ছবিতে বসবে</p>
+                </div>
+
+                <div class="form-group" id="bulkUpscaleWrap" style="display:none;">
+                    <label class="wm-toggle">
+                        <input type="checkbox" id="bulkApplyUpscale">
+                        <span>🔍 প্রসেস করার আগে লোকাল আপস্কেল প্রয়োগ করুন</span>
+                    </label>
+                    <p class="wm-hint" id="bulkUpscaleHint">"আপস্কেল" ট্যাবের লোকাল সেকশনে যে ফ্যাক্টর/শার্পনেস সেট করা আছে, সেটাই প্রতিটা ছবিতে প্রয়োগ হবে (প্রিসেট সাইজে বসানোর আগে)</p>
                 </div>
 
                 <div class="bulk-progress" id="bulkProgress" style="display:none;">

@@ -380,8 +380,11 @@
     // it by far the longest scroll in the app. Now each method's header is a
     // toggle: opening one closes the others, so only one method's controls
     // are visible (and taking up scroll space) at a time.
-    (function initBgMethodAccordion() {
-        const cards = document.querySelectorAll('#tab-bgremove .bg-method-card');
+    // Reusable per-container accordion — used by BG-remove (7 methods) and
+    // Upscale (2 methods). Scoped to one container at a time so opening a
+    // card in one tab never touches the other tab's open/closed state.
+    function initMethodAccordion(containerSelector) {
+        const cards = document.querySelectorAll(`${containerSelector} .bg-method-card`);
         if (!cards.length) return;
 
         cards.forEach(card => {
@@ -405,7 +408,9 @@
                 }
             });
         });
-    })();
+    }
+    initMethodAccordion('#tab-bgremove');
+    initMethodAccordion('#tab-upscale');
 
     // ============================================
     // Tool 1: File Size
@@ -3918,5 +3923,478 @@
             }, 100);
         });
     })(); // end initWatermarkModule
+
+    // ============================================
+    // Phase 11: Upscale — pure helpers
+    // ============================================
+
+    // Works out the final pixel size for a local upscale request, clamped to
+    // maxDimension on the longer side so a big multi-MP photo at 4x can't
+    // blow past what a canvas (and the user's RAM) can comfortably hold.
+    function computeUpscaleDimensions(width, height, factor, maxDimension) {
+        maxDimension = maxDimension || 6000;
+        width = Math.max(1, Math.round(width) || 0);
+        height = Math.max(1, Math.round(height) || 0);
+        factor = (typeof factor === 'number' && factor > 0) ? factor : 1;
+
+        let targetW = Math.max(1, Math.round(width * factor));
+        let targetH = Math.max(1, Math.round(height * factor));
+        let clamped = false;
+
+        const longSide = Math.max(targetW, targetH);
+        if (longSide > maxDimension) {
+            const scale = maxDimension / longSide;
+            targetW = Math.max(1, Math.round(targetW * scale));
+            targetH = Math.max(1, Math.round(targetH * scale));
+            clamped = true;
+        }
+
+        return { width: targetW, height: targetH, clamped };
+    }
+
+    // Breaks a single upscale factor into a chain of ≤2x hops. Scaling up in
+    // several smaller steps (each re-sampled by the browser's own "high
+    // quality" resampler) keeps edges noticeably crisper than one huge
+    // single-hop stretch — canvas has no true bicubic/Lanczos mode, so this
+    // is the standard trick to approximate one.
+    function planUpscaleSteps(factor) {
+        factor = (typeof factor === 'number' && factor > 0) ? factor : 1;
+        if (factor <= 1) return [1];
+
+        const steps = [];
+        let remaining = factor;
+        while (remaining > 2) {
+            steps.push(2);
+            remaining /= 2;
+        }
+        if (remaining > 1.0001) steps.push(remaining);
+        return steps.length ? steps : [factor];
+    }
+
+    // Simple variable-strength 3x3 sharpen convolution — pure (no canvas),
+    // so it's Node-testable. `imageData` only needs {data, width, height};
+    // a real ImageData satisfies that, and so does a plain mock in tests.
+    // amount === 0 (or a too-small image) must be a byte-for-byte no-op —
+    // that's the regression guard for the "sharpen off" default.
+    function sharpenImageData(imageData, amount) {
+        const data = imageData.data;
+        const width = imageData.width;
+        const height = imageData.height;
+        const out = new Uint8ClampedArray(data.length);
+
+        if (!amount || amount <= 0 || width < 3 || height < 3) {
+            out.set(data);
+            return { data: out, width, height };
+        }
+
+        const center = 1 + 4 * amount;
+        const edge = -amount;
+
+        function at(x, y, c) {
+            x = Math.min(width - 1, Math.max(0, x));
+            y = Math.min(height - 1, Math.max(0, y));
+            return data[(y * width + x) * 4 + c];
+        }
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const idx = (y * width + x) * 4;
+                for (let c = 0; c < 3; c++) { // RGB only — alpha passes through untouched
+                    out[idx + c] = center * at(x, y, c)
+                        + edge * at(x - 1, y, c)
+                        + edge * at(x + 1, y, c)
+                        + edge * at(x, y - 1, c)
+                        + edge * at(x, y + 1, c);
+                }
+                out[idx + 3] = data[idx + 3];
+            }
+        }
+        return { data: out, width, height };
+    }
+
+    // Shared with bulk.js (same window-exposure pattern as watermark.js /
+    // social-presets.js) so a bulk-resize run can optionally run the exact
+    // same progressive-resample + sharpen pipeline as the single-image tab
+    // before handing the result to renderSocialCanvas(). Pure helpers first,
+    // so bulk.js (or a future standalone test) can call them independently.
+    window.computeUpscaleDimensions = computeUpscaleDimensions;
+    window.planUpscaleSteps = planUpscaleSteps;
+    window.sharpenImageData = sharpenImageData;
+
+    // Not pure (real canvas calls) — runs the same progressive-resample +
+    // optional-sharpen pipeline the single-image "লোকাল আপস্কেল" button uses,
+    // but on any source (an <img> OR a <canvas>, e.g. one bulk.js already
+    // watermarked) and returns a canvas instead of mutating the shared
+    // originalImage/canvas/ctx globals — so it's safe to call once per bulk
+    // item in a loop.
+    window.applyLocalUpscaleToCanvas = function (img, factor, sharpenAmount, maxDimension) {
+        const srcW = img.naturalWidth || img.width;
+        const srcH = img.naturalHeight || img.height;
+        const target = computeUpscaleDimensions(srcW, srcH, factor, maxDimension || 6000);
+        const steps = planUpscaleSteps(target.width / srcW);
+
+        let stepSrc = document.createElement('canvas');
+        stepSrc.width = srcW;
+        stepSrc.height = srcH;
+        stepSrc.getContext('2d').drawImage(img, 0, 0, srcW, srcH);
+
+        let curW = srcW, curH = srcH;
+        for (let i = 0; i < steps.length; i++) {
+            const isLast = i === steps.length - 1;
+            const nextW = isLast ? target.width : Math.round(curW * steps[i]);
+            const nextH = isLast ? target.height : Math.round(curH * steps[i]);
+
+            const stepCanvas = document.createElement('canvas');
+            stepCanvas.width = nextW;
+            stepCanvas.height = nextH;
+            const stepCtx = stepCanvas.getContext('2d');
+            stepCtx.imageSmoothingEnabled = true;
+            stepCtx.imageSmoothingQuality = 'high';
+            stepCtx.drawImage(stepSrc, 0, 0, nextW, nextH);
+
+            stepSrc = stepCanvas;
+            curW = nextW;
+            curH = nextH;
+        }
+
+        if (sharpenAmount > 0) {
+            const outCtx = stepSrc.getContext('2d');
+            const imgData = outCtx.getImageData(0, 0, curW, curH);
+            const sharpened = sharpenImageData(imgData, sharpenAmount);
+            outCtx.putImageData(new ImageData(sharpened.data, sharpened.width, sharpened.height), 0, 0);
+        }
+
+        return { canvas: stepSrc, width: curW, height: curH, clamped: target.clamped };
+    };
+
+    // ============================================
+    // Phase 11: Upscale — local canvas resample + Cloud AI (DeepAI torch-srgan)
+    // ============================================
+    (function initUpscaleModule() {
+        // Cloud (AI) elements
+        const upApiKey = document.getElementById('upApiKey');
+        const copyUpscaleApiLinkBtn = document.getElementById('copyUpscaleApiLinkBtn');
+        const upAiBtn = document.getElementById('upAiBtn');
+        const upAiLoading = document.getElementById('upAiLoading');
+
+        // Local elements
+        const upFactor = document.getElementById('upFactor');
+        const upSharpen = document.getElementById('upSharpen');
+        const upSharpenValue = document.getElementById('upSharpenValue');
+        const upLocalBtn = document.getElementById('upLocalBtn');
+
+        // Shared result readout
+        const upResult = document.getElementById('upResult');
+        const upResultText = document.getElementById('upResultText');
+
+        if (!upAiBtn || !upLocalBtn) return;
+
+        // Exposed for bulk.js (same pattern as window.getWatermarkSettings) —
+        // called fresh at process time, so it always reflects whatever is
+        // currently set on the "আপস্কেল" tab's local-upscale controls, even
+        // if the user never clicked "প্রয়োগ করুন" here themselves.
+        window.getUpscaleSettings = function () {
+            const factor = upFactor ? (parseFloat(upFactor.value) || 2) : 2;
+            const sharpenAmount = upSharpen ? (parseInt(upSharpen.value, 10) / 100) * 0.5 : 0;
+            return { factor, sharpenAmount };
+        };
+
+        // Restore saved API key (same pattern as Remove.bg's bgApiKey)
+        if (upApiKey) {
+            upApiKey.value = localStorage.getItem('deepai_api_key') || '';
+            upApiKey.addEventListener('change', () => {
+                localStorage.setItem('deepai_api_key', upApiKey.value.trim());
+            });
+        }
+
+        // Copy the DeepAI signup link to the clipboard (same pattern as
+        // Remove.bg's copyApiLinkBtn)
+        if (copyUpscaleApiLinkBtn) {
+            copyUpscaleApiLinkBtn.addEventListener('click', async () => {
+                const link = 'https://deepai.org/';
+                try {
+                    await navigator.clipboard.writeText(link);
+                    showToast('✅ লিংক কপি হয়েছে', 'success');
+                } catch (err) {
+                    const tmp = document.createElement('textarea');
+                    tmp.value = link;
+                    tmp.style.position = 'fixed';
+                    tmp.style.opacity = '0';
+                    document.body.appendChild(tmp);
+                    tmp.select();
+                    try {
+                        document.execCommand('copy');
+                        showToast('✅ লিংক কপি হয়েছে', 'success');
+                    } catch (e2) {
+                        showToast('❌ কপি করা যায়নি, লিংকে ক্লিক করুন', 'error');
+                    }
+                    document.body.removeChild(tmp);
+                }
+            });
+        }
+
+        if (upSharpen && upSharpenValue) {
+            upSharpen.addEventListener('input', () => {
+                upSharpenValue.textContent = upSharpen.value;
+            });
+        }
+
+        // Refreshes the dimension-dependent UI other tabs cache — same fix
+        // Rotate/Flip's finalizeTransform needed — otherwise a later
+        // crop/dimension edit would start from the pre-upscale size.
+        function syncDimensionDependentUI(w, h) {
+            infoDimension.textContent = `${w} × ${h}`;
+            currentPixels.textContent = formatPixels(w * h);
+            targetWidth.value = w;
+            targetHeight.value = h;
+            cropX.value = 0;
+            cropY.value = 0;
+            cropWidth.value = w;
+            cropHeight.value = h;
+            if (typeof drawCropPreview === 'function') drawCropPreview();
+        }
+
+        function showResult(text) {
+            if (!upResult || !upResultText) return;
+            upResultText.textContent = text;
+            upResult.style.display = 'block';
+        }
+
+        // ──────────────────────────────────────────
+        // Local upscale — canvas resample + optional sharpen, fully offline
+        // ──────────────────────────────────────────
+        upLocalBtn.addEventListener('click', () => {
+            if (!originalImage) {
+                showToast('প্রথমে একটি ছবি আপলোড করুন', 'error');
+                return;
+            }
+
+            const factor = parseFloat(upFactor.value) || 2;
+            const sharpenAmount = upSharpen ? (parseInt(upSharpen.value, 10) / 100) * 0.5 : 0;
+
+            upLocalBtn.classList.add('loading');
+
+            setTimeout(() => {
+                // Reuse the exact same progressive-resample + sharpen pipeline
+                // that bulk.js calls for batch upscaling (window.applyLocalUpscaleToCanvas)
+                // so the two paths can never silently drift apart.
+                const result = window.applyLocalUpscaleToCanvas(originalImage, factor, sharpenAmount, 6000);
+                const target = { width: result.width, height: result.height, clamped: result.clamped };
+
+                canvas.width = result.width;
+                canvas.height = result.height;
+                ctx.drawImage(result.canvas, 0, 0);
+
+                canvas.toBlob(blob => {
+                    if (!blob) {
+                        upLocalBtn.classList.remove('loading');
+                        showToast('❌ প্রয়োগ করা যায়নি', 'error');
+                        return;
+                    }
+
+                    const url = URL.createObjectURL(blob);
+                    const img = new Image();
+                    img.onload = () => {
+                        originalImage = img;
+                        originalWidth = img.naturalWidth;
+                        originalHeight = img.naturalHeight;
+                        aspectRatio = originalWidth / originalHeight;
+                        syncDimensionDependentUI(originalWidth, originalHeight);
+
+                        processedBlob = blob;
+                        downloadSection.style.display = 'block';
+                        updatePreview(blob);
+                        pushHistory(blob, `লোকাল আপস্কেল ${factor}x`);
+                        document.dispatchEvent(new CustomEvent('app:historyrestored'));
+
+                        showResult(`নতুন সাইজ: ${originalWidth} × ${originalHeight}px${target.clamped ? ' (মেমরি সীমার কারণে সর্বোচ্চ সাইজে ক্ল্যাম্প করা হয়েছে)' : ''}`);
+                        upLocalBtn.classList.remove('loading');
+                        showToast('✅ লোকাল আপস্কেল সম্পন্ন হয়েছে!', 'success');
+                    };
+                    img.onerror = () => {
+                        upLocalBtn.classList.remove('loading');
+                        showToast('❌ প্রয়োগ করা যায়নি', 'error');
+                    };
+                    img.src = url;
+                }, 'image/png');
+            }, 100);
+        });
+
+        // ──────────────────────────────────────────
+        // Cloud AI upscale — DeepAI torch-srgan (fixed 4x, needs an API key)
+        // ──────────────────────────────────────────
+        upAiBtn.addEventListener('click', async () => {
+            if (!originalFile && !processedBlob) {
+                showToast('প্রথমে একটি ছবি আপলোড করুন', 'error');
+                return;
+            }
+            const apiKey = upApiKey ? upApiKey.value.trim() : '';
+            if (!apiKey) {
+                showToast('DeepAI API Key দিন', 'error');
+                return;
+            }
+            localStorage.setItem('deepai_api_key', apiKey);
+
+            if (upAiLoading) upAiLoading.style.display = 'flex';
+            upAiBtn.disabled = true;
+
+            try {
+                // Use the latest processed blob or fall back to original file
+                const blobToSend = processedBlob || originalFile;
+                const formData = new FormData();
+                formData.append('image', blobToSend, 'image.png');
+
+                const response = await fetch('https://api.deepai.org/api/torch-srgan', {
+                    method: 'POST',
+                    headers: { 'api-key': apiKey },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => ({}));
+                    const msg = (errData && (errData.err || errData.status)) || `HTTP ${response.status}`;
+                    throw new Error(msg);
+                }
+
+                const result = await response.json();
+                if (!result || !result.output_url) {
+                    throw new Error('output_url পাওয়া যায়নি');
+                }
+
+                const resultBlob = await fetch(result.output_url).then(r => r.blob());
+                const url = URL.createObjectURL(resultBlob);
+
+                // Same "keep originalImage in sync" fix every other apply
+                // path needs — otherwise the next tool silently edits the
+                // stale pre-upscale pixels.
+                await new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        originalImage = img;
+                        originalWidth = img.naturalWidth;
+                        originalHeight = img.naturalHeight;
+                        aspectRatio = originalWidth / originalHeight;
+                        syncDimensionDependentUI(originalWidth, originalHeight);
+                        resolve();
+                    };
+                    img.onerror = reject;
+                    img.src = url;
+                });
+
+                processedBlob = resultBlob;
+                downloadSection.style.display = 'block';
+                downloadBtn.setAttribute('data-ext', 'jpg');
+                previewImage.src = url;
+                pushHistory(resultBlob, 'AI আপস্কেল (৪x)');
+                document.dispatchEvent(new CustomEvent('app:historyrestored'));
+
+                showResult(`নতুন সাইজ: ${originalWidth} × ${originalHeight}px (DeepAI ৪x)`);
+                showToast('✅ AI আপস্কেল সম্পন্ন হয়েছে!', 'success');
+            } catch (err) {
+                showToast(`❌ ত্রুটি: ${err.message}`, 'error');
+            } finally {
+                if (upAiLoading) upAiLoading.style.display = 'none';
+                upAiBtn.disabled = false;
+            }
+        });
+    })(); // end initUpscaleModule
+
+    // ============================================
+    // Phase 12: PWA — অফলাইন সাপোর্ট, ইনস্টল প্রম্পট, আপডেট ব্যানার
+    // ============================================
+    (function initPwaModule() {
+        const pwaInstallBtn = document.getElementById('pwaInstallBtn');
+        const pwaUpdateBanner = document.getElementById('pwaUpdateBanner');
+        const pwaUpdateReloadBtn = document.getElementById('pwaUpdateReloadBtn');
+
+        let deferredInstallPrompt = null;
+        let waitingWorker = null;
+        let refreshingAfterUpdate = false;
+
+        // --- Service worker রেজিস্ট্রেশন (ব্রাউজার সাপোর্ট না থাকলে চুপচাপ স্কিপ) ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').then((registration) => {
+                    // ইতিমধ্যে একটা নতুন ভার্সন 'waiting' অবস্থায় থাকতে পারে (আগের সেশনে ডাউনলোড হয়ে থেমে ছিল)
+                    if (registration.waiting) {
+                        waitingWorker = registration.waiting;
+                        if (pwaUpdateBanner) pwaUpdateBanner.classList.add('show');
+                    }
+
+                    registration.addEventListener('updatefound', () => {
+                        const newWorker = registration.installing;
+                        if (!newWorker) return;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // পুরনো কন্ট্রোলার আগে থেকেই আছে মানে এটা আপডেট, প্রথমবার install না
+                                waitingWorker = newWorker;
+                                if (pwaUpdateBanner) pwaUpdateBanner.classList.add('show');
+                            }
+                        });
+                    });
+                }).catch(() => {
+                    // অফলাইন ফার্স্ট-লোড বা রেজিস্ট্রেশন ফেইল হলেও মূল এডিটর কাজ করা উচিত,
+                    // তাই এখানে কোনো toast/error দেখানো হচ্ছে না — sw.js শুধু একটা enhancement
+                });
+
+                // নতুন SW কন্ট্রোল নেওয়ার পর পেজ একবারই রিলোড হবে
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (refreshingAfterUpdate) return;
+                    refreshingAfterUpdate = true;
+                    window.location.reload();
+                });
+            });
+        }
+
+        if (pwaUpdateReloadBtn) {
+            pwaUpdateReloadBtn.addEventListener('click', () => {
+                if (waitingWorker) {
+                    waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+                }
+                if (pwaUpdateBanner) pwaUpdateBanner.classList.remove('show');
+            });
+        }
+
+        // --- "হোম স্ক্রিনে যোগ করুন" ইনস্টল প্রম্পট ---
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            if (pwaInstallBtn) pwaInstallBtn.classList.add('show');
+        });
+
+        if (pwaInstallBtn) {
+            pwaInstallBtn.addEventListener('click', async () => {
+                if (!deferredInstallPrompt) return;
+                pwaInstallBtn.disabled = true;
+                try {
+                    deferredInstallPrompt.prompt();
+                    const choice = await deferredInstallPrompt.userChoice;
+                    if (choice && choice.outcome === 'accepted') {
+                        showToast('✅ অ্যাপ ইনস্টল হয়েছে!', 'success');
+                    }
+                } catch (err) {
+                    // ইউজার ডিসমিস করলে বা ব্রাউজার সাপোর্ট না করলে চুপচাপ ইগনোর
+                } finally {
+                    deferredInstallPrompt = null;
+                    pwaInstallBtn.classList.remove('show');
+                    pwaInstallBtn.disabled = false;
+                }
+            });
+        }
+
+        // ইনস্টল হয়ে গেলে (এই ইভেন্ট বা manual ইনস্টল — দুই ক্ষেত্রেই) বাটন লুকিয়ে ফেলা
+        window.addEventListener('appinstalled', () => {
+            deferredInstallPrompt = null;
+            if (pwaInstallBtn) pwaInstallBtn.classList.remove('show');
+        });
+
+        // --- অনলাইন/অফলাইন ট্রানজিশন নোটিফাই করা ---
+        window.addEventListener('offline', () => {
+            showToast('📴 ইন্টারনেট সংযোগ নেই — লোকাল এডিটিং কাজ করবে, তবে AI ফিচারগুলো (রিমুভ.bg, DeepAI) কাজ করবে না', 'info');
+        });
+        window.addEventListener('online', () => {
+            showToast('🌐 ইন্টারনেট সংযোগ ফিরে এসেছে', 'success');
+        });
+    })(); // end initPwaModule
 
 })();

@@ -18,6 +18,9 @@
     const bulkWatermarkWrap = document.getElementById('bulkWatermarkWrap');
     const bulkApplyWatermark = document.getElementById('bulkApplyWatermark');
     const bulkWatermarkHint = document.getElementById('bulkWatermarkHint');
+    const bulkUpscaleWrap = document.getElementById('bulkUpscaleWrap');
+    const bulkApplyUpscale = document.getElementById('bulkApplyUpscale');
+    const bulkUpscaleHint = document.getElementById('bulkUpscaleHint');
     const bulkClearBtn = document.getElementById('bulkClearBtn');
     const bulkProcessBtn = document.getElementById('bulkProcessBtn');
     const bulkProgress = document.getElementById('bulkProgress');
@@ -35,6 +38,7 @@
     function openModal() {
         bulkModalOverlay.style.display = 'flex';
         refreshBulkWatermarkHint();
+        refreshBulkUpscaleHint();
     }
     function closeModal() {
         bulkModalOverlay.style.display = 'none';
@@ -145,6 +149,10 @@
             bulkWatermarkWrap.style.display = 'block';
             refreshBulkWatermarkHint();
         }
+        if (bulkUpscaleWrap) {
+            bulkUpscaleWrap.style.display = 'block';
+            refreshBulkUpscaleHint();
+        }
         updateProcessButtonState();
         bulkFileInput.value = '';
     }
@@ -170,6 +178,7 @@
         bulkPresetWrap.style.display = 'none';
         bulkModeWrap.style.display = 'none';
         if (bulkWatermarkWrap) bulkWatermarkWrap.style.display = 'none';
+        if (bulkUpscaleWrap) bulkUpscaleWrap.style.display = 'none';
         bulkProgress.style.display = 'none';
         updateProcessButtonState();
     }
@@ -186,6 +195,20 @@
         } else {
             bulkWatermarkHint.textContent = '"ওয়াটারমার্ক" ট্যাবে যা সেট করা আছে, ঠিক সেটাই প্রতিটা ছবিতে বসবে';
         }
+    }
+
+    // Phase 11 bulk follow-up: the Upscale tab's local controls always have
+    // a usable default (factor select + sharpen slider both start non-empty),
+    // so unlike the watermark hint there's no "not configured yet" state to
+    // warn about — this just keeps the number in the hint text live.
+    function refreshBulkUpscaleHint() {
+        if (!bulkUpscaleWrap || !bulkUpscaleHint) return;
+        if (typeof window.getUpscaleSettings !== 'function') {
+            bulkUpscaleWrap.style.display = 'none';
+            return;
+        }
+        const settings = window.getUpscaleSettings();
+        bulkUpscaleHint.textContent = `"আপস্কেল" ট্যাবের লোকাল সেকশনে বর্তমানে ${settings.factor}x সেট করা আছে — সেটাই প্রতিটা ছবিতে প্রয়োগ হবে (প্রিসেট সাইজে বসানোর আগে)`;
     }
 
     function updateProcessButtonState() {
@@ -240,6 +263,30 @@
         return off;
     }
 
+    // Phase 11 bulk follow-up: runs the same progressive-resample + sharpen
+    // pipeline the single-image "লোকাল আপস্কেল" button uses (exposed as
+    // window.applyLocalUpscaleToCanvas, same window-exposure pattern as
+    // drawWatermark()/renderSocialCanvas()) and returns a <canvas> — which
+    // works anywhere an <img> does for the rest of this pipeline, so nothing
+    // downstream needs to know the difference.
+    function applyBulkUpscaleIfNeeded(img) {
+        if (!bulkApplyUpscale || !bulkApplyUpscale.checked) return img;
+        if (typeof window.applyLocalUpscaleToCanvas !== 'function' || typeof window.getUpscaleSettings !== 'function') return img;
+
+        const settings = window.getUpscaleSettings();
+        const result = window.applyLocalUpscaleToCanvas(img, settings.factor, settings.sharpenAmount, 6000);
+        return result.canvas;
+    }
+
+    // Runs upscale first (so it works from the sharpest/most-detail source),
+    // then burns in the watermark on top of the (possibly larger) result —
+    // the opposite order would upscale the watermark's own pixels along with
+    // the photo and soften its edges.
+    function preprocessBulkImage(img) {
+        const upscaled = applyBulkUpscaleIfNeeded(img);
+        return applyBulkWatermarkIfNeeded(upscaled);
+    }
+
     function triggerDownload(blob, fileName) {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -276,8 +323,8 @@
             const item = items[i];
             try {
                 const img = await waitForImage(item);
-                const watermarked = applyBulkWatermarkIfNeeded(img);
-                const rendered = window.renderSocialCanvas(watermarked, preset.w, preset.h, mode);
+                const preprocessed = preprocessBulkImage(img);
+                const rendered = window.renderSocialCanvas(preprocessed, preset.w, preset.h, mode);
                 const blob = await blobFromCanvas(rendered, 'image/jpeg', 0.92);
 
                 let baseName = item.file.name.replace(/\.[^/.]+$/, '') || `image_${i + 1}`;

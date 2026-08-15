@@ -1296,6 +1296,15 @@ select:focus {
     gap: 10px;
 }
 
+/* Upscale tab reuses the same accordion-card look as BG-remove (see
+   .bg-method-card etc. above/below) — only the tab-level layout needs
+   its own rule since #tab-bgremove's is ID-scoped. */
+#tab-upscale {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 /* Accordion: each method is a card whose header is a full-width button.
    Only one body is visible at a time (state applied via .open by JS), so
    the tallest tab in the app (7 methods) no longer forces one long scroll —
@@ -2240,4 +2249,52 @@ kbd {
 .wm-handle.dragging {
     outline: 2px dashed var(--accent-primary);
     outline-offset: 3px;
+}
+
+/* ===== Phase 12: PWA — ইনস্টল বাটন + আপডেট ব্যানার ===== */
+.btn-pwa-install {
+    display: none;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-pwa-install.show {
+    display: inline-flex;
+}
+
+.pwa-update-banner {
+    position: fixed;
+    left: 50%;
+    bottom: 30px;
+    transform: translateX(-50%) translateY(120px);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--accent-primary);
+    box-shadow: var(--shadow-lg);
+    border-radius: var(--radius-md);
+    padding: 12px 16px 12px 20px;
+    z-index: 1001;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    max-width: calc(100vw - 32px);
+}
+
+.pwa-update-banner.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.pwa-update-banner span {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.pwa-update-banner .btn {
+    white-space: nowrap;
 }
