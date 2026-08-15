@@ -1465,6 +1465,11 @@
         const bgFeather       = document.getElementById('bgFeather');
         const bgFeatherVal    = document.getElementById('bgFeatherVal');
         const bgColorRemoveBtn= document.getElementById('bgColorRemoveBtn');
+        const bgColorCanvas   = document.getElementById('bgColorCanvas');
+        const bgScopeGlobal   = document.getElementById('bgScopeGlobal');
+        const bgScopeContiguous = document.getElementById('bgScopeContiguous');
+        const bgDespill       = document.getElementById('bgDespill');
+        const bgLivePreview   = document.getElementById('bgLivePreview');
 
         const bgLassoFreeBtn  = document.getElementById('bgLassoFreeBtn');
         const bgLassoPolyBtn  = document.getElementById('bgLassoPolyBtn');
@@ -1569,8 +1574,13 @@
         }
 
         // Slider live display
-        bgTolerance.addEventListener('input', () => bgToleranceVal.textContent = bgTolerance.value);
-        bgFeather.addEventListener('input',   () => bgFeatherVal.textContent   = bgFeather.value);
+        bgTolerance.addEventListener('input', () => { bgToleranceVal.textContent = bgTolerance.value; scheduleColorPreview(); });
+        bgFeather.addEventListener('input',   () => { bgFeatherVal.textContent   = bgFeather.value; });
+        bgTargetColor.addEventListener('input', () => scheduleColorPreview());
+        if (bgScopeGlobal)      bgScopeGlobal.addEventListener('change', scheduleColorPreview);
+        if (bgScopeContiguous)  bgScopeContiguous.addEventListener('change', scheduleColorPreview);
+        if (bgDespill)          bgDespill.addEventListener('change', scheduleColorPreview);
+        if (bgLivePreview)      bgLivePreview.addEventListener('change', () => { if (!bgLivePreview.checked) clearColorPreview(); else scheduleColorPreview(); });
 
         // Lasso mode toggle
         bgLassoFreeBtn.addEventListener('click', () => {
@@ -1822,9 +1832,19 @@
             loupe.style.display = 'block';
         }
 
-        bgColorRemoveBtn.addEventListener('click', () => {
+        bgColorRemoveBtn.addEventListener('click', async () => {
             if (!originalImage) { showToast('প্রথমে ছবি আপলোড করুন', 'error'); return; }
-            removeByColor();
+            if (bgColorRemoveBtn.disabled) return;
+            bgColorRemoveBtn.disabled = true;
+            bgColorRemoveBtn.textContent = '⏳ প্রসেস করছে...';
+            // Yield to browser so the button UI updates before heavy CPU work
+            await new Promise(r => setTimeout(r, 0));
+            try {
+                await removeByColor();
+            } finally {
+                bgColorRemoveBtn.disabled = false;
+                bgColorRemoveBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> রঙ-ভিত্তিক রিমুভ করুন`;
+            }
         });
 
         function hexToRgb(hex) {
@@ -1834,12 +1854,196 @@
             return { r, g, b };
         }
 
-        function colorDistance(r1, g1, b1, r2, g2, b2) {
-            return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
+        // ── Color matching ──────────────────────────────────────────────────
+        // Dual-mode strategy:
+        //  • For CHROMATIC targets (high saturation): compare by Hue only.
+        //    Dark-green shadows and bright-green lit areas share the same hue
+        //    (~120°) so ALL lightness variants are removed in one pass.
+        //    tolerance 1-100 maps to 0-50 hue-degrees of allowed deviation.
+        //  • For NEUTRAL targets (grays/whites/blacks, low saturation): fall
+        //    back to CIE-Lab Euclidean distance which works well for those.
+        const SRGB_LUT = (() => {
+            const lut = new Float32Array(256);
+            for (let i = 0; i < 256; i++) {
+                const c = i / 255;
+                lut[i] = c > 0.04045 ? Math.pow((c + 0.055) / 1.055, 2.4) : c / 12.92;
+            }
+            return lut;
+        })();
+
+        function rgbToLab(r, g, b) {
+            const rL = SRGB_LUT[r], gL = SRGB_LUT[g], bL = SRGB_LUT[b];
+            const x = (0.4124564 * rL + 0.3575761 * gL + 0.1804375 * bL) / 0.95047;
+            const y = (0.2126729 * rL + 0.7151522 * gL + 0.0721750 * bL);
+            const z = (0.0193339 * rL + 0.1191920 * gL + 0.9503041 * bL) / 1.08883;
+            const eps = 0.008856, k = 903.3;
+            const fx = x > eps ? Math.cbrt(x) : (k * x + 16) / 116;
+            const fy = y > eps ? Math.cbrt(y) : (k * y + 16) / 116;
+            const fz = z > eps ? Math.cbrt(z) : (k * z + 16) / 116;
+            return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
         }
 
-        function removeByColor() {
-            // Draw current image onto canvas
+        function rgbToHsl(r, g, b) {
+            r /= 255; g /= 255; b /= 255;
+            const max = Math.max(r, g, b), min = Math.min(r, g, b);
+            const l = (max + min) / 2;
+            if (max === min) return [0, 0, l]; // achromatic
+            const d = max - min;
+            const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            let h;
+            if (max === r)      h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+            else if (max === g) h = ((b - r) / d + 2) / 6;
+            else                h = ((r - g) / d + 4) / 6;
+            return [h * 360, s, l]; // [0-360, 0-1, 0-1]
+        }
+
+        function hueDist(h1, h2) {
+            const d = Math.abs(h1 - h2);
+            return d > 180 ? 360 - d : d;
+        }
+
+        // Pre-computed target info for the current removal session
+        let _matchMode   = 'lab';  // 'hue' | 'lab'
+        let _targetHsl   = null;
+        let _targetLab   = null;
+        let _labLW       = 1.0;
+        let _hueTolDeg   = 20;
+        let _labThresh   = 30;
+        let _minSat      = 0.08;   // pixels below this saturation are never hue-matched
+
+        function prepareMatchTarget(targetHex, toleranceValue) {
+            const t = hexToRgb(targetHex);
+            const tol = parseInt(toleranceValue, 10);   // 1–100
+            _targetHsl = rgbToHsl(t.r, t.g, t.b);
+            _targetLab = rgbToLab(t.r, t.g, t.b);
+            const tChroma = Math.sqrt(_targetLab[1] ** 2 + _targetLab[2] ** 2);
+            // Use hue mode when the target itself has meaningful saturation
+            _matchMode = (_targetHsl[1] > 0.20) ? 'hue' : 'lab';
+            if (_matchMode === 'hue') {
+                // tol 1-100 → hue tolerance 3-60°
+                _hueTolDeg = 3 + (tol / 100) * 57;
+                // Minimum saturation a pixel must have to be hue-matched
+                // (prevents matching near-white or near-black neutrals)
+                _minSat = Math.max(0.06, _targetHsl[1] * 0.15);
+            } else {
+                _labLW = tChroma < 12 ? 1.0 : 0.6;
+                _labThresh = tol;
+            }
+        }
+
+        // Returns true if pixel (r,g,b) with existing alpha matches the target.
+        function pixelMatches(r, g, b, existingAlpha) {
+            if (existingAlpha === 0) return false; // already transparent
+            if (_matchMode === 'hue') {
+                const hsl = rgbToHsl(r, g, b);
+                // Must have enough saturation to have a meaningful hue
+                if (hsl[1] < _minSat) return false;
+                return hueDist(hsl[0], _targetHsl[0]) <= _hueTolDeg;
+            } else {
+                const lab = rgbToLab(r, g, b);
+                const dL  = (lab[0] - _targetLab[0]) * _labLW;
+                const da  = lab[1] - _targetLab[1];
+                const db  = lab[2] - _targetLab[2];
+                return Math.sqrt(dL * dL + da * da + db * db) <= _labThresh;
+            }
+        }
+
+        // Legacy wrapper kept for floodFillMask (paint-bucket) which still
+        // compares from a specific start pixel rather than a fixed target.
+        function colorDistance(r1, g1, b1, r2, g2, b2) {
+            const lab1 = rgbToLab(r1, g1, b1);
+            const lab2 = rgbToLab(r2, g2, b2);
+            const chroma = Math.sqrt(lab1[1] * lab1[1] + lab1[2] * lab1[2]);
+            const lW = chroma < 12 ? 1.0 : 0.6;
+            const dL = (lab1[0] - lab2[0]) * lW;
+            const da = lab1[1] - lab2[1];
+            const db = lab1[2] - lab2[2];
+            return Math.sqrt(dL * dL + da * da + db * db);
+        }
+
+        // ── Live preview ─────────────────────────────────────────────────────
+        let colorPreviewRAF = null;
+        const bgColorCtx = bgColorCanvas ? bgColorCanvas.getContext('2d') : null;
+
+        function clearColorPreview() {
+            if (!bgColorCtx) return;
+            bgColorCanvas.style.display = 'none';
+            bgColorCtx.clearRect(0, 0, bgColorCanvas.width, bgColorCanvas.height);
+        }
+
+        function scheduleColorPreview() {
+            if (!bgLivePreview || !bgLivePreview.checked || !originalImage || !bgColorCtx) return;
+            if (colorPreviewRAF) cancelAnimationFrame(colorPreviewRAF);
+            colorPreviewRAF = requestAnimationFrame(drawColorPreview);
+        }
+
+        function drawColorPreview() {
+            colorPreviewRAF = null;
+            if (!originalImage || !bgColorCtx) return;
+            const w = originalImage.naturalWidth  || originalWidth;
+            const h = originalImage.naturalHeight || originalHeight;
+            ensurePickCanvas();
+            const imageData = pickCtx.getImageData(0, 0, w, h);
+            const data = imageData.data;
+            prepareMatchTarget(bgTargetColor.value, bgTolerance.value);
+            const contiguous = bgScopeContiguous && bgScopeContiguous.checked;
+
+            let mask;
+            if (contiguous) {
+                mask = buildColorMaskContiguous(data, w, h);
+            } else {
+                mask = new Uint8Array(w * h);
+                for (let i = 0; i < w * h; i++) {
+                    mask[i] = pixelMatches(data[i*4], data[i*4+1], data[i*4+2], data[i*4+3]) ? 1 : 0;
+                }
+            }
+
+            // Draw red tinted overlay
+            bgColorCanvas.width  = w;
+            bgColorCanvas.height = h;
+            const overlay = bgColorCtx.createImageData(w, h);
+            for (let i = 0; i < w * h; i++) {
+                if (mask[i]) {
+                    overlay.data[i * 4]     = 255;
+                    overlay.data[i * 4 + 1] = 30;
+                    overlay.data[i * 4 + 2] = 30;
+                    overlay.data[i * 4 + 3] = 140;
+                }
+            }
+            bgColorCtx.putImageData(overlay, 0, 0);
+            bgColorCanvas.style.display = 'block';
+        }
+
+        // Contiguous flood-fill using the unified pixelMatches() function
+        function buildColorMaskContiguous(data, w, h) {
+            const total = w * h;
+            const mask    = new Uint8Array(total);
+            const visited = new Uint8Array(total);
+            // Seeds: all 4 corners + center.  For complex backgrounds the user
+            // can switch to Global mode, which catches disconnected patches too.
+            const seeds = [
+                0, w - 1, (h - 1) * w, h * w - 1,
+                Math.floor(h / 2) * w + Math.floor(w / 2)
+            ];
+            const stack = [];
+            for (const s of seeds) {
+                if (!visited[s]) { visited[s] = 1; stack.push(s); }
+            }
+            while (stack.length) {
+                const idx = stack.pop();
+                if (!pixelMatches(data[idx*4], data[idx*4+1], data[idx*4+2], data[idx*4+3])) continue;
+                mask[idx] = 1;
+                const x = idx % w, y = (idx - x) / w;
+                if (x > 0)     { const n = idx - 1; if (!visited[n]) { visited[n] = 1; stack.push(n); } }
+                if (x < w - 1) { const n = idx + 1; if (!visited[n]) { visited[n] = 1; stack.push(n); } }
+                if (y > 0)     { const n = idx - w; if (!visited[n]) { visited[n] = 1; stack.push(n); } }
+                if (y < h - 1) { const n = idx + w; if (!visited[n]) { visited[n] = 1; stack.push(n); } }
+            }
+            return mask;
+        }
+
+        async function removeByColor() {
+            clearColorPreview();
             const w = originalImage.naturalWidth  || originalWidth;
             const h = originalImage.naturalHeight || originalHeight;
             canvas.width  = w;
@@ -1849,20 +2053,28 @@
 
             const imageData = ctx.getImageData(0, 0, w, h);
             const data = imageData.data;
-            const target = hexToRgb(bgTargetColor.value);
-            // tolerance 0–100 maps to 0–441.67 (max RGB distance)
-            const threshold = (parseInt(bgTolerance.value) / 100) * 441.67;
-            const feather   = parseInt(bgFeather.value);
 
-            // Pass 1: mark pixels for removal
-            const alpha = new Float32Array(w * h); // 0 = keep, 1 = remove
-            for (let i = 0; i < w * h; i++) {
-                const ri = data[i * 4];
-                const gi = data[i * 4 + 1];
-                const bi = data[i * 4 + 2];
-                const dist = colorDistance(ri, gi, bi, target.r, target.g, target.b);
-                alpha[i] = dist <= threshold ? 1.0 : 0.0;
+            // Prepare unified matcher (hue-mode for chromatic colors, Lab for neutrals)
+            prepareMatchTarget(bgTargetColor.value, bgTolerance.value);
+
+            const feather    = parseInt(bgFeather.value, 10);
+            const contiguous = bgScopeContiguous && bgScopeContiguous.checked;
+            const doDespill  = bgDespill && bgDespill.checked;
+
+            // Pass 1: build removal mask
+            let mask;
+            if (contiguous) {
+                mask = buildColorMaskContiguous(data, w, h);
+            } else {
+                mask = new Uint8Array(w * h);
+                for (let i = 0; i < w * h; i++) {
+                    mask[i] = pixelMatches(data[i*4], data[i*4+1], data[i*4+2], data[i*4+3]) ? 1 : 0;
+                }
             }
+
+            // Convert mask to float alpha (0=keep, 1=remove)
+            const alpha = new Float32Array(w * h);
+            for (let i = 0; i < w * h; i++) alpha[i] = mask[i];
 
             // Pass 2: feathering (simple box blur on alpha mask)
             if (feather > 0) {
@@ -1886,24 +2098,62 @@
                 for (let i = 0; i < w * h; i++) alpha[i] = blurred[i];
             }
 
-            // Apply alpha mask
+            // Pass 3: apply alpha mask + optional despill
+            // doDs only applies when the target is a chromatic color.
+            const doDs = doDespill && _targetHsl && _targetHsl[1] > 0.20;
             for (let i = 0; i < w * h; i++) {
-                data[i * 4 + 3] = Math.round((1 - alpha[i]) * data[i * 4 + 3]);
+                const a = alpha[i];
+                if (a <= 0) {
+                    if (doDs && data[i * 4 + 3] > 0) {
+                        const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2];
+                        const lab  = rgbToLab(r, g, b);
+                        const dL   = (lab[0] - _targetLab[0]) * _labLW;
+                        const da   = lab[1] - _targetLab[1];
+                        const db   = lab[2] - _targetLab[2];
+                        const dist = Math.sqrt(dL * dL + da * da + db * db);
+                        const sThresh = _labThresh * 1.5;
+                        if (dist < sThresh) {
+                            const spillStr = 1.0 - dist / sThresh;
+                            const lum = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
+                            data[i * 4]     = Math.round(r + (lum - r) * spillStr * 0.7);
+                            data[i * 4 + 1] = Math.round(g + (lum - g) * spillStr * 0.7);
+                            data[i * 4 + 2] = Math.round(b + (lum - b) * spillStr * 0.7);
+                        }
+                    }
+                } else {
+                    data[i * 4 + 3] = Math.round((1 - a) * data[i * 4 + 3]);
+                }
             }
             ctx.putImageData(imageData, 0, 0);
 
-            canvas.toBlob(blob => {
-                processedBlob = blob;
-                const url = URL.createObjectURL(blob);
-                // Update the source image so eyedropper and future ops use new state
-                originalImage = new Image();
-                originalImage.src = url;
-                previewImage.src = url;
-                downloadSection.style.display = 'block';
-                downloadBtn.setAttribute('data-ext', 'png');
-                pushHistory(blob, 'রঙ-ভিত্তিক BG রিমুভ');
-                showToast('✅ রঙ-ভিত্তিক রিমুভ সম্পন্ন! PNG হিসেবে ডাউনলোড করুন।', 'success');
-            }, 'image/png');
+            // Await blob creation and image load before updating originalImage
+            // so that the next click always samples the freshly updated pixels.
+            await new Promise((resolve, reject) => {
+                canvas.toBlob(blob => {
+                    if (!blob) { reject(new Error('blob null')); return; }
+                    processedBlob = blob;
+                    const url = URL.createObjectURL(blob);
+                    const img = new Image();
+                    img.onload = () => {
+                        originalImage = img;
+                        previewImage.src = url;
+                        // Refresh pick-canvas so eyedropper/preview uses new pixels
+                        if (pickCanvas) {
+                            pickCanvas.width  = img.naturalWidth;
+                            pickCanvas.height = img.naturalHeight;
+                            pickCtx.clearRect(0, 0, img.naturalWidth, img.naturalHeight);
+                            pickCtx.drawImage(img, 0, 0);
+                        }
+                        downloadSection.style.display = 'block';
+                        downloadBtn.setAttribute('data-ext', 'png');
+                        pushHistory(blob, 'রঙ-ভিত্তিক BG রিমুভ');
+                        showToast('✅ রঙ-ভিত্তিক রিমুভ সম্পন্ন! আবার করতে পারেন বা PNG ডাউনলোড করুন।', 'success');
+                        resolve();
+                    };
+                    img.onerror = reject;
+                    img.src = url;
+                }, 'image/png');
+            });
         }
 
         // ──────────────────────────────────────────

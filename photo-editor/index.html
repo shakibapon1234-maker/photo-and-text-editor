@@ -630,16 +630,16 @@
                         <button type="button" class="bg-method-header" aria-expanded="false">
                             <div class="bg-method-icon">🎨</div>
                             <div class="bg-method-title">
-                                <h3>রঙ-ভিত্তিক ইরেজার</h3>
-                                <p class="tool-desc">ব্যাকগ্রাউন্ডের রঙ বেছে নিন — সেই রঙের সব পিক্সেল মুছে যাবে।</p>
+                                <h3>রঙ-ভিত্তিক ইরেজার (কালার ইরেজার)</h3>
+                                <p class="tool-desc">নির্দিষ্ট রঙ নিখুঁতভাবে রিমুভ করুন — মানুষ, জামাকাপড় ও ছায়া অক্ষত থাকবে।</p>
                             </div>
                             <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                         </button>
                         <div class="bg-method-body">
                         <div class="form-group">
-                            <label>টার্গেট রঙ (ব্যাকগ্রাউন্ড রঙ)</label>
+                            <label>টার্গেট রঙ (যে রঙটি মুছতে চান)</label>
                             <div class="color-target-row">
-                                <input type="color" id="bgTargetColor" value="#ffffff" class="color-swatch-input">
+                                <input type="color" id="bgTargetColor" value="#1ea035" class="color-swatch-input">
                                 <button class="btn btn-ghost" id="bgEyedropperBtn" title="ছবি থেকে রঙ তুলুন">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l-1 1-8.5 8.5A2 2 0 0 0 2 13v2a2 2 0 0 0 2 2h2a2 2 0 0 0 1.41-.59L16 8l-4-4zM15 5l4 4"/><line x1="20" y1="22" x2="20" y2="16"/><line x1="17" y1="19" x2="23" y2="19"/></svg>
                                     আইড্রপার
@@ -647,19 +647,47 @@
                                 <span id="bgEyedropperStatus" class="eyedropper-status"></span>
                             </div>
                         </div>
-                        <div class="form-row-2col">
-                            <div class="form-group">
-                                <label>টলারেন্স: <strong id="bgToleranceVal">30</strong></label>
-                                <input type="range" id="bgTolerance" min="0" max="100" value="30" class="range-slider">
-                                <div class="range-labels"><span>সুনির্দিষ্ট</span><span>প্রশস্ত</span></div>
-                            </div>
-                            <div class="form-group">
-                                <label>এজ ফেদারিং: <strong id="bgFeatherVal">1</strong></label>
-                                <input type="range" id="bgFeather" min="0" max="10" value="1" class="range-slider">
-                                <div class="range-labels"><span>তীক্ষ্ণ</span><span>নরম</span></div>
+
+                        <!-- Mode selection -->
+                        <div class="form-group">
+                            <label>ইরেজ মোড</label>
+                            <div class="color-erase-modes" style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap;">
+                                <label class="radio-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+                                    <input type="radio" name="bgEraseScope" id="bgScopeGlobal" value="global" checked>
+                                    🌐 পুরো ছবি জুড়ে (Global)
+                                </label>
+                                <label class="radio-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+                                    <input type="radio" name="bgEraseScope" id="bgScopeContiguous" value="contiguous">
+                                    🔗 শুধুমাত্র সংযুক্ত এলাকা (Contiguous)
+                                </label>
                             </div>
                         </div>
-                        <button class="btn btn-primary btn-action" id="bgColorRemoveBtn">
+
+                        <div class="form-row-2col">
+                            <div class="form-group">
+                                <label>টলারেন্স (নির্ভুলতা): <strong id="bgToleranceVal">25</strong></label>
+                                <input type="range" id="bgTolerance" min="1" max="100" value="25" class="range-slider">
+                                <div class="range-labels"><span>সুনির্দিষ্ট (১)</span><span>স্বাভাবিক (২৫)</span><span>প্রশস্ত (১০০)</span></div>
+                            </div>
+                            <div class="form-group">
+                                <label>এজ ফেদারিং (স্মুথনেস): <strong id="bgFeatherVal">2</strong></label>
+                                <input type="range" id="bgFeather" min="0" max="10" value="2" class="range-slider">
+                                <div class="range-labels"><span>শার্প (০)</span><span>নরম এজ (১০)</span></div>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-top:6px;display:flex;flex-direction:column;gap:6px;">
+                            <label class="checkbox-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+                                <input type="checkbox" id="bgDespill" checked>
+                                🌿 কালার স্পিল ক্লিন করুন (ধারের অতিরিক্ত সবুজ/নীল আভা দূর করে)
+                            </label>
+                            <label class="checkbox-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+                                <input type="checkbox" id="bgLivePreview" checked>
+                                👁️ লাইভ প্রিভিউ মাস্ক দেখুন (কোন কোন অংশ মুছবে তা সরাসরি দেখুন)
+                            </label>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="bgColorRemoveBtn" style="margin-top:10px;">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
                             রঙ-ভিত্তিক রিমুভ করুন
                         </button>
@@ -1107,6 +1135,8 @@
                     </div>
                     <div class="preview-image-wrapper" id="previewImageWrapper" style="position:relative;">
                         <img id="previewImage" src="" alt="Preview">
+                        <!-- Color Eraser live-preview overlay canvas -->
+                        <canvas id="bgColorCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;z-index:9;display:none;pointer-events:none;"></canvas>
                         <!-- Lasso overlay canvas -->
                         <canvas id="bgLassoCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;z-index:10;display:none;"></canvas>
                         <!-- Clone Stamp live-edit canvas (draws the real, full-res pixels; sits over previewImage while active) -->
