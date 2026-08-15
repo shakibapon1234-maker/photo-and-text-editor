@@ -49,9 +49,11 @@ esbuild
     const htmlPath = path.join(wwwDir, 'index.html');
     if (fs.existsSync(htmlPath)) {
       let html = fs.readFileSync(htmlPath, 'utf8');
-      html = html.replace(/src="main\.bundle\.js(?:\?v=\d+)?"/g, `src="main.bundle.js?v=${timestamp}"`);
-      fs.writeFileSync(htmlPath, html, 'utf8');
-      console.log(`Updated www/index.html script tag cache buster (v=${timestamp})`);
+      if (/src="main\.bundle\.js\?v=\d+"/.test(html)) {
+        html = html.replace(/src="main\.bundle\.js\?v=\d+"/g, 'src="main.bundle.js"');
+        fs.writeFileSync(htmlPath, html, 'utf8');
+        console.log('Cleaned www/index.html script tag');
+      }
     }
 
     // Sync to docs/ directory if present
