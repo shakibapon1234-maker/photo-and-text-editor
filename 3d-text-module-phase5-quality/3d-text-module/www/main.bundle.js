@@ -25808,7 +25808,13 @@ var reflectionToggle = document.getElementById("reflectionToggle");
 var reflectionIntensityField = document.getElementById("reflectionIntensityField");
 var reflectionIntensityRange = document.getElementById("reflectionIntensityRange");
 var reflectionIntensityValue = document.getElementById("reflectionIntensityValue");
-var dragRotateToggle = document.getElementById("dragRotateToggle");
+var posXRange = document.getElementById("posXRange");
+var posXValue = document.getElementById("posXValue");
+var posYRange = document.getElementById("posYRange");
+var posYValue = document.getElementById("posYValue");
+var quickAlignGrid = document.getElementById("quickAlignGrid");
+var dragModeSelect = document.getElementById("dragModeSelect");
+var dragEnabledToggle = document.getElementById("dragEnabledToggle");
 var resetCameraBtn = document.getElementById("resetCameraBtn");
 var qualityPresetGrid = document.getElementById("qualityPresetGrid");
 var qualityNote = document.getElementById("qualityNote");
@@ -26075,7 +26081,11 @@ var state = {
   shadowIntensity: Number(shadowIntensityRange ? shadowIntensityRange.value : 0.35),
   reflectionsOn: reflectionToggle.checked,
   reflectionIntensity: Number(reflectionIntensityRange ? reflectionIntensityRange.value : 1.2),
-  dragRotateOn: dragRotateToggle ? dragRotateToggle.checked : false,
+  posX: Number(posXRange?.value || 0),
+  posY: Number(posYRange?.value || 0),
+  posZ: 0,
+  dragMode: dragModeSelect?.value || "move",
+  dragEnabled: dragEnabledToggle ? dragEnabledToggle.checked : true,
   autoRotate: false,
   quality: "medium"
   // Phase 5: low/medium/high — medium = old fixed behavior
@@ -27065,6 +27075,11 @@ function updateTextModeNote(isBangla, curveOn = false) {
   }
   textModeNote.hidden = !(isBangla || curveOn);
 }
+function applyPosition() {
+  if (!textMesh) return;
+  textMesh.position.set(state.posX || 0, state.posY || 0, state.posZ || 0);
+  updateShadowFrustum();
+}
 function applyRotation() {
   if (!textMesh) return;
   const styleTiltZ = textMesh.userData && textMesh.userData.styleTiltZ || 0;
@@ -27073,6 +27088,7 @@ function applyRotation() {
     MathUtils.degToRad(state.rotY),
     MathUtils.degToRad(state.rotZ + styleTiltZ)
   );
+  applyPosition();
 }
 function applyMaterial() {
   if (!textMesh) return;
@@ -27234,7 +27250,10 @@ handleResize();
 var rebuildTimer = null;
 function scheduleRebuild() {
   clearTimeout(rebuildTimer);
-  rebuildTimer = setTimeout(rebuildTextMesh, 120);
+  rebuildTimer = setTimeout(() => {
+    rebuildTextMesh();
+    saveStudioStateDebounced();
+  }, 120);
 }
 textInput.addEventListener("input", () => {
   state.text = textInput.value;
@@ -27354,6 +27373,241 @@ rotXRange.addEventListener("input", () => {
   rotXValue.textContent = `${state.rotX}\xB0`;
   applyRotation();
 });
+function saveStudioState() {
+  try {
+    const toSave = {
+      text: state.text,
+      fontFamily: state.fontFamily,
+      colorMode: state.colorMode,
+      colorStart: state.colorStart,
+      colorEnd: state.colorEnd,
+      gradientPreset: state.gradientPreset,
+      gradientAngle: state.gradientAngle,
+      posX: state.posX,
+      posY: state.posY,
+      rotX: state.rotX,
+      rotY: state.rotY,
+      rotZ: state.rotZ,
+      depth: state.depth,
+      size: state.size,
+      color: state.color,
+      materialType: state.materialType,
+      lightingPreset: state.lightingPreset,
+      bgMode: state.bgMode,
+      bgColor: state.bgColor
+    };
+    localStorage.setItem("3d_studio_saved_state", JSON.stringify(toSave));
+  } catch (_) {
+  }
+}
+var saveTimeout = null;
+function saveStudioStateDebounced() {
+  if (saveTimeout) clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(saveStudioState, 300);
+}
+function loadStudioState() {
+  try {
+    const raw = localStorage.getItem("3d_studio_saved_state");
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (!saved) return;
+    if (saved.text !== void 0 && textInput) {
+      state.text = saved.text;
+      textInput.value = saved.text;
+    }
+    if (saved.fontFamily && fontSelect) {
+      state.fontFamily = saved.fontFamily;
+      fontSelect.value = saved.fontFamily;
+    }
+    if (saved.colorMode && colorModeSelect) {
+      state.colorMode = saved.colorMode;
+      colorModeSelect.value = saved.colorMode;
+      if (solidColorGroup) solidColorGroup.hidden = saved.colorMode !== "solid";
+      if (gradientColorGroup) gradientColorGroup.hidden = saved.colorMode !== "gradient";
+    }
+    if (saved.colorStart && colorStartPicker) {
+      state.colorStart = saved.colorStart;
+      colorStartPicker.value = saved.colorStart;
+    }
+    if (saved.colorEnd && colorEndPicker) {
+      state.colorEnd = saved.colorEnd;
+      colorEndPicker.value = saved.colorEnd;
+    }
+    if (saved.gradientPreset && gradientPresetSelect) {
+      state.gradientPreset = saved.gradientPreset;
+      gradientPresetSelect.value = saved.gradientPreset;
+    }
+    if (saved.gradientAngle !== void 0 && gradientAngleRange) {
+      state.gradientAngle = saved.gradientAngle;
+      gradientAngleRange.value = saved.gradientAngle;
+      if (gradientAngleValue) gradientAngleValue.textContent = `${saved.gradientAngle}\xB0`;
+    }
+    if (saved.posX !== void 0 && posXRange) {
+      state.posX = saved.posX;
+      posXRange.value = saved.posX;
+      if (posXValue) posXValue.textContent = `${saved.posX}px`;
+    }
+    if (saved.posY !== void 0 && posYRange) {
+      state.posY = saved.posY;
+      posYRange.value = saved.posY;
+      if (posYValue) posYValue.textContent = `${saved.posY}px`;
+    }
+    if (saved.rotX !== void 0 && rotXRange) {
+      state.rotX = saved.rotX;
+      rotXRange.value = saved.rotX;
+      if (rotXValue) rotXValue.textContent = `${saved.rotX}\xB0`;
+    }
+    if (saved.rotY !== void 0 && rotYRange) {
+      state.rotY = saved.rotY;
+      rotYRange.value = saved.rotY;
+      if (rotYValue) rotYValue.textContent = `${saved.rotY}\xB0`;
+    }
+    if (saved.rotZ !== void 0 && rotZRange) {
+      state.rotZ = saved.rotZ;
+      rotZRange.value = saved.rotZ;
+      if (rotZValue) rotZValue.textContent = `${saved.rotZ}\xB0`;
+    }
+    if (saved.depth !== void 0 && depthRange) {
+      state.depth = saved.depth;
+      depthRange.value = saved.depth;
+      if (depthValue) depthValue.textContent = saved.depth;
+    }
+    if (saved.size !== void 0 && sizeRange) {
+      state.size = saved.size;
+      sizeRange.value = saved.size;
+      if (sizeValue) sizeValue.textContent = saved.size;
+    }
+    if (saved.materialType) {
+      state.materialType = saved.materialType;
+      setActivePreset(materialPresetGrid, "material", saved.materialType);
+    }
+    if (saved.bgMode && bgModeSelect) {
+      state.bgMode = saved.bgMode;
+      bgModeSelect.value = saved.bgMode;
+    }
+  } catch (_) {
+  }
+}
+var isPointerDragging = false;
+var previousPointerPos = { x: 0, y: 0 };
+viewportEl.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  if (!state.dragEnabled) return;
+  if (state.dragMode === "orbit") return;
+  isPointerDragging = true;
+  previousPointerPos = { x: e.clientX, y: e.clientY };
+  controls.enabled = false;
+  viewportEl.style.cursor = "grabbing";
+});
+window.addEventListener("pointermove", (e) => {
+  if (!isPointerDragging || !state.dragEnabled || state.dragMode === "orbit") return;
+  const deltaX = e.clientX - previousPointerPos.x;
+  const deltaY = e.clientY - previousPointerPos.y;
+  previousPointerPos = { x: e.clientX, y: e.clientY };
+  if (state.dragMode === "move") {
+    const vH = 2 * Math.tan((camera.fov || 45) * Math.PI / 360) * Math.abs(camera.position.z || 220);
+    const scale = viewportEl.clientHeight && viewportEl.clientHeight > 0 ? vH / viewportEl.clientHeight : 0.45;
+    state.posX = Math.round(state.posX + deltaX * scale);
+    state.posY = Math.round(state.posY - deltaY * scale);
+    state.posX = Math.max(-400, Math.min(400, state.posX));
+    state.posY = Math.max(-300, Math.min(300, state.posY));
+    if (posXRange) posXRange.value = state.posX;
+    if (posXValue) posXValue.textContent = `${state.posX}px`;
+    if (posYRange) posYRange.value = state.posY;
+    if (posYValue) posYValue.textContent = `${state.posY}px`;
+    applyPosition();
+    saveStudioStateDebounced();
+  } else if (state.dragMode === "rotate") {
+    let newRotY = (state.rotY + deltaX * 0.5) % 360;
+    if (newRotY > 180) newRotY -= 360;
+    if (newRotY < -180) newRotY -= 360;
+    let newRotX = (state.rotX + deltaY * 0.5) % 360;
+    if (newRotX > 180) newRotX -= 360;
+    if (newRotX < -180) newRotX -= 360;
+    state.rotX = Math.round(newRotX);
+    state.rotY = Math.round(newRotY);
+    if (rotXRange) rotXRange.value = state.rotX;
+    if (rotXValue) rotXValue.textContent = `${state.rotX}\xB0`;
+    if (rotYRange) rotYRange.value = state.rotY;
+    if (rotYValue) rotYValue.textContent = `${state.rotY}\xB0`;
+    applyRotation();
+    saveStudioStateDebounced();
+  }
+});
+var stopPointerDrag = () => {
+  if (isPointerDragging) {
+    isPointerDragging = false;
+    controls.enabled = !state.dragEnabled || state.dragMode === "orbit";
+    viewportEl.style.cursor = state.dragEnabled && state.dragMode !== "orbit" ? "grab" : "default";
+    saveStudioState();
+  }
+};
+window.addEventListener("pointerup", stopPointerDrag);
+window.addEventListener("pointercancel", stopPointerDrag);
+window.addEventListener("mouseup", stopPointerDrag);
+window.addEventListener("blur", stopPointerDrag);
+if (posXRange) {
+  posXRange.addEventListener("input", () => {
+    state.posX = Number(posXRange.value);
+    if (posXValue) posXValue.textContent = `${state.posX}px`;
+    applyPosition();
+    saveStudioStateDebounced();
+  });
+}
+if (posYRange) {
+  posYRange.addEventListener("input", () => {
+    state.posY = Number(posYRange.value);
+    if (posYValue) posYValue.textContent = `${state.posY}px`;
+    applyPosition();
+    saveStudioStateDebounced();
+  });
+}
+if (quickAlignGrid) {
+  quickAlignGrid.addEventListener("click", (e) => {
+    const btn = e.target.closest(".preset-btn");
+    if (!btn) return;
+    const align = btn.dataset.align;
+    if (align === "topLeft") {
+      state.posX = -170;
+      state.posY = 90;
+    } else if (align === "topRight") {
+      state.posX = 170;
+      state.posY = 90;
+    } else if (align === "center") {
+      state.posX = 0;
+      state.posY = 0;
+    } else if (align === "bottomLeft") {
+      state.posX = -170;
+      state.posY = -80;
+    } else if (align === "bottomCenter") {
+      state.posX = 0;
+      state.posY = -80;
+    } else if (align === "bottomRight") {
+      state.posX = 170;
+      state.posY = -80;
+    }
+    if (posXRange) posXRange.value = state.posX;
+    if (posXValue) posXValue.textContent = `${state.posX}px`;
+    if (posYRange) posYRange.value = state.posY;
+    if (posYValue) posYValue.textContent = `${state.posY}px`;
+    applyPosition();
+    saveStudioState();
+  });
+}
+if (dragModeSelect) {
+  dragModeSelect.addEventListener("change", () => {
+    state.dragMode = dragModeSelect.value;
+    controls.enabled = state.dragMode === "orbit";
+    viewportEl.style.cursor = state.dragEnabled && state.dragMode !== "orbit" ? "grab" : "default";
+  });
+}
+if (dragEnabledToggle) {
+  dragEnabledToggle.addEventListener("change", () => {
+    state.dragEnabled = dragEnabledToggle.checked;
+    controls.enabled = !state.dragEnabled || state.dragMode === "orbit";
+    viewportEl.style.cursor = state.dragEnabled && state.dragMode !== "orbit" ? "grab" : "default";
+  });
+}
 rotYRange.addEventListener("input", () => {
   state.rotY = Number(rotYRange.value);
   rotYValue.textContent = `${state.rotY}\xB0`;
@@ -27409,53 +27663,6 @@ reflectionIntensityRange.addEventListener("input", () => {
   state.reflectionIntensity = Number(reflectionIntensityRange.value);
   reflectionIntensityValue.textContent = state.reflectionIntensity.toFixed(1);
   applyReflectionToggle();
-});
-var isPointerDragging = false;
-var previousPointerPos = { x: 0, y: 0 };
-viewportEl.addEventListener("pointerdown", (e) => {
-  if (!state.dragRotateOn) return;
-  isPointerDragging = true;
-  previousPointerPos = { x: e.clientX, y: e.clientY };
-  controls.enabled = false;
-  try {
-    viewportEl.setPointerCapture(e.pointerId);
-  } catch (_) {
-  }
-});
-viewportEl.addEventListener("pointermove", (e) => {
-  if (!isPointerDragging || !state.dragRotateOn) return;
-  const deltaX = e.clientX - previousPointerPos.x;
-  const deltaY = e.clientY - previousPointerPos.y;
-  previousPointerPos = { x: e.clientX, y: e.clientY };
-  let newRotY = (state.rotY + deltaX * 0.5) % 360;
-  if (newRotY > 180) newRotY -= 360;
-  if (newRotY < -180) newRotY += 360;
-  let newRotX = (state.rotX + deltaY * 0.5) % 360;
-  if (newRotX > 180) newRotX -= 360;
-  if (newRotX < -180) newRotX += 360;
-  state.rotX = Math.round(newRotX);
-  state.rotY = Math.round(newRotY);
-  rotXRange.value = state.rotX;
-  rotXValue.textContent = `${state.rotX}\xB0`;
-  rotYRange.value = state.rotY;
-  rotYValue.textContent = `${state.rotY}\xB0`;
-  applyRotation();
-});
-var stopPointerDrag = (e) => {
-  if (isPointerDragging) {
-    isPointerDragging = false;
-    controls.enabled = true;
-    try {
-      viewportEl.releasePointerCapture(e.pointerId);
-    } catch (_) {
-    }
-  }
-};
-viewportEl.addEventListener("pointerup", stopPointerDrag);
-viewportEl.addEventListener("pointercancel", stopPointerDrag);
-dragRotateToggle.addEventListener("change", () => {
-  state.dragRotateOn = dragRotateToggle.checked;
-  viewportEl.style.cursor = state.dragRotateOn ? "grab" : "default";
 });
 resetCameraBtn.addEventListener("click", () => {
   if (!textMesh) {
@@ -27752,6 +27959,7 @@ if (bgFileInput) {
     reader.readAsDataURL(file);
   });
 }
+loadStudioState();
 setActivePreset(contentModeGrid, "content", state.contentMode);
 setActivePreset(curveDirectionGrid, "curveDirection", state.curveDirection);
 setActivePreset(materialPresetGrid, "material", state.materialType);

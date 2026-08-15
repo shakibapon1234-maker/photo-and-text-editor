@@ -170,7 +170,43 @@
       </section>
 
       <section class="panel-section">
-        <h3>Rotate / Tilt</h3>
+        <h3>পজিশন ও স্থান পরিবর্তন (Position)</h3>
+        <label class="field">
+          <span>X পজিশন</span>
+          <input type="range" id="posXRange" min="-350" max="350" value="0" />
+          <span class="field-value" id="posXValue">0px</span>
+        </label>
+        <label class="field">
+          <span>Y পজিশন</span>
+          <input type="range" id="posYRange" min="-250" max="250" value="0" />
+          <span class="field-value" id="posYValue">0px</span>
+        </label>
+
+        <!-- Quick Align Buttons -->
+        <div class="preset-grid preset-grid-3" id="quickAlignGrid" style="margin-top: 6px;">
+          <button type="button" class="preset-btn" data-align="topLeft">↖️ উপরে-বামে</button>
+          <button type="button" class="preset-btn" data-align="center">🎯 মাঝখানে</button>
+          <button type="button" class="preset-btn" data-align="topRight">↗️ উপরে-ডানে</button>
+          <button type="button" class="preset-btn" data-align="bottomLeft">↙️ নিচে-বামে</button>
+          <button type="button" class="preset-btn" data-align="bottomCenter">⬇️ নিচে-মাঝে</button>
+          <button type="button" class="preset-btn" data-align="bottomRight">↘️ নিচে-ডানে</button>
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <h3>Rotate / Tilt ও মাউস ড্র্যাগ</h3>
+        <label class="field">
+          <span>ড্র্যাগ মোড</span>
+          <select id="dragModeSelect">
+            <option value="move" selected>✋ টেনে স্থান পরিবর্তন (Drag to Move)</option>
+            <option value="rotate">🔄 টেনে রোটেট (Drag to Rotate)</option>
+            <option value="orbit">🌐 ক্যামেরা অরবিট (Orbit Camera)</option>
+          </select>
+        </label>
+        <label class="field checkbox-field">
+          <input type="checkbox" id="dragEnabledToggle" checked />
+          <span>মাউস দিয়ে সরাসরি টেক্সট কন্ট্রোল চালু</span>
+        </label>
         <label class="field">
           <span>X অক্ষ</span>
           <input type="range" id="rotXRange" min="-180" max="180" value="0" />
@@ -189,10 +225,6 @@
         <label class="field checkbox-field">
           <input type="checkbox" id="autoRotateToggle" />
           <span>অটো-রোটেট (প্রিভিউ)</span>
-        </label>
-        <label class="field checkbox-field">
-          <input type="checkbox" id="dragRotateToggle" />
-          <span>মাউস দিয়ে ক্যানভাসে টেক্সট রোটেট (Direct Drag)</span>
         </label>
       </section>
 

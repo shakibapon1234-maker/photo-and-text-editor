@@ -133,13 +133,26 @@
         frame3d.classList.remove('active');
         tabPhotoBtn.classList.add('active');
         tab3dBtn.classList.remove('active');
+        try { localStorage.setItem('active_studio_tab', 'photo'); } catch (_) {}
       } else {
         frame3d.classList.add('active');
         framePhoto.classList.remove('active');
         tab3dBtn.classList.add('active');
         tabPhotoBtn.classList.remove('active');
+        try { localStorage.setItem('active_studio_tab', '3d'); } catch (_) {}
       }
     }
+
+    // Auto-restore active tab on refresh/page load
+    document.addEventListener('DOMContentLoaded', () => {
+      let savedTab = 'photo';
+      try {
+        savedTab = localStorage.getItem('active_studio_tab') || 'photo';
+      } catch (_) {}
+      if (savedTab === '3d') {
+        switchTab('3d');
+      }
+    });
   </script>
 </body>
 </html>

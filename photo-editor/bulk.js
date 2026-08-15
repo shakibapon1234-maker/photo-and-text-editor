@@ -18,6 +18,7 @@
     const bulkBgColorWrap = document.getElementById('bulkBgColorWrap');
     const bulkBgReplaceColor = document.getElementById('bulkBgReplaceColor');
     const bulkBgColor = document.getElementById('bulkBgColor');
+    const bulkWarishaPipelineBtn = document.getElementById('bulkWarishaPipelineBtn');
     const bulkPresetWrap = document.getElementById('bulkPresetWrap');
     const bulkPresetGrid = document.getElementById('bulkPresetGrid');
     const bulkModeWrap = document.getElementById('bulkModeWrap');
@@ -80,6 +81,39 @@
         });
     }
     buildPresetGrid();
+
+    // Phase 15: Warisha Product Pipeline — one-click preset combo
+    if (bulkWarishaPipelineBtn) {
+        bulkWarishaPipelineBtn.addEventListener('click', () => {
+            if (!items.length) {
+                showToast('প্রথমে ছবি আপলোড করুন');
+                return;
+            }
+            // BG-remove on
+            if (bulkApplyBgRemove) bulkApplyBgRemove.checked = true;
+            // Solid white background
+            if (bulkBgReplaceColor) bulkBgReplaceColor.checked = true;
+            if (bulkBgColor) bulkBgColor.value = '#ffffff';
+            if (bulkBgColorWrap) bulkBgColorWrap.style.display = 'block';
+            // Preset: Warisha Fashion Square 1:1
+            const warishaPreset = (window.SOCIAL_PRESETS || []).find(p => p.id === 'warisha_square_1_1');
+            if (warishaPreset) {
+                selectedPreset = warishaPreset;
+                bulkPresetGrid.querySelectorAll('.preset-btn-social').forEach(b => {
+                    b.classList.toggle('active', b.dataset.presetId === 'warisha_square_1_1');
+                });
+            }
+            // Mode: fill
+            const fillRadio = document.querySelector('input[name="bulkMode"][value="fill"]');
+            if (fillRadio) fillRadio.checked = true;
+            document.querySelectorAll('input[name="bulkMode"]').forEach(r => {
+                const label = r.closest('.mode-option');
+                if (label) label.classList.toggle('active', r.checked);
+            });
+            updateProcessButtonState();
+            showToast('✅ Warisha Product Pipeline সেট হয়েছে — BG-remove + সাদা ব্যাকগ্রাউন্ড + Square 1:1 + ফিল মোড');
+        });
+    }
 
     function getBulkMode() {
         const el = document.querySelector('input[name="bulkMode"]:checked');

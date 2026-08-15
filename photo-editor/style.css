@@ -2406,3 +2406,91 @@ kbd {
 .pwa-update-banner .btn {
     white-space: nowrap;
 }
+
+/* ===== Phase 15: Warisha Product Pipeline button ===== */
+.btn-warisha-pipeline {
+    background: linear-gradient(135deg, #f59e0b, #ec4899);
+    color: #fff;
+    border: none;
+    font-weight: 600;
+    width: 100%;
+}
+.btn-warisha-pipeline:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+}
+
+/* ===== Phase 17: Collage / Grid Maker ===== */
+.collage-upload-area {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg-input);
+}
+.collage-upload-area:hover {
+    border-color: var(--accent-primary);
+    background: rgba(245, 158, 11, 0.04);
+}
+.collage-upload-area.drag-over {
+    border-color: var(--accent-primary);
+    background: rgba(245, 158, 11, 0.08);
+}
+.collage-upload-area p {
+    font-size: 13px;
+    margin: 8px 0 0;
+    color: var(--text-secondary);
+}
+.collage-thumbs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+.collage-thumb {
+    position: relative;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    aspect-ratio: 1 / 1;
+    background: var(--bg-input);
+}
+.collage-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.collage-thumb-remove {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.collage-thumb-name {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 9px;
+    padding: 2px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+

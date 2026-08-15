@@ -680,6 +680,49 @@
         return filter;
     }
 
+    // Phase 18: pure function — analyzes a downsampled ImageData and returns
+    // suggested { brightness, contrast, saturation } percentages. Works from
+    // a simple histogram stretch (linear stretch between low/high clips) plus
+    // a modest saturation boost if the image is desaturated.
+    function computeAutoEnhanceSettings(imageData) {
+        const data = imageData.data;
+        const len = data.length;
+        const brightnesses = new Float32Array(len / 4);
+        const saturations = new Float32Array(len / 4);
+        let idx = 0;
+        for (let i = 0; i < len; i += 4) {
+            const r = data[i], g = data[i + 1], b = data[i + 2];
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const lum = (max + min) / 2;
+            brightnesses[idx] = lum;
+            saturations[idx] = max === 0 ? 0 : (max - min) / max;
+            idx++;
+        }
+
+        brightnesses.sort();
+        const lowClip = brightnesses[Math.floor(brightnesses.length * 0.01)];
+        const highClip = brightnesses[Math.floor(brightnesses.length * 0.99)];
+        const mid = (lowClip + highClip) / 2;
+        const targetMid = 128;
+        const targetRange = 200;
+        const actualRange = Math.max(1, highClip - lowClip);
+
+        const brightness = Math.round((targetMid / mid) * 100);
+        const contrast = Math.round((targetRange / actualRange) * 100);
+
+        let avgSat = 0;
+        for (let i = 0; i < saturations.length; i++) avgSat += saturations[i];
+        avgSat /= saturations.length;
+        const saturation = avgSat < 0.15 ? Math.round(100 + (0.15 - avgSat) * 400) : 100;
+
+        return {
+            brightness: Math.max(50, Math.min(200, brightness)),
+            contrast: Math.max(50, Math.min(200, contrast)),
+            saturation: Math.max(50, Math.min(200, saturation)),
+        };
+    }
+
     // Brightness presets
     presetBrightBtns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -702,6 +745,48 @@
             presetHueRotate = parseFloat(btn.dataset.h || 0);
         });
     });
+
+    // Phase 18: auto-enhance button
+    const autoEnhanceBtn = document.getElementById('autoEnhanceBtn');
+    if (autoEnhanceBtn) {
+        autoEnhanceBtn.addEventListener('click', () => {
+            if (!originalImage) {
+                showToast('প্রথমে একটি ছবি আপলোড করুন', 'error');
+                return;
+            }
+            const w = originalImage.naturalWidth || originalImage.width;
+            const h = originalImage.naturalHeight || originalImage.height;
+            const sampleSize = 200;
+            const scale = Math.min(1, sampleSize / Math.max(w, h));
+            const sw = Math.max(1, Math.round(w * scale));
+            const sh = Math.max(1, Math.round(h * scale));
+            const off = document.createElement('canvas');
+            off.width = sw;
+            off.height = sh;
+            const octx = off.getContext('2d');
+            octx.drawImage(originalImage, 0, 0, sw, sh);
+            const imageData = octx.getImageData(0, 0, sw, sh);
+            const settings = computeAutoEnhanceSettings(imageData);
+
+            brightnessSlider.value = settings.brightness;
+            brightnessValue.textContent = settings.brightness;
+            updateSliderPercent(brightnessSlider);
+            contrastSlider.value = settings.contrast;
+            contrastValue.textContent = settings.contrast;
+            updateSliderPercent(contrastSlider);
+            saturationSlider.value = settings.saturation;
+            saturationValue.textContent = settings.saturation;
+            updateSliderPercent(saturationSlider);
+
+            // Clear any active filter preset so auto-enhance is the only effect
+            presetGrayscale = 0;
+            presetSepia = 0;
+            presetHueRotate = 0;
+            document.querySelectorAll('.preset-btn-bright').forEach(b => b.classList.remove('active'));
+
+            showToast(`✨ অটো ফিক্স: Brightness ${settings.brightness}%, Contrast ${settings.contrast}%, Saturation ${settings.saturation}% — "অ্যাপ্লাই করুন" চাপুন`);
+        });
+    }
 
     applyBrightness.addEventListener('click', () => {
         if (!originalImage) return;
@@ -1481,6 +1566,11 @@
         const bgLassoHint     = document.getElementById('bgLassoHint');
         const bgLassoCanvas   = document.getElementById('bgLassoCanvas');
 
+        // Phase 14: single-image solid background replace
+        const bgSolidReplaceWrap = document.getElementById('bgSolidReplaceWrap');
+        const bgSolidReplaceToggle = document.getElementById('bgSolidReplaceToggle');
+        const bgSolidReplaceColor = document.getElementById('bgSolidReplaceColor');
+
         const bgCloneCanvas       = document.getElementById('bgCloneCanvas');
         const cloneBrushSize      = document.getElementById('cloneBrushSize');
         const cloneBrushSizeVal   = document.getElementById('cloneBrushSizeVal');
@@ -1572,6 +1662,30 @@
         }
         window.removeBackgroundAI = removeBackgroundViaRemoveBg;
 
+        // Phase 14: shared helper — composites an image onto a solid-color
+        // background. Exposed on `window` so bulk.js can reuse the exact same
+        // logic (same pattern as removeBackgroundAI above).
+        window.fillSolidBackground = function (img, hexColor) {
+            const w = img.naturalWidth || img.width;
+            const h = img.naturalHeight || img.height;
+            const off = document.createElement('canvas');
+            off.width = w;
+            off.height = h;
+            const octx = off.getContext('2d');
+            octx.fillStyle = hexColor || '#ffffff';
+            octx.fillRect(0, 0, w, h);
+            octx.drawImage(img, 0, 0, w, h);
+            return off;
+        };
+
+        // Phase 14: toggle solid-color replace visibility
+        if (bgSolidReplaceToggle && bgSolidReplaceWrap) {
+            bgSolidReplaceWrap.style.display = 'none';
+            bgSolidReplaceToggle.addEventListener('change', () => {
+                bgSolidReplaceWrap.style.display = bgSolidReplaceToggle.checked ? 'block' : 'none';
+            });
+        }
+
         // Copy the Remove.bg signup link to the clipboard
         const copyApiLinkBtn = document.getElementById('copyApiLinkBtn');
         if (copyApiLinkBtn) {
@@ -1644,27 +1758,41 @@
                 // Use the latest processed blob or fall back to original file
                 const blobToSend = processedBlob || originalFile;
                 const resultBlob = await removeBackgroundViaRemoveBg(blobToSend, apiKey);
-                processedBlob = resultBlob;
-                const url = URL.createObjectURL(resultBlob);
+                let finalBlob = resultBlob;
+                let finalUrl = URL.createObjectURL(resultBlob);
+
+                // Phase 14: if solid background replace is enabled, composite
+                // the BG-removed image onto the chosen solid color.
+                if (bgSolidReplaceToggle && bgSolidReplaceToggle.checked) {
+                    const removedImg = await new Promise((resolve, reject) => {
+                        const im = new Image();
+                        im.onload = () => resolve(im);
+                        im.onerror = reject;
+                        im.src = finalUrl;
+                    });
+                    const solidCanvas = window.fillSolidBackground(removedImg, bgSolidReplaceColor.value);
+                    finalBlob = await new Promise(resolve => solidCanvas.toBlob(resolve, 'image/jpeg', 0.92));
+                    URL.revokeObjectURL(finalUrl);
+                    finalUrl = URL.createObjectURL(finalBlob);
+                }
+
+                processedBlob = finalBlob;
 
                 // IMPORTANT: keep `originalImage` in sync with the new pixels.
-                // Previously only previewImage.src was updated here, so the
-                // eyedropper / color-eraser / lasso tools kept sampling the
-                // OLD (pre-AI-remove) image afterwards, silently corrupting
-                // every edit made after an AI removal.
                 await new Promise((resolve, reject) => {
                     const img = new Image();
                     img.onload = () => { originalImage = img; resolve(); };
                     img.onerror = reject;
-                    img.src = url;
+                    img.src = finalUrl;
                 });
 
-                previewImage.src = url;
+                previewImage.src = finalUrl;
                 downloadSection.style.display = 'block';
-                // Make download use PNG
-                downloadBtn.setAttribute('data-ext', 'png');
-                pushHistory(resultBlob, 'AI ব্যাকগ্রাউন্ড রিমুভ');
-                showToast('✅ AI ব্যাকগ্রাউন্ড সফলভাবে রিমুভ হয়েছে!', 'success');
+                // Solid color replacement outputs JPEG; transparent BG outputs PNG.
+                downloadBtn.setAttribute('data-ext', bgSolidReplaceToggle?.checked ? 'jpg' : 'png');
+                const actionLabel = bgSolidReplaceToggle?.checked ? 'AI ব্যাকগ্রাউন্ড রিমুভ + সলিড রঙ বসানো হয়েছে!' : '✅ AI ব্যাকগ্রাউন্ড সফলভাবে রিমুভ হয়েছে!';
+                pushHistory(finalBlob, 'AI ব্যাকগ্রাউন্ড রিমুভ' + (bgSolidReplaceToggle?.checked ? ' + সলিড BG' : ''));
+                showToast(actionLabel, 'success');
             } catch (err) {
                 showToast(`❌ ত্রুটি: ${err.message}`, 'error');
             } finally {
@@ -3900,6 +4028,7 @@
         const wmTextHandle = document.getElementById('wmTextHandle');
         const wmLogoHandle = document.getElementById('wmLogoHandle');
         const wmLogoHandleImg = document.getElementById('wmLogoHandleImg');
+        const wmTemplateGrid = document.getElementById('wmTemplateGrid');
 
         if (!wmTextEnabled || !wmLogoEnabled || !applyWatermarkBtn || !wmOverlay) return;
 
@@ -3995,6 +4124,39 @@
             wmLogoFields.style.display = wmLogoEnabled.checked ? 'block' : 'none';
             refreshAll();
         });
+
+        // Phase 16: quick ad text templates
+        const WM_TEMPLATES = {
+            'new-collection': { text: '🆕 নতুন কালেকশন', fontFamily: "'Montserrat', sans-serif", fontSizeRatio: 0.08, color: '#ffffff', textOpacity: 90, fx: 0.5, fy: 0.12 },
+            'special-offer': { text: '🔥 স্পেশাল অফার', fontFamily: "'Montserrat', sans-serif", fontSizeRatio: 0.09, color: '#ff4500', textOpacity: 95, fx: 0.5, fy: 0.12 },
+            'price-tag': { text: '৳___ মাত্র', fontFamily: "'Montserrat', sans-serif", fontSizeRatio: 0.07, color: '#ffffff', textOpacity: 90, fx: 0.5, fy: 0.88 },
+            'sale': { text: '🏷️ সেল!', fontFamily: "'Montserrat', sans-serif", fontSizeRatio: 0.1, color: '#ff0000', textOpacity: 95, fx: 0.5, fy: 0.12 },
+            'limited': { text: '⏳ লিমিটেড অফার', fontFamily: "'Montserrat', sans-serif", fontSizeRatio: 0.07, color: '#ffd700', textOpacity: 90, fx: 0.5, fy: 0.88 },
+            'free-shipping': { text: '🚚 ফ্রি ডেলিভারি', fontFamily: "'Montserrat', sans-serif", fontSizeRatio: 0.07, color: '#00c853', textOpacity: 90, fx: 0.5, fy: 0.88 },
+        };
+
+        if (wmTemplateGrid) {
+            wmTemplateGrid.addEventListener('click', (e) => {
+                const btn = e.target.closest('.preset-btn');
+                if (!btn) return;
+                const tpl = WM_TEMPLATES[btn.dataset.wmTemplate];
+                if (!tpl) return;
+                wmTextEnabled.checked = true;
+                wmTextFields.style.display = 'block';
+                wmText.value = tpl.text;
+                wmFontFamily.value = tpl.fontFamily;
+                wmFontSize.value = Math.round(tpl.fontSizeRatio * 100);
+                wmFontSizeValue.textContent = wmFontSize.value;
+                wmTextColor.value = tpl.color;
+                wmTextOpacity.value = tpl.textOpacity;
+                wmTextOpacityValue.textContent = tpl.textOpacity;
+                wmTextPos = { fx: tpl.fx, fy: tpl.fy };
+                wmTemplateGrid.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                refreshAll();
+                showToast(`টেমপ্লেট "${tpl.text}" অ্যাপ্লাই করা হয়েছে — প্রয়োজনীয় পরিবর্তন করুন এবং "ওয়াটারমার্ক প্রয়োগ করুন" চাপুন`);
+            });
+        }
 
         // ---------- Text field inputs ----------
         wmText.addEventListener('input', updateTextHandle);

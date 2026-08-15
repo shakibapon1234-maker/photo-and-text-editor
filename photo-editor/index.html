@@ -173,6 +173,16 @@
                         </svg>
                         <span>আপস্কেল</span>
                     </button>
+                    <button class="tab-btn" data-tab="collage">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="7" />
+                            <rect x="14" y="3" width="7" height="7" />
+                            <rect x="14" y="14" width="7" height="7" />
+                            <rect x="3" y="14" width="7" height="7" />
+                        </svg>
+                        <span>কোলাজ</span>
+                    </button>
                 </div>
 
                 <!-- Scrollable panel that holds whichever tool is active, so switching
@@ -417,6 +427,10 @@
                             </div>
                         </div>
 
+                        <button type="button" class="btn btn-secondary" id="autoEnhanceBtn" style="width:100%;margin-bottom:8px;">
+                            ✨ অটো ফিক্স (স্বয়ংক্রিয় ব্রাইটনেস/কন্ট্রাস্ট)
+                        </button>
+
                         <button class="btn btn-primary btn-action" id="applyBrightness">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2">
@@ -621,6 +635,14 @@
                         <div class="bg-ai-loading" id="bgAiLoading" style="display:none;">
                             <div class="spinner"></div>
                             <span>AI প্রসেস করছে...</span>
+                        </div>
+                        <div class="form-group" id="bgSolidReplaceWrap" style="margin-top:10px;display:none;">
+                            <label class="wm-toggle">
+                                <input type="checkbox" id="bgSolidReplaceToggle">
+                                <span>🎨 রিমুভের পর সলিড রঙ ব্যাকগ্রাউন্ড বসান</span>
+                            </label>
+                            <p class="wm-hint">চেক না করলে স্বচ্ছ (transparent) PNG থাকবে</p>
+                            <input type="color" id="bgSolidReplaceColor" value="#ffffff" style="margin-top:6px;">
                         </div>
                         </div>
                     </div>
@@ -935,6 +957,19 @@
                             </div>
                         </div>
 
+                        <!-- Phase 16: quick ad text templates -->
+                        <div class="wm-section">
+                            <h4 style="margin:8px 0 6px;font-size:13px;color:var(--text-secondary);">⚡ কুইক টেমপ্লেট</h4>
+                            <div class="preset-grid preset-grid-3" id="wmTemplateGrid">
+                                <button type="button" class="preset-btn" data-wm-template="new-collection">🆕 নতুন কালেকশন</button>
+                                <button type="button" class="preset-btn" data-wm-template="special-offer">🔥 স্পেশাল অফার</button>
+                                <button type="button" class="preset-btn" data-wm-template="price-tag">৳___ মাত্র</button>
+                                <button type="button" class="preset-btn" data-wm-template="sale">🏷️ সেল!</button>
+                                <button type="button" class="preset-btn" data-wm-template="limited">⏳ লিমিটেড অফার</button>
+                                <button type="button" class="preset-btn" data-wm-template="free-shipping">🚚 ফ্রি ডেলিভারি</button>
+                            </div>
+                        </div>
+
                         <div class="wm-section">
                             <label class="wm-toggle">
                                 <input type="checkbox" id="wmLogoEnabled">
@@ -1062,7 +1097,61 @@
                     </div>
                 </div>
 
-                </div><!-- /.tool-panels -->
+                <!-- Phase 17: Collage / Grid Maker -->
+                <div class="tool-content" id="tab-collage">
+                    <div class="tool-card">
+                        <h3>🖼️ কোলাজ / গ্রিড মেকার</h3>
+                        <p class="tool-desc">২-৬টা ছবি আপলোড করে গ্রিড লেআউটে একসাথে বসানো — সোশ্যাল প্রিসেট সাইজে এক্সপোর্ট করুন</p>
+
+                        <div class="form-group">
+                            <label>ছবি আপলোড করুন (২-৬টা)</label>
+                            <div class="collage-upload-area" id="collageUploadArea">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="17 8 12 3 7 8" />
+                                    <line x1="12" y1="3" x2="12" y2="15" />
+                                </svg>
+                                <p>এখানে ক্লিক করুন অথবা টেনে আনুন</p>
+                                <input type="file" id="collageFileInput" accept="image/*" multiple hidden>
+                            </div>
+                            <div class="collage-thumbs" id="collageThumbs"></div>
+                        </div>
+
+                        <div class="form-group" id="collageLayoutWrap" style="display:none;">
+                            <label>লেআউট</label>
+                            <div class="preset-grid preset-grid-3" id="collageLayoutGrid">
+                                <button type="button" class="preset-btn active" data-collage-layout="2x2">২x২</button>
+                                <button type="button" class="preset-btn" data-collage-layout="3x1">৩x১</button>
+                                <button type="button" class="preset-btn" data-collage-layout="1x3">১x৩</button>
+                                <button type="button" class="preset-btn" data-collage-layout="2x3">২x৩</button>
+                                <button type="button" class="preset-btn" data-collage-layout="3x2">৩x২</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="collageGapWrap" style="display:none;">
+                            <label>গ্যাপ (px): <strong id="collageGapValue">10</strong></label>
+                            <input type="range" id="collageGapRange" min="0" max="40" step="2" value="10" class="range-slider">
+                        </div>
+
+                        <div class="form-group" id="collageBorderWrap" style="display:none;">
+                            <label>বর্ডার (px): <strong id="collageBorderValue">0</strong></label>
+                            <input type="range" id="collageBorderRange" min="0" max="20" step="1" value="0" class="range-slider">
+                            <label style="margin-top:6px;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+                                <input type="checkbox" id="collageBorderColorToggle"> বর্ডার রঙ
+                            </label>
+                            <input type="color" id="collageBorderColor" value="#ffffff" style="margin-top:4px;display:none;">
+                        </div>
+
+                        <div class="form-group" id="collagePresetWrap" style="display:none;">
+                            <label>আউটপুট সাইজ</label>
+                            <div class="social-preset-grid" id="collagePresetGrid"></div>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="collageGenerateBtn" disabled>🖼️ কোলাজ তৈরি করুন</button>
+                    </div>
+                </div>
+
+            </div><!-- /.tool-panels -->
               </div><!-- /.tools-panel-body -->
 
                             </div><!-- /.tools-panel -->
@@ -1276,6 +1365,10 @@
                 <div class="form-group" id="bulkPresetWrap" style="display:none;">
                     <label>প্ল্যাটফর্ম প্রিসেট বাছাই করুন</label>
                     <div class="social-preset-grid" id="bulkPresetGrid"></div>
+                    <button type="button" class="btn btn-secondary btn-warisha-pipeline" id="bulkWarishaPipelineBtn" style="margin-top:8px;">
+                        🏷️ Warisha প্রোডাক্ট পাইপলাইন (এক-ক্লিক)
+                    </button>
+                    <p class="wm-hint" style="margin-top:4px;">BG-remove ✓, সাদা ব্যাকগ্রাউন্ড ✓, Square 1:1 ✓, ফিল মোড ✓ — সব একসাথে সেট হয়ে যাবে</p>
                 </div>
 
                 <div class="form-group social-mode-group" id="bulkModeWrap" style="display:none;">
@@ -1323,6 +1416,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="social-presets.js"></script>
     <script src="watermark.js"></script>
+    <script src="collage.js"></script>
     <script src="app.js"></script>
     <script src="bulk.js"></script>
 </body>
