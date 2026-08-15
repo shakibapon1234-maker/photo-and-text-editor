@@ -15,6 +15,9 @@
     const bulkPresetWrap = document.getElementById('bulkPresetWrap');
     const bulkPresetGrid = document.getElementById('bulkPresetGrid');
     const bulkModeWrap = document.getElementById('bulkModeWrap');
+    const bulkWatermarkWrap = document.getElementById('bulkWatermarkWrap');
+    const bulkApplyWatermark = document.getElementById('bulkApplyWatermark');
+    const bulkWatermarkHint = document.getElementById('bulkWatermarkHint');
     const bulkClearBtn = document.getElementById('bulkClearBtn');
     const bulkProcessBtn = document.getElementById('bulkProcessBtn');
     const bulkProgress = document.getElementById('bulkProgress');
@@ -31,6 +34,7 @@
     // ---------- Open / Close ----------
     function openModal() {
         bulkModalOverlay.style.display = 'flex';
+        refreshBulkWatermarkHint();
     }
     function closeModal() {
         bulkModalOverlay.style.display = 'none';
@@ -137,6 +141,10 @@
 
         bulkPresetWrap.style.display = 'block';
         bulkModeWrap.style.display = 'block';
+        if (bulkWatermarkWrap) {
+            bulkWatermarkWrap.style.display = 'block';
+            refreshBulkWatermarkHint();
+        }
         updateProcessButtonState();
         bulkFileInput.value = '';
     }
@@ -161,10 +169,24 @@
         bulkThumbs.innerHTML = '';
         bulkPresetWrap.style.display = 'none';
         bulkModeWrap.style.display = 'none';
+        if (bulkWatermarkWrap) bulkWatermarkWrap.style.display = 'none';
         bulkProgress.style.display = 'none';
         updateProcessButtonState();
     }
     bulkClearBtn.addEventListener('click', clearAll);
+
+    // Phase 9: reflect whether the "ওয়াটারমার্ক" tab actually has anything
+    // configured, so the checkbox doesn't silently do nothing when checked.
+    function refreshBulkWatermarkHint() {
+        if (!bulkWatermarkWrap || !bulkWatermarkHint) return;
+        const wm = (typeof window.getWatermarkSettings === 'function') ? window.getWatermarkSettings() : null;
+        if (!wm || !wm.enabled) {
+            bulkWatermarkHint.textContent = '"ওয়াটারমার্ক" ট্যাবে আগে টেক্সট বা লোগো সক্রিয় করুন, তারপর এখানে টিক দিন';
+            if (bulkApplyWatermark) bulkApplyWatermark.checked = false;
+        } else {
+            bulkWatermarkHint.textContent = '"ওয়াটারমার্ক" ট্যাবে যা সেট করা আছে, ঠিক সেটাই প্রতিটা ছবিতে বসবে';
+        }
+    }
 
     function updateProcessButtonState() {
         bulkProcessBtn.disabled = !(items.length > 0 && selectedPreset);
@@ -195,6 +217,27 @@
 
     function blobFromCanvas(canvasEl, type, quality) {
         return new Promise(resolve => canvasEl.toBlob(resolve, type, quality));
+    }
+
+    // Phase 9: draws the currently-configured watermark onto a fresh
+    // full-resolution canvas and returns that canvas as the "source image"
+    // for renderSocialCanvas() — a <canvas> works anywhere an <img> does
+    // for ctx.drawImage()/img.naturalWidth (which falls back to .width),
+    // so no changes were needed in social-presets.js.
+    function applyBulkWatermarkIfNeeded(img) {
+        if (!bulkApplyWatermark || !bulkApplyWatermark.checked) return img;
+        const wm = (typeof window.getWatermarkSettings === 'function') ? window.getWatermarkSettings() : null;
+        if (!wm || !wm.enabled || typeof window.drawWatermark !== 'function') return img;
+
+        const w = img.naturalWidth || img.width;
+        const h = img.naturalHeight || img.height;
+        const off = document.createElement('canvas');
+        off.width = w;
+        off.height = h;
+        const octx = off.getContext('2d');
+        octx.drawImage(img, 0, 0, w, h);
+        window.drawWatermark(octx, w, h, wm.settings, wm.logoImage);
+        return off;
     }
 
     function triggerDownload(blob, fileName) {
@@ -233,7 +276,8 @@
             const item = items[i];
             try {
                 const img = await waitForImage(item);
-                const rendered = window.renderSocialCanvas(img, preset.w, preset.h, mode);
+                const watermarked = applyBulkWatermarkIfNeeded(img);
+                const rendered = window.renderSocialCanvas(watermarked, preset.w, preset.h, mode);
                 const blob = await blobFromCanvas(rendered, 'image/jpeg', 0.92);
 
                 let baseName = item.file.name.replace(/\.[^/.]+$/, '') || `image_${i + 1}`;

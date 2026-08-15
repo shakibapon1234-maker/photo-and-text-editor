@@ -979,6 +979,51 @@ select:focus {
     box-shadow: 0 6px 25px rgba(16, 185, 129, 0.45);
 }
 
+/* ===== Rotate / Flip Toolbar (Phase 7) ===== */
+.rotate-flip-card {
+    margin-bottom: 20px;
+}
+
+.rotate-flip-toolbar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+}
+
+.btn-rotate-flip {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 14px 10px;
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-rotate-flip .rf-icon {
+    font-size: 22px;
+    line-height: 1;
+    color: var(--accent-secondary);
+}
+
+.btn-rotate-flip:hover {
+    border-color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.1);
+    transform: translateY(-1px);
+}
+
+.btn-rotate-flip.loading {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
 /* ===== Crop Canvas ===== */
 .crop-preview-container {
     margin-bottom: 20px;
@@ -2074,4 +2119,125 @@ kbd {
 .bulk-progress span {
     font-size: 12px;
     color: var(--text-muted);
+}
+
+/* ===== Watermark Tool (Phase 9) ===== */
+.wm-section {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    margin-bottom: 16px;
+}
+
+.wm-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.wm-toggle input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent-primary);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.wm-fields {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-color);
+}
+
+.wm-position-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    max-width: 150px;
+}
+
+.wm-position-grid button {
+    width: 100%;
+    aspect-ratio: 1;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    padding: 0;
+}
+
+.wm-position-grid button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transform: translate(-50%, -50%);
+}
+
+.wm-position-grid button:hover {
+    border-color: var(--accent-primary);
+}
+
+.wm-position-grid button.active {
+    border-color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.15);
+}
+
+.wm-position-grid button.active::after {
+    background: var(--accent-primary);
+}
+
+.wm-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 10px;
+    line-height: 1.5;
+}
+
+/* Live drag-to-position overlay, sits on top of previewImage inside
+   #previewImageWrapper — same "absolute layer over the image" approach
+   as the BG-remove module's lasso/clone/erase canvases. */
+.wm-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 14;
+    pointer-events: none;
+}
+
+.wm-handle {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    cursor: move;
+    pointer-events: auto;
+    user-select: none;
+    touch-action: none;
+}
+
+.wm-handle-text {
+    white-space: nowrap;
+    font-weight: 700;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.wm-handle-logo img {
+    display: block;
+    pointer-events: none;
+}
+
+.wm-handle.dragging {
+    outline: 2px dashed var(--accent-primary);
+    outline-offset: 3px;
 }

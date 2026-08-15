@@ -73,6 +73,15 @@
     const newBrightness = document.getElementById('newBrightness');
     const presetBrightBtns = document.querySelectorAll('.preset-btn-bright');
 
+    // Phase 8: extra filter-preset state (grayscale/sepia/hue-rotate amounts).
+    // These have no dedicated sliders — they're only ever set by clicking a
+    // filter-preset button (see buildFilterString() below) — so they live
+    // as plain state instead of being read off a DOM control like
+    // brightness/contrast/saturation are.
+    let presetGrayscale = 0; // 0–1
+    let presetSepia = 0;     // 0–1
+    let presetHueRotate = 0; // degrees
+
     // Crop Tool
     const cropX = document.getElementById('cropX');
     const cropY = document.getElementById('cropY');
@@ -145,28 +154,149 @@
         }
     }
 
+    // ============================================
+    // Phase 7: EXIF auto-orientation
+    // ============================================
+    // parseExifOrientation() is a PURE function — it only reads bytes out
+    // of an ArrayBuffer and returns a number, no canvas/DOM involved — so
+    // it can be unit-tested standalone in plain Node (same pattern as
+    // floodFillMask() in the BG-remove module). It walks the JPEG marker
+    // segments looking for APP1/Exif, then walks IFD0 looking for tag
+    // 0x0112 (Orientation). Non-JPEGs (PNG/WEBP/BMP) simply fail the SOI
+    // check on the first line and fall back to 1 (no rotation needed).
+    function parseExifOrientation(buffer) {
+        try {
+            if (!buffer || buffer.byteLength < 4) return 1;
+            const view = new DataView(buffer);
+            if (view.getUint16(0, false) !== 0xFFD8) return 1; // not a JPEG
+
+            let offset = 2;
+            const length = view.byteLength;
+
+            while (offset + 4 <= length) {
+                const marker = view.getUint16(offset, false);
+                offset += 2;
+
+                // Markers with no length field at all — skip past them.
+                if (marker === 0xFFD8 || marker === 0xFFD9 || (marker >= 0xFFD0 && marker <= 0xFFD7)) {
+                    continue;
+                }
+                if ((marker & 0xFF00) !== 0xFF00) break; // corrupt data, bail out safely
+
+                if (offset + 2 > length) break;
+                const segmentLength = view.getUint16(offset, false);
+                if (segmentLength < 2) break;
+
+                if (marker === 0xFFE1) {
+                    const segStart = offset + 2;
+                    if (
+                        segStart + 6 <= length &&
+                        view.getUint32(segStart, false) === 0x45786966 && // "Exif"
+                        view.getUint16(segStart + 4, false) === 0x0000
+                    ) {
+                        const tiffOffset = segStart + 6;
+                        if (tiffOffset + 8 <= length) {
+                            const little = view.getUint16(tiffOffset, false) === 0x4949; // "II"
+                            if (view.getUint16(tiffOffset + 2, little) === 0x002A) {
+                                const ifd0Offset = tiffOffset + view.getUint32(tiffOffset + 4, little);
+                                if (ifd0Offset + 2 <= length) {
+                                    const numEntries = view.getUint16(ifd0Offset, little);
+                                    for (let i = 0; i < numEntries; i++) {
+                                        const entryOffset = ifd0Offset + 2 + i * 12;
+                                        if (entryOffset + 12 > length) break;
+                                        const tag = view.getUint16(entryOffset, little);
+                                        if (tag === 0x0112) {
+                                            const value = view.getUint16(entryOffset + 8, little);
+                                            return (value >= 1 && value <= 8) ? value : 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (marker === 0xFFDA) break; // Start of Scan — headers are over
+                offset += segmentLength;
+            }
+        } catch (err) {
+            return 1;
+        }
+        return 1;
+    }
+
+    // Redraws `img` onto an offscreen canvas upright according to an EXIF
+    // orientation value (2–8), returning a PNG data URL. Uses the standard
+    // orientation → matrix table. Not pure (touches canvas), so this part
+    // needs a real-browser check rather than a Node unit test.
+    function reorientImageDataUrl(img, orientation) {
+        const w = img.naturalWidth;
+        const h = img.naturalHeight;
+        const swapDims = orientation >= 5 && orientation <= 8;
+
+        const off = document.createElement('canvas');
+        off.width = swapDims ? h : w;
+        off.height = swapDims ? w : h;
+        const offCtx = off.getContext('2d');
+
+        switch (orientation) {
+            case 2: offCtx.transform(-1, 0, 0, 1, w, 0); break;
+            case 3: offCtx.transform(-1, 0, 0, -1, w, h); break;
+            case 4: offCtx.transform(1, 0, 0, -1, 0, h); break;
+            case 5: offCtx.transform(0, 1, 1, 0, 0, 0); break;
+            case 6: offCtx.transform(0, 1, -1, 0, h, 0); break;
+            case 7: offCtx.transform(0, -1, -1, 0, h, w); break;
+            case 8: offCtx.transform(0, -1, 1, 0, 0, w); break;
+            default: break;
+        }
+        offCtx.drawImage(img, 0, 0);
+        return off.toDataURL('image/png');
+    }
+
     function loadImage(file) {
         originalFile = file;
-        const reader = new FileReader();
-        reader.onload = function (e) {
-            const img = new Image();
-            img.onload = function () {
-                originalImage = img;
-                originalWidth = img.naturalWidth;
-                originalHeight = img.naturalHeight;
-                aspectRatio = originalWidth / originalHeight;
-                previewImage.src = e.target.result;
-                // Phase 6: every fresh upload starts a brand-new undo/redo
-                // timeline — the uploaded file itself becomes history[0],
-                // the permanent "restore to original" baseline (also used
-                // by the Erase/Restore brush and the Before/After slider).
-                resetHistory(e.target.result);
-                document.dispatchEvent(new CustomEvent('app:newimage'));
-                showEditor(file);
+
+        // Read the raw bytes once to look for a JPEG EXIF Orientation tag.
+        // file.arrayBuffer() resolving to something unexpected (or not
+        // being available at all) must never block the normal upload path,
+        // so any failure here just falls back to orientation 1 (no-op).
+        const exifCheck = (typeof file.arrayBuffer === 'function')
+            ? file.arrayBuffer().then(parseExifOrientation).catch(() => 1)
+            : Promise.resolve(1);
+
+        exifCheck.then((orientation) => {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const img = new Image();
+                img.onload = function () {
+                    const dataUrl = (orientation >= 2 && orientation <= 8)
+                        ? reorientImageDataUrl(img, orientation)
+                        : e.target.result;
+                    finishImageLoad(dataUrl, file);
+                };
+                img.src = e.target.result;
             };
-            img.src = e.target.result;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function finishImageLoad(dataUrl, file) {
+        const img = new Image();
+        img.onload = function () {
+            originalImage = img;
+            originalWidth = img.naturalWidth;
+            originalHeight = img.naturalHeight;
+            aspectRatio = originalWidth / originalHeight;
+            previewImage.src = dataUrl;
+            // Phase 6: every fresh upload starts a brand-new undo/redo
+            // timeline — the uploaded file itself becomes history[0],
+            // the permanent "restore to original" baseline (also used
+            // by the Erase/Restore brush and the Before/After slider).
+            resetHistory(dataUrl);
+            document.dispatchEvent(new CustomEvent('app:newimage'));
+            showEditor(file);
         };
-        reader.readAsDataURL(file);
+        img.src = dataUrl;
     }
 
     function showEditor(file) {
@@ -213,6 +343,13 @@
         saturationSlider.value = 100;
         saturationValue.textContent = '100';
         saturationSlider.style.setProperty('--slider-percent', '33.3%');
+
+        // Phase 8: clear any active filter preset (grayscale/sepia/hue-rotate)
+        // and its highlighted button so a fresh upload always starts neutral.
+        presetGrayscale = 0;
+        presetSepia = 0;
+        presetHueRotate = 0;
+        presetBrightBtns.forEach(b => b.classList.remove('active'));
     }
 
     // ============================================
@@ -522,18 +659,21 @@
         slider.style.setProperty('--slider-percent', percent + '%');
     }
 
-    brightnessSlider.addEventListener('input', () => {
-        brightnessValue.textContent = brightnessSlider.value;
-        updateSliderPercent(brightnessSlider);
-    });
-    contrastSlider.addEventListener('input', () => {
-        contrastValue.textContent = contrastSlider.value;
-        updateSliderPercent(contrastSlider);
-    });
-    saturationSlider.addEventListener('input', () => {
-        saturationValue.textContent = saturationSlider.value;
-        updateSliderPercent(saturationSlider);
-    });
+    // Phase 8: PURE function — builds the ctx.filter CSS string from plain
+    // numbers, no canvas/DOM involved, so it's unit-testable standalone in
+    // plain Node. brightness/contrast/saturation are ratios (1 = 100%),
+    // grayscale/sepia are 0–1, hueRotate is in degrees. Zero-valued
+    // grayscale/sepia/hueRotate are omitted entirely rather than emitted
+    // as a no-op grayscale(0)/sepia(0)/hue-rotate(0deg), keeping the
+    // filter string identical to the pre-Phase-8 output when no filter
+    // preset is active.
+    function buildFilterString(brightness, contrast, saturation, grayscale, sepia, hueRotate) {
+        let filter = `brightness(${brightness}) contrast(${contrast}) saturate(${saturation})`;
+        if (grayscale) filter += ` grayscale(${grayscale})`;
+        if (sepia) filter += ` sepia(${sepia})`;
+        if (hueRotate) filter += ` hue-rotate(${hueRotate}deg)`;
+        return filter;
+    }
 
     // Brightness presets
     presetBrightBtns.forEach(btn => {
@@ -549,6 +689,12 @@
             saturationSlider.value = btn.dataset.s;
             saturationValue.textContent = btn.dataset.s;
             updateSliderPercent(saturationSlider);
+            // Phase 8: filter-preset amounts. Buttons that don't set these
+            // (all the pre-Phase-8 tone presets) fall back to 0, which
+            // correctly clears any previously-active filter preset too.
+            presetGrayscale = parseFloat(btn.dataset.g || 0);
+            presetSepia = parseFloat(btn.dataset.sp || 0);
+            presetHueRotate = parseFloat(btn.dataset.h || 0);
         });
     });
 
@@ -564,7 +710,7 @@
         setTimeout(() => {
             canvas.width = originalWidth;
             canvas.height = originalHeight;
-            ctx.filter = `brightness(${brightness}) contrast(${contrast}) saturate(${saturation})`;
+            ctx.filter = buildFilterString(brightness, contrast, saturation, presetGrayscale, presetSepia, presetHueRotate);
             ctx.drawImage(originalImage, 0, 0);
             ctx.filter = 'none';
 
@@ -580,6 +726,7 @@
             }, 'image/png');
         }, 100);
     });
+
 
     // ============================================
     // Tool 5: Crop
@@ -3338,5 +3485,438 @@
         document.addEventListener('touchend', onDividerUp);
 
     })(); // end initBeforeAfterModule
+
+    // ============================================
+    // Phase 7: Rotate / Flip
+    // ============================================
+    // normalizeAngle()/getRotatedDimensions() are PURE functions (no
+    // canvas/DOM), unit-testable standalone in plain Node.
+    function normalizeAngle(deg) {
+        return ((deg % 360) + 360) % 360;
+    }
+
+    function getRotatedDimensions(width, height, angleDeg) {
+        const angle = normalizeAngle(angleDeg);
+        if (angle === 90 || angle === 270) {
+            return { width: height, height: width };
+        }
+        return { width, height };
+    }
+
+    (function initRotateFlipModule() {
+        const rotateLeftBtn = document.getElementById('rotateLeftBtn');
+        const rotateRightBtn = document.getElementById('rotateRightBtn');
+        const flipHorizontalBtn = document.getElementById('flipHorizontalBtn');
+        const flipVerticalBtn = document.getElementById('flipVerticalBtn');
+        if (!rotateLeftBtn || !rotateRightBtn || !flipHorizontalBtn || !flipVerticalBtn) return;
+
+        const allBtns = [rotateLeftBtn, rotateRightBtn, flipHorizontalBtn, flipVerticalBtn];
+
+        // Draws the transformed image into the main canvas, converts it to
+        // a blob, and — same "keep originalImage in sync with the new
+        // pixels" fix the BG-remove module needed — reloads that blob into
+        // a fresh Image so every tool that reads originalImage/Width/Height
+        // afterwards (crop, dimension, another rotate, ...) sees the
+        // transformed result instead of stale pre-transform pixels.
+        function finalizeTransform(label) {
+            allBtns.forEach(b => b.classList.add('loading'));
+
+            canvas.toBlob(blob => {
+                if (!blob) {
+                    allBtns.forEach(b => b.classList.remove('loading'));
+                    showToast('❌ প্রয়োগ করা যায়নি', 'error');
+                    return;
+                }
+
+                const url = URL.createObjectURL(blob);
+                const img = new Image();
+                img.onload = () => {
+                    originalImage = img;
+                    originalWidth = img.naturalWidth;
+                    originalHeight = img.naturalHeight;
+                    aspectRatio = originalWidth / originalHeight;
+
+                    // Refresh the other tabs' cached-dimension UI so a
+                    // subsequent crop/dimension edit starts from the new
+                    // (possibly width/height-swapped) size, not the old one.
+                    infoDimension.textContent = `${originalWidth} × ${originalHeight}`;
+                    currentPixels.textContent = formatPixels(originalWidth * originalHeight);
+                    targetWidth.value = originalWidth;
+                    targetHeight.value = originalHeight;
+                    cropX.value = 0;
+                    cropY.value = 0;
+                    cropWidth.value = originalWidth;
+                    cropHeight.value = originalHeight;
+                    drawCropPreview();
+
+                    processedBlob = blob;
+                    downloadSection.style.display = 'block';
+                    updatePreview(blob);
+                    pushHistory(blob, label);
+                    document.dispatchEvent(new CustomEvent('app:historyrestored'));
+
+                    allBtns.forEach(b => b.classList.remove('loading'));
+                    showToast(`✅ ${label} সম্পন্ন হয়েছে!`, 'success');
+                };
+                img.onerror = () => {
+                    allBtns.forEach(b => b.classList.remove('loading'));
+                    showToast('❌ প্রয়োগ করা যায়নি', 'error');
+                };
+                img.src = url;
+            }, 'image/png');
+        }
+
+        function applyRotate(deltaDeg, label) {
+            if (!originalImage) return;
+            setTimeout(() => {
+                const { width: newW, height: newH } = getRotatedDimensions(originalWidth, originalHeight, deltaDeg);
+                canvas.width = newW;
+                canvas.height = newH;
+                ctx.save();
+                ctx.translate(newW / 2, newH / 2);
+                ctx.rotate(deltaDeg * Math.PI / 180); // canvas rotate() is clockwise for positive angles
+                ctx.drawImage(originalImage, -originalWidth / 2, -originalHeight / 2);
+                ctx.restore();
+                finalizeTransform(label);
+            }, 100);
+        }
+
+        function applyFlip(axis, label) {
+            if (!originalImage) return;
+            setTimeout(() => {
+                canvas.width = originalWidth;
+                canvas.height = originalHeight;
+                ctx.save();
+                if (axis === 'horizontal') {
+                    ctx.translate(originalWidth, 0);
+                    ctx.scale(-1, 1);
+                } else {
+                    ctx.translate(0, originalHeight);
+                    ctx.scale(1, -1);
+                }
+                ctx.drawImage(originalImage, 0, 0);
+                ctx.restore();
+                finalizeTransform(label);
+            }, 100);
+        }
+
+        rotateLeftBtn.addEventListener('click', () => applyRotate(-90, 'রোটেট ৯০° বামে'));
+        rotateRightBtn.addEventListener('click', () => applyRotate(90, 'রোটেট ৯০° ডানে'));
+        flipHorizontalBtn.addEventListener('click', () => applyFlip('horizontal', 'হরাইজন্টাল ফ্লিপ'));
+        flipVerticalBtn.addEventListener('click', () => applyFlip('vertical', 'ভার্টিক্যাল ফ্লিপ'));
+    })(); // end initRotateFlipModule
+
+    // ============================================
+    // Phase 9: Text / Logo Watermark
+    // ============================================
+    (function initWatermarkModule() {
+        const wmTextEnabled = document.getElementById('wmTextEnabled');
+        const wmTextFields = document.getElementById('wmTextFields');
+        const wmText = document.getElementById('wmText');
+        const wmFontSize = document.getElementById('wmFontSize');
+        const wmFontSizeValue = document.getElementById('wmFontSizeValue');
+        const wmFontFamily = document.getElementById('wmFontFamily');
+        const wmTextColor = document.getElementById('wmTextColor');
+        const wmTextOpacity = document.getElementById('wmTextOpacity');
+        const wmTextOpacityValue = document.getElementById('wmTextOpacityValue');
+        const wmTextPositionGrid = document.getElementById('wmTextPositionGrid');
+
+        const wmLogoEnabled = document.getElementById('wmLogoEnabled');
+        const wmLogoFields = document.getElementById('wmLogoFields');
+        const wmLogoFile = document.getElementById('wmLogoFile');
+        const wmLogoScale = document.getElementById('wmLogoScale');
+        const wmLogoScaleValue = document.getElementById('wmLogoScaleValue');
+        const wmLogoOpacity = document.getElementById('wmLogoOpacity');
+        const wmLogoOpacityValue = document.getElementById('wmLogoOpacityValue');
+        const wmLogoPositionGrid = document.getElementById('wmLogoPositionGrid');
+
+        const applyWatermarkBtn = document.getElementById('applyWatermark');
+        const wmOverlay = document.getElementById('wmOverlay');
+        const wmTextHandle = document.getElementById('wmTextHandle');
+        const wmLogoHandle = document.getElementById('wmLogoHandle');
+        const wmLogoHandleImg = document.getElementById('wmLogoHandleImg');
+
+        if (!wmTextEnabled || !wmLogoEnabled || !applyWatermarkBtn || !wmOverlay) return;
+
+        let wmTextPos = { fx: 0.88, fy: 0.88 };
+        let wmLogoPos = { fx: 0.88, fy: 0.88 };
+        let wmLogoImage = null;   // loaded HTMLImageElement for the uploaded logo
+        let wmLogoAspect = 1;     // naturalHeight / naturalWidth, for preserving logo proportions
+
+        // Same "image's own rendered box, not the wrapper's" positioning
+        // approach the BG-remove module's lasso/clone/erase canvases use —
+        // written as its own local copy here since that helper lives inside
+        // initBgRemoveModule's closure and isn't reachable from other modules.
+        function getImageDisplayRect() {
+            const wrapper = previewImage.parentElement;
+            const imgRect = previewImage.getBoundingClientRect();
+            const wrapRect = wrapper.getBoundingClientRect();
+            return {
+                left: imgRect.left - wrapRect.left,
+                top: imgRect.top - wrapRect.top,
+                width: imgRect.width,
+                height: imgRect.height
+            };
+        }
+
+        function refreshSliderLabels() {
+            wmFontSizeValue.textContent = wmFontSize.value;
+            wmTextOpacityValue.textContent = wmTextOpacity.value;
+            wmLogoScaleValue.textContent = wmLogoScale.value;
+            wmLogoOpacityValue.textContent = wmLogoOpacity.value;
+        }
+
+        function isWatermarkTabActive() {
+            const activeTab = document.querySelector('.tab-btn.active');
+            return !!activeTab && activeTab.dataset.tab === 'watermark';
+        }
+
+        function syncOverlayVisibility() {
+            const shouldShow = isWatermarkTabActive() && !!originalImage &&
+                (wmTextEnabled.checked || wmLogoEnabled.checked);
+            wmOverlay.style.display = shouldShow ? 'block' : 'none';
+        }
+
+        // Positions text/logo preview handles using the same fx/fy anchor
+        // fractions that get burned into the full-resolution canvas on
+        // Apply, so the drag-preview is a faithful (WYSIWYG) match.
+        function updateTextHandle() {
+            if (!wmTextEnabled.checked || !originalImage) {
+                wmTextHandle.style.display = 'none';
+                return;
+            }
+            const rect = getImageDisplayRect();
+            const refDim = Math.min(rect.width, rect.height);
+            const fontPx = Math.max(8, Math.round(refDim * (parseFloat(wmFontSize.value) / 100)));
+            wmTextHandle.textContent = wmText.value || 'নমুনা টেক্সট';
+            wmTextHandle.style.left = (wmTextPos.fx * 100) + '%';
+            wmTextHandle.style.top = (wmTextPos.fy * 100) + '%';
+            wmTextHandle.style.fontSize = fontPx + 'px';
+            wmTextHandle.style.fontFamily = wmFontFamily.value;
+            wmTextHandle.style.color = wmTextColor.value;
+            wmTextHandle.style.opacity = parseFloat(wmTextOpacity.value) / 100;
+            wmTextHandle.style.display = 'block';
+        }
+
+        function updateLogoHandle() {
+            if (!wmLogoEnabled.checked || !originalImage || !wmLogoImage) {
+                wmLogoHandle.style.display = 'none';
+                return;
+            }
+            const rect = getImageDisplayRect();
+            const width = Math.max(4, Math.round(rect.width * (parseFloat(wmLogoScale.value) / 100)));
+            const height = Math.round(width * wmLogoAspect);
+            wmLogoHandleImg.src = wmLogoImage.src;
+            wmLogoHandleImg.style.width = width + 'px';
+            wmLogoHandleImg.style.height = height + 'px';
+            wmLogoHandle.style.left = (wmLogoPos.fx * 100) + '%';
+            wmLogoHandle.style.top = (wmLogoPos.fy * 100) + '%';
+            wmLogoHandle.style.opacity = parseFloat(wmLogoOpacity.value) / 100;
+            wmLogoHandle.style.display = 'block';
+        }
+
+        function refreshAll() {
+            syncOverlayVisibility();
+            updateTextHandle();
+            updateLogoHandle();
+        }
+
+        // ---------- Toggle sections ----------
+        wmTextEnabled.addEventListener('change', () => {
+            wmTextFields.style.display = wmTextEnabled.checked ? 'block' : 'none';
+            refreshAll();
+        });
+        wmLogoEnabled.addEventListener('change', () => {
+            wmLogoFields.style.display = wmLogoEnabled.checked ? 'block' : 'none';
+            refreshAll();
+        });
+
+        // ---------- Text field inputs ----------
+        wmText.addEventListener('input', updateTextHandle);
+        wmFontSize.addEventListener('input', () => { refreshSliderLabels(); updateTextHandle(); });
+        wmFontFamily.addEventListener('change', updateTextHandle);
+        wmTextColor.addEventListener('input', updateTextHandle);
+        wmTextOpacity.addEventListener('input', () => { refreshSliderLabels(); updateTextHandle(); });
+
+        // ---------- Logo field inputs ----------
+        wmLogoScale.addEventListener('input', () => { refreshSliderLabels(); updateLogoHandle(); });
+        wmLogoOpacity.addEventListener('input', () => { refreshSliderLabels(); updateLogoHandle(); });
+
+        wmLogoFile.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const img = new Image();
+                img.onload = () => {
+                    wmLogoImage = img;
+                    wmLogoAspect = img.naturalHeight / img.naturalWidth;
+                    updateLogoHandle();
+                    showToast('✅ লোগো লোড হয়েছে', 'success');
+                };
+                img.onerror = () => showToast('❌ লোগো ছবি লোড করা যায়নি', 'error');
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // ---------- 9-grid position presets ----------
+        function wirePositionGrid(grid, posState, onPick) {
+            grid.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    grid.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    posState.fx = parseFloat(btn.dataset.fx);
+                    posState.fy = parseFloat(btn.dataset.fy);
+                    onPick();
+                });
+            });
+        }
+        wirePositionGrid(wmTextPositionGrid, wmTextPos, updateTextHandle);
+        wirePositionGrid(wmLogoPositionGrid, wmLogoPos, updateLogoHandle);
+
+        // ---------- Free-drag positioning ----------
+        // Same "fixed element + JS-computed left/top from the pointer"
+        // approach as the eyedropper loupe, adapted to set a persistent
+        // fx/fy anchor (0–1) instead of a one-off cursor-follow position.
+        function wireDrag(handle, posState, grid, onMove) {
+            let dragging = false;
+
+            function clientToFraction(clientX, clientY) {
+                const rect = getImageDisplayRect();
+                if (rect.width === 0 || rect.height === 0) return null;
+                const imgRect = previewImage.getBoundingClientRect();
+                let fx = (clientX - imgRect.left) / rect.width;
+                let fy = (clientY - imgRect.top) / rect.height;
+                fx = Math.min(1, Math.max(0, fx));
+                fy = Math.min(1, Math.max(0, fy));
+                return { fx, fy };
+            }
+
+            function onPointerMove(e) {
+                if (!dragging) return;
+                const pt = clientToFraction(e.clientX, e.clientY);
+                if (!pt) return;
+                posState.fx = pt.fx;
+                posState.fy = pt.fy;
+                onMove();
+            }
+
+            function onPointerUp() {
+                if (!dragging) return;
+                dragging = false;
+                handle.classList.remove('dragging');
+                // A manual drag no longer matches any 9-grid preset exactly —
+                // clear the active highlight so the grid doesn't lie about it.
+                if (grid) grid.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                document.removeEventListener('pointermove', onPointerMove);
+                document.removeEventListener('pointerup', onPointerUp);
+            }
+
+            handle.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                dragging = true;
+                handle.classList.add('dragging');
+                document.addEventListener('pointermove', onPointerMove);
+                document.addEventListener('pointerup', onPointerUp);
+            });
+        }
+        wireDrag(wmTextHandle, wmTextPos, wmTextPositionGrid, updateTextHandle);
+        wireDrag(wmLogoHandle, wmLogoPos, wmLogoPositionGrid, updateLogoHandle);
+
+        // ---------- Tab / image lifecycle ----------
+        document.addEventListener('app:tabchange', syncOverlayVisibility);
+        document.addEventListener('app:newimage', refreshAll);
+        document.addEventListener('app:historyrestored', refreshAll);
+        previewImage.addEventListener('load', refreshAll);
+        window.addEventListener('resize', () => { updateTextHandle(); updateLogoHandle(); });
+
+        // ---------- Apply ----------
+        function currentSettings() {
+            return {
+                textEnabled: wmTextEnabled.checked,
+                text: wmText.value,
+                fontSizeRatio: parseFloat(wmFontSize.value) / 100,
+                fontFamily: wmFontFamily.value,
+                color: wmTextColor.value,
+                textOpacity: parseFloat(wmTextOpacity.value),
+                textPos: { fx: wmTextPos.fx, fy: wmTextPos.fy },
+                logoEnabled: wmLogoEnabled.checked,
+                logoScaleRatio: parseFloat(wmLogoScale.value) / 100,
+                logoAspect: wmLogoAspect,
+                logoOpacity: parseFloat(wmLogoOpacity.value),
+                logoPos: { fx: wmLogoPos.fx, fy: wmLogoPos.fy }
+            };
+        }
+
+        // Exposed for bulk.js — reads live off the DOM/state each call so
+        // it always reflects whatever is currently configured on this tab.
+        window.getWatermarkSettings = function () {
+            return {
+                enabled: wmTextEnabled.checked || wmLogoEnabled.checked,
+                settings: currentSettings(),
+                logoImage: wmLogoImage
+            };
+        };
+
+        applyWatermarkBtn.addEventListener('click', () => {
+            if (!originalImage) return;
+            if (!wmTextEnabled.checked && !wmLogoEnabled.checked) {
+                showToast('কমপক্ষে একটি ওয়াটারমার্ক (টেক্সট বা লোগো) সক্রিয় করুন', 'error');
+                return;
+            }
+            if (wmTextEnabled.checked && !wmText.value.trim()) {
+                showToast('টেক্সট লিখুন', 'error');
+                return;
+            }
+            if (wmLogoEnabled.checked && !wmLogoImage) {
+                showToast('লোগো ছবি আপলোড করুন', 'error');
+                return;
+            }
+
+            applyWatermarkBtn.classList.add('loading');
+
+            setTimeout(() => {
+                canvas.width = originalWidth;
+                canvas.height = originalHeight;
+                ctx.drawImage(originalImage, 0, 0);
+                window.drawWatermark(ctx, canvas.width, canvas.height, currentSettings(), wmLogoImage);
+
+                canvas.toBlob(blob => {
+                    if (!blob) {
+                        applyWatermarkBtn.classList.remove('loading');
+                        showToast('❌ প্রয়োগ করা যায়নি', 'error');
+                        return;
+                    }
+                    const url = URL.createObjectURL(blob);
+                    const img = new Image();
+                    img.onload = () => {
+                        // Keep originalImage in sync with the new (watermarked)
+                        // pixels — same fix as the BG-remove and Rotate/Flip
+                        // modules — so a later crop/rotate/brightness edit
+                        // doesn't silently discard the watermark.
+                        originalImage = img;
+                        originalWidth = img.naturalWidth;
+                        originalHeight = img.naturalHeight;
+                        aspectRatio = originalWidth / originalHeight;
+
+                        processedBlob = blob;
+                        downloadSection.style.display = 'block';
+                        updatePreview(blob);
+                        pushHistory(blob, 'ওয়াটারমার্ক যোগ করা হয়েছে');
+                        document.dispatchEvent(new CustomEvent('app:historyrestored'));
+
+                        applyWatermarkBtn.classList.remove('loading');
+                        showToast('✅ ওয়াটারমার্ক প্রয়োগ হয়েছে!', 'success');
+                    };
+                    img.onerror = () => {
+                        applyWatermarkBtn.classList.remove('loading');
+                        showToast('❌ প্রয়োগ করা যায়নি', 'error');
+                    };
+                    img.src = url;
+                }, 'image/png');
+            }, 100);
+        });
+    })(); // end initWatermarkModule
 
 })();
