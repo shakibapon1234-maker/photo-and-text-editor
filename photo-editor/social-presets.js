@@ -8,12 +8,28 @@
 
     window.SOCIAL_PRESETS = [
         {
-            id: 'fb_reels',
-            label: 'Facebook Reels / Story',
+            id: 'warisha_product_3_4',
+            label: '👑 Warisha Fashion (Website 3:4)',
+            w: 900,
+            h: 1200,
+            ratioLabel: '3:4',
+            note: 'ওয়ারিশা ফ্যাশন ওয়েবসাইটে প্রোডাক্ট আপলোড করার আদর্শ সাইজ (ফুল ফ্রেম ফিট, কোনো গ্যাপ থাকবে না)'
+        },
+        {
+            id: 'warisha_product_4_5',
+            label: '👑 Warisha Fashion (Website 4:5)',
             w: 1080,
-            h: 1920,
-            ratioLabel: '9:16',
-            note: 'রিলস, স্টোরি, বুস্ট ভিডিও/ইমেজ অ্যাড (ফুল স্ক্রিন)'
+            h: 1350,
+            ratioLabel: '4:5',
+            note: 'ওয়েবসাইট ও ফেসবুক বুস্টিং উভয়ের জন্য প্রিমিয়াম পোর্ট্রেট সাইজ'
+        },
+        {
+            id: 'warisha_square_1_1',
+            label: '👑 Warisha Fashion (Square 1:1)',
+            w: 1080,
+            h: 1080,
+            ratioLabel: '1:1',
+            note: 'ওয়েবসাইট ও সোশ্যাল মিডিয়া ক্যাটালগের পারফেক্ট স্কয়ার সাইজ'
         },
         {
             id: 'fb_feed_portrait',
@@ -30,6 +46,14 @@
             h: 1080,
             ratioLabel: '1:1',
             note: 'নিউজফিড পোস্ট/অ্যাড — সবচেয়ে নিরাপদ, সব প্লেসমেন্টে ভালো ফিট হয়'
+        },
+        {
+            id: 'fb_reels',
+            label: 'Facebook Reels / Story',
+            w: 1080,
+            h: 1920,
+            ratioLabel: '9:16',
+            note: 'রিলস, স্টোরি, বুস্ট ভিডিও/ইমেজ অ্যাড (ফুল স্ক্রিন)'
         },
         {
             id: 'fb_feed_landscape',
