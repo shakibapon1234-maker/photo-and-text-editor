@@ -358,3 +358,23 @@ body.is-exporting .panel-section:not(.panel-section-export) {
   }
   .viewport { flex: 1 1 55vh; }
 }
+
+/* ---------- checkbox fields (multicolor, pattern toggles) ---------- */
+.checkbox-field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 2px;
+}
+.checkbox-field input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.checkbox-field span {
+  font-size: 12px;
+  color: var(--text-dim);
+}

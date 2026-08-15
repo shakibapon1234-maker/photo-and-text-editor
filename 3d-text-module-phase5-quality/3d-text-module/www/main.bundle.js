@@ -25855,6 +25855,19 @@ var colorStartPicker = document.getElementById("colorStartPicker");
 var colorEndPicker = document.getElementById("colorEndPicker");
 var gradientAngleRange = document.getElementById("gradientAngleRange");
 var gradientAngleValue = document.getElementById("gradientAngleValue");
+var multicolorGroup = document.getElementById("multicolorGroup");
+var multicolorPaletteSelect = document.getElementById("multicolorPaletteSelect");
+var comicOutlineToggle = document.getElementById("comicOutlineToggle");
+var patternGroup = document.getElementById("patternGroup");
+var patternPresetSelect = document.getElementById("patternPresetSelect");
+var festiveDecorToggle = document.getElementById("festiveDecorToggle");
+var cubeContentSection = document.getElementById("cubeContentSection");
+var cubeFace1Input = document.getElementById("cubeFace1Input");
+var cubeFace2Input = document.getElementById("cubeFace2Input");
+var cubeFace3Input = document.getElementById("cubeFace3Input");
+var cubeColorPicker = document.getElementById("cubeColorPicker");
+var cubeTextColorPicker = document.getElementById("cubeTextColorPicker");
+var cubeTextBorderPicker = document.getElementById("cubeTextBorderPicker");
 var bgModeSelect = document.getElementById("bgModeSelect");
 var bgColorGroup = document.getElementById("bgColorGroup");
 var bgColorPicker = document.getElementById("bgColorPicker");
@@ -26043,6 +26056,16 @@ var state = {
   colorStart: colorStartPicker?.value || "#ffd700",
   colorEnd: colorEndPicker?.value || "#ff4500",
   gradientAngle: Number(gradientAngleRange?.value || 90),
+  multicolorPalette: multicolorPaletteSelect?.value || "comic",
+  comicOutline: comicOutlineToggle ? comicOutlineToggle.checked : true,
+  patternPreset: patternPresetSelect?.value || "candyCane",
+  festiveDecor: festiveDecorToggle ? festiveDecorToggle.checked : true,
+  cubeFace1: cubeFace1Input?.value || "3",
+  cubeFace2: cubeFace2Input?.value || "D",
+  cubeFace3: cubeFace3Input?.value || "3D",
+  cubeColor: cubeColorPicker?.value || "#1d4ed8",
+  cubeTextColor: cubeTextColorPicker?.value || "#ffffff",
+  cubeTextBorder: cubeTextBorderPicker?.value || "#0f172a",
   bgMode: bgModeSelect?.value || "darkBlue",
   bgColor: bgColorPicker?.value || "#0a192f",
   bgImageElement: null,
@@ -26226,6 +26249,198 @@ function getGradientFillStyle(ctx, width, height) {
     return grad;
   }
 }
+var MULTICOLOR_PALETTES = {
+  comic: ["#e53935", "#f57c00", "#43a047", "#1e88e5", "#8e24aa", "#e91e63", "#ff8f00"],
+  pastel: ["#ff8a80", "#82b1ff", "#ccff90", "#ea80fc", "#80d8ff", "#ffd180", "#b9f6ca"],
+  neon: ["#ff1744", "#00e5ff", "#76ff03", "#ffea00", "#d500f9", "#ff6d00", "#1de9b6"],
+  warmCool: ["#f44336", "#ff9800", "#ffeb3b", "#00bcd4", "#3f51b5", "#9c27b0", "#009688"],
+  rainbow: ["#e53935", "#f4511e", "#f9a825", "#2e7d32", "#0277bd", "#283593", "#6a1b9a"]
+};
+function getMulticolorPalette() {
+  return MULTICOLOR_PALETTES[state.multicolorPalette] || MULTICOLOR_PALETTES.comic;
+}
+function getPatternFillStyle(ctx, charW, charH, colorOverride) {
+  const p = state.patternPreset;
+  const patCanvas = document.createElement("canvas");
+  if (p === "candyCane") {
+    const tileSize = Math.max(60, Math.round(charH * 0.22));
+    patCanvas.width = tileSize;
+    patCanvas.height = tileSize;
+    const pc = patCanvas.getContext("2d");
+    pc.fillStyle = "#ffffff";
+    pc.fillRect(0, 0, tileSize, tileSize);
+    pc.strokeStyle = "#e53935";
+    pc.lineWidth = tileSize * 0.38;
+    pc.lineCap = "butt";
+    for (let i = -2; i <= 4; i++) {
+      pc.beginPath();
+      pc.moveTo(i * tileSize - tileSize, 0);
+      pc.lineTo(i * tileSize, tileSize);
+      pc.stroke();
+    }
+    const pattern = ctx.createPattern(patCanvas, "repeat");
+    return pattern;
+  }
+  if (p === "floral") {
+    const ts = 120;
+    patCanvas.width = ts;
+    patCanvas.height = ts;
+    const pc = patCanvas.getContext("2d");
+    pc.fillStyle = "#1b5e20";
+    pc.fillRect(0, 0, ts, ts);
+    const petalColors = ["#f06292", "#ab47bc", "#ff7043", "#ffca28", "#ef5350"];
+    const flowers = [[ts * 0.25, ts * 0.25], [ts * 0.75, ts * 0.75], [ts * 0.25, ts * 0.75], [ts * 0.75, ts * 0.25], [ts * 0.5, ts * 0.5]];
+    flowers.forEach(([fx, fy], fi) => {
+      const r = ts * 0.13;
+      for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 3) {
+        pc.beginPath();
+        pc.ellipse(fx + Math.cos(angle) * r * 1.1, fy + Math.sin(angle) * r * 1.1, r * 0.85, r * 0.5, angle, 0, Math.PI * 2);
+        pc.fillStyle = petalColors[fi % petalColors.length];
+        pc.fill();
+      }
+      pc.beginPath();
+      pc.arc(fx, fy, r * 0.45, 0, Math.PI * 2);
+      pc.fillStyle = "#ffee58";
+      pc.fill();
+    });
+    return ctx.createPattern(patCanvas, "repeat");
+  }
+  if (p === "goldGlitter") {
+    const ts = 80;
+    patCanvas.width = ts;
+    patCanvas.height = ts;
+    const pc = patCanvas.getContext("2d");
+    const grd = pc.createLinearGradient(0, 0, ts, ts);
+    grd.addColorStop(0, "#bf8f2e");
+    grd.addColorStop(0.3, "#ffd700");
+    grd.addColorStop(0.6, "#f0c040");
+    grd.addColorStop(1, "#c9982a");
+    pc.fillStyle = grd;
+    pc.fillRect(0, 0, ts, ts);
+    for (let s = 0; s < 22; s++) {
+      const sx = Math.random() * ts;
+      const sy = Math.random() * ts;
+      const sr = 1 + Math.random() * 3;
+      pc.beginPath();
+      pc.arc(sx, sy, sr, 0, Math.PI * 2);
+      pc.fillStyle = `rgba(255,255,255,${0.4 + Math.random() * 0.5})`;
+      pc.fill();
+    }
+    return ctx.createPattern(patCanvas, "repeat");
+  }
+  if (p === "cyberGrid") {
+    const ts = 60;
+    patCanvas.width = ts;
+    patCanvas.height = ts;
+    const pc = patCanvas.getContext("2d");
+    pc.fillStyle = "#0a0a1a";
+    pc.fillRect(0, 0, ts, ts);
+    pc.strokeStyle = "#00e5ff";
+    pc.lineWidth = 1.5;
+    pc.beginPath();
+    pc.moveTo(ts / 2, 0);
+    pc.lineTo(ts / 2, ts);
+    pc.stroke();
+    pc.beginPath();
+    pc.moveTo(0, ts / 2);
+    pc.lineTo(ts, ts / 2);
+    pc.stroke();
+    pc.strokeStyle = "rgba(0,229,255,0.25)";
+    pc.lineWidth = 0.5;
+    pc.beginPath();
+    pc.moveTo(0, 0);
+    pc.lineTo(ts, ts);
+    pc.stroke();
+    pc.beginPath();
+    pc.moveTo(ts, 0);
+    pc.lineTo(0, ts);
+    pc.stroke();
+    pc.beginPath();
+    pc.arc(ts / 2, ts / 2, ts * 0.12, 0, Math.PI * 2);
+    pc.fillStyle = "#00e5ff";
+    pc.fill();
+    return ctx.createPattern(patCanvas, "repeat");
+  }
+  if (p === "marble") {
+    const ts = 200;
+    patCanvas.width = ts;
+    patCanvas.height = ts;
+    const pc = patCanvas.getContext("2d");
+    pc.fillStyle = "#f5f5f0";
+    pc.fillRect(0, 0, ts, ts);
+    for (let v = 0; v < 8; v++) {
+      pc.beginPath();
+      const x1 = Math.random() * ts, y1 = Math.random() * ts;
+      const x2 = x1 + (Math.random() - 0.5) * ts * 0.9, y2 = y1 + (Math.random() - 0.5) * ts * 0.9;
+      pc.moveTo(x1, y1);
+      pc.lineTo(x2, y2);
+      pc.strokeStyle = `rgba(${100 + Math.random() * 60},${100 + Math.random() * 60},${100 + Math.random() * 60},${0.12 + Math.random() * 0.18})`;
+      pc.lineWidth = 0.8 + Math.random() * 2.5;
+      pc.stroke();
+    }
+    return ctx.createPattern(patCanvas, "repeat");
+  }
+  if (p === "wood") {
+    const ts = 160;
+    patCanvas.width = ts;
+    patCanvas.height = ts;
+    const pc = patCanvas.getContext("2d");
+    const gw = pc.createLinearGradient(0, 0, ts, 0);
+    gw.addColorStop(0, "#5d3a1a");
+    gw.addColorStop(0.5, "#8d5524");
+    gw.addColorStop(1, "#5d3a1a");
+    pc.fillStyle = gw;
+    pc.fillRect(0, 0, ts, ts);
+    for (let gr = 0; gr < 14; gr++) {
+      pc.beginPath();
+      pc.moveTo(0, gr / 14 * ts);
+      pc.bezierCurveTo(ts * 0.33, gr / 14 * ts + (Math.random() - 0.5) * 8, ts * 0.66, gr / 14 * ts + (Math.random() - 0.5) * 8, ts, gr / 14 * ts);
+      pc.strokeStyle = `rgba(60,30,5,${0.06 + Math.random() * 0.12})`;
+      pc.lineWidth = 0.5 + Math.random() * 1.5;
+      pc.stroke();
+    }
+    return ctx.createPattern(patCanvas, "repeat");
+  }
+  return colorOverride || "#ffffff";
+}
+function drawClusteredMulticolor(ctx, clusters, layout, centerX, baselineY, palette, outlineOn) {
+  clusters.forEach((cluster, i) => {
+    const c = layout.chars[i];
+    if (!c) return;
+    const col = palette[i % palette.length];
+    ctx.save();
+    ctx.translate(centerX + c.x, baselineY + c.y);
+    ctx.rotate(c.rotation);
+    if (outlineOn) {
+      ctx.lineWidth = CANVAS_TEXT_FONT_PX * 0.12;
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "#111111";
+      ctx.strokeText(cluster, 0, 0);
+    }
+    const glyphW = ctx.measureText(cluster).width;
+    const hGrad = ctx.createLinearGradient(-glyphW / 2, -CANVAS_TEXT_FONT_PX * 0.6, glyphW / 2, CANVAS_TEXT_FONT_PX * 0.5);
+    hGrad.addColorStop(0, lightenHex(col, 0.55));
+    hGrad.addColorStop(0.45, col);
+    hGrad.addColorStop(1, darkenHex(col, 0.35));
+    ctx.fillStyle = hGrad;
+    ctx.fillText(cluster, 0, 0);
+    ctx.restore();
+  });
+}
+function lightenHex(hex, amount) {
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  const lr = Math.min(255, Math.round(r + (255 - r) * amount));
+  const lg = Math.min(255, Math.round(g + (255 - g) * amount));
+  const lb = Math.min(255, Math.round(b + (255 - b) * amount));
+  return `rgb(${lr},${lg},${lb})`;
+}
+function darkenHex(hex, amount) {
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  const dr = Math.max(0, Math.round(r * (1 - amount)));
+  const dg = Math.max(0, Math.round(g * (1 - amount)));
+  const db = Math.max(0, Math.round(b * (1 - amount)));
+  return `rgb(${dr},${dg},${db})`;
+}
 function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
   const fontStack = getFontStack(state.fontFamily);
   const measureCtx = document.createElement("canvas").getContext("2d");
@@ -26245,10 +26460,57 @@ function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
   canvas2.height = canvasH;
   const ctx = canvas2.getContext("2d");
   ctx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${fontStack}`;
+  if (state.colorMode === "multicolor") {
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const palette = getMulticolorPalette();
+    const outlineOn = state.comicOutline !== false;
+    perLine.forEach(({ clusters, layout }, i) => {
+      const y = maxBulge + CANVAS_TEXT_PAD_PX + CANVAS_TEXT_LINE_HEIGHT_PX * i + CANVAS_TEXT_LINE_HEIGHT_PX / 2;
+      drawClusteredMulticolor(ctx, clusters, layout, canvasW / 2, y, palette, outlineOn);
+    });
+    return { canvas: canvas2, aspect: canvasW / canvasH };
+  }
+  if (state.colorMode === "pattern") {
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const patFill = getPatternFillStyle(ctx, canvasW, canvasH);
+    perLine.forEach(({ clusters, layout }, i) => {
+      const y = maxBulge + CANVAS_TEXT_PAD_PX + CANVAS_TEXT_LINE_HEIGHT_PX * i + CANVAS_TEXT_LINE_HEIGHT_PX / 2;
+      clusters.forEach((cluster, ci) => {
+        const c = layout.chars[ci];
+        if (!c) return;
+        ctx.save();
+        ctx.translate(canvasW / 2 + c.x, y + c.y);
+        ctx.rotate(c.rotation);
+        ctx.lineWidth = CANVAS_TEXT_FONT_PX * 0.1;
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = "#1a0a00";
+        ctx.strokeText(cluster, 0, 0);
+        if (typeof patFill === "string") {
+          ctx.fillStyle = patFill;
+        } else {
+          ctx.fillStyle = patFill;
+        }
+        ctx.fillText(cluster, 0, 0);
+        if (state.festiveDecor) {
+          const gw = ctx.measureText(cluster).width;
+          const snowGrad = ctx.createLinearGradient(-gw / 2, -CANVAS_TEXT_FONT_PX * 0.58, gw / 2, -CANVAS_TEXT_FONT_PX * 0.15);
+          snowGrad.addColorStop(0, "rgba(255,255,255,0.85)");
+          snowGrad.addColorStop(0.5, "rgba(255,255,255,0.30)");
+          snowGrad.addColorStop(1, "rgba(255,255,255,0.0)");
+          ctx.fillStyle = snowGrad;
+          ctx.fillText(cluster, 0, 0);
+        }
+        ctx.restore();
+      });
+    });
+    return { canvas: canvas2, aspect: canvasW / canvasH };
+  }
   if (state.colorMode === "gradient") {
     ctx.fillStyle = getGradientFillStyle(ctx, canvasW, canvasH);
   } else {
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = state.color || "#ffffff";
   }
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -26981,6 +27243,108 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
   textMesh = group;
   textMesh.material = materials;
 }
+function drawCubeFaceCanvas(faceText, cubeColor, textColor, borderColor) {
+  const size = 512;
+  const canvas2 = document.createElement("canvas");
+  canvas2.width = size;
+  canvas2.height = size;
+  const ctx = canvas2.getContext("2d");
+  ctx.fillStyle = cubeColor;
+  ctx.fillRect(0, 0, size, size);
+  const vgrd = ctx.createRadialGradient(size / 2, size / 2, size * 0.08, size / 2, size / 2, size * 0.72);
+  vgrd.addColorStop(0, "rgba(255,255,255,0.18)");
+  vgrd.addColorStop(1, "rgba(0,0,0,0.35)");
+  ctx.fillStyle = vgrd;
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 1;
+  for (let g = 0; g <= 4; g++) {
+    const gp = size / 4 * g;
+    ctx.beginPath();
+    ctx.moveTo(gp, 0);
+    ctx.lineTo(gp, size);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, gp);
+    ctx.lineTo(size, gp);
+    ctx.stroke();
+  }
+  if (!faceText || !faceText.trim()) return { canvas: canvas2 };
+  const len = faceText.length;
+  const fontSize = len <= 1 ? size * 0.62 : len <= 3 ? size * 0.42 : size * 0.28;
+  const fontFamily = `"Grand Hotel", "Pacifico", sans-serif`;
+  ctx.font = `700 ${fontSize}px ${fontFamily}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const shadowLayers = 7;
+  for (let s = shadowLayers; s >= 1; s--) {
+    const alpha = 0.08 + (shadowLayers - s) * 0.04;
+    ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+    ctx.fillText(faceText, size / 2 + s * 2, size / 2 + s * 2);
+  }
+  ctx.lineWidth = fontSize * 0.14;
+  ctx.lineJoin = "round";
+  ctx.strokeStyle = borderColor || "#0a0a2a";
+  ctx.strokeText(faceText, size / 2, size / 2);
+  const tGrad = ctx.createLinearGradient(0, size / 2 - fontSize * 0.6, 0, size / 2 + fontSize * 0.6);
+  const tc = textColor || "#ffffff";
+  tGrad.addColorStop(0, lightenHex(tc, 0.5));
+  tGrad.addColorStop(0.4, tc);
+  tGrad.addColorStop(1, darkenHex(tc, 0.4));
+  ctx.fillStyle = tGrad;
+  ctx.fillText(faceText, size / 2, size / 2);
+  return { canvas: canvas2 };
+}
+function buildCubeBoxMesh() {
+  const cubeSize = state.size * 1.4;
+  const cubeColor = state.cubeColor || "#1d4ed8";
+  const textColor = state.cubeTextColor || "#ffffff";
+  const borderColor = state.cubeTextBorder || "#0f172a";
+  const face1 = state.cubeFace1 || "3";
+  const face2 = state.cubeFace2 || "D";
+  const face3 = state.cubeFace3 || "";
+  const { canvas: cFront } = drawCubeFaceCanvas(face1, cubeColor, textColor, borderColor);
+  const { canvas: cRight } = drawCubeFaceCanvas(face2, cubeColor, textColor, borderColor);
+  const { canvas: cTop } = drawCubeFaceCanvas(face3, cubeColor, textColor, borderColor);
+  const { canvas: cBack } = drawCubeFaceCanvas(face1, cubeColor, textColor, borderColor);
+  const { canvas: cLeft } = drawCubeFaceCanvas(face2, cubeColor, textColor, borderColor);
+  const { canvas: cBottom } = drawCubeFaceCanvas("", cubeColor, textColor, borderColor);
+  function makeCubeTex(cnv, mirrorH) {
+    const t = new CanvasTexture(cnv);
+    t.colorSpace = SRGBColorSpace;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    if (mirrorH) {
+      t.wrapS = RepeatWrapping;
+      t.repeat.x = -1;
+      t.offset.x = 1;
+    }
+    t.needsUpdate = true;
+    return t;
+  }
+  const materials = [
+    new MeshStandardMaterial({ map: makeCubeTex(cRight, false), roughness: 0.25, metalness: 0.1 }),
+    // right
+    new MeshStandardMaterial({ map: makeCubeTex(cLeft, true), roughness: 0.25, metalness: 0.1 }),
+    // left
+    new MeshStandardMaterial({ map: makeCubeTex(cTop, false), roughness: 0.25, metalness: 0.1 }),
+    // top
+    new MeshStandardMaterial({ map: makeCubeTex(cBottom, false), roughness: 0.35, metalness: 0.1 }),
+    // bottom
+    new MeshStandardMaterial({ map: makeCubeTex(cFront, false), roughness: 0.2, metalness: 0.12 }),
+    // front
+    new MeshStandardMaterial({ map: makeCubeTex(cBack, true), roughness: 0.2, metalness: 0.12 })
+    // back
+  ];
+  const geometry = new BoxGeometry(cubeSize, cubeSize, cubeSize);
+  const mesh = new Mesh(geometry, materials);
+  mesh.castShadow = state.shadowsOn;
+  mesh.receiveShadow = state.shadowsOn;
+  const group = new Group();
+  group.add(mesh);
+  renderMode = "canvas";
+  textMesh = group;
+  textMesh.material = materials;
+}
 function rebuildTextMesh() {
   if (state.contentMode === "sticker") {
     disposeTextMesh();
@@ -27007,6 +27371,16 @@ function rebuildTextMesh() {
     updateShadowFrustum();
     return;
   }
+  if (state.contentMode === "cube") {
+    disposeTextMesh();
+    buildCubeBoxMesh();
+    applyRotation();
+    scene.add(textMesh);
+    updateQualityNote();
+    if (typeof updateTextModeNote === "function") updateTextModeNote(false);
+    updateShadowFrustum();
+    return;
+  }
   if (state.contentMode === "image") {
     disposeTextMesh();
     if (!state.imageElement) {
@@ -27025,7 +27399,7 @@ function rebuildTextMesh() {
   const rawContent = state.text || " ";
   const lines = rawContent.split(/\r?\n/);
   const validLines = lines.map((l) => l.length > 0 ? l : " ");
-  const isCustomFontOrGradient = state.fontFamily && state.fontFamily !== "helvetiker" || state.colorMode === "gradient";
+  const isCustomFontOrGradient = state.fontFamily && state.fontFamily !== "helvetiker" || state.colorMode === "gradient" || state.colorMode === "multicolor" || state.colorMode === "pattern";
   const needsCanvasCard = isBanglaText(rawContent) || state.curveIntensity !== 0 || isCustomFontOrGradient;
   if (!needsCanvasCard && !font) return;
   disposeTextMesh();
@@ -27267,10 +27641,35 @@ contentModeGrid.addEventListener("click", (e) => {
   textContentSection.hidden = state.contentMode !== "text";
   imageContentSection.hidden = state.contentMode !== "image";
   stickerContentSection.hidden = state.contentMode !== "sticker";
-  curveSection.hidden = state.contentMode === "image";
+  if (cubeContentSection) cubeContentSection.hidden = state.contentMode !== "cube";
+  curveSection.hidden = state.contentMode === "image" || state.contentMode === "cube";
   stopAnimation();
   rebuildTextMesh();
   updateExportSourceNote();
+});
+if (cubeFace1Input) cubeFace1Input.addEventListener("input", () => {
+  state.cubeFace1 = cubeFace1Input.value;
+  if (state.contentMode === "cube") scheduleRebuild();
+});
+if (cubeFace2Input) cubeFace2Input.addEventListener("input", () => {
+  state.cubeFace2 = cubeFace2Input.value;
+  if (state.contentMode === "cube") scheduleRebuild();
+});
+if (cubeFace3Input) cubeFace3Input.addEventListener("input", () => {
+  state.cubeFace3 = cubeFace3Input.value;
+  if (state.contentMode === "cube") scheduleRebuild();
+});
+if (cubeColorPicker) cubeColorPicker.addEventListener("input", () => {
+  state.cubeColor = cubeColorPicker.value;
+  if (state.contentMode === "cube") scheduleRebuild();
+});
+if (cubeTextColorPicker) cubeTextColorPicker.addEventListener("input", () => {
+  state.cubeTextColor = cubeTextColorPicker.value;
+  if (state.contentMode === "cube") scheduleRebuild();
+});
+if (cubeTextBorderPicker) cubeTextBorderPicker.addEventListener("input", () => {
+  state.cubeTextBorder = cubeTextBorderPicker.value;
+  if (state.contentMode === "cube") scheduleRebuild();
 });
 stickerTextInput.addEventListener("input", () => {
   state.stickerText = stickerTextInput.value;
@@ -27424,6 +27823,8 @@ function loadStudioState() {
       colorModeSelect.value = saved.colorMode;
       if (solidColorGroup) solidColorGroup.hidden = saved.colorMode !== "solid";
       if (gradientColorGroup) gradientColorGroup.hidden = saved.colorMode !== "gradient";
+      if (multicolorGroup) multicolorGroup.hidden = saved.colorMode !== "multicolor";
+      if (patternGroup) patternGroup.hidden = saved.colorMode !== "pattern";
     }
     if (saved.colorStart && colorStartPicker) {
       state.colorStart = saved.colorStart;
@@ -27882,6 +28283,8 @@ if (colorModeSelect) {
     state.colorMode = colorModeSelect.value;
     if (solidColorGroup) solidColorGroup.hidden = state.colorMode !== "solid";
     if (gradientColorGroup) gradientColorGroup.hidden = state.colorMode !== "gradient";
+    if (multicolorGroup) multicolorGroup.hidden = state.colorMode !== "multicolor";
+    if (patternGroup) patternGroup.hidden = state.colorMode !== "pattern";
     scheduleRebuild();
   });
 }
@@ -27908,6 +28311,30 @@ if (colorEndPicker) {
   colorEndPicker.addEventListener("input", () => {
     state.colorEnd = colorEndPicker.value;
     if (state.colorMode === "gradient") scheduleRebuild();
+  });
+}
+if (multicolorPaletteSelect) {
+  multicolorPaletteSelect.addEventListener("change", () => {
+    state.multicolorPalette = multicolorPaletteSelect.value;
+    if (state.colorMode === "multicolor") scheduleRebuild();
+  });
+}
+if (comicOutlineToggle) {
+  comicOutlineToggle.addEventListener("change", () => {
+    state.comicOutline = comicOutlineToggle.checked;
+    if (state.colorMode === "multicolor") scheduleRebuild();
+  });
+}
+if (patternPresetSelect) {
+  patternPresetSelect.addEventListener("change", () => {
+    state.patternPreset = patternPresetSelect.value;
+    if (state.colorMode === "pattern") scheduleRebuild();
+  });
+}
+if (festiveDecorToggle) {
+  festiveDecorToggle.addEventListener("change", () => {
+    state.festiveDecor = festiveDecorToggle.checked;
+    if (state.colorMode === "pattern") scheduleRebuild();
   });
 }
 if (gradientAngleRange) {

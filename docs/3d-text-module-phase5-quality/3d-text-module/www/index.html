@@ -32,8 +32,38 @@
           <button type="button" class="preset-btn" data-content="text">টেক্সট</button>
           <button type="button" class="preset-btn" data-content="image">ছবি</button>
           <button type="button" class="preset-btn" data-content="sticker">স্টিকার/ব্যাজ</button>
+          <button type="button" class="preset-btn" data-content="cube">🧊 ৩D কিউব বক্স</button>
         </div>
-        <p class="field-note">টেক্সট, ছবি বা স্টিকার/ব্যাজ — যেকোনো একটা একবারে অ্যাক্টিভ থাকে (একই Rotate/Material/Animation/Export প্যানেল সবগুলোতেই কাজ করে)।</p>
+        <p class="field-note">টেক্সট, ছবি, স্টিকার/ব্যাজ বা ৩D কিউব — যেকোনো একটা একবারে অ্যাক্টিভ থাকে।</p>
+      </section>
+
+      <section class="panel-section" id="cubeContentSection" hidden>
+        <h3>🧊 ৩D কিউব বক্স সেটিংস</h3>
+        <label class="field">
+          <span>বাম পাশ (Face 1)</span>
+          <input type="text" id="cubeFace1Input" value="3" placeholder="বাম পাশের লেখা" />
+        </label>
+        <label class="field">
+          <span>ডান পাশ (Face 2)</span>
+          <input type="text" id="cubeFace2Input" value="D" placeholder="ডান পাশের লেখা" />
+        </label>
+        <label class="field">
+          <span>উপরের পাশ (Face 3)</span>
+          <input type="text" id="cubeFace3Input" value="3D" placeholder="উপরের লেখা (ঐচ্ছিক)" />
+        </label>
+        <label class="field" style="margin-top: 8px;">
+          <span>কিউব বডি কালার</span>
+          <input type="color" id="cubeColorPicker" value="#1d4ed8" />
+        </label>
+        <label class="field">
+          <span>টেক্সট কালার</span>
+          <input type="color" id="cubeTextColorPicker" value="#ffffff" />
+        </label>
+        <label class="field">
+          <span>টেক্সট ৩D বর্ডার</span>
+          <input type="color" id="cubeTextBorderPicker" value="#0f172a" />
+        </label>
+        <p class="field-note">মাউস দিয়ে ক্যানভাসে ড্র্যাগ করে ৩D কিউবটি ৩৬০° ঘুরিয়ে প্রতিটি পাশের ৩D লেখা দেখতে পারবেন।</p>
       </section>
 
       <section class="panel-section" id="textContentSection">
@@ -239,9 +269,11 @@
         </div>
 
         <label class="field" style="margin-top:10px;">
-          <span>কালার টাইপ</span>
+          <span>কালার ও টেক্সচার মোড</span>
           <select id="colorModeSelect">
             <option value="gradient" selected>✨ গ্রেডিয়েন্ট কালার (Gradient)</option>
+            <option value="multicolor">🌈 রেইনবো / মাল্টিকালার (প্রতি অক্ষরে ভিন্ন রঙ)</option>
+            <option value="pattern">🍬 ফেস্টিভ ও প্যাটার্ন (Candy Cane / Floral)</option>
             <option value="solid">এক কালার (Solid Color)</option>
           </select>
         </label>
@@ -250,6 +282,41 @@
           <label class="field">
             <span>সলিড কালার</span>
             <input type="color" id="colorPicker" value="#c97f2e" />
+          </label>
+        </div>
+
+        <div id="multicolorGroup" hidden>
+          <label class="field">
+            <span>কালার প্যালেট</span>
+            <select id="multicolorPaletteSelect">
+              <option value="comic" selected>💥 Comic Pop (লাল, কমলা, সবুজ, নীল, বেগুনি - স্ক্রিনশট ১)</option>
+              <option value="pastel">🧁 Pastel Candy (সফট পেস্টেল রেইনবো)</option>
+              <option value="neon">⚡ Cyber Neon (হট পিঙ্ক, ইলেকট্রিক ব্লু, সাইবার ইয়েলো)</option>
+              <option value="warmCool">🔥 Warm & Cool (লাল, হলুদ, সাইয়ান, ব্লু)</option>
+              <option value="rainbow">🌈 Full Rainbow Spectrum (৭ রঙের রংধনু)</option>
+            </select>
+          </label>
+          <label class="field checkbox-field" style="margin-top: 4px;">
+            <input type="checkbox" id="comicOutlineToggle" checked />
+            <span>বোল্ড কার্টুন ৩D আউটলাইন বর্ডার</span>
+          </label>
+        </div>
+
+        <div id="patternGroup" hidden>
+          <label class="field">
+            <span>প্যাটার্ন / ফেস্টিভ স্টাইল</span>
+            <select id="patternPresetSelect">
+              <option value="candyCane" selected>🍬 Candy Cane / Christmas (লাল-সাদা স্ট্রাইপ - স্ক্রিনশট ২)</option>
+              <option value="floral">🌸 Floral Blossom (ফুলের রঙিন গার্ডেন)</option>
+              <option value="goldGlitter">✨ Gold Sparkle Foil (চকচকে গোল্ডেন গ্লিটার)</option>
+              <option value="cyberGrid">🌐 Cyber Matrix Grid (নিয়ন হাই-টেক)</option>
+              <option value="marble">🏛️ Luxury White Marble (মার্বেল টেক্সচার)</option>
+              <option value="wood">🪵 Rich Woodgrain (উডেন ফিনিশ)</option>
+            </select>
+          </label>
+          <label class="field checkbox-field" style="margin-top: 4px;">
+            <input type="checkbox" id="festiveDecorToggle" checked />
+            <span>ফেস্টিভ ডেকোরেশন (তুষার ক্যাপ / গ্লো)</span>
           </label>
         </div>
 
