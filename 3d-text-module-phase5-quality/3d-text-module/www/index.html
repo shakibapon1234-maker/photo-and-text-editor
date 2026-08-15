@@ -4,6 +4,9 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>3D Text Module — Phase 4 (+ ছবি, স্টিকার/ব্যাজ, কার্ভড টেক্সট)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Grand+Hotel&family=Pacifico&family=Lobster&family=Satisfy&family=Yellowtail&family=Montserrat:ital,wght@0,700;0,900;1,700&family=Playfair+Display:wght@700&family=Bungee&family=Noto+Sans+Bengali:wght@400;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -37,7 +40,22 @@
         <h3>টেক্সট</h3>
         <label class="field" style="align-items: flex-start;">
           <span style="margin-top: 6px;">কন্টেন্ট</span>
-          <textarea id="textInput" rows="2" placeholder="লেখা লিখুন (Enter দিয়ে একাধিক লাইন)" style="resize: vertical; min-height: 52px; font-family: inherit;">Hello 3D</textarea>
+          <textarea id="textInput" rows="2" placeholder="লেখা লিখুন (Enter দিয়ে একাধিক লাইন)" style="resize: vertical; min-height: 52px; font-family: inherit;">Style</textarea>
+        </label>
+        <label class="field" style="margin-top: 8px;">
+          <span>ফন্ট (Font)</span>
+          <select id="fontSelect">
+            <option value="Grand Hotel" selected>✨ Grand Hotel (Retro Cursive - 'Style')</option>
+            <option value="Pacifico">Pacifico (Bold Vintage Script)</option>
+            <option value="Lobster">Lobster (Classic Retro Script)</option>
+            <option value="Satisfy">Satisfy (Smooth Cursive)</option>
+            <option value="Yellowtail">Yellowtail (Brush Script)</option>
+            <option value="Montserrat">Montserrat (Bold Sans - 'DESIGN')</option>
+            <option value="Playfair Display">Playfair Display (Classic Serif)</option>
+            <option value="Bungee">Bungee (3D Heavy Display)</option>
+            <option value="Noto Sans Bengali">Noto Sans Bengali (বাংলা ফন্ট)</option>
+            <option value="helvetiker">Helvetiker (Vector 3D Default)</option>
+          </select>
         </label>
         <p class="field-note" id="textModeNote" hidden>—</p>
       </section>
@@ -179,18 +197,69 @@
       </section>
 
       <section class="panel-section">
-        <h3>ম্যাটেরিয়াল প্রিসেট</h3>
+        <h3>ম্যাটেরিয়াল ও কালার</h3>
         <div class="preset-grid" id="materialPresetGrid">
           <button type="button" class="preset-btn" data-material="matte">Matte</button>
-          <button type="button" class="preset-btn" data-material="glossy">Glossy</button>
+          <button type="button" class="preset-btn active" data-material="glossy">Glossy</button>
           <button type="button" class="preset-btn" data-material="metallic">Metallic</button>
           <button type="button" class="preset-btn" data-material="glass">Glass</button>
           <button type="button" class="preset-btn" data-material="neon">Neon</button>
         </div>
+
         <label class="field" style="margin-top:10px;">
-          <span>কালার</span>
-          <input type="color" id="colorPicker" value="#c97f2e" />
+          <span>কালার টাইপ</span>
+          <select id="colorModeSelect">
+            <option value="gradient" selected>✨ গ্রেডিয়েন্ট কালার (Gradient)</option>
+            <option value="solid">এক কালার (Solid Color)</option>
+          </select>
         </label>
+
+        <div id="solidColorGroup" hidden>
+          <label class="field">
+            <span>সলিড কালার</span>
+            <input type="color" id="colorPicker" value="#c97f2e" />
+          </label>
+        </div>
+
+        <div id="gradientColorGroup">
+          <label class="field">
+            <span>প্রিসেট</span>
+            <select id="gradientPresetSelect">
+              <option value="gold" selected>💛 Gold / Sunset ('Style' স্ক্রিনশট)</option>
+              <option value="neon">💙 Neon Cyan</option>
+              <option value="purple">💜 Sunset Purple</option>
+              <option value="silver">🤍 Metallic Silver</option>
+              <option value="emerald">💚 Emerald Green</option>
+              <option value="fire">❤️ Fire Red</option>
+              <option value="custom">⚙️ কাস্টম গ্রেডিয়েন্ট (Custom)</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>টাইপ</span>
+            <select id="gradientTypeSelect">
+              <option value="linear" selected>Linear (সোজা)</option>
+              <option value="radial">Radial (বৃত্তাকার)</option>
+            </select>
+          </label>
+
+          <div id="customGradientControls">
+            <label class="field">
+              <span>শুরু কালার</span>
+              <input type="color" id="colorStartPicker" value="#ffd700" />
+            </label>
+            <label class="field">
+              <span>শেষ কালার</span>
+              <input type="color" id="colorEndPicker" value="#ff4500" />
+            </label>
+            <label class="field">
+              <span>এঙ্গেল (Angle)</span>
+              <input type="range" id="gradientAngleRange" min="0" max="360" step="15" value="90" />
+              <span class="field-value" id="gradientAngleValue">90°</span>
+            </label>
+          </div>
+        </div>
+
         <label class="field" id="neonIntensityField" hidden>
           <span>Glow তীব্রতা</span>
           <input type="range" id="neonIntensityRange" min="0.5" max="4" step="0.1" value="1.8" />
@@ -205,6 +274,41 @@
           <button type="button" class="preset-btn" data-lighting="dramatic">Dramatic</button>
           <button type="button" class="preset-btn" data-lighting="soft">Soft</button>
         </div>
+      </section>
+
+      <section class="panel-section">
+        <h3>ব্যাকগ্রাউন্ড ইমেজ ও থিম</h3>
+        <label class="field">
+          <span>ব্যাকগ্রাউন্ড</span>
+          <select id="bgModeSelect">
+            <option value="darkBlue" selected>🌌 Dark Blue Studio ('Style' স্ক্রিনশট)</option>
+            <option value="lightStudio">🏢 Studio Floor & Wall ('DESIGN' স্ক্রিনশট)</option>
+            <option value="gradientDark">🖤 Dark Vignette</option>
+            <option value="cyberpunk">🌆 Cyberpunk Neon</option>
+            <option value="image">🖼️ কাস্টম ইমেজ আপলোড</option>
+            <option value="color">🎨 এক কালার (Solid Color)</option>
+            <option value="none">✨ স্বচ্ছ (Transparent Export)</option>
+          </select>
+        </label>
+
+        <div id="bgColorGroup" hidden>
+          <label class="field">
+            <span>কালার</span>
+            <input type="color" id="bgColorPicker" value="#0a192f" />
+          </label>
+        </div>
+
+        <div id="bgImageGroup" hidden>
+          <label class="field file-field">
+            <span>ছবি আপলোড</span>
+            <input type="file" id="bgFileInput" accept="image/*" />
+          </label>
+          <img id="bgPreviewThumb" class="image-preview-thumb" alt="ব্যাকগ্রাউন্ড প্রিভিউ" hidden />
+          <p class="field-note" id="bgImageNote">কোনো ব্যাকগ্রাউন্ড ছবি সিলেক্ট করা হয়নি।</p>
+        </div>
+        <p class="field-note">
+          থ্রিডি লেখার পিছনে যেকোনো ছবি বা ব্যাকগ্রাউন্ড যোগ করতে পারবেন। এক্সপোর্ট করার সময় এই ব্যাকগ্রাউন্ডও সাথে সেভ হবে।
+        </p>
       </section>
 
       <section class="panel-section">
@@ -411,10 +515,6 @@
     </aside>
   </div>
 
-<<<<<<< HEAD
-  <script type="module" src="main.bundle.js?v=1786781357566"></script>
-=======
   <script type="module" src="main.bundle.js"></script>
->>>>>>> f60361a85910ff665be23e58e53e2dbe999a0093
 </body>
 </html>

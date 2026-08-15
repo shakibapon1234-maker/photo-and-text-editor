@@ -125,6 +125,25 @@ const exportResult = document.getElementById('exportResult');
 const exportResultInfo = document.getElementById('exportResultInfo');
 const exportDownloadLink = document.getElementById('exportDownloadLink');
 
+const fontSelect = document.getElementById('fontSelect');
+const colorModeSelect = document.getElementById('colorModeSelect');
+const solidColorGroup = document.getElementById('solidColorGroup');
+const gradientColorGroup = document.getElementById('gradientColorGroup');
+const gradientPresetSelect = document.getElementById('gradientPresetSelect');
+const gradientTypeSelect = document.getElementById('gradientTypeSelect');
+const customGradientControls = document.getElementById('customGradientControls');
+const colorStartPicker = document.getElementById('colorStartPicker');
+const colorEndPicker = document.getElementById('colorEndPicker');
+const gradientAngleRange = document.getElementById('gradientAngleRange');
+const gradientAngleValue = document.getElementById('gradientAngleValue');
+const bgModeSelect = document.getElementById('bgModeSelect');
+const bgColorGroup = document.getElementById('bgColorGroup');
+const bgColorPicker = document.getElementById('bgColorPicker');
+const bgImageGroup = document.getElementById('bgImageGroup');
+const bgFileInput = document.getElementById('bgFileInput');
+const bgPreviewThumb = document.getElementById('bgPreviewThumb');
+const bgImageNote = document.getElementById('bgImageNote');
+
 // PLAN_3 §4 (Phase C1-C6): GIF export panel
 const gifOptionsGroup = document.getElementById('gifOptionsGroup');
 const gifTransparentToggle = document.getElementById('gifTransparentToggle');
@@ -218,6 +237,66 @@ ground.position.y = -70;
 ground.receiveShadow = true;
 scene.add(ground);
 
+function updateSceneBackground() {
+  const mode = state.bgMode;
+  if (mode === 'none') {
+    scene.background = null;
+    return;
+  }
+  if (mode === 'color') {
+    scene.background = new THREE.Color(state.bgColor);
+    return;
+  }
+  if (mode === 'image' && state.bgImageElement) {
+    const tex = new THREE.CanvasTexture(state.bgImageElement);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    scene.background = tex;
+    return;
+  }
+
+  // Procedural presets
+  const canvas = document.createElement('canvas');
+  canvas.width = 1024;
+  canvas.height = 1024;
+  const ctx = canvas.getContext('2d');
+
+  if (mode === 'darkBlue') {
+    const grad = ctx.createRadialGradient(512, 512, 100, 512, 512, 700);
+    grad.addColorStop(0, '#0a2c56');
+    grad.addColorStop(0.6, '#031936');
+    grad.addColorStop(1, '#010d1e');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1024, 1024);
+  } else if (mode === 'lightStudio') {
+    const grad = ctx.createLinearGradient(0, 0, 0, 1024);
+    grad.addColorStop(0, '#f4f6f9');
+    grad.addColorStop(0.6, '#dbe0e6');
+    grad.addColorStop(1, '#b8c1cc');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1024, 1024);
+  } else if (mode === 'gradientDark') {
+    const grad = ctx.createRadialGradient(512, 512, 50, 512, 512, 700);
+    grad.addColorStop(0, '#222730');
+    grad.addColorStop(1, '#090b0e');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1024, 1024);
+  } else if (mode === 'cyberpunk') {
+    const grad = ctx.createLinearGradient(0, 0, 1024, 1024);
+    grad.addColorStop(0, '#10002b');
+    grad.addColorStop(0.5, '#240046');
+    grad.addColorStop(1, '#3c096c');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1024, 1024);
+  } else {
+    scene.background = null;
+    return;
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  scene.background = tex;
+}
+
 // ---------- lighting rigs ----------
 // Three named presets per PLAN_2 Phase 2. Each preset owns its own light set;
 // switching presets tears down the previous set and builds the new one, so
@@ -285,6 +364,16 @@ let font = null;
 let textMesh = null;
 const state = {
   contentMode: 'text', // PLAN_3 §1: 'text' | 'image' | 'sticker' — mutually exclusive, one active object at a time
+  fontFamily: fontSelect?.value || 'Grand Hotel',
+  colorMode: colorModeSelect?.value || 'gradient',
+  gradientPreset: gradientPresetSelect?.value || 'gold',
+  gradientType: gradientTypeSelect?.value || 'linear',
+  colorStart: colorStartPicker?.value || '#ffd700',
+  colorEnd: colorEndPicker?.value || '#ff4500',
+  gradientAngle: Number(gradientAngleRange?.value || 90),
+  bgMode: bgModeSelect?.value || 'darkBlue',
+  bgColor: bgColorPicker?.value || '#0a192f',
+  bgImageElement: null,
   imageElement: null, // HTMLImageElement of the uploaded photo, null until one is chosen
   pictureStyle: 'none', // §8.2 follow-up: id into PICTURE_STYLES, image mode only
   stickerText: stickerTextInput.value, // PLAN_3 §2: sticker/badge mode only
@@ -489,19 +578,52 @@ function drawCurvedLine(ctx, clusters, layout, centerX, baselineY) {
   });
 }
 
-// Draws all lines onto one offscreen canvas (white glyphs on a transparent
-// background) and returns it plus its aspect ratio. Using the *real* browser
-// text-layout engine here is the entire point — it's what makes Bangla
-// (or Arabic, Devanagari, emoji, anything) come out correctly shaped without
-// this module needing to know anything about any specific script.
-//
-// curveOpts (PLAN_3 §3): { curveIntensity, curveDirection, curveSpacing }.
-// At curveIntensity 0 this draws exactly like the pre-curve version (one
-// ctx.fillText(line, ...) per line) via layoutCurvedLines's straight-line
-// fallback — curve OFF is a guaranteed no-op, not an approximation.
+function getFontStack(family) {
+  if (!family || family === 'helvetiker' || family === 'Noto Sans Bengali') {
+    return CANVAS_TEXT_FONT_STACK;
+  }
+  return `"${family}", ${CANVAS_TEXT_FONT_STACK}`;
+}
+
+function getGradientFillStyle(ctx, width, height) {
+  let colors = ['#ffd700', '#ff4500'];
+  let type = state.gradientType || 'linear';
+  let angleDeg = state.gradientAngle || 90;
+
+  if (state.gradientPreset === 'gold') colors = ['#ffd700', '#ff4500'];
+  else if (state.gradientPreset === 'neon') colors = ['#00f2fe', '#4facfe'];
+  else if (state.gradientPreset === 'purple') colors = ['#ff0844', '#ffb199'];
+  else if (state.gradientPreset === 'silver') colors = ['#e6e9f0', '#eef1f5'];
+  else if (state.gradientPreset === 'emerald') colors = ['#11998e', '#38ef7d'];
+  else if (state.gradientPreset === 'fire') colors = ['#ff416c', '#ff4b2b'];
+  else if (state.gradientPreset === 'custom') colors = [state.colorStart || '#ffd700', state.colorEnd || '#ff4500'];
+
+  if (type === 'radial') {
+    const grad = ctx.createRadialGradient(width / 2, height / 2, 10, width / 2, height / 2, Math.max(width, height) / 2);
+    grad.addColorStop(0, colors[0]);
+    grad.addColorStop(1, colors[1]);
+    return grad;
+  } else {
+    const rad = (angleDeg * Math.PI) / 180;
+    const cx = width / 2;
+    const cy = height / 2;
+    const r = Math.max(width, height) / 2;
+    const x0 = cx - Math.cos(rad) * r;
+    const y0 = cy - Math.sin(rad) * r;
+    const x1 = cx + Math.cos(rad) * r;
+    const y1 = cy + Math.sin(rad) * r;
+    const grad = ctx.createLinearGradient(x0, y0, x1, y1);
+    grad.addColorStop(0, colors[0]);
+    grad.addColorStop(1, colors[1]);
+    return grad;
+  }
+}
+
+// Draws all lines onto one offscreen canvas (white/gradient glyphs on a transparent background)
 function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
+  const fontStack = getFontStack(state.fontFamily);
   const measureCtx = document.createElement('canvas').getContext('2d');
-  measureCtx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${CANVAS_TEXT_FONT_STACK}`;
+  measureCtx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${fontStack}`;
   const arcOpts = {
     curveIntensity: curveOpts.curveIntensity,
     direction: curveOpts.curveDirection,
@@ -510,10 +632,6 @@ function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
   const { perLine, maxLineWidth, maxBulge } = layoutCurvedLines(measureCtx, lines, arcOpts);
 
   const canvasW = Math.ceil(maxLineWidth + CANVAS_TEXT_PAD_PX * 2);
-  // maxBulge (the arc's extra vertical reach beyond a straight line, 0 when
-  // curve is off) is added as uniform top+bottom headroom so curved glyphs
-  // — which can swing above/below the line's normal slot — don't clip
-  // against the canvas edge.
   const canvasH = Math.ceil(
     CANVAS_TEXT_LINE_HEIGHT_PX * lines.length + CANVAS_TEXT_PAD_PX * 2 + maxBulge * 2
   );
@@ -522,8 +640,14 @@ function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
   canvas.width = canvasW;
   canvas.height = canvasH;
   const ctx = canvas.getContext('2d');
-  ctx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${CANVAS_TEXT_FONT_STACK}`;
-  ctx.fillStyle = '#ffffff';
+  ctx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${fontStack}`;
+
+  if (state.colorMode === 'gradient') {
+    ctx.fillStyle = getGradientFillStyle(ctx, canvasW, canvasH);
+  } else {
+    ctx.fillStyle = '#ffffff';
+  }
+
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   perLine.forEach(({ clusters, layout }, i) => {
@@ -608,9 +732,10 @@ function registerBundledCanvasFont() {
 function buildCanvasCardMaterials(frontTex, backTex, isImage = false) {
   const sideMat = buildMaterial(state.materialType, state.color);
 
-  // For text card, font glyphs are white and get tinted by state.color.
-  // For photo/image card, texture contains full-color photo pixels, so front/back color should be white (#ffffff) to preserve photo colors!
-  const faceColor = isImage ? '#ffffff' : state.color;
+  // For text card with gradient or photo card, faceColor is #ffffff to preserve exact texture gradient/photo colors.
+  // For solid text card, faceColor is state.color!
+  const isTexturePreserved = isImage || state.colorMode === 'gradient';
+  const faceColor = isTexturePreserved ? '#ffffff' : state.color;
 
   const frontMat = buildMaterial(state.materialType, faceColor);
   frontMat.map = frontTex;
@@ -1549,7 +1674,8 @@ function rebuildTextMesh() {
   const lines = rawContent.split(/\r?\n/);
   const validLines = lines.map((l) => (l.length > 0 ? l : ' '));
 
-  const needsCanvasCard = isBanglaText(rawContent) || state.curveIntensity !== 0;
+  const isCustomFontOrGradient = (state.fontFamily && state.fontFamily !== 'helvetiker') || state.colorMode === 'gradient';
+  const needsCanvasCard = isBanglaText(rawContent) || state.curveIntensity !== 0 || isCustomFontOrGradient;
 
   // If vector geometry is required but the vendored JSON font isn't parsed
   // yet, delay the rebuild until it is available. Canvas-card path does not
@@ -2385,6 +2511,109 @@ exportBtn.addEventListener('click', async () => {
   }
 });
 
+// ---------- Font, Gradient & Background Event Listeners ----------
+if (fontSelect) {
+  fontSelect.addEventListener('change', async () => {
+    state.fontFamily = fontSelect.value;
+    if (state.fontFamily && state.fontFamily !== 'helvetiker') {
+      try {
+        await document.fonts.load(`600 220px "${state.fontFamily}"`);
+      } catch (err) {
+        console.warn('Font load error:', err);
+      }
+    }
+    scheduleRebuild();
+  });
+}
+
+if (colorModeSelect) {
+  colorModeSelect.addEventListener('change', () => {
+    state.colorMode = colorModeSelect.value;
+    if (solidColorGroup) solidColorGroup.hidden = state.colorMode !== 'solid';
+    if (gradientColorGroup) gradientColorGroup.hidden = state.colorMode !== 'gradient';
+    scheduleRebuild();
+  });
+}
+
+if (gradientPresetSelect) {
+  gradientPresetSelect.addEventListener('change', () => {
+    state.gradientPreset = gradientPresetSelect.value;
+    if (customGradientControls) customGradientControls.hidden = state.gradientPreset !== 'custom';
+    scheduleRebuild();
+  });
+}
+
+if (gradientTypeSelect) {
+  gradientTypeSelect.addEventListener('change', () => {
+    state.gradientType = gradientTypeSelect.value;
+    scheduleRebuild();
+  });
+}
+
+if (colorStartPicker) {
+  colorStartPicker.addEventListener('input', () => {
+    state.colorStart = colorStartPicker.value;
+    if (state.colorMode === 'gradient') scheduleRebuild();
+  });
+}
+
+if (colorEndPicker) {
+  colorEndPicker.addEventListener('input', () => {
+    state.colorEnd = colorEndPicker.value;
+    if (state.colorMode === 'gradient') scheduleRebuild();
+  });
+}
+
+if (gradientAngleRange) {
+  gradientAngleRange.addEventListener('input', () => {
+    state.gradientAngle = Number(gradientAngleRange.value);
+    if (gradientAngleValue) gradientAngleValue.textContent = `${state.gradientAngle}°`;
+    if (state.colorMode === 'gradient') scheduleRebuild();
+  });
+}
+
+if (bgModeSelect) {
+  bgModeSelect.addEventListener('change', () => {
+    state.bgMode = bgModeSelect.value;
+    if (bgColorGroup) bgColorGroup.hidden = state.bgMode !== 'color';
+    if (bgImageGroup) bgImageGroup.hidden = state.bgMode !== 'image';
+    updateSceneBackground();
+  });
+}
+
+if (bgColorPicker) {
+  bgColorPicker.addEventListener('input', () => {
+    state.bgColor = bgColorPicker.value;
+    if (state.bgMode === 'color') updateSceneBackground();
+  });
+}
+
+if (bgFileInput) {
+  bgFileInput.addEventListener('change', () => {
+    const file = bgFileInput.files && bgFileInput.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      if (bgImageNote) bgImageNote.textContent = 'শুধু ইমেজ ফাইল (JPG/PNG/WebP) সাপোর্টেড।';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        state.bgImageElement = img;
+        if (bgPreviewThumb) {
+          bgPreviewThumb.src = reader.result;
+          bgPreviewThumb.hidden = false;
+        }
+        if (bgImageNote) bgImageNote.textContent = `আপলোড সম্পন্ন: ${file.name} (${img.naturalWidth}×${img.naturalHeight}px)`;
+        if (state.bgMode === 'image') updateSceneBackground();
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 // ---------- initial preset UI state ----------
 setActivePreset(contentModeGrid, 'content', state.contentMode);
 setActivePreset(curveDirectionGrid, 'curveDirection', state.curveDirection);
@@ -2395,6 +2624,7 @@ setActivePreset(qualityPresetGrid, 'quality', state.quality);
 setActivePreset(pictureStyleGrid, 'pictureStyle', state.pictureStyle);
 animPlayBtn.disabled = animState.presetId === 'none';
 buildLightingPreset(state.lightingPreset);
+updateSceneBackground();
 scene.environment = state.reflectionsOn ? envTexture : null;
 updateWebmSupportNote();
 updateExportSourceNote();

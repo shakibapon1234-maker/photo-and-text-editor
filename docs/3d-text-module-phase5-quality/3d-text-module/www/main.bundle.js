@@ -25838,6 +25838,24 @@ var exportStatusLabel = document.getElementById("exportStatusLabel");
 var exportResult = document.getElementById("exportResult");
 var exportResultInfo = document.getElementById("exportResultInfo");
 var exportDownloadLink = document.getElementById("exportDownloadLink");
+var fontSelect = document.getElementById("fontSelect");
+var colorModeSelect = document.getElementById("colorModeSelect");
+var solidColorGroup = document.getElementById("solidColorGroup");
+var gradientColorGroup = document.getElementById("gradientColorGroup");
+var gradientPresetSelect = document.getElementById("gradientPresetSelect");
+var gradientTypeSelect = document.getElementById("gradientTypeSelect");
+var customGradientControls = document.getElementById("customGradientControls");
+var colorStartPicker = document.getElementById("colorStartPicker");
+var colorEndPicker = document.getElementById("colorEndPicker");
+var gradientAngleRange = document.getElementById("gradientAngleRange");
+var gradientAngleValue = document.getElementById("gradientAngleValue");
+var bgModeSelect = document.getElementById("bgModeSelect");
+var bgColorGroup = document.getElementById("bgColorGroup");
+var bgColorPicker = document.getElementById("bgColorPicker");
+var bgImageGroup = document.getElementById("bgImageGroup");
+var bgFileInput = document.getElementById("bgFileInput");
+var bgPreviewThumb = document.getElementById("bgPreviewThumb");
+var bgImageNote = document.getElementById("bgImageNote");
 var gifOptionsGroup = document.getElementById("gifOptionsGroup");
 var gifTransparentToggle = document.getElementById("gifTransparentToggle");
 var gifBackgroundColorField = document.getElementById("gifBackgroundColorField");
@@ -25902,6 +25920,61 @@ ground.rotation.x = -Math.PI / 2;
 ground.position.y = -70;
 ground.receiveShadow = true;
 scene.add(ground);
+function updateSceneBackground() {
+  const mode = state.bgMode;
+  if (mode === "none") {
+    scene.background = null;
+    return;
+  }
+  if (mode === "color") {
+    scene.background = new Color(state.bgColor);
+    return;
+  }
+  if (mode === "image" && state.bgImageElement) {
+    const tex2 = new CanvasTexture(state.bgImageElement);
+    tex2.colorSpace = SRGBColorSpace;
+    scene.background = tex2;
+    return;
+  }
+  const canvas2 = document.createElement("canvas");
+  canvas2.width = 1024;
+  canvas2.height = 1024;
+  const ctx = canvas2.getContext("2d");
+  if (mode === "darkBlue") {
+    const grad = ctx.createRadialGradient(512, 512, 100, 512, 512, 700);
+    grad.addColorStop(0, "#0a2c56");
+    grad.addColorStop(0.6, "#031936");
+    grad.addColorStop(1, "#010d1e");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1024, 1024);
+  } else if (mode === "lightStudio") {
+    const grad = ctx.createLinearGradient(0, 0, 0, 1024);
+    grad.addColorStop(0, "#f4f6f9");
+    grad.addColorStop(0.6, "#dbe0e6");
+    grad.addColorStop(1, "#b8c1cc");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1024, 1024);
+  } else if (mode === "gradientDark") {
+    const grad = ctx.createRadialGradient(512, 512, 50, 512, 512, 700);
+    grad.addColorStop(0, "#222730");
+    grad.addColorStop(1, "#090b0e");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1024, 1024);
+  } else if (mode === "cyberpunk") {
+    const grad = ctx.createLinearGradient(0, 0, 1024, 1024);
+    grad.addColorStop(0, "#10002b");
+    grad.addColorStop(0.5, "#240046");
+    grad.addColorStop(1, "#3c096c");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1024, 1024);
+  } else {
+    scene.background = null;
+    return;
+  }
+  const tex = new CanvasTexture(canvas2);
+  tex.colorSpace = SRGBColorSpace;
+  scene.background = tex;
+}
 var lights = new Group();
 scene.add(lights);
 function clearLights() {
@@ -25957,6 +26030,16 @@ var textMesh = null;
 var state = {
   contentMode: "text",
   // PLAN_3 §1: 'text' | 'image' | 'sticker' — mutually exclusive, one active object at a time
+  fontFamily: fontSelect?.value || "Grand Hotel",
+  colorMode: colorModeSelect?.value || "gradient",
+  gradientPreset: gradientPresetSelect?.value || "gold",
+  gradientType: gradientTypeSelect?.value || "linear",
+  colorStart: colorStartPicker?.value || "#ffd700",
+  colorEnd: colorEndPicker?.value || "#ff4500",
+  gradientAngle: Number(gradientAngleRange?.value || 90),
+  bgMode: bgModeSelect?.value || "darkBlue",
+  bgColor: bgColorPicker?.value || "#0a192f",
+  bgImageElement: null,
   imageElement: null,
   // HTMLImageElement of the uploaded photo, null until one is chosen
   pictureStyle: "none",
@@ -26096,9 +26179,47 @@ function drawCurvedLine(ctx, clusters, layout, centerX, baselineY) {
     ctx.restore();
   });
 }
+function getFontStack(family) {
+  if (!family || family === "helvetiker" || family === "Noto Sans Bengali") {
+    return CANVAS_TEXT_FONT_STACK;
+  }
+  return `"${family}", ${CANVAS_TEXT_FONT_STACK}`;
+}
+function getGradientFillStyle(ctx, width, height) {
+  let colors = ["#ffd700", "#ff4500"];
+  let type = state.gradientType || "linear";
+  let angleDeg = state.gradientAngle || 90;
+  if (state.gradientPreset === "gold") colors = ["#ffd700", "#ff4500"];
+  else if (state.gradientPreset === "neon") colors = ["#00f2fe", "#4facfe"];
+  else if (state.gradientPreset === "purple") colors = ["#ff0844", "#ffb199"];
+  else if (state.gradientPreset === "silver") colors = ["#e6e9f0", "#eef1f5"];
+  else if (state.gradientPreset === "emerald") colors = ["#11998e", "#38ef7d"];
+  else if (state.gradientPreset === "fire") colors = ["#ff416c", "#ff4b2b"];
+  else if (state.gradientPreset === "custom") colors = [state.colorStart || "#ffd700", state.colorEnd || "#ff4500"];
+  if (type === "radial") {
+    const grad = ctx.createRadialGradient(width / 2, height / 2, 10, width / 2, height / 2, Math.max(width, height) / 2);
+    grad.addColorStop(0, colors[0]);
+    grad.addColorStop(1, colors[1]);
+    return grad;
+  } else {
+    const rad = angleDeg * Math.PI / 180;
+    const cx = width / 2;
+    const cy = height / 2;
+    const r = Math.max(width, height) / 2;
+    const x0 = cx - Math.cos(rad) * r;
+    const y0 = cy - Math.sin(rad) * r;
+    const x1 = cx + Math.cos(rad) * r;
+    const y1 = cy + Math.sin(rad) * r;
+    const grad = ctx.createLinearGradient(x0, y0, x1, y1);
+    grad.addColorStop(0, colors[0]);
+    grad.addColorStop(1, colors[1]);
+    return grad;
+  }
+}
 function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
+  const fontStack = getFontStack(state.fontFamily);
   const measureCtx = document.createElement("canvas").getContext("2d");
-  measureCtx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${CANVAS_TEXT_FONT_STACK}`;
+  measureCtx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${fontStack}`;
   const arcOpts = {
     curveIntensity: curveOpts.curveIntensity,
     direction: curveOpts.curveDirection,
@@ -26113,8 +26234,12 @@ function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
   canvas2.width = canvasW;
   canvas2.height = canvasH;
   const ctx = canvas2.getContext("2d");
-  ctx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${CANVAS_TEXT_FONT_STACK}`;
-  ctx.fillStyle = "#ffffff";
+  ctx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${fontStack}`;
+  if (state.colorMode === "gradient") {
+    ctx.fillStyle = getGradientFillStyle(ctx, canvasW, canvasH);
+  } else {
+    ctx.fillStyle = "#ffffff";
+  }
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   perLine.forEach(({ clusters, layout }, i) => {
@@ -26174,7 +26299,8 @@ function registerBundledCanvasFont() {
 }
 function buildCanvasCardMaterials(frontTex, backTex, isImage = false) {
   const sideMat = buildMaterial(state.materialType, state.color);
-  const faceColor = isImage ? "#ffffff" : state.color;
+  const isTexturePreserved = isImage || state.colorMode === "gradient";
+  const faceColor = isTexturePreserved ? "#ffffff" : state.color;
   const frontMat = buildMaterial(state.materialType, faceColor);
   frontMat.map = frontTex;
   frontMat.transparent = true;
@@ -26889,7 +27015,8 @@ function rebuildTextMesh() {
   const rawContent = state.text || " ";
   const lines = rawContent.split(/\r?\n/);
   const validLines = lines.map((l) => l.length > 0 ? l : " ");
-  const needsCanvasCard = isBanglaText(rawContent) || state.curveIntensity !== 0;
+  const isCustomFontOrGradient = state.fontFamily && state.fontFamily !== "helvetiker" || state.colorMode === "gradient";
+  const needsCanvasCard = isBanglaText(rawContent) || state.curveIntensity !== 0 || isCustomFontOrGradient;
   if (!needsCanvasCard && !font) return;
   disposeTextMesh();
   if (needsCanvasCard) {
@@ -27530,6 +27657,98 @@ exportBtn.addEventListener("click", async () => {
     document.body.classList.remove("is-exporting");
   }
 });
+if (fontSelect) {
+  fontSelect.addEventListener("change", async () => {
+    state.fontFamily = fontSelect.value;
+    if (state.fontFamily && state.fontFamily !== "helvetiker") {
+      try {
+        await document.fonts.load(`600 220px "${state.fontFamily}"`);
+      } catch (err) {
+        console.warn("Font load error:", err);
+      }
+    }
+    scheduleRebuild();
+  });
+}
+if (colorModeSelect) {
+  colorModeSelect.addEventListener("change", () => {
+    state.colorMode = colorModeSelect.value;
+    if (solidColorGroup) solidColorGroup.hidden = state.colorMode !== "solid";
+    if (gradientColorGroup) gradientColorGroup.hidden = state.colorMode !== "gradient";
+    scheduleRebuild();
+  });
+}
+if (gradientPresetSelect) {
+  gradientPresetSelect.addEventListener("change", () => {
+    state.gradientPreset = gradientPresetSelect.value;
+    if (customGradientControls) customGradientControls.hidden = state.gradientPreset !== "custom";
+    scheduleRebuild();
+  });
+}
+if (gradientTypeSelect) {
+  gradientTypeSelect.addEventListener("change", () => {
+    state.gradientType = gradientTypeSelect.value;
+    scheduleRebuild();
+  });
+}
+if (colorStartPicker) {
+  colorStartPicker.addEventListener("input", () => {
+    state.colorStart = colorStartPicker.value;
+    if (state.colorMode === "gradient") scheduleRebuild();
+  });
+}
+if (colorEndPicker) {
+  colorEndPicker.addEventListener("input", () => {
+    state.colorEnd = colorEndPicker.value;
+    if (state.colorMode === "gradient") scheduleRebuild();
+  });
+}
+if (gradientAngleRange) {
+  gradientAngleRange.addEventListener("input", () => {
+    state.gradientAngle = Number(gradientAngleRange.value);
+    if (gradientAngleValue) gradientAngleValue.textContent = `${state.gradientAngle}\xB0`;
+    if (state.colorMode === "gradient") scheduleRebuild();
+  });
+}
+if (bgModeSelect) {
+  bgModeSelect.addEventListener("change", () => {
+    state.bgMode = bgModeSelect.value;
+    if (bgColorGroup) bgColorGroup.hidden = state.bgMode !== "color";
+    if (bgImageGroup) bgImageGroup.hidden = state.bgMode !== "image";
+    updateSceneBackground();
+  });
+}
+if (bgColorPicker) {
+  bgColorPicker.addEventListener("input", () => {
+    state.bgColor = bgColorPicker.value;
+    if (state.bgMode === "color") updateSceneBackground();
+  });
+}
+if (bgFileInput) {
+  bgFileInput.addEventListener("change", () => {
+    const file = bgFileInput.files && bgFileInput.files[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      if (bgImageNote) bgImageNote.textContent = "\u09B6\u09C1\u09A7\u09C1 \u0987\u09AE\u09C7\u099C \u09AB\u09BE\u0987\u09B2 (JPG/PNG/WebP) \u09B8\u09BE\u09AA\u09CB\u09B0\u09CD\u099F\u09C7\u09A1\u0964";
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        state.bgImageElement = img;
+        if (bgPreviewThumb) {
+          bgPreviewThumb.src = reader.result;
+          bgPreviewThumb.hidden = false;
+        }
+        if (bgImageNote) bgImageNote.textContent = `\u0986\u09AA\u09B2\u09CB\u09A1 \u09B8\u09AE\u09CD\u09AA\u09A8\u09CD\u09A8: ${file.name} (${img.naturalWidth}\xD7${img.naturalHeight}px)`;
+        if (state.bgMode === "image") updateSceneBackground();
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 setActivePreset(contentModeGrid, "content", state.contentMode);
 setActivePreset(curveDirectionGrid, "curveDirection", state.curveDirection);
 setActivePreset(materialPresetGrid, "material", state.materialType);
@@ -27539,6 +27758,7 @@ setActivePreset(qualityPresetGrid, "quality", state.quality);
 setActivePreset(pictureStyleGrid, "pictureStyle", state.pictureStyle);
 animPlayBtn.disabled = animState.presetId === "none";
 buildLightingPreset(state.lightingPreset);
+updateSceneBackground();
 scene.environment = state.reflectionsOn ? envTexture : null;
 updateWebmSupportNote();
 updateExportSourceNote();
