@@ -302,7 +302,7 @@
     function showEditor(file) {
         uploadSection.style.display = 'none';
         editorSection.style.display = 'grid';
-        downloadSection.style.display = 'none';
+        downloadSection.style.display = 'inline-flex';
         processedBlob = null;
 
         // Reset results
