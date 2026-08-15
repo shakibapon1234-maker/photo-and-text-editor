@@ -290,6 +290,104 @@ function updateSceneBackground() {
     grad.addColorStop(1, '#010d1e');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 1024, 1024);
+  } else if (mode === 'aiCircuitBg') {
+    // Dark deep navy/black high-tech cyber background with cyan PCB traces and circular HUD target rings (Screenshot 1)
+    ctx.fillStyle = '#020b18';
+    ctx.fillRect(0, 0, 1024, 1024);
+
+    // Radial energy core glow
+    const radialCore = ctx.createRadialGradient(512, 512, 50, 512, 512, 600);
+    radialCore.addColorStop(0, 'rgba(0, 229, 255, 0.22)');
+    radialCore.addColorStop(0.5, 'rgba(2, 44, 90, 0.45)');
+    radialCore.addColorStop(1, 'rgba(1, 10, 24, 0.95)');
+    ctx.fillStyle = radialCore;
+    ctx.fillRect(0, 0, 1024, 1024);
+
+    // Concentric futuristic HUD circular rings in center
+    const centerHUD = [160, 220, 280, 340, 420];
+    centerHUD.forEach((r, idx) => {
+      ctx.strokeStyle = idx % 2 === 0 ? 'rgba(0, 229, 255, 0.45)' : 'rgba(0, 180, 255, 0.25)';
+      ctx.lineWidth = idx === 2 ? 8 : (idx === 3 ? 4 : 2);
+      ctx.beginPath();
+      if (idx === 2) {
+        ctx.setLineDash([24, 16, 8, 16]);
+      } else if (idx === 3) {
+        ctx.setLineDash([40, 20]);
+      } else {
+        ctx.setLineDash([]);
+      }
+      ctx.arc(512, 512, r, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+    ctx.setLineDash([]);
+
+    // PCB circuit lines & microchip buses
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 3;
+    const traces = [
+      [[0, 150], [200, 150], [320, 270], [320, 400]],
+      [[1024, 200], [800, 200], [680, 320], [680, 420]],
+      [[0, 850], [250, 850], [380, 720], [380, 620]],
+      [[1024, 820], [780, 820], [650, 690], [650, 600]],
+      [[100, 0], [100, 180], [220, 300]],
+      [[900, 0], [900, 160], [780, 280]],
+      [[120, 1024], [120, 840], [240, 720]],
+      [[920, 1024], [920, 860], [800, 740]],
+    ];
+    traces.forEach(path => {
+      ctx.beginPath();
+      path.forEach(([x, y], i) => {
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+      const last = path[path.length - 1];
+      ctx.beginPath(); ctx.arc(last[0], last[1], 6, 0, Math.PI * 2); ctx.fillStyle = '#38bdf8'; ctx.fill();
+      ctx.beginPath(); ctx.arc(last[0], last[1], 3, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill();
+    });
+
+    // Floating data chip squares
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.6)';
+    ctx.lineWidth = 2;
+    [[60, 240, 50, 50], [880, 280, 60, 60], [80, 700, 55, 55], [870, 680, 65, 65]].forEach(([x, y, w, h]) => {
+      ctx.strokeRect(x, y, w, h);
+      ctx.fillStyle = 'rgba(0, 229, 255, 0.12)';
+      ctx.fillRect(x, y, w, h);
+    });
+  } else if (mode === 'brickWallBg') {
+    // Dark slate/brick wall with realistic mortar lines (Screenshot 2)
+    ctx.fillStyle = '#0b0d13';
+    ctx.fillRect(0, 0, 1024, 1024);
+
+    const brickW = 100;
+    const brickH = 42;
+    const rows = Math.ceil(1024 / brickH);
+    const cols = Math.ceil(1024 / brickW) + 1;
+
+    for (let r = 0; r <= rows; r++) {
+      const offsetX = (r % 2 === 0) ? 0 : -brickW / 2;
+      for (let c = 0; c <= cols; c++) {
+        const bx = c * brickW + offsetX;
+        const by = r * brickH;
+
+        // Individual brick subtle variations
+        const shade = 14 + ((r * 7 + c * 13) % 12);
+        ctx.fillStyle = `rgb(${shade}, ${shade + 2}, ${shade + 6})`;
+        ctx.fillRect(bx + 2, by + 2, brickW - 4, brickH - 4);
+
+        // Subtle brick bevel highlight
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+        ctx.fillRect(bx + 2, by + 2, brickW - 4, 3);
+      }
+    }
+
+    // Dark vignette overlay with blue ambient mood
+    const vig = ctx.createRadialGradient(512, 512, 100, 512, 512, 700);
+    vig.addColorStop(0, 'rgba(0, 30, 60, 0.35)');
+    vig.addColorStop(0.6, 'rgba(5, 8, 15, 0.7)');
+    vig.addColorStop(1, 'rgba(1, 2, 5, 0.98)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, 1024, 1024);
   } else if (mode === 'lightStudio') {
     const grad = ctx.createLinearGradient(0, 0, 0, 1024);
     grad.addColorStop(0, '#f4f6f9');
@@ -627,7 +725,8 @@ function getGradientFillStyle(ctx, width, height) {
   let type = state.gradientType || 'linear';
   let angleDeg = state.gradientAngle || 90;
 
-  if (state.gradientPreset === 'gold') colors = ['#ffd700', '#ff4500'];
+  if (state.gradientPreset === 'electricCyan') colors = ['#00f5ff', '#0072ff'];
+  else if (state.gradientPreset === 'gold') colors = ['#ffd700', '#ff4500'];
   else if (state.gradientPreset === 'neon') colors = ['#00f2fe', '#4facfe'];
   else if (state.gradientPreset === 'purple') colors = ['#ff0844', '#ffb199'];
   else if (state.gradientPreset === 'silver') colors = ['#e6e9f0', '#eef1f5'];
@@ -673,6 +772,27 @@ function getMulticolorPalette() {
 function getPatternFillStyle(ctx, charW, charH, colorOverride) {
   const p = state.patternPreset;
   const patCanvas = document.createElement('canvas');
+
+  if (p === 'aiCircuit') {
+    const ts = 90;
+    patCanvas.width = ts; patCanvas.height = ts;
+    const pc = patCanvas.getContext('2d');
+    pc.fillStyle = '#03152d'; pc.fillRect(0, 0, ts, ts);
+
+    pc.strokeStyle = '#00f0ff'; pc.lineWidth = 2.5;
+    pc.beginPath();
+    pc.moveTo(0, ts*0.25); pc.lineTo(ts*0.4, ts*0.25); pc.lineTo(ts*0.65, ts*0.5); pc.lineTo(ts, ts*0.5);
+    pc.moveTo(ts*0.5, 0); pc.lineTo(ts*0.5, ts*0.35); pc.lineTo(ts*0.75, ts*0.6); pc.lineTo(ts*0.75, ts);
+    pc.moveTo(0, ts*0.8); pc.lineTo(ts*0.3, ts*0.8); pc.lineTo(ts*0.5, ts);
+    pc.stroke();
+
+    const nodes = [[ts*0.4, ts*0.25], [ts*0.65, ts*0.5], [ts*0.5, ts*0.35], [ts*0.75, ts*0.6], [ts*0.3, ts*0.8]];
+    nodes.forEach(([nx, ny]) => {
+      pc.beginPath(); pc.arc(nx, ny, 4, 0, Math.PI*2); pc.fillStyle = '#38bdf8'; pc.fill();
+      pc.beginPath(); pc.arc(nx, ny, 2, 0, Math.PI*2); pc.fillStyle = '#ffffff'; pc.fill();
+    });
+    return ctx.createPattern(patCanvas, 'repeat');
+  }
 
   if (p === 'candyCane') {
     const tileSize = Math.max(60, Math.round(charH * 0.22));
@@ -875,7 +995,7 @@ function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
     return { canvas, aspect: canvasW / canvasH };
   }
 
-  // ---- PATTERN MODE (Design 2: Candy Cane, Floral, etc.) ----
+  // ---- PATTERN MODE (Design 2: Candy Cane, Floral, AI Circuit, Neon Sign, etc.) ----
   if (state.colorMode === 'pattern') {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -889,27 +1009,109 @@ function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
         ctx.save();
         ctx.translate(canvasW / 2 + c.x, y + c.y);
         ctx.rotate(c.rotation);
-        // Thick outline first for 3D pop effect
-        ctx.lineWidth = CANVAS_TEXT_FONT_PX * 0.1;
-        ctx.lineJoin = 'round';
-        ctx.strokeStyle = '#1a0a00';
-        ctx.strokeText(cluster, 0, 0);
-        // Pattern fill
-        if (typeof patFill === 'string') {
-          ctx.fillStyle = patFill;
-        } else {
-          ctx.fillStyle = patFill;
-        }
-        ctx.fillText(cluster, 0, 0);
-        // Festive snow cap highlight if enabled
-        if (state.festiveDecor) {
-          const gw = ctx.measureText(cluster).width;
-          const snowGrad = ctx.createLinearGradient(-gw/2, -CANVAS_TEXT_FONT_PX*0.58, gw/2, -CANVAS_TEXT_FONT_PX*0.15);
-          snowGrad.addColorStop(0, 'rgba(255,255,255,0.85)');
-          snowGrad.addColorStop(0.5, 'rgba(255,255,255,0.30)');
-          snowGrad.addColorStop(1, 'rgba(255,255,255,0.0)');
-          ctx.fillStyle = snowGrad;
+
+        if (state.patternPreset === 'neonSign') {
+          // Multi-layer Real Neon Gas Tube Glow (Screenshot 2)
+          // 1. Broad outer ambient electric blue bloom
+          ctx.save();
+          ctx.shadowColor = '#0072ff';
+          ctx.shadowBlur = 55;
+          ctx.lineWidth = CANVAS_TEXT_FONT_PX * 0.18;
+          ctx.strokeStyle = '#00e5ff';
+          ctx.strokeText(cluster, 0, 0);
+          ctx.restore();
+
+          // 2. Intense cyan electric plasma ring
+          ctx.save();
+          ctx.shadowColor = '#00f0ff';
+          ctx.shadowBlur = 28;
+          ctx.lineWidth = CANVAS_TEXT_FONT_PX * 0.11;
+          ctx.strokeStyle = '#38bdf8';
+          ctx.strokeText(cluster, 0, 0);
+          ctx.restore();
+
+          // 3. Bright core tube glow
+          ctx.save();
+          ctx.shadowColor = '#ffffff';
+          ctx.shadowBlur = 12;
+          ctx.lineWidth = CANVAS_TEXT_FONT_PX * 0.06;
+          ctx.strokeStyle = '#e0f2fe';
+          ctx.strokeText(cluster, 0, 0);
+          ctx.restore();
+
+          // 4. White-hot center neon gas core
+          ctx.save();
+          ctx.lineWidth = Math.max(3, CANVAS_TEXT_FONT_PX * 0.035);
+          ctx.strokeStyle = '#ffffff';
+          ctx.strokeText(cluster, 0, 0);
+          ctx.fillStyle = '#ffffff';
           ctx.fillText(cluster, 0, 0);
+          ctx.restore();
+
+          // Electric plasma haze around text
+          if (state.festiveDecor) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 229, 255, 0.12)';
+            for (let w = 0; w < 3; w++) {
+              ctx.beginPath();
+              ctx.arc((Math.random() - 0.5) * 40, (Math.random() - 0.5) * 40, 15 + Math.random() * 20, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.restore();
+          }
+        } else if (state.patternPreset === 'aiCircuit') {
+          // AI Cyber Circuit Style (Screenshot 1)
+          // 1. Outer cyan cyber glow
+          ctx.save();
+          ctx.shadowColor = '#00e5ff';
+          ctx.shadowBlur = 22;
+          ctx.lineWidth = CANVAS_TEXT_FONT_PX * 0.12;
+          ctx.strokeStyle = '#0072ff';
+          ctx.lineJoin = 'round';
+          ctx.strokeText(cluster, 0, 0);
+          ctx.restore();
+
+          // 2. Cyan border
+          ctx.lineWidth = CANVAS_TEXT_FONT_PX * 0.07;
+          ctx.strokeStyle = '#00f0ff';
+          ctx.lineJoin = 'round';
+          ctx.strokeText(cluster, 0, 0);
+
+          // 3. Circuit pattern fill
+          ctx.fillStyle = patFill;
+          ctx.fillText(cluster, 0, 0);
+
+          // 4. Central holographic neon shine
+          const gw = ctx.measureText(cluster).width;
+          const cyberGrad = ctx.createLinearGradient(-gw/2, -CANVAS_TEXT_FONT_PX*0.5, gw/2, CANVAS_TEXT_FONT_PX*0.5);
+          cyberGrad.addColorStop(0, 'rgba(0, 240, 255, 0.7)');
+          cyberGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.9)');
+          cyberGrad.addColorStop(1, 'rgba(0, 114, 255, 0.4)');
+          ctx.fillStyle = cyberGrad;
+          ctx.fillText(cluster, 0, 0);
+        } else {
+          // Thick outline first for 3D pop effect
+          ctx.lineWidth = CANVAS_TEXT_FONT_PX * 0.1;
+          ctx.lineJoin = 'round';
+          ctx.strokeStyle = '#1a0a00';
+          ctx.strokeText(cluster, 0, 0);
+          // Pattern fill
+          if (typeof patFill === 'string') {
+            ctx.fillStyle = patFill;
+          } else {
+            ctx.fillStyle = patFill;
+          }
+          ctx.fillText(cluster, 0, 0);
+          // Festive snow cap highlight if enabled
+          if (state.festiveDecor && state.patternPreset === 'candyCane') {
+            const gw = ctx.measureText(cluster).width;
+            const snowGrad = ctx.createLinearGradient(-gw/2, -CANVAS_TEXT_FONT_PX*0.58, gw/2, -CANVAS_TEXT_FONT_PX*0.15);
+            snowGrad.addColorStop(0, 'rgba(255,255,255,0.85)');
+            snowGrad.addColorStop(0.5, 'rgba(255,255,255,0.30)');
+            snowGrad.addColorStop(1, 'rgba(255,255,255,0.0)');
+            ctx.fillStyle = snowGrad;
+            ctx.fillText(cluster, 0, 0);
+          }
         }
         ctx.restore();
       });
@@ -1427,10 +1629,22 @@ const STICKER_PAD_RATIO = 0.28; // base padding between shape edge and text, rel
 const STICKER_SHAPE_SIZING = {
   circle: { square: true, padMul: 1.0 },
   roundedRect: { square: false, padMul: 1.0 },
+  wavyBanner: { square: false, padMul: 1.2 },
+  thoughtCloud: { square: true, padMul: 1.3, tailRatio: 0.25 },
+  speechOval: { square: false, padMul: 1.25, tailRatio: 0.22 },
+  glassPlate: { square: false, padMul: 1.1 },
+  waterRipple: { square: true, padMul: 1.2 },
+  whiteCutout: { square: false, padMul: 1.05 },
   starburst: { square: true, padMul: 1.15 },
   stamp: { square: true, padMul: 1.08 },
   ribbon: { square: false, padMul: 1.15, pointExtraW: 0.22 },
   speech: { square: false, padMul: 1.0, tailRatio: 0.22 },
+  hexagon: { square: true, padMul: 1.15 },
+  diamond: { square: true, padMul: 1.35 },
+  lowerThird: { square: false, padMul: 1.0 },
+  pill: { square: false, padMul: 1.1 },
+  heart: { square: true, padMul: 1.3 },
+  neonFrame: { square: false, padMul: 1.15 },
   radiant: { square: true, padMul: 1.7 },
   starSpray: { square: true, padMul: 1.85 },
   letterBlocks: { square: false, padMul: 1.2 },
@@ -1739,6 +1953,205 @@ function drawLetterBlocksBackground(ctx, w, h, color) {
   ctx.restore();
 }
 
+// 7. Wavy Banner Path
+function drawWavyBannerPath(ctx, x, y, w, h) {
+  const amp = h * 0.16;
+  ctx.beginPath();
+  ctx.moveTo(x, y + amp);
+  ctx.bezierCurveTo(x + w * 0.3, y - amp, x + w * 0.7, y + amp * 2, x + w, y + amp);
+  ctx.lineTo(x + w, y + h + amp);
+  ctx.bezierCurveTo(x + w * 0.7, y + h + amp * 2, x + w * 0.3, y + h - amp, x, y + h + amp);
+  ctx.closePath();
+}
+
+// 8. Thought Cloud Path with Bubble Tails
+function drawThoughtCloudPath(ctx, cx, cy, rx, ry) {
+  ctx.beginPath();
+  const bumps = 8;
+  for (let i = 0; i < bumps; i++) {
+    const angle = (i / bumps) * Math.PI * 2;
+    const bx = cx + Math.cos(angle) * (rx * 0.78);
+    const by = cy + Math.sin(angle) * (ry * 0.78);
+    const br = Math.min(rx, ry) * 0.34;
+    ctx.arc(bx, by, br, 0, Math.PI * 2);
+  }
+  ctx.closePath();
+}
+function drawThoughtBubbles(ctx, cx, cy, rx, ry, color) {
+  ctx.save();
+  ctx.fillStyle = color;
+  const b1 = [cx - rx * 0.55, cy + ry * 0.82, rx * 0.12];
+  const b2 = [cx - rx * 0.72, cy + ry * 1.05, rx * 0.08];
+  const b3 = [cx - rx * 0.85, cy + ry * 1.22, rx * 0.05];
+  [b1, b2, b3].forEach(([bx, by, br]) => {
+    ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.restore();
+}
+
+// 9. Oval Speech Bubble Path
+function drawSpeechOvalPath(ctx, cx, cy, rx, ry, tailPx) {
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  if (tailPx > 0) {
+    ctx.moveTo(cx - rx * 0.35, cy + ry * 0.75);
+    ctx.lineTo(cx - rx * 0.65, cy + ry + tailPx);
+    ctx.lineTo(cx - rx * 0.1, cy + ry * 0.9);
+    ctx.closePath();
+  }
+}
+
+// 10. Hexagon Path
+function drawHexagonPath(ctx, cx, cy, rx, ry) {
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2 - Math.PI / 6;
+    const x = cx + Math.cos(angle) * rx;
+    const y = cy + Math.sin(angle) * ry;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
+
+// 11. Diamond Path
+function drawDiamondPath(ctx, cx, cy, rx, ry) {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - ry);
+  ctx.lineTo(cx + rx, cy);
+  ctx.lineTo(cx, cy + ry);
+  ctx.lineTo(cx - rx, cy);
+  ctx.closePath();
+}
+
+// 12. Heart Path
+function drawHeartPath(ctx, cx, cy, rx, ry) {
+  const topY = cy - ry * 0.35;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + ry * 0.88);
+  ctx.bezierCurveTo(cx - rx * 1.35, cy + ry * 0.1, cx - rx * 1.15, cy - ry * 1.05, cx, topY);
+  ctx.bezierCurveTo(cx + rx * 1.15, cy - ry * 1.05, cx + rx * 1.35, cy + ry * 0.1, cx, cy + ry * 0.88);
+  ctx.closePath();
+}
+
+// 13. Pill / Capsule Path
+function drawPillPath(ctx, x, y, w, h) {
+  const r = h / 2;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arc(x + w - r, y + r, r, -Math.PI / 2, Math.PI / 2);
+  ctx.lineTo(x + r, y + h);
+  ctx.arc(x + r, y + r, r, Math.PI / 2, -Math.PI / 2);
+  ctx.closePath();
+}
+
+// 14. Frosted Glass Plate
+function drawGlassPlateBackground(ctx, w, h) {
+  ctx.save();
+  const r = Math.min(w, h) * 0.14;
+  const gGrad = ctx.createLinearGradient(0, 0, w, h);
+  gGrad.addColorStop(0, 'rgba(255, 255, 255, 0.45)');
+  gGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.12)');
+  gGrad.addColorStop(1, 'rgba(255, 255, 255, 0.28)');
+  ctx.fillStyle = gGrad;
+  drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, r);
+  ctx.fill();
+
+  const shine = ctx.createLinearGradient(0, 0, w * 0.8, h * 0.8);
+  shine.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
+  shine.addColorStop(0.4, 'rgba(255, 255, 255, 0.1)');
+  shine.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = shine;
+  ctx.beginPath();
+  ctx.moveTo(4, 4);
+  ctx.lineTo(w * 0.65, 4);
+  ctx.lineTo(4, h * 0.65);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+  ctx.lineWidth = 3;
+  drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, r);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// 15. Water Ripple / Liquid Drop Plaque
+function drawWaterRippleBackground(ctx, w, h, color) {
+  ctx.save();
+  const cx = w / 2;
+  const cy = h / 2;
+  const rx = w / 2 - 6;
+  const ry = h / 2 - 6;
+
+  const wGrad = ctx.createRadialGradient(cx - rx * 0.25, cy - ry * 0.3, 10, cx, cy, rx);
+  wGrad.addColorStop(0, '#67e8f9');
+  wGrad.addColorStop(0.5, '#06b6d4');
+  wGrad.addColorStop(1, '#0e7490');
+  ctx.fillStyle = wGrad;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+  ctx.lineWidth = 2.5;
+  [0.4, 0.7, 0.92].forEach(scale => {
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx * scale, ry * scale, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  });
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+  ctx.beginPath();
+  ctx.ellipse(cx - rx * 0.45, cy - ry * 0.45, rx * 0.22, ry * 0.12, -Math.PI / 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// 16. Lower Third Video Bar
+function drawLowerThirdBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.fillStyle = '#ff0055';
+  ctx.fillRect(0, 0, Math.max(12, w * 0.03), h);
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+  ctx.beginPath();
+  ctx.moveTo(w - Math.max(20, h * 0.6), 0);
+  ctx.lineTo(w, 0);
+  ctx.lineTo(w, h);
+  ctx.lineTo(w - Math.max(30, h * 0.9), h);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// 17. Neon Frame Box
+function drawNeonFrameBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(10, 15, 30, 0.85)';
+  drawRoundedRectPath(ctx, 6, 6, w - 12, h - 12, 10);
+  ctx.fill();
+
+  ctx.shadowColor = color || '#00e5ff';
+  ctx.shadowBlur = 24;
+  ctx.strokeStyle = color || '#00e5ff';
+  ctx.lineWidth = 4;
+  drawRoundedRectPath(ctx, 8, 8, w - 16, h - 16, 8);
+  ctx.stroke();
+
+  ctx.lineWidth = 6;
+  const bLen = Math.min(24, Math.min(w, h) * 0.25);
+  ctx.beginPath(); ctx.moveTo(8, 8 + bLen); ctx.lineTo(8, 8); ctx.lineTo(8 + bLen, 8); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w - 8 - bLen, 8); ctx.lineTo(w - 8, 8); ctx.lineTo(w - 8, 8 + bLen); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(8, h - 8 - bLen); ctx.lineTo(8, h - 8); ctx.lineTo(8 + bLen, h - 8); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w - 8 - bLen, h - 8); ctx.lineTo(w - 8, h - 8); ctx.lineTo(w - 8, h - 8 - bLen); ctx.stroke();
+  ctx.restore();
+}
+
 function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, borderColor = '#ffffff', shadow = false) {
   const cx = w / 2;
   const cy = bodyH / 2;
@@ -1753,12 +2166,60 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
 
   ctx.fillStyle = color;
   switch (shape) {
+    case 'wavyBanner':
+      drawWavyBannerPath(ctx, 4, 4, w - 8, bodyH - 8);
+      ctx.fill();
+      break;
+    case 'thoughtCloud':
+      drawThoughtCloudPath(ctx, cx, cy, cx - 12, cy - 12);
+      ctx.fill();
+      drawThoughtBubbles(ctx, cx, cy, cx - 12, cy - 12, color);
+      break;
+    case 'speechOval':
+      drawSpeechOvalPath(ctx, cx, cy, cx - 10, cy - 10, tailPx);
+      ctx.fill();
+      break;
+    case 'glassPlate':
+      drawGlassPlateBackground(ctx, w, bodyH);
+      break;
+    case 'waterRipple':
+      drawWaterRippleBackground(ctx, w, bodyH, color);
+      break;
+    case 'whiteCutout':
+      ctx.fillStyle = '#ffffff';
+      drawRoundedRectPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.25);
+      ctx.fill();
+      ctx.fillStyle = color;
+      drawRoundedRectPath(ctx, 12, 12, w - 24, bodyH - 24, Math.min(w, bodyH) * 0.2);
+      ctx.fill();
+      break;
+    case 'hexagon':
+      drawHexagonPath(ctx, cx, cy, outerR * 0.95, outerR * 0.95);
+      ctx.fill();
+      break;
+    case 'diamond':
+      drawDiamondPath(ctx, cx, cy, outerR * 0.96, outerR * 0.96);
+      ctx.fill();
+      break;
+    case 'lowerThird':
+      drawLowerThirdBackground(ctx, w, bodyH, color);
+      break;
+    case 'pill':
+      drawPillPath(ctx, 4, 4, w - 8, bodyH - 8);
+      ctx.fill();
+      break;
+    case 'heart':
+      drawHeartPath(ctx, cx, cy, outerR * 0.72, outerR * 0.72);
+      ctx.fill();
+      break;
+    case 'neonFrame':
+      drawNeonFrameBackground(ctx, w, bodyH, color);
+      break;
     case 'roundedRect':
       drawRoundedRectPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.16);
       ctx.fill();
       break;
     case 'starburst':
-      // Red Starburst ("SPECIAL" red reference)
       drawStarPolygonPath(ctx, cx, cy, outerR, outerR * 0.72, 14);
       ctx.fill();
       ctx.lineWidth = Math.max(3, outerR * 0.05);
@@ -1766,24 +2227,20 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
       ctx.stroke();
       break;
     case 'stamp':
-      // Rubber Stamp ("ORIGINAL" reference)
       drawScallopedCirclePath(ctx, cx, cy, outerR, outerR * 0.92, 20);
       ctx.fill();
       drawRubberStampFrame(ctx, w, bodyH, color === '#e5484d' ? '#c62828' : color);
       break;
     case 'ribbon':
-      // Ribbon / Tag ("ONLY FOR YOU" reference)
       drawRibbonPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.28);
       ctx.fill();
       break;
     case 'speech':
-      // Speech Bubble ("HURRY UP!" reference)
       drawSpeechBubblePath(ctx, 0, 0, w, bodyH, tailPx, Math.min(w, bodyH) * 0.18);
       ctx.fill();
       drawAlarmClockIcon(ctx, Math.min(w, bodyH) * 0.04, Math.min(w, bodyH) * 0.06, Math.min(w, bodyH) * 0.22, '#d32f2f');
       break;
     case 'radiant': {
-      // Celebration Burst ("Congratulations" reference)
       drawCelebrationRays(ctx, cx, cy, outerR);
       const coreW = w * 0.75;
       const coreH = bodyH * 0.55;
@@ -1794,7 +2251,6 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
       break;
     }
     case 'starSpray': {
-      // 3D Multi-Color Star Spray ("SPECIAL" colorful spray reference)
       drawStarClusterSpray(ctx, cx, cy, outerR);
       const coreR = outerR * 0.65;
       drawStarPolygonPath(ctx, cx, cy, outerR * 0.85, coreR, 16);
@@ -1806,13 +2262,11 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
       break;
     }
     case 'letterBlocks': {
-      // 3D Yellow Letter Block Tiles ("ONLY FOR YOU" block tiles reference)
       drawLetterBlocksBackground(ctx, w, bodyH, color);
       break;
     }
     case 'circle':
     default:
-      // Red Circle Sticker with Peeled Corner ("yes!" reference)
       ctx.beginPath();
       ctx.ellipse(cx, cy, w / 2, bodyH / 2, 0, 0, Math.PI * 2);
       ctx.closePath();
@@ -1829,6 +2283,54 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     switch (shape) {
+      case 'wavyBanner':
+        drawWavyBannerPath(ctx, 4, 4, w - 8, bodyH - 8);
+        ctx.stroke();
+        break;
+      case 'thoughtCloud':
+        drawThoughtCloudPath(ctx, cx, cy, cx - 12, cy - 12);
+        ctx.stroke();
+        break;
+      case 'speechOval':
+        drawSpeechOvalPath(ctx, cx, cy, cx - 10, cy - 10, tailPx);
+        ctx.stroke();
+        break;
+      case 'glassPlate':
+        drawRoundedRectPath(ctx, 4, 4, w - 8, bodyH - 8, Math.min(w, bodyH) * 0.14);
+        ctx.stroke();
+        break;
+      case 'waterRipple':
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, w / 2 - 6, bodyH / 2 - 6, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      case 'whiteCutout':
+        drawRoundedRectPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.25);
+        ctx.stroke();
+        break;
+      case 'hexagon':
+        drawHexagonPath(ctx, cx, cy, outerR * 0.95, outerR * 0.95);
+        ctx.stroke();
+        break;
+      case 'diamond':
+        drawDiamondPath(ctx, cx, cy, outerR * 0.96, outerR * 0.96);
+        ctx.stroke();
+        break;
+      case 'lowerThird':
+        ctx.strokeRect(0, 0, w, bodyH);
+        break;
+      case 'pill':
+        drawPillPath(ctx, 4, 4, w - 8, bodyH - 8);
+        ctx.stroke();
+        break;
+      case 'heart':
+        drawHeartPath(ctx, cx, cy, outerR * 0.72, outerR * 0.72);
+        ctx.stroke();
+        break;
+      case 'neonFrame':
+        drawRoundedRectPath(ctx, 8, 8, w - 16, bodyH - 16, 8);
+        ctx.stroke();
+        break;
       case 'roundedRect':
       case 'letterBlocks':
         drawRoundedRectPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.16);

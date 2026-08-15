@@ -133,10 +133,22 @@
         <div class="preset-grid" id="stickerShapeGrid">
           <button type="button" class="preset-btn active" data-sticker-shape="circle">গোল স্টিকার (Peeled)</button>
           <button type="button" class="preset-btn" data-sticker-shape="roundedRect">রাউন্ড-রেক্ট ব্যাজ</button>
+          <button type="button" class="preset-btn" data-sticker-shape="wavyBanner">🌊 ওয়েভি ব্যানার</button>
+          <button type="button" class="preset-btn" data-sticker-shape="thoughtCloud">💭 থট ক্লাউড</button>
+          <button type="button" class="preset-btn" data-sticker-shape="speechOval">💬 স্পিচ বাবল (ওভাল)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="glassPlate">🪟 ফ্রস্টেড গ্লাস প্লেট</button>
+          <button type="button" class="preset-btn" data-sticker-shape="waterRipple">💧 ওয়াটার ড্রপ ও রীপল</button>
+          <button type="button" class="preset-btn" data-sticker-shape="whiteCutout">🏷️ হোয়াইট স্টিকার বর্ডার</button>
           <button type="button" class="preset-btn" data-sticker-shape="starburst">Starburst (Red)</button>
           <button type="button" class="preset-btn" data-sticker-shape="stamp">Stamp/Seal</button>
           <button type="button" class="preset-btn" data-sticker-shape="ribbon">Ribbon/Tag</button>
-          <button type="button" class="preset-btn" data-sticker-shape="speech">Speech Bubble</button>
+          <button type="button" class="preset-btn" data-sticker-shape="speech">Speech Bubble (Box)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="hexagon">⬡ ৬-কোণা হেক্সাগন</button>
+          <button type="button" class="preset-btn" data-sticker-shape="diamond">💠 ডায়মন্ড / রম্বস</button>
+          <button type="button" class="preset-btn" data-sticker-shape="lowerThird">🎬 লোয়ার-থার্ড ভিডিও বার</button>
+          <button type="button" class="preset-btn" data-sticker-shape="pill">💊 ক্যাপসুল / পিল শেপ</button>
+          <button type="button" class="preset-btn" data-sticker-shape="heart">❤️ লাভ হার্ট ব্যাজ</button>
+          <button type="button" class="preset-btn" data-sticker-shape="neonFrame">⚡ নিয়ন সাইবার ফ্রেম</button>
           <button type="button" class="preset-btn" data-sticker-shape="radiant">Celebration Burst</button>
           <button type="button" class="preset-btn" data-sticker-shape="starSpray">3D Star Spray</button>
           <button type="button" class="preset-btn" data-sticker-shape="letterBlocks">3D Letter Blocks</button>
@@ -306,7 +318,9 @@
           <label class="field">
             <span>প্যাটার্ন / ফেস্টিভ স্টাইল</span>
             <select id="patternPresetSelect">
-              <option value="candyCane" selected>🍬 Candy Cane / Christmas (লাল-সাদা স্ট্রাইপ - স্ক্রিনশট ২)</option>
+              <option value="aiCircuit">🤖 AI Cyber Circuit (সায়ান সার্কিট ও হলোগ্রাম - স্ক্রিনশট ১)</option>
+              <option value="neonSign">💡 Electric Neon Tube Sign (আসল নিয়ন সাইন গ্লো - স্ক্রিনশট ২)</option>
+              <option value="candyCane" selected>🍬 Candy Cane / Christmas (লাল-সাদা স্ট্রাইপ)</option>
               <option value="floral">🌸 Floral Blossom (ফুলের রঙিন গার্ডেন)</option>
               <option value="goldGlitter">✨ Gold Sparkle Foil (চকচকে গোল্ডেন গ্লিটার)</option>
               <option value="cyberGrid">🌐 Cyber Matrix Grid (নিয়ন হাই-টেক)</option>
@@ -316,7 +330,7 @@
           </label>
           <label class="field checkbox-field" style="margin-top: 4px;">
             <input type="checkbox" id="festiveDecorToggle" checked />
-            <span>ফেস্টিভ ডেকোরেশন (তুষার ক্যাপ / গ্লো)</span>
+            <span>স্পেশাল ইফেক্ট (HUD রিং / তুষার ক্যাপ / গ্লো)</span>
           </label>
         </div>
 
@@ -324,6 +338,7 @@
           <label class="field">
             <span>প্রিসেট</span>
             <select id="gradientPresetSelect">
+              <option value="electricCyan">⚡ Electric Neon Cyan (ইলেকট্রিক নিয়ন সায়ান - স্ক্রিনশট ১ ও ২)</option>
               <option value="gold" selected>💛 Gold / Sunset ('Style' স্ক্রিনশট)</option>
               <option value="neon">💙 Neon Cyan</option>
               <option value="purple">💜 Sunset Purple</option>
@@ -390,6 +405,8 @@
           <span>ব্যাকগ্রাউন্ড থিম</span>
           <select id="bgModeSelect">
             <option value="image">🖼️ আমার আপলোডকৃত ছবি</option>
+            <option value="aiCircuitBg">🤖 AI Cyber Circuit Board (হাই-টেক সার্কিট - স্ক্রিনশট ১)</option>
+            <option value="brickWallBg">🧱 Dark Brick Wall (ডার্ক ব্রিক ওয়াল - স্ক্রিনশট ২)</option>
             <option value="darkBlue" selected>🌌 Dark Blue Studio ('Style' স্ক্রিনশট)</option>
             <option value="lightStudio">🏢 Studio Floor & Wall ('DESIGN' স্ক্রিনশট)</option>
             <option value="gradientDark">🖤 Dark Vignette</option>
