@@ -638,23 +638,14 @@ function createGradientTexture(gradState = state) {
   canvas.height = 512;
   const ctx = canvas.getContext('2d');
 
-  let colors = [gradState.colorStart || '#ffd700', gradState.colorEnd || '#ff4500'];
-  const preset = gradState.gradientPreset || 'gold';
+  const c1 = gradState.colorStart || '#ffd700';
+  const c2 = gradState.colorEnd || '#ff4500';
+  const colors = [c1, c2];
+
   const type = gradState.gradientType || 'linear';
   const angleDeg = Number(gradState.gradientAngle ?? 90);
   const stop1 = Math.max(0, Math.min(100, Number(gradState.gradientStop1 ?? 0))) / 100;
   const stop2 = Math.max(0, Math.min(100, Number(gradState.gradientStop2 ?? 100))) / 100;
-
-  if (preset === 'electricCyan') colors = ['#00f5ff', '#0072ff'];
-  else if (preset === 'gold') colors = ['#ffd700', '#ff4500'];
-  else if (preset === 'neon') colors = ['#00f2fe', '#4facfe'];
-  else if (preset === 'purple') colors = ['#ff0844', '#ffb199'];
-  else if (preset === 'silver') colors = ['#e6e9f0', '#eef1f5'];
-  else if (preset === 'emerald') colors = ['#11998e', '#38ef7d'];
-  else if (preset === 'fire') colors = ['#ff416c', '#ff4b2b'];
-  else if (preset === 'custom') {
-    colors = [gradState.colorStart || '#ffd700', gradState.colorEnd || '#ffffff'];
-  }
 
   const p1 = Math.min(stop1, stop2);
   const p2 = Math.max(stop1, stop2);
@@ -663,10 +654,10 @@ function createGradientTexture(gradState = state) {
 
   if (type === 'radial') {
     const radGrad = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
-    if (p1 > 0) radGrad.addColorStop(0, firstColor);
+    radGrad.addColorStop(0, firstColor);
     radGrad.addColorStop(p1, firstColor);
     radGrad.addColorStop(p2, secondColor);
-    if (p2 < 1) radGrad.addColorStop(1, secondColor);
+    radGrad.addColorStop(1, secondColor);
     ctx.fillStyle = radGrad;
   } else {
     const rad = (angleDeg * Math.PI) / 180;
@@ -678,10 +669,10 @@ function createGradientTexture(gradState = state) {
     const x1 = cx + Math.cos(rad) * r;
     const y1 = cy - Math.sin(rad) * r;
     const linGrad = ctx.createLinearGradient(x0, y0, x1, y1);
-    if (p1 > 0) linGrad.addColorStop(0, firstColor);
+    linGrad.addColorStop(0, firstColor);
     linGrad.addColorStop(p1, firstColor);
     linGrad.addColorStop(p2, secondColor);
-    if (p2 < 1) linGrad.addColorStop(1, secondColor);
+    linGrad.addColorStop(1, secondColor);
     ctx.fillStyle = linGrad;
   }
 
@@ -3376,9 +3367,61 @@ function setActivePreset(grid, datasetKey, value) {
   }
 }
 
-// ---------- font load (bundled JSON, no network fetch at runtime) ----------
-const loader = new FontLoader();
-font = loader.parse(helvetikerRegular);
+// ---------- font load (bundled JSON & on-demand 3D typeface loader) ----------
+const fontCache = {};
+const fontLoader = new FontLoader();
+font = fontLoader.parse(helvetikerRegular);
+fontCache['helvetiker'] = font;
+
+const FONT_MAP = {
+  'helvetiker': './assets/fonts/helvetiker_regular.typeface.json',
+  'helvetiker_bold': './assets/fonts/helvetiker_bold.typeface.json',
+  'Grand Hotel': './assets/fonts/GrandHotel.typeface.json',
+  'Pacifico': './assets/fonts/Pacifico.typeface.json',
+  'Lobster': './assets/fonts/Lobster.typeface.json',
+  'Satisfy': './assets/fonts/Satisfy.typeface.json',
+  'Yellowtail': './assets/fonts/Yellowtail.typeface.json',
+  'Montserrat': './assets/fonts/Montserrat.typeface.json',
+  'Playfair Display': './assets/fonts/PlayfairDisplay.typeface.json',
+  'Bungee': './assets/fonts/Bungee.typeface.json',
+  'optimer': './assets/fonts/optimer_regular.typeface.json',
+  'gentilis': './assets/fonts/gentilis_regular.typeface.json',
+  'droid_sans': './assets/fonts/droid_sans_regular.typeface.json',
+  'droid_serif': './assets/fonts/droid_serif_regular.typeface.json'
+};
+
+async function loadAndSetFont(fontFamily) {
+  if (!fontFamily) fontFamily = 'helvetiker';
+  state.fontFamily = fontFamily;
+  if (fontCache[fontFamily]) {
+    font = fontCache[fontFamily];
+    rebuildTextMesh();
+    saveStudioStateDebounced();
+    return;
+  }
+  const fontUrl = FONT_MAP[fontFamily];
+  if (fontUrl) {
+    try {
+      const res = await fetch(fontUrl);
+      if (res.ok) {
+        const json = await res.json();
+        const parsed = fontLoader.parse(json);
+        fontCache[fontFamily] = parsed;
+        if (state.fontFamily === fontFamily) {
+          font = parsed;
+          rebuildTextMesh();
+          saveStudioStateDebounced();
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load 3D font for ' + fontFamily, e);
+    }
+  }
+  rebuildTextMesh();
+  saveStudioStateDebounced();
+}
+
 statusNote.textContent = 'রেডি';
 // Try to register an optional bundled Bengali TTF so canvas text draws are
 // deterministic across platforms. This is best-effort; if the file is not
@@ -3670,6 +3713,7 @@ function loadStudioState() {
     if (saved.fontFamily && fontSelect) {
       state.fontFamily = saved.fontFamily;
       fontSelect.value = saved.fontFamily;
+      loadAndSetFont(saved.fontFamily);
     }
     if (saved.contentMode && contentModeGrid) {
       state.contentMode = saved.contentMode;
@@ -4542,16 +4586,8 @@ exportBtn.addEventListener('click', async () => {
 
 // ---------- Font, Gradient & Background Event Listeners ----------
 if (fontSelect) {
-  fontSelect.addEventListener('change', async () => {
-    state.fontFamily = fontSelect.value;
-    if (state.fontFamily && state.fontFamily !== 'helvetiker') {
-      try {
-        await document.fonts.load(`600 220px "${state.fontFamily}"`);
-      } catch (err) {
-        console.warn('Font load error:', err);
-      }
-    }
-    scheduleRebuild();
+  fontSelect.addEventListener('change', () => {
+    loadAndSetFont(fontSelect.value);
   });
 }
 
@@ -4592,13 +4628,7 @@ if (gradientPresetSelect) {
       if (gradientStop2Range) gradientStop2Range.value = 100;
       if (gradientStop2Value) gradientStop2Value.textContent = '100%';
     }
-    if (state.colorMode === 'gradient') {
-      if (isBanglaText(state.text) || state.contentMode !== 'text') {
-        scheduleRebuild();
-      } else {
-        applyMaterialColor();
-      }
-    }
+    if (state.colorMode === 'gradient') scheduleRebuild();
     saveStudioStateDebounced();
   });
 }
@@ -4606,13 +4636,7 @@ if (gradientPresetSelect) {
 if (gradientTypeSelect) {
   gradientTypeSelect.addEventListener('change', () => {
     state.gradientType = gradientTypeSelect.value;
-    if (state.colorMode === 'gradient') {
-      if (isBanglaText(state.text) || state.contentMode !== 'text') {
-        scheduleRebuild();
-      } else {
-        applyMaterialColor();
-      }
-    }
+    if (state.colorMode === 'gradient') scheduleRebuild();
     saveStudioStateDebounced();
   });
 }
@@ -4622,13 +4646,7 @@ if (colorStartPicker) {
     state.colorStart = colorStartPicker.value;
     state.gradientPreset = 'custom';
     if (gradientPresetSelect) gradientPresetSelect.value = 'custom';
-    if (state.colorMode === 'gradient') {
-      if (isBanglaText(state.text) || state.contentMode !== 'text') {
-        scheduleRebuild();
-      } else {
-        applyMaterialColor();
-      }
-    }
+    if (state.colorMode === 'gradient') scheduleRebuild();
     saveStudioStateDebounced();
   });
 }
@@ -4638,13 +4656,7 @@ if (colorEndPicker) {
     state.colorEnd = colorEndPicker.value;
     state.gradientPreset = 'custom';
     if (gradientPresetSelect) gradientPresetSelect.value = 'custom';
-    if (state.colorMode === 'gradient') {
-      if (isBanglaText(state.text) || state.contentMode !== 'text') {
-        scheduleRebuild();
-      } else {
-        applyMaterialColor();
-      }
-    }
+    if (state.colorMode === 'gradient') scheduleRebuild();
     saveStudioStateDebounced();
   });
 }
@@ -4655,13 +4667,7 @@ if (gradientStop1Range) {
     if (gradientStop1Value) gradientStop1Value.textContent = `${state.gradientStop1}%`;
     state.gradientPreset = 'custom';
     if (gradientPresetSelect) gradientPresetSelect.value = 'custom';
-    if (state.colorMode === 'gradient') {
-      if (isBanglaText(state.text) || state.contentMode !== 'text') {
-        scheduleRebuild();
-      } else {
-        applyMaterialColor();
-      }
-    }
+    if (state.colorMode === 'gradient') scheduleRebuild();
     saveStudioStateDebounced();
   });
 }
@@ -4672,13 +4678,7 @@ if (gradientStop2Range) {
     if (gradientStop2Value) gradientStop2Value.textContent = `${state.gradientStop2}%`;
     state.gradientPreset = 'custom';
     if (gradientPresetSelect) gradientPresetSelect.value = 'custom';
-    if (state.colorMode === 'gradient') {
-      if (isBanglaText(state.text) || state.contentMode !== 'text') {
-        scheduleRebuild();
-      } else {
-        applyMaterialColor();
-      }
-    }
+    if (state.colorMode === 'gradient') scheduleRebuild();
     saveStudioStateDebounced();
   });
 }
@@ -4782,6 +4782,24 @@ scene.environment = state.reflectionsOn ? envTexture : null;
 updateWebmSupportNote();
 updateExportSourceNote();
 rebuildTextMesh();
+
+// ---------- Mouse-wheel zoom: scale text mesh ----------
+// Scrolling up/down shrinks or grows the active textMesh without touching camera FOV.
+// Works regardless of drag mode. Ctrl+Wheel keeps the default browser zoom.
+if (canvas) {
+  canvas.addEventListener('wheel', (e) => {
+    if (e.ctrlKey || e.metaKey) return; // let Ctrl+scroll be browser zoom
+    e.preventDefault();
+    if (!textMesh) return;
+    const factor = e.deltaY > 0 ? 0.95 : 1.05; // scroll down = shrink, up = grow
+    textMesh.scale.multiplyScalar(factor);
+    // Clamp so the user can't accidentally make it invisible or enormous
+    const s = textMesh.scale.x;
+    if (s < 0.05) textMesh.scale.setScalar(0.05);
+    if (s > 20)   textMesh.scale.setScalar(20);
+    saveStudioStateDebounced();
+  }, { passive: false });
+}
 
 // ---------- render loop ----------
 function animate(now) {
