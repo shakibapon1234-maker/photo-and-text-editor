@@ -1,4 +1,4 @@
-// 3D Text Module — Phase 3: Animation System
+﻿// 3D Text Module — Phase 3: Animation System
 // Scope (per PLAN_2 Phase 3 checklist):
 //   - Preset animation library (16 effects + "none" — finalized in the
 //     animation-list-finalization pass, see PLAN_2 §6 Open Decisions)
@@ -514,11 +514,9 @@ const state = {
   stickerBorderWidth: parseInt(stickerBorderWidthRange?.value || '0', 10),
   stickerBorderColor: stickerBorderColorPicker?.value || '#ffffff',
   stickerShadow: stickerShadowCheckbox?.checked || false,
-  // PLAN_3 §3: curved text — shared by Text and Sticker/Badge content modes
-  // (§3.2), read directly by drawCanvasTextTexture/drawStickerCanvasTexture.
-  curveIntensity: Number(curveIntensityRange.value), // -100..100, 0 = straight
-  curveDirection: 'up', // 'up' (⌣ smile) | 'down' (⌢ dome)
-  curveSpacing: Number(curveSpacingRange.value) / 100, // slider is a %, state stores the multiplier
+  curveIntensity: Number(curveIntensityRange.value),
+  curveDirection: 'up',
+  curveSpacing: Number(curveSpacingRange.value) / 100,
   text: textInput.value,
   depth: Number(depthRange.value),
   size: Number(sizeRange.value),
@@ -539,13 +537,9 @@ const state = {
   dragMode: dragModeSelect?.value || 'move',
   dragEnabled: dragEnabledToggle ? dragEnabledToggle.checked : true,
   autoRotate: false,
-  quality: 'medium', // Phase 5: low/medium/high — medium = old fixed behavior
+  quality: 'medium',
 };
 
-// Phase 3: playback state, separate from `state` above since it describes
-// *how the mesh is being previewed right now*, not a persistent text/material
-// setting. `presetId` picks a function from ANIMATION_PRESETS; duration/delay
-// are in ms; easing is a key into EASINGS.
 const animState = {
   presetId: 'none',
   durationMs: Number(animDurationRange.value),
@@ -557,13 +551,9 @@ const animState = {
 };
 
 function getBaseOpacity() {
-  // Mirrors buildMaterial(): every preset is fully opaque except glass, which
-  // is deliberately semi-transparent (see buildMaterial's "glass" case for
-  // why real opacity is used instead of transmission).
   return state.materialType === 'glass' ? 0.55 : 1;
 }
 
-// ---------- material presets (Phase 2: 5 presets) ----------
 function buildMaterial(type, colorHex) {
   const color = new THREE.Color(colorHex);
   const refIntensity = state.reflectionsOn ? state.reflectionIntensity : 0;
@@ -628,51 +618,78 @@ function buildMaterial(type, colorHex) {
   }
 }
 
-// ---------- Bangla support (this session, PLAN_2 §8.1) ----------
-// `TextGeometry` extrudes glyph outlines from a Three.js typeface-JSON font,
-// which is fine for Latin (helvetiker) but wrong for Bangla: (1) the vendored
-// fonts have no Bengali glyphs at all, and (2) even with a Bengali font,
-// TextGeometry's glyph pipeline doesn't handle complex-script shaping
-// (juktakkhor/conjuncts, matra/kar positioning) — so per-character extrusion
-// would render broken/disconnected shapes even with the right font data.
-//
-// Chosen fix = plan §8.1 option 3 (hybrid canvas-texture card), NOT option 1
-// (vendor a Bengali typeface-JSON) or option 2 (switch to troika-three-text):
-//   - Option 1 was rejected because TextGeometry's shaping limitation (2)
-//     above would remain even with a correct font file.
-//   - Option 2 was rejected for this pass because troika doesn't give true
-//     extrude/depth out of the box, and swapping the text engine would touch
-//     every existing Latin-text code path (materials, animation, export) —
-//     much larger blast radius than adding a second, isolated render path.
-//   - Option 3 draws the line(s) into an offscreen 2D <canvas> using the
-//     *browser's own* text shaping (correct for Bangla, or any script, by
-//     construction — it's the same engine that renders the <textarea> above)
-//     and maps that as a texture onto an extruded card (BoxGeometry). This
-//     keeps every existing material/animation/export code path working
-//     unchanged, because the result is still just a Group containing
-//     mesh(es) with a `.rotation`/`.position`/`.material`.
-//
-// Trade-off (documented up front, not discovered later): this is a flat
-// card with depth, not per-letter extrusion — the depth "wall" is the
-// card's rectangular edge, not each glyph's silhouette. That matches what
-// §8.1 option 3 describes ("extruded plane/shape"), not what Latin text
-// currently does. Latin text is completely unaffected — it still uses the
-// original per-glyph TextGeometry path.
+function buildMaterialWithTexture(type, colorHex, texture) {
+  const mat = buildMaterial(type, colorHex || '#ffffff');
+  if (texture) {
+    mat.map = texture;
+    mat.needsUpdate = true;
+  }
+  return mat;
+}
+
+function createGradientTexture(gradState = state) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  let colors = ['#ffd700', '#ff4500'];
+  const preset = gradState.gradientPreset || 'gold';
+  const type = gradState.gradientType || 'linear';
+  const angleDeg = Number(gradState.gradientAngle ?? 90);
+
+  if (preset === 'electricCyan') colors = ['#00f5ff', '#0072ff'];
+  else if (preset === 'gold') colors = ['#ffd700', '#ff4500'];
+  else if (preset === 'neon') colors = ['#00f2fe', '#4facfe'];
+  else if (preset === 'purple') colors = ['#ff0844', '#ffb199'];
+  else if (preset === 'silver') colors = ['#e6e9f0', '#eef1f5'];
+  else if (preset === 'emerald') colors = ['#11998e', '#38ef7d'];
+  else if (preset === 'fire') colors = ['#ff416c', '#ff4b2b'];
+  else if (preset === 'custom') {
+    colors = [gradState.colorStart || '#ff0000', gradState.colorEnd || '#ffffff'];
+  }
+
+  if (type === 'radial') {
+    const grad = ctx.createRadialGradient(256, 256, 10, 256, 256, 256);
+    grad.addColorStop(0, colors[0]);
+    grad.addColorStop(1, colors[1]);
+    ctx.fillStyle = grad;
+  } else {
+    const rad = ((angleDeg - 90) * Math.PI) / 180;
+    const cx = 256;
+    const cy = 256;
+    const r = 256;
+    const x0 = cx - Math.cos(rad) * r;
+    const y0 = cy - Math.sin(rad) * r;
+    const x1 = cx + Math.cos(rad) * r;
+    const y1 = cy + Math.sin(rad) * r;
+    const grad = ctx.createLinearGradient(x0, y0, x1, y1);
+    grad.addColorStop(0, colors[0]);
+    grad.addColorStop(1, colors[1]);
+    ctx.fillStyle = grad;
+  }
+
+  ctx.fillRect(0, 0, 512, 512);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 4;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 const BANGLA_RANGE = /[\u0980-\u09FF]/;
 function isBanglaText(str) {
-  // Checks if string contains Bengali Unicode range or any non-ASCII character not present in Latin Helvetiker font
   return BANGLA_RANGE.test(str) || /[^\x00-\x7F]/.test(str);
 }
 
 const CANVAS_TEXT_FONT_STACK =
   '"Noto Sans Bengali","Nirmala UI","Vrinda UI","Vrinda","Kalpurush","Siyam Rupali","Bangla Sans UI","Segoe UI",sans-serif';
-const CANVAS_TEXT_FONT_PX = 220; // supersampled resolution, independent of world-space size
+const CANVAS_TEXT_FONT_PX = 220;
 const CANVAS_TEXT_LINE_HEIGHT_PX = CANVAS_TEXT_FONT_PX * 1.35;
 const CANVAS_TEXT_PAD_PX = CANVAS_TEXT_FONT_PX * 0.35;
-
-// ---------- PLAN_3 §3, Phase B2: curved-text canvas rendering ----------
-// Shared by both the plain text card (drawCanvasTextTexture) and the
-// Sticker/Badge card (drawStickerCanvasTexture) — plan §3.2 explicitly asks
 // for curve inside badge text too, and both already go through this same
 // canvas-card pipeline, so one helper covers both call sites.
 //
@@ -712,7 +729,6 @@ function drawCurvedLine(ctx, clusters, layout, centerX, baselineY) {
     ctx.restore();
   });
 }
-
 function getFontStack(family) {
   if (!family || family === 'helvetiker' || family === 'Noto Sans Bengali') {
     return CANVAS_TEXT_FONT_STACK;
@@ -723,7 +739,7 @@ function getFontStack(family) {
 function getGradientFillStyle(ctx, width, height) {
   let colors = ['#ffd700', '#ff4500'];
   let type = state.gradientType || 'linear';
-  let angleDeg = state.gradientAngle || 90;
+  let angleDeg = Number(state.gradientAngle ?? 90);
 
   if (state.gradientPreset === 'electricCyan') colors = ['#00f5ff', '#0072ff'];
   else if (state.gradientPreset === 'gold') colors = ['#ffd700', '#ff4500'];
@@ -732,7 +748,9 @@ function getGradientFillStyle(ctx, width, height) {
   else if (state.gradientPreset === 'silver') colors = ['#e6e9f0', '#eef1f5'];
   else if (state.gradientPreset === 'emerald') colors = ['#11998e', '#38ef7d'];
   else if (state.gradientPreset === 'fire') colors = ['#ff416c', '#ff4b2b'];
-  else if (state.gradientPreset === 'custom') colors = [state.colorStart || '#ffd700', state.colorEnd || '#ff4500'];
+  else if (state.gradientPreset === 'custom') {
+    colors = [state.colorStart || '#ff0000', state.colorEnd || '#ffffff'];
+  }
 
   if (type === 'radial') {
     const grad = ctx.createRadialGradient(width / 2, height / 2, 10, width / 2, height / 2, Math.max(width, height) / 2);
@@ -740,29 +758,20 @@ function getGradientFillStyle(ctx, width, height) {
     grad.addColorStop(1, colors[1]);
     return grad;
   } else {
-    const rad = (angleDeg * Math.PI) / 180;
+    const rad = ((angleDeg - 90) * Math.PI) / 180;
     const cx = width / 2;
     const cy = height / 2;
-    const dx = Math.cos(rad);
-    const dy = Math.sin(rad);
-
-    // Span the entire canvas along the selected axis.  Using only half of
-    // the largest side makes diagonal gradients end before reaching the
-    // canvas corners, so most wide text can appear to use just the end
-    // colour.  This is the projection of the canvas onto the gradient axis.
-    const halfSpan = Math.abs(dx) * width / 2 + Math.abs(dy) * height / 2;
-    const x0 = cx - dx * halfSpan;
-    const y0 = cy - dy * halfSpan;
-    const x1 = cx + dx * halfSpan;
-    const y1 = cy + dy * halfSpan;
+    const r = Math.max(width, height) / 2;
+    const x0 = cx - Math.cos(rad) * r;
+    const y0 = cy - Math.sin(rad) * r;
+    const x1 = cx + Math.cos(rad) * r;
+    const y1 = cy + Math.sin(rad) * r;
     const grad = ctx.createLinearGradient(x0, y0, x1, y1);
     grad.addColorStop(0, colors[0]);
     grad.addColorStop(1, colors[1]);
     return grad;
   }
 }
-
-// -------- Multicolor palettes (Design 1: Rainbow / Comic Pop) --------
 const MULTICOLOR_PALETTES = {
   comic:    ['#e53935','#f57c00','#43a047','#1e88e5','#8e24aa','#e91e63','#ff8f00'],
   pastel:   ['#ff8a80','#82b1ff','#ccff90','#ea80fc','#80d8ff','#ffd180','#b9f6ca'],
@@ -1517,6 +1526,7 @@ function disposeTextMesh() {
   if (textMesh.userData) {
     if (textMesh.userData.frontTex) textMesh.userData.frontTex.dispose();
     if (textMesh.userData.backTex) textMesh.userData.backTex.dispose();
+    if (textMesh.userData.gradTex) textMesh.userData.gradTex.dispose();
   }
   textMesh.traverse((child) => {
     if (child.isMesh) {
@@ -1535,7 +1545,14 @@ function buildVectorTextMesh(validLines) {
   const lineHeight = state.size * 1.35;
 
   const group = new THREE.Group();
-  const material = buildMaterial(state.materialType, state.color);
+  let material;
+  if (state.colorMode === 'gradient') {
+    const gradTex = createGradientTexture(state);
+    material = buildMaterialWithTexture(state.materialType, '#ffffff', gradTex);
+    group.userData.gradTex = gradTex;
+  } else {
+    material = buildMaterial(state.materialType, state.color);
+  }
 
   const totalLinesHeight = (validLines.length - 1) * lineHeight;
 
@@ -1557,6 +1574,23 @@ function buildVectorTextMesh(validLines) {
     geometry.computeBoundingBox();
     if (hasText && geometry.boundingBox && !isNaN(geometry.boundingBox.min.x)) {
       geometry.center();
+      geometry.computeBoundingBox();
+    }
+
+    if (geometry.boundingBox) {
+      const pos = geometry.attributes.position;
+      const min = geometry.boundingBox.min;
+      const max = geometry.boundingBox.max;
+      const spanX = Math.max(0.0001, max.x - min.x);
+      const spanY = Math.max(0.0001, max.y - min.y);
+      const uvs = new Float32Array(pos.count * 2);
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const y = pos.getY(i);
+        uvs[i * 2] = (x - min.x) / spanX;
+        uvs[i * 2 + 1] = (y - min.y) / spanY;
+      }
+      geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     }
 
     const lineMesh = new THREE.Mesh(geometry, material);
@@ -2438,22 +2472,6 @@ function drawCubeFaceCanvas(faceText, cubeColor, textColor, borderColor) {
   const len = faceText.length;
   const fontSize = len <= 1 ? size * 0.62 : len <= 3 ? size * 0.42 : size * 0.28;
   const fontFamily = `"Grand Hotel", "Pacifico", sans-serif`;
-  ctx.font = `700 ${fontSize}px ${fontFamily}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  // Multi-layered 3D emboss: dark offset shadow layers
-  const shadowLayers = 7;
-  for (let s = shadowLayers; s >= 1; s--) {
-    const alpha = 0.08 + (shadowLayers - s) * 0.04;
-    ctx.fillStyle = `rgba(0,0,0,${alpha})`;
-    ctx.fillText(faceText, size/2 + s*2, size/2 + s*2);
-  }
-
-  // Bold dark outline for cartoon 3D pop
-  ctx.lineWidth = fontSize * 0.14;
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = borderColor || '#0a0a2a';
   ctx.strokeText(faceText, size/2, size/2);
 
   // Main text fill: vertical highlight gradient
@@ -2478,7 +2496,6 @@ function buildCubeBoxMesh() {
   const face2 = state.cubeFace2 || 'D';
   const face3 = state.cubeFace3 || '';
 
-  // Draw each face canvas
   const { canvas: cFront } = drawCubeFaceCanvas(face1, cubeColor, textColor, borderColor);
   const { canvas: cRight } = drawCubeFaceCanvas(face2, cubeColor, textColor, borderColor);
   const { canvas: cTop } = drawCubeFaceCanvas(face3, cubeColor, textColor, borderColor);
@@ -2495,27 +2512,26 @@ function buildCubeBoxMesh() {
     return t;
   }
 
-  // BoxGeometry face order: right(+x), left(-x), top(+y), bottom(-y), front(+z), back(-z)
-  const materials = [
-    new THREE.MeshStandardMaterial({ map: makeCubeTex(cRight, false), roughness: 0.25, metalness: 0.1 }),  // right
-    new THREE.MeshStandardMaterial({ map: makeCubeTex(cLeft, true),  roughness: 0.25, metalness: 0.1 }),  // left
-    new THREE.MeshStandardMaterial({ map: makeCubeTex(cTop, false),  roughness: 0.25, metalness: 0.1 }),  // top
-    new THREE.MeshStandardMaterial({ map: makeCubeTex(cBottom, false), roughness: 0.35, metalness: 0.1 }), // bottom
-    new THREE.MeshStandardMaterial({ map: makeCubeTex(cFront, false), roughness: 0.20, metalness: 0.12 }), // front
-    new THREE.MeshStandardMaterial({ map: makeCubeTex(cBack, true),  roughness: 0.20, metalness: 0.12 }),  // back
+  const cubeMatArr = [
+    new THREE.MeshStandardMaterial({ map: makeCubeTex(cRight, false), roughness: 0.25, metalness: 0.1 }),
+    new THREE.MeshStandardMaterial({ map: makeCubeTex(cLeft, true),  roughness: 0.25, metalness: 0.1 }),
+    new THREE.MeshStandardMaterial({ map: makeCubeTex(cTop, false),  roughness: 0.25, metalness: 0.1 }),
+    new THREE.MeshStandardMaterial({ map: makeCubeTex(cBottom, false), roughness: 0.35, metalness: 0.1 }),
+    new THREE.MeshStandardMaterial({ map: makeCubeTex(cFront, false), roughness: 0.20, metalness: 0.12 }),
+    new THREE.MeshStandardMaterial({ map: makeCubeTex(cBack, true),  roughness: 0.20, metalness: 0.12 }),
   ];
 
-  const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
-  const mesh = new THREE.Mesh(geometry, materials);
-  mesh.castShadow = state.shadowsOn;
-  mesh.receiveShadow = state.shadowsOn;
+  const cubeGeo = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
+  const cubeMesh = new THREE.Mesh(cubeGeo, cubeMatArr);
+  cubeMesh.castShadow = state.shadowsOn;
+  cubeMesh.receiveShadow = state.shadowsOn;
 
-  const group = new THREE.Group();
-  group.add(mesh);
+  const cubeGroup = new THREE.Group();
+  cubeGroup.add(cubeMesh);
 
   renderMode = 'canvas';
-  textMesh = group;
-  textMesh.material = materials;
+  textMesh = cubeGroup;
+  textMesh.material = cubeMatArr;
 }
 
 function rebuildTextMesh() {
@@ -2545,7 +2561,6 @@ function rebuildTextMesh() {
     return;
   }
 
-  // ---- 3D CUBE BOX MODE ----
   if (state.contentMode === 'cube') {
     disposeTextMesh();
     buildCubeBoxMesh();
@@ -2562,7 +2577,7 @@ function rebuildTextMesh() {
     if (!state.imageElement) {
       updateQualityNote();
       updateTextModeNote(false);
-      return; // nothing uploaded yet — leave the scene empty, same as an empty text field
+      return;
     }
     buildImageCardMesh(state.imageElement);
     applyRotation();
@@ -2573,25 +2588,15 @@ function rebuildTextMesh() {
     return;
   }
 
-  // Determine rendering path first: canvas-card (correct shaping, curved
-  // lines) vs. vector TextGeometry path. The canvas path must be allowed to
-  // run even when the vendored typeface-JSON `font` isn't loaded yet (the
-  // vendored JSON only applies to the vector/extrude path). Previously the
-  // function returned early if `font` was falsy which blocked canvas-based
-  // Bangla rendering until the JSON font parsed — that prevented using the
-  // bundled TTF for canvas draws. Compute the decision first and only
-  // require `font` when the vector path is selected.
-
+  // 'gradient' is NOT in needsCanvasCard — Latin 3D text handles gradients
+  // via UV-mapped texture on TextGeometry, preserving full 3D depth/bevel.
   const rawContent = state.text || ' ';
-  const lines = rawContent.split(/\r?\n/);
-  const validLines = lines.map((l) => (l.length > 0 ? l : ' '));
+  const textLines = rawContent.split(/\r?\n/);
+  const validLines = textLines.map((l) => (l.length > 0 ? l : ' '));
 
-  const isCustomFontOrGradient = (state.fontFamily && state.fontFamily !== 'helvetiker') || state.colorMode === 'gradient' || state.colorMode === 'multicolor' || state.colorMode === 'pattern';
-  const needsCanvasCard = isBanglaText(rawContent) || state.curveIntensity !== 0 || isCustomFontOrGradient;
+  const isCustomFont = (state.fontFamily && state.fontFamily !== 'helvetiker');
+  const needsCanvasCard = isBanglaText(rawContent) || state.curveIntensity !== 0 || isCustomFont || state.colorMode === 'multicolor' || state.colorMode === 'pattern';
 
-  // If vector geometry is required but the vendored JSON font isn't parsed
-  // yet, delay the rebuild until it is available. Canvas-card path does not
-  // need `font` and should proceed immediately.
   if (!needsCanvasCard && !font) return;
 
   disposeTextMesh();
@@ -2609,16 +2614,11 @@ function rebuildTextMesh() {
   updateShadowFrustum();
 }
 
-// ---------- Phase 5: quality preset apply + readout ----------
-// Rebuilds whatever is quality-dependent: pixel ratio cap, shadow map
-// resolution (via a lighting-rig rebuild, which re-reads QUALITY_PRESETS),
-// and geometry segment counts (via a text-mesh rebuild). Shadow/reflection
-// toggle state is preserved because buildLightingPreset() re-applies it.
 function applyQuality() {
   const q = QUALITY_PRESETS[state.quality];
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.pixelRatioCap));
   buildLightingPreset(state.lightingPreset);
-  rebuildTextMesh(); // also calls updateQualityNote()
+  rebuildTextMesh();
 }
 
 function updateQualityNote() {
@@ -2634,7 +2634,7 @@ function updateQualityNote() {
       }
     });
   }
-  const triLabel = triCount > 0 ? triCount.toLocaleString('bn-BD') : '—';
+  const triLabel = triCount > 0 ? triCount.toLocaleString('bn-BD') : '\u2014';
   qualityNote.textContent =
     `বর্তমান: ~${triLabel} ট্রায়াঙ্গেল, পিক্সেল-রেশিও সর্বোচ্চ ${q.pixelRatioCap}x, শ্যাডো ম্যাপ ${q.shadowMapSize}px। ` +
     `লো-এন্ড ডিভাইস/কম-শক্তির পিসিতে ল্যাগ হলে "Low" বেছে নিন।`;
@@ -2643,19 +2643,11 @@ function updateQualityNote() {
 function updateTextModeNote(isBangla, curveOn = false) {
   if (!textModeNote) return;
   if (isBangla && curveOn) {
-    // PLAN_3 §3, Phase B2 caveat: curve draws one grapheme cluster at a
-    // time (see curve.js splitGraphemes), which keeps a single conjunct
-    // (ক্ষ ইত্যাদি) intact but can't do cross-cluster shaping the way one
-    // whole-line fillText() call does — worth surfacing, not silently
-    // shipping a subtly different Bangla render than the straight case.
-    textModeNote.textContent =
-      'বাংলা লেখা শনাক্ত হয়েছে — ছবি-টেক্সচার কার্ড মোডে রেন্ডার হচ্ছে। কার্ভ চালু থাকায় প্রতিটা অক্ষর/যুক্তাক্ষর আলাদাভাবে বসানো হচ্ছে (একসাথে পুরো লাইন শেপ করা হচ্ছে না) — জটিল যুক্তাক্ষরে সামান্য পার্থক্য দেখা যেতে পারে সোজা টেক্সটের তুলনায়।';
+    textModeNote.textContent = '\u09ac\u09be\u0982\u09b2\u09be \u09b2\u09c7\u0996\u09be \u09b6\u09a8\u09be\u0995\u09cd\u09a4 \u09b9\u09af\u09bc\u09c7\u099b\u09c7 \u2014 \u099b\u09ac\u09bf-\u099f\u09c7\u0995\u09cd\u09b8\u099a\u09be\u09b0 \u0995\u09be\u09b0\u09cd\u09a1 \u09ae\u09cb\u09a1\u09c7 \u09b0\u09c7\u09a8\u09cd\u09a1\u09be\u09b0 \u09b9\u099a\u09cd\u099b\u09c7\u0964 \u0995\u09be\u09b0\u09cd\u09ad \u099a\u09be\u09b2\u09c1 \u09a5\u09be\u0995\u09be\u09af\u09bc \u09aa\u09cd\u09b0\u09a4\u09bf\u099f\u09be \u0985\u0995\u09cd\u09b7\u09b0 \u0986\u09b2\u09be\u09a6\u09be\u09ad\u09be\u09ac\u09c7 \u09ac\u09b8\u09be\u09a8\u09cb \u09b9\u099a\u09cd\u099b\u09c7\u0964';
   } else if (isBangla) {
-    textModeNote.textContent =
-      'বাংলা লেখা শনাক্ত হয়েছে — ছবি-টেক্সচার কার্ড মোডে রেন্ডার হচ্ছে (ব্রাউজারের নিজস্ব বাংলা ফন্ট/শেপিং ব্যবহার করে, তাই যুক্তাক্ষর/মাত্রা ঠিকভাবে বসে), বাক্যের প্রান্ত থেকে গভীরতা বের হয় — আলাদা আলাদা অক্ষরের কিনারা থেকে না।';
+    textModeNote.textContent = '\u09ac\u09be\u0982\u09b2\u09be \u09b2\u09c7\u0996\u09be \u09b6\u09a8\u09be\u0995\u09cd\u09a4 \u09b9\u09af\u09bc\u09c7\u099b\u09c7 \u2014 \u099b\u09ac\u09bf-\u099f\u09c7\u0995\u09cd\u09b8\u099a\u09be\u09b0 \u0995\u09be\u09b0\u09cd\u09a1 \u09ae\u09cb\u09a1\u09c7 \u09b0\u09c7\u09a8\u09cd\u09a1\u09be\u09b0 \u09b9\u099a\u09cd\u099b\u09c7\u0964';
   } else if (curveOn) {
-    textModeNote.textContent =
-      'কার্ভ চালু থাকায় ছবি-টেক্সচার কার্ড মোডে রেন্ডার হচ্ছে (ভেক্টর ৩ডি এক্সট্রুশনের বদলে) — বাক্যের প্রান্ত থেকে গভীরতা বের হয়, আলাদা আলাদা অক্ষরের কিনারা থেকে না।';
+    textModeNote.textContent = '\u0995\u09be\u09b0\u09cd\u09ad \u099a\u09be\u09b2\u09c1 \u09a5\u09be\u0995\u09be\u09af\u09bc \u099b\u09ac\u09bf-\u099f\u09c7\u0995\u09cd\u09b8\u099a\u09be\u09b0 \u0995\u09be\u09b0\u09cd\u09a1 \u09ae\u09cb\u09a1\u09c7 \u09b0\u09c7\u09a8\u09cd\u09a1\u09be\u09b0 \u09b9\u099a\u09cd\u099b\u09c7\u0964';
   } else {
     textModeNote.textContent = '';
   }
@@ -2666,14 +2658,11 @@ function applyPosition() {
   if (!textMesh) return;
   textMesh.position.set(state.posX || 0, state.posY || 0, state.posZ || 0);
   updateShadowFrustum();
+  saveStudioStateDebounced();
 }
 
 function applyRotation() {
   if (!textMesh) return;
-  // §৮.২ picture styles: some frames (e.g. "পোলারয়েড") bake in a fixed extra
-  // tilt on top of whatever the user's Rotate/Tilt sliders say, exactly like
-  // Word's "Rotated, White Frame" style. Defaults to 0 for text and for
-  // every non-tilted picture style, so this is a no-op everywhere else.
   const styleTiltZ = (textMesh.userData && textMesh.userData.styleTiltZ) || 0;
   textMesh.rotation.set(
     THREE.MathUtils.degToRad(state.rotX),
@@ -2681,30 +2670,29 @@ function applyRotation() {
     THREE.MathUtils.degToRad(state.rotZ + styleTiltZ)
   );
   applyPosition();
+  saveStudioStateDebounced();
 }
 
 function applyMaterial() {
   if (!textMesh) return;
 
   if (renderMode === 'canvas') {
-    // Multi-material box (front/back textured faces + plain side faces) —
-    // rebuild the material array from the cached textures rather than the
-    // single-material clone-per-mesh logic below, which doesn't apply to a
-    // mesh whose `.material` is an array.
     const mesh = textMesh.children[0];
     if (!mesh) return;
-    const old = mesh.material;
-    const materials = buildCanvasCardMaterials(textMesh.userData.frontTex, textMesh.userData.backTex, state.contentMode === 'image' || state.contentMode === 'sticker');
-    mesh.material = materials;
-    textMesh.material = materials;
-    if (Array.isArray(old)) old.forEach((m) => m.dispose());
+    const oldMat = mesh.material;
+    const newMaterials = buildCanvasCardMaterials(
+      textMesh.userData.frontTex,
+      textMesh.userData.backTex,
+      state.contentMode === 'image' || state.contentMode === 'sticker'
+    );
+    mesh.material = newMaterials;
+    textMesh.material = newMaterials;
+    if (Array.isArray(oldMat)) oldMat.forEach((m) => m.dispose());
 
-    // Keep the "রিফ্লেকশন ফ্রেম" copy (if this image has one) in sync with
-    // whatever material/color the main mesh just switched to.
     const reflMesh = textMesh.children[1];
     if (reflMesh && reflMesh.isMesh) {
       const oldRefl = reflMesh.material;
-      const reflMaterials = materials.map((m) => {
+      const reflMaterials = newMaterials.map((m) => {
         const clone = m.clone();
         clone.transparent = true;
         clone.opacity = 0.32;
@@ -2715,18 +2703,31 @@ function applyMaterial() {
       textMesh.userData.reflMaterials = reflMaterials;
       if (Array.isArray(oldRefl)) oldRefl.forEach((m) => m.dispose());
     }
+    saveStudioStateDebounced();
     return;
   }
 
-  const newMat = buildMaterial(state.materialType, state.color);
+  let newMat;
+  if (state.colorMode === 'gradient') {
+    if (textMesh.userData && textMesh.userData.gradTex) {
+      textMesh.userData.gradTex.dispose();
+    }
+    const gradTex = createGradientTexture(state);
+    newMat = buildMaterialWithTexture(state.materialType, '#ffffff', gradTex);
+    textMesh.userData = textMesh.userData || {};
+    textMesh.userData.gradTex = gradTex;
+  } else {
+    newMat = buildMaterial(state.materialType, state.color);
+  }
   textMesh.material = newMat;
   textMesh.traverse((child) => {
     if (child.isMesh) {
-      const old = child.material;
+      const oldChild = child.material;
       child.material = newMat.clone ? newMat.clone() : newMat;
-      if (old && old.dispose) old.dispose();
+      if (oldChild && oldChild.dispose) oldChild.dispose();
     }
   });
+  saveStudioStateDebounced();
 }
 
 function applyShadowToggle() {
@@ -2744,6 +2745,7 @@ function applyShadowToggle() {
     if (l.isDirectionalLight) l.castShadow = state.shadowsOn;
   }
   updateShadowFrustum();
+  saveStudioStateDebounced();
 }
 
 function applyReflectionToggle() {
@@ -3063,7 +3065,9 @@ function saveStudioState() {
     const toSave = {
       text: state.text,
       fontFamily: state.fontFamily,
+      contentMode: state.contentMode,
       colorMode: state.colorMode,
+      color: state.color,
       colorStart: state.colorStart,
       colorEnd: state.colorEnd,
       gradientPreset: state.gradientPreset,
@@ -3076,11 +3080,19 @@ function saveStudioState() {
       rotZ: state.rotZ,
       depth: state.depth,
       size: state.size,
-      color: state.color,
+      curveIntensity: state.curveIntensity,
+      curveDirection: state.curveDirection,
+      curveSpacing: state.curveSpacing,
       materialType: state.materialType,
       lightingPreset: state.lightingPreset,
       bgMode: state.bgMode,
-      bgColor: state.bgColor
+      bgColor: state.bgColor,
+      dragMode: state.dragMode,
+      dragEnabled: state.dragEnabled,
+      shadowsOn: state.shadowsOn,
+      shadowIntensity: state.shadowIntensity,
+      reflectionsOn: state.reflectionsOn,
+      quality: state.quality,
     };
     localStorage.setItem('3d_studio_saved_state', JSON.stringify(toSave));
   } catch (_) {}
@@ -3106,6 +3118,19 @@ function loadStudioState() {
     if (saved.fontFamily && fontSelect) {
       state.fontFamily = saved.fontFamily;
       fontSelect.value = saved.fontFamily;
+    }
+    if (saved.contentMode && contentModeGrid) {
+      state.contentMode = saved.contentMode;
+      setActivePreset(contentModeGrid, 'content', saved.contentMode);
+      if (textContentSection) textContentSection.hidden = saved.contentMode !== 'text';
+      if (imageContentSection) imageContentSection.hidden = saved.contentMode !== 'image';
+      if (stickerContentSection) stickerContentSection.hidden = saved.contentMode !== 'sticker';
+      if (cubeContentSection) cubeContentSection.hidden = saved.contentMode !== 'cube';
+      if (curveSection) curveSection.hidden = saved.contentMode === 'image' || saved.contentMode === 'cube';
+    }
+    if (saved.color && colorPicker) {
+      state.color = saved.color;
+      colorPicker.value = saved.color;
     }
     if (saved.colorMode && colorModeSelect) {
       state.colorMode = saved.colorMode;
@@ -3136,6 +3161,20 @@ function loadStudioState() {
       state.gradientAngle = saved.gradientAngle;
       gradientAngleRange.value = saved.gradientAngle;
       if (gradientAngleValue) gradientAngleValue.textContent = `${saved.gradientAngle}°`;
+    }
+    if (saved.curveIntensity !== undefined && curveIntensityRange) {
+      state.curveIntensity = saved.curveIntensity;
+      curveIntensityRange.value = saved.curveIntensity;
+      if (curveIntensityValue) curveIntensityValue.textContent = `${saved.curveIntensity}%`;
+    }
+    if (saved.curveDirection && curveDirectionGrid) {
+      state.curveDirection = saved.curveDirection;
+      setActivePreset(curveDirectionGrid, 'curveDirection', saved.curveDirection);
+    }
+    if (saved.curveSpacing !== undefined && curveSpacingRange) {
+      state.curveSpacing = saved.curveSpacing;
+      curveSpacingRange.value = Math.round(saved.curveSpacing * 100);
+      if (curveSpacingValue) curveSpacingValue.textContent = `${curveSpacingRange.value}%`;
     }
     if (saved.posX !== undefined && posXRange) {
       state.posX = saved.posX;
@@ -3176,13 +3215,46 @@ function loadStudioState() {
       state.materialType = saved.materialType;
       setActivePreset(materialPresetGrid, 'material', saved.materialType);
     }
+    if (saved.lightingPreset) {
+      state.lightingPreset = saved.lightingPreset;
+      setActivePreset(lightingPresetGrid, 'lighting', saved.lightingPreset);
+    }
+    if (saved.quality) {
+      state.quality = saved.quality;
+      setActivePreset(qualityPresetGrid, 'quality', saved.quality);
+    }
     if (saved.bgMode && bgModeSelect) {
       state.bgMode = saved.bgMode;
       bgModeSelect.value = saved.bgMode;
+      if (bgColorGroup) bgColorGroup.hidden = saved.bgMode !== 'color';
+      if (bgImageGroup) bgImageGroup.hidden = saved.bgMode !== 'image';
+    }
+    if (saved.bgColor && bgColorPicker) {
+      state.bgColor = saved.bgColor;
+      bgColorPicker.value = saved.bgColor;
+    }
+    if (saved.dragMode && dragModeSelect) {
+      state.dragMode = saved.dragMode;
+      dragModeSelect.value = saved.dragMode;
+    }
+    if (saved.dragEnabled !== undefined && dragEnabledToggle) {
+      state.dragEnabled = saved.dragEnabled;
+      dragEnabledToggle.checked = saved.dragEnabled;
+    }
+    if (saved.shadowsOn !== undefined && shadowToggle) {
+      state.shadowsOn = saved.shadowsOn;
+      shadowToggle.checked = saved.shadowsOn;
+    }
+    if (saved.shadowIntensity !== undefined && shadowIntensityRange) {
+      state.shadowIntensity = saved.shadowIntensity;
+      shadowIntensityRange.value = saved.shadowIntensity;
+    }
+    if (saved.reflectionsOn !== undefined && reflectionToggle) {
+      state.reflectionsOn = saved.reflectionsOn;
+      reflectionToggle.checked = saved.reflectionsOn;
     }
   } catch (_) {}
 }
-
 // ---------- Direct Drag Pointer Manipulation (Natural 1:1 Move / Rotate / Orbit) ----------
 let isPointerDragging = false;
 let previousPointerPos = { x: 0, y: 0 };

@@ -26168,14 +26168,9 @@ var state = {
   stickerBorderWidth: parseInt(stickerBorderWidthRange?.value || "0", 10),
   stickerBorderColor: stickerBorderColorPicker?.value || "#ffffff",
   stickerShadow: stickerShadowCheckbox?.checked || false,
-  // PLAN_3 §3: curved text — shared by Text and Sticker/Badge content modes
-  // (§3.2), read directly by drawCanvasTextTexture/drawStickerCanvasTexture.
   curveIntensity: Number(curveIntensityRange.value),
-  // -100..100, 0 = straight
   curveDirection: "up",
-  // 'up' (⌣ smile) | 'down' (⌢ dome)
   curveSpacing: Number(curveSpacingRange.value) / 100,
-  // slider is a %, state stores the multiplier
   text: textInput.value,
   depth: Number(depthRange.value),
   size: Number(sizeRange.value),
@@ -26197,7 +26192,6 @@ var state = {
   dragEnabled: dragEnabledToggle ? dragEnabledToggle.checked : true,
   autoRotate: false,
   quality: "medium"
-  // Phase 5: low/medium/high — medium = old fixed behavior
 };
 var animState = {
   presetId: "none",
@@ -26268,6 +26262,61 @@ function buildMaterial(type, colorHex) {
       return new MeshStandardMaterial({ color });
   }
 }
+function buildMaterialWithTexture(type, colorHex, texture) {
+  const mat = buildMaterial(type, colorHex || "#ffffff");
+  if (texture) {
+    mat.map = texture;
+    mat.needsUpdate = true;
+  }
+  return mat;
+}
+function createGradientTexture(gradState = state) {
+  const canvas2 = document.createElement("canvas");
+  canvas2.width = 512;
+  canvas2.height = 512;
+  const ctx = canvas2.getContext("2d");
+  let colors = ["#ffd700", "#ff4500"];
+  const preset = gradState.gradientPreset || "gold";
+  const type = gradState.gradientType || "linear";
+  const angleDeg = Number(gradState.gradientAngle ?? 90);
+  if (preset === "electricCyan") colors = ["#00f5ff", "#0072ff"];
+  else if (preset === "gold") colors = ["#ffd700", "#ff4500"];
+  else if (preset === "neon") colors = ["#00f2fe", "#4facfe"];
+  else if (preset === "purple") colors = ["#ff0844", "#ffb199"];
+  else if (preset === "silver") colors = ["#e6e9f0", "#eef1f5"];
+  else if (preset === "emerald") colors = ["#11998e", "#38ef7d"];
+  else if (preset === "fire") colors = ["#ff416c", "#ff4b2b"];
+  else if (preset === "custom") {
+    colors = [gradState.colorStart || "#ff0000", gradState.colorEnd || "#ffffff"];
+  }
+  if (type === "radial") {
+    const grad = ctx.createRadialGradient(256, 256, 10, 256, 256, 256);
+    grad.addColorStop(0, colors[0]);
+    grad.addColorStop(1, colors[1]);
+    ctx.fillStyle = grad;
+  } else {
+    const rad = (angleDeg - 90) * Math.PI / 180;
+    const cx = 256;
+    const cy = 256;
+    const r = 256;
+    const x0 = cx - Math.cos(rad) * r;
+    const y0 = cy - Math.sin(rad) * r;
+    const x1 = cx + Math.cos(rad) * r;
+    const y1 = cy + Math.sin(rad) * r;
+    const grad = ctx.createLinearGradient(x0, y0, x1, y1);
+    grad.addColorStop(0, colors[0]);
+    grad.addColorStop(1, colors[1]);
+    ctx.fillStyle = grad;
+  }
+  ctx.fillRect(0, 0, 512, 512);
+  const texture = new CanvasTexture(canvas2);
+  texture.colorSpace = SRGBColorSpace;
+  texture.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 4;
+  texture.wrapS = ClampToEdgeWrapping;
+  texture.wrapT = ClampToEdgeWrapping;
+  texture.needsUpdate = true;
+  return texture;
+}
 var BANGLA_RANGE = /[\u0980-\u09FF]/;
 function isBanglaText(str) {
   return BANGLA_RANGE.test(str) || /[^\x00-\x7F]/.test(str);
@@ -26307,7 +26356,7 @@ function getFontStack(family) {
 function getGradientFillStyle(ctx, width, height) {
   let colors = ["#ffd700", "#ff4500"];
   let type = state.gradientType || "linear";
-  let angleDeg = state.gradientAngle || 90;
+  let angleDeg = Number(state.gradientAngle ?? 90);
   if (state.gradientPreset === "electricCyan") colors = ["#00f5ff", "#0072ff"];
   else if (state.gradientPreset === "gold") colors = ["#ffd700", "#ff4500"];
   else if (state.gradientPreset === "neon") colors = ["#00f2fe", "#4facfe"];
@@ -26315,23 +26364,23 @@ function getGradientFillStyle(ctx, width, height) {
   else if (state.gradientPreset === "silver") colors = ["#e6e9f0", "#eef1f5"];
   else if (state.gradientPreset === "emerald") colors = ["#11998e", "#38ef7d"];
   else if (state.gradientPreset === "fire") colors = ["#ff416c", "#ff4b2b"];
-  else if (state.gradientPreset === "custom") colors = [state.colorStart || "#ffd700", state.colorEnd || "#ff4500"];
+  else if (state.gradientPreset === "custom") {
+    colors = [state.colorStart || "#ff0000", state.colorEnd || "#ffffff"];
+  }
   if (type === "radial") {
     const grad = ctx.createRadialGradient(width / 2, height / 2, 10, width / 2, height / 2, Math.max(width, height) / 2);
     grad.addColorStop(0, colors[0]);
     grad.addColorStop(1, colors[1]);
     return grad;
   } else {
-    const rad = angleDeg * Math.PI / 180;
+    const rad = (angleDeg - 90) * Math.PI / 180;
     const cx = width / 2;
     const cy = height / 2;
-    const dx = Math.cos(rad);
-    const dy = Math.sin(rad);
-    const halfSpan = Math.abs(dx) * width / 2 + Math.abs(dy) * height / 2;
-    const x0 = cx - dx * halfSpan;
-    const y0 = cy - dy * halfSpan;
-    const x1 = cx + dx * halfSpan;
-    const y1 = cy + dy * halfSpan;
+    const r = Math.max(width, height) / 2;
+    const x0 = cx - Math.cos(rad) * r;
+    const y0 = cy - Math.sin(rad) * r;
+    const x1 = cx + Math.cos(rad) * r;
+    const y1 = cy + Math.sin(rad) * r;
     const grad = ctx.createLinearGradient(x0, y0, x1, y1);
     grad.addColorStop(0, colors[0]);
     grad.addColorStop(1, colors[1]);
@@ -26969,6 +27018,7 @@ function disposeTextMesh() {
   if (textMesh.userData) {
     if (textMesh.userData.frontTex) textMesh.userData.frontTex.dispose();
     if (textMesh.userData.backTex) textMesh.userData.backTex.dispose();
+    if (textMesh.userData.gradTex) textMesh.userData.gradTex.dispose();
   }
   textMesh.traverse((child) => {
     if (child.isMesh) {
@@ -26985,7 +27035,14 @@ function buildVectorTextMesh(validLines) {
   const q = QUALITY_PRESETS[state.quality];
   const lineHeight = state.size * 1.35;
   const group = new Group();
-  const material = buildMaterial(state.materialType, state.color);
+  let material;
+  if (state.colorMode === "gradient") {
+    const gradTex = createGradientTexture(state);
+    material = buildMaterialWithTexture(state.materialType, "#ffffff", gradTex);
+    group.userData.gradTex = gradTex;
+  } else {
+    material = buildMaterial(state.materialType, state.color);
+  }
   const totalLinesHeight = (validLines.length - 1) * lineHeight;
   validLines.forEach((lineStr, idx) => {
     const hasText = lineStr.trim().length > 0;
@@ -27003,6 +27060,22 @@ function buildVectorTextMesh(validLines) {
     geometry.computeBoundingBox();
     if (hasText && geometry.boundingBox && !isNaN(geometry.boundingBox.min.x)) {
       geometry.center();
+      geometry.computeBoundingBox();
+    }
+    if (geometry.boundingBox) {
+      const pos = geometry.attributes.position;
+      const min = geometry.boundingBox.min;
+      const max = geometry.boundingBox.max;
+      const spanX = Math.max(1e-4, max.x - min.x);
+      const spanY = Math.max(1e-4, max.y - min.y);
+      const uvs = new Float32Array(pos.count * 2);
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const y = pos.getY(i);
+        uvs[i * 2] = (x - min.x) / spanX;
+        uvs[i * 2 + 1] = (y - min.y) / spanY;
+      }
+      geometry.setAttribute("uv", new BufferAttribute(uvs, 2));
     }
     const lineMesh = new Mesh(geometry, material);
     lineMesh.castShadow = state.shadowsOn;
@@ -27755,18 +27828,6 @@ function drawCubeFaceCanvas(faceText, cubeColor, textColor, borderColor) {
   const len = faceText.length;
   const fontSize = len <= 1 ? size * 0.62 : len <= 3 ? size * 0.42 : size * 0.28;
   const fontFamily = `"Grand Hotel", "Pacifico", sans-serif`;
-  ctx.font = `700 ${fontSize}px ${fontFamily}`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  const shadowLayers = 7;
-  for (let s = shadowLayers; s >= 1; s--) {
-    const alpha = 0.08 + (shadowLayers - s) * 0.04;
-    ctx.fillStyle = `rgba(0,0,0,${alpha})`;
-    ctx.fillText(faceText, size / 2 + s * 2, size / 2 + s * 2);
-  }
-  ctx.lineWidth = fontSize * 0.14;
-  ctx.lineJoin = "round";
-  ctx.strokeStyle = borderColor || "#0a0a2a";
   ctx.strokeText(faceText, size / 2, size / 2);
   const tGrad = ctx.createLinearGradient(0, size / 2 - fontSize * 0.6, 0, size / 2 + fontSize * 0.6);
   const tc = textColor || "#ffffff";
@@ -27803,29 +27864,23 @@ function buildCubeBoxMesh() {
     t.needsUpdate = true;
     return t;
   }
-  const materials = [
+  const cubeMatArr = [
     new MeshStandardMaterial({ map: makeCubeTex(cRight, false), roughness: 0.25, metalness: 0.1 }),
-    // right
     new MeshStandardMaterial({ map: makeCubeTex(cLeft, true), roughness: 0.25, metalness: 0.1 }),
-    // left
     new MeshStandardMaterial({ map: makeCubeTex(cTop, false), roughness: 0.25, metalness: 0.1 }),
-    // top
     new MeshStandardMaterial({ map: makeCubeTex(cBottom, false), roughness: 0.35, metalness: 0.1 }),
-    // bottom
     new MeshStandardMaterial({ map: makeCubeTex(cFront, false), roughness: 0.2, metalness: 0.12 }),
-    // front
     new MeshStandardMaterial({ map: makeCubeTex(cBack, true), roughness: 0.2, metalness: 0.12 })
-    // back
   ];
-  const geometry = new BoxGeometry(cubeSize, cubeSize, cubeSize);
-  const mesh = new Mesh(geometry, materials);
-  mesh.castShadow = state.shadowsOn;
-  mesh.receiveShadow = state.shadowsOn;
-  const group = new Group();
-  group.add(mesh);
+  const cubeGeo = new BoxGeometry(cubeSize, cubeSize, cubeSize);
+  const cubeMesh = new Mesh(cubeGeo, cubeMatArr);
+  cubeMesh.castShadow = state.shadowsOn;
+  cubeMesh.receiveShadow = state.shadowsOn;
+  const cubeGroup = new Group();
+  cubeGroup.add(cubeMesh);
   renderMode = "canvas";
-  textMesh = group;
-  textMesh.material = materials;
+  textMesh = cubeGroup;
+  textMesh.material = cubeMatArr;
 }
 function rebuildTextMesh() {
   if (state.contentMode === "sticker") {
@@ -27879,10 +27934,10 @@ function rebuildTextMesh() {
     return;
   }
   const rawContent = state.text || " ";
-  const lines = rawContent.split(/\r?\n/);
-  const validLines = lines.map((l) => l.length > 0 ? l : " ");
-  const isCustomFontOrGradient = state.fontFamily && state.fontFamily !== "helvetiker" || state.colorMode === "gradient" || state.colorMode === "multicolor" || state.colorMode === "pattern";
-  const needsCanvasCard = isBanglaText(rawContent) || state.curveIntensity !== 0 || isCustomFontOrGradient;
+  const textLines = rawContent.split(/\r?\n/);
+  const validLines = textLines.map((l) => l.length > 0 ? l : " ");
+  const isCustomFont = state.fontFamily && state.fontFamily !== "helvetiker";
+  const needsCanvasCard = isBanglaText(rawContent) || state.curveIntensity !== 0 || isCustomFont || state.colorMode === "multicolor" || state.colorMode === "pattern";
   if (!needsCanvasCard && !font) return;
   disposeTextMesh();
   if (needsCanvasCard) {
@@ -27921,11 +27976,11 @@ function updateQualityNote() {
 function updateTextModeNote(isBangla, curveOn = false) {
   if (!textModeNote) return;
   if (isBangla && curveOn) {
-    textModeNote.textContent = "\u09AC\u09BE\u0982\u09B2\u09BE \u09B2\u09C7\u0996\u09BE \u09B6\u09A8\u09BE\u0995\u09CD\u09A4 \u09B9\u09AF\u09BC\u09C7\u099B\u09C7 \u2014 \u099B\u09AC\u09BF-\u099F\u09C7\u0995\u09CD\u09B8\u099A\u09BE\u09B0 \u0995\u09BE\u09B0\u09CD\u09A1 \u09AE\u09CB\u09A1\u09C7 \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7\u0964 \u0995\u09BE\u09B0\u09CD\u09AD \u099A\u09BE\u09B2\u09C1 \u09A5\u09BE\u0995\u09BE\u09AF\u09BC \u09AA\u09CD\u09B0\u09A4\u09BF\u099F\u09BE \u0985\u0995\u09CD\u09B7\u09B0/\u09AF\u09C1\u0995\u09CD\u09A4\u09BE\u0995\u09CD\u09B7\u09B0 \u0986\u09B2\u09BE\u09A6\u09BE\u09AD\u09BE\u09AC\u09C7 \u09AC\u09B8\u09BE\u09A8\u09CB \u09B9\u099A\u09CD\u099B\u09C7 (\u098F\u0995\u09B8\u09BE\u09A5\u09C7 \u09AA\u09C1\u09B0\u09CB \u09B2\u09BE\u0987\u09A8 \u09B6\u09C7\u09AA \u0995\u09B0\u09BE \u09B9\u099A\u09CD\u099B\u09C7 \u09A8\u09BE) \u2014 \u099C\u099F\u09BF\u09B2 \u09AF\u09C1\u0995\u09CD\u09A4\u09BE\u0995\u09CD\u09B7\u09B0\u09C7 \u09B8\u09BE\u09AE\u09BE\u09A8\u09CD\u09AF \u09AA\u09BE\u09B0\u09CD\u09A5\u0995\u09CD\u09AF \u09A6\u09C7\u0996\u09BE \u09AF\u09C7\u09A4\u09C7 \u09AA\u09BE\u09B0\u09C7 \u09B8\u09CB\u099C\u09BE \u099F\u09C7\u0995\u09CD\u09B8\u099F\u09C7\u09B0 \u09A4\u09C1\u09B2\u09A8\u09BE\u09AF\u09BC\u0964";
+    textModeNote.textContent = "\u09AC\u09BE\u0982\u09B2\u09BE \u09B2\u09C7\u0996\u09BE \u09B6\u09A8\u09BE\u0995\u09CD\u09A4 \u09B9\u09AF\u09BC\u09C7\u099B\u09C7 \u2014 \u099B\u09AC\u09BF-\u099F\u09C7\u0995\u09CD\u09B8\u099A\u09BE\u09B0 \u0995\u09BE\u09B0\u09CD\u09A1 \u09AE\u09CB\u09A1\u09C7 \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7\u0964 \u0995\u09BE\u09B0\u09CD\u09AD \u099A\u09BE\u09B2\u09C1 \u09A5\u09BE\u0995\u09BE\u09AF\u09BC \u09AA\u09CD\u09B0\u09A4\u09BF\u099F\u09BE \u0985\u0995\u09CD\u09B7\u09B0 \u0986\u09B2\u09BE\u09A6\u09BE\u09AD\u09BE\u09AC\u09C7 \u09AC\u09B8\u09BE\u09A8\u09CB \u09B9\u099A\u09CD\u099B\u09C7\u0964";
   } else if (isBangla) {
-    textModeNote.textContent = "\u09AC\u09BE\u0982\u09B2\u09BE \u09B2\u09C7\u0996\u09BE \u09B6\u09A8\u09BE\u0995\u09CD\u09A4 \u09B9\u09AF\u09BC\u09C7\u099B\u09C7 \u2014 \u099B\u09AC\u09BF-\u099F\u09C7\u0995\u09CD\u09B8\u099A\u09BE\u09B0 \u0995\u09BE\u09B0\u09CD\u09A1 \u09AE\u09CB\u09A1\u09C7 \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7 (\u09AC\u09CD\u09B0\u09BE\u0989\u099C\u09BE\u09B0\u09C7\u09B0 \u09A8\u09BF\u099C\u09B8\u09CD\u09AC \u09AC\u09BE\u0982\u09B2\u09BE \u09AB\u09A8\u09CD\u099F/\u09B6\u09C7\u09AA\u09BF\u0982 \u09AC\u09CD\u09AF\u09AC\u09B9\u09BE\u09B0 \u0995\u09B0\u09C7, \u09A4\u09BE\u0987 \u09AF\u09C1\u0995\u09CD\u09A4\u09BE\u0995\u09CD\u09B7\u09B0/\u09AE\u09BE\u09A4\u09CD\u09B0\u09BE \u09A0\u09BF\u0995\u09AD\u09BE\u09AC\u09C7 \u09AC\u09B8\u09C7), \u09AC\u09BE\u0995\u09CD\u09AF\u09C7\u09B0 \u09AA\u09CD\u09B0\u09BE\u09A8\u09CD\u09A4 \u09A5\u09C7\u0995\u09C7 \u0997\u09AD\u09C0\u09B0\u09A4\u09BE \u09AC\u09C7\u09B0 \u09B9\u09AF\u09BC \u2014 \u0986\u09B2\u09BE\u09A6\u09BE \u0986\u09B2\u09BE\u09A6\u09BE \u0985\u0995\u09CD\u09B7\u09B0\u09C7\u09B0 \u0995\u09BF\u09A8\u09BE\u09B0\u09BE \u09A5\u09C7\u0995\u09C7 \u09A8\u09BE\u0964";
+    textModeNote.textContent = "\u09AC\u09BE\u0982\u09B2\u09BE \u09B2\u09C7\u0996\u09BE \u09B6\u09A8\u09BE\u0995\u09CD\u09A4 \u09B9\u09AF\u09BC\u09C7\u099B\u09C7 \u2014 \u099B\u09AC\u09BF-\u099F\u09C7\u0995\u09CD\u09B8\u099A\u09BE\u09B0 \u0995\u09BE\u09B0\u09CD\u09A1 \u09AE\u09CB\u09A1\u09C7 \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7\u0964";
   } else if (curveOn) {
-    textModeNote.textContent = "\u0995\u09BE\u09B0\u09CD\u09AD \u099A\u09BE\u09B2\u09C1 \u09A5\u09BE\u0995\u09BE\u09AF\u09BC \u099B\u09AC\u09BF-\u099F\u09C7\u0995\u09CD\u09B8\u099A\u09BE\u09B0 \u0995\u09BE\u09B0\u09CD\u09A1 \u09AE\u09CB\u09A1\u09C7 \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7 (\u09AD\u09C7\u0995\u09CD\u099F\u09B0 \u09E9\u09A1\u09BF \u098F\u0995\u09CD\u09B8\u099F\u09CD\u09B0\u09C1\u09B6\u09A8\u09C7\u09B0 \u09AC\u09A6\u09B2\u09C7) \u2014 \u09AC\u09BE\u0995\u09CD\u09AF\u09C7\u09B0 \u09AA\u09CD\u09B0\u09BE\u09A8\u09CD\u09A4 \u09A5\u09C7\u0995\u09C7 \u0997\u09AD\u09C0\u09B0\u09A4\u09BE \u09AC\u09C7\u09B0 \u09B9\u09AF\u09BC, \u0986\u09B2\u09BE\u09A6\u09BE \u0986\u09B2\u09BE\u09A6\u09BE \u0985\u0995\u09CD\u09B7\u09B0\u09C7\u09B0 \u0995\u09BF\u09A8\u09BE\u09B0\u09BE \u09A5\u09C7\u0995\u09C7 \u09A8\u09BE\u0964";
+    textModeNote.textContent = "\u0995\u09BE\u09B0\u09CD\u09AD \u099A\u09BE\u09B2\u09C1 \u09A5\u09BE\u0995\u09BE\u09AF\u09BC \u099B\u09AC\u09BF-\u099F\u09C7\u0995\u09CD\u09B8\u099A\u09BE\u09B0 \u0995\u09BE\u09B0\u09CD\u09A1 \u09AE\u09CB\u09A1\u09C7 \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7\u0964";
   } else {
     textModeNote.textContent = "";
   }
@@ -27935,6 +27990,7 @@ function applyPosition() {
   if (!textMesh) return;
   textMesh.position.set(state.posX || 0, state.posY || 0, state.posZ || 0);
   updateShadowFrustum();
+  saveStudioStateDebounced();
 }
 function applyRotation() {
   if (!textMesh) return;
@@ -27945,21 +28001,26 @@ function applyRotation() {
     MathUtils.degToRad(state.rotZ + styleTiltZ)
   );
   applyPosition();
+  saveStudioStateDebounced();
 }
 function applyMaterial() {
   if (!textMesh) return;
   if (renderMode === "canvas") {
     const mesh = textMesh.children[0];
     if (!mesh) return;
-    const old = mesh.material;
-    const materials = buildCanvasCardMaterials(textMesh.userData.frontTex, textMesh.userData.backTex, state.contentMode === "image" || state.contentMode === "sticker");
-    mesh.material = materials;
-    textMesh.material = materials;
-    if (Array.isArray(old)) old.forEach((m) => m.dispose());
+    const oldMat = mesh.material;
+    const newMaterials = buildCanvasCardMaterials(
+      textMesh.userData.frontTex,
+      textMesh.userData.backTex,
+      state.contentMode === "image" || state.contentMode === "sticker"
+    );
+    mesh.material = newMaterials;
+    textMesh.material = newMaterials;
+    if (Array.isArray(oldMat)) oldMat.forEach((m) => m.dispose());
     const reflMesh = textMesh.children[1];
     if (reflMesh && reflMesh.isMesh) {
       const oldRefl = reflMesh.material;
-      const reflMaterials = materials.map((m) => {
+      const reflMaterials = newMaterials.map((m) => {
         const clone = m.clone();
         clone.transparent = true;
         clone.opacity = 0.32;
@@ -27970,17 +28031,30 @@ function applyMaterial() {
       textMesh.userData.reflMaterials = reflMaterials;
       if (Array.isArray(oldRefl)) oldRefl.forEach((m) => m.dispose());
     }
+    saveStudioStateDebounced();
     return;
   }
-  const newMat = buildMaterial(state.materialType, state.color);
+  let newMat;
+  if (state.colorMode === "gradient") {
+    if (textMesh.userData && textMesh.userData.gradTex) {
+      textMesh.userData.gradTex.dispose();
+    }
+    const gradTex = createGradientTexture(state);
+    newMat = buildMaterialWithTexture(state.materialType, "#ffffff", gradTex);
+    textMesh.userData = textMesh.userData || {};
+    textMesh.userData.gradTex = gradTex;
+  } else {
+    newMat = buildMaterial(state.materialType, state.color);
+  }
   textMesh.material = newMat;
   textMesh.traverse((child) => {
     if (child.isMesh) {
-      const old = child.material;
+      const oldChild = child.material;
       child.material = newMat.clone ? newMat.clone() : newMat;
-      if (old && old.dispose) old.dispose();
+      if (oldChild && oldChild.dispose) oldChild.dispose();
     }
   });
+  saveStudioStateDebounced();
 }
 function applyShadowToggle() {
   ground.visible = state.shadowsOn;
@@ -27997,6 +28071,7 @@ function applyShadowToggle() {
     if (l.isDirectionalLight) l.castShadow = state.shadowsOn;
   }
   updateShadowFrustum();
+  saveStudioStateDebounced();
 }
 function applyReflectionToggle() {
   scene.environment = state.reflectionsOn ? envTexture : null;
@@ -28263,7 +28338,9 @@ function saveStudioState() {
     const toSave = {
       text: state.text,
       fontFamily: state.fontFamily,
+      contentMode: state.contentMode,
       colorMode: state.colorMode,
+      color: state.color,
       colorStart: state.colorStart,
       colorEnd: state.colorEnd,
       gradientPreset: state.gradientPreset,
@@ -28276,11 +28353,19 @@ function saveStudioState() {
       rotZ: state.rotZ,
       depth: state.depth,
       size: state.size,
-      color: state.color,
+      curveIntensity: state.curveIntensity,
+      curveDirection: state.curveDirection,
+      curveSpacing: state.curveSpacing,
       materialType: state.materialType,
       lightingPreset: state.lightingPreset,
       bgMode: state.bgMode,
-      bgColor: state.bgColor
+      bgColor: state.bgColor,
+      dragMode: state.dragMode,
+      dragEnabled: state.dragEnabled,
+      shadowsOn: state.shadowsOn,
+      shadowIntensity: state.shadowIntensity,
+      reflectionsOn: state.reflectionsOn,
+      quality: state.quality
     };
     localStorage.setItem("3d_studio_saved_state", JSON.stringify(toSave));
   } catch (_) {
@@ -28304,6 +28389,19 @@ function loadStudioState() {
     if (saved.fontFamily && fontSelect) {
       state.fontFamily = saved.fontFamily;
       fontSelect.value = saved.fontFamily;
+    }
+    if (saved.contentMode && contentModeGrid) {
+      state.contentMode = saved.contentMode;
+      setActivePreset(contentModeGrid, "content", saved.contentMode);
+      if (textContentSection) textContentSection.hidden = saved.contentMode !== "text";
+      if (imageContentSection) imageContentSection.hidden = saved.contentMode !== "image";
+      if (stickerContentSection) stickerContentSection.hidden = saved.contentMode !== "sticker";
+      if (cubeContentSection) cubeContentSection.hidden = saved.contentMode !== "cube";
+      if (curveSection) curveSection.hidden = saved.contentMode === "image" || saved.contentMode === "cube";
+    }
+    if (saved.color && colorPicker) {
+      state.color = saved.color;
+      colorPicker.value = saved.color;
     }
     if (saved.colorMode && colorModeSelect) {
       state.colorMode = saved.colorMode;
@@ -28334,6 +28432,20 @@ function loadStudioState() {
       state.gradientAngle = saved.gradientAngle;
       gradientAngleRange.value = saved.gradientAngle;
       if (gradientAngleValue) gradientAngleValue.textContent = `${saved.gradientAngle}\xB0`;
+    }
+    if (saved.curveIntensity !== void 0 && curveIntensityRange) {
+      state.curveIntensity = saved.curveIntensity;
+      curveIntensityRange.value = saved.curveIntensity;
+      if (curveIntensityValue) curveIntensityValue.textContent = `${saved.curveIntensity}%`;
+    }
+    if (saved.curveDirection && curveDirectionGrid) {
+      state.curveDirection = saved.curveDirection;
+      setActivePreset(curveDirectionGrid, "curveDirection", saved.curveDirection);
+    }
+    if (saved.curveSpacing !== void 0 && curveSpacingRange) {
+      state.curveSpacing = saved.curveSpacing;
+      curveSpacingRange.value = Math.round(saved.curveSpacing * 100);
+      if (curveSpacingValue) curveSpacingValue.textContent = `${curveSpacingRange.value}%`;
     }
     if (saved.posX !== void 0 && posXRange) {
       state.posX = saved.posX;
@@ -28374,9 +28486,43 @@ function loadStudioState() {
       state.materialType = saved.materialType;
       setActivePreset(materialPresetGrid, "material", saved.materialType);
     }
+    if (saved.lightingPreset) {
+      state.lightingPreset = saved.lightingPreset;
+      setActivePreset(lightingPresetGrid, "lighting", saved.lightingPreset);
+    }
+    if (saved.quality) {
+      state.quality = saved.quality;
+      setActivePreset(qualityPresetGrid, "quality", saved.quality);
+    }
     if (saved.bgMode && bgModeSelect) {
       state.bgMode = saved.bgMode;
       bgModeSelect.value = saved.bgMode;
+      if (bgColorGroup) bgColorGroup.hidden = saved.bgMode !== "color";
+      if (bgImageGroup) bgImageGroup.hidden = saved.bgMode !== "image";
+    }
+    if (saved.bgColor && bgColorPicker) {
+      state.bgColor = saved.bgColor;
+      bgColorPicker.value = saved.bgColor;
+    }
+    if (saved.dragMode && dragModeSelect) {
+      state.dragMode = saved.dragMode;
+      dragModeSelect.value = saved.dragMode;
+    }
+    if (saved.dragEnabled !== void 0 && dragEnabledToggle) {
+      state.dragEnabled = saved.dragEnabled;
+      dragEnabledToggle.checked = saved.dragEnabled;
+    }
+    if (saved.shadowsOn !== void 0 && shadowToggle) {
+      state.shadowsOn = saved.shadowsOn;
+      shadowToggle.checked = saved.shadowsOn;
+    }
+    if (saved.shadowIntensity !== void 0 && shadowIntensityRange) {
+      state.shadowIntensity = saved.shadowIntensity;
+      shadowIntensityRange.value = saved.shadowIntensity;
+    }
+    if (saved.reflectionsOn !== void 0 && reflectionToggle) {
+      state.reflectionsOn = saved.reflectionsOn;
+      reflectionToggle.checked = saved.reflectionsOn;
     }
   } catch (_) {
   }
