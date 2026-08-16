@@ -632,7 +632,7 @@ function createGradientTexture(gradState = state) {
   canvas.height = 512;
   const ctx = canvas.getContext('2d');
 
-  let colors = ['#ffd700', '#ff4500'];
+  let colors = [gradState.colorStart || '#ffd700', gradState.colorEnd || '#ff4500'];
   const preset = gradState.gradientPreset || 'gold';
   const type = gradState.gradientType || 'linear';
   const angleDeg = Number(gradState.gradientAngle ?? 90);
@@ -645,27 +645,27 @@ function createGradientTexture(gradState = state) {
   else if (preset === 'emerald') colors = ['#11998e', '#38ef7d'];
   else if (preset === 'fire') colors = ['#ff416c', '#ff4b2b'];
   else if (preset === 'custom') {
-    colors = [gradState.colorStart || '#ff0000', gradState.colorEnd || '#ffffff'];
+    colors = [gradState.colorStart || '#000000', gradState.colorEnd || '#ffffff'];
   }
 
   if (type === 'radial') {
-    const grad = ctx.createRadialGradient(256, 256, 10, 256, 256, 256);
-    grad.addColorStop(0, colors[0]);
-    grad.addColorStop(1, colors[1]);
-    ctx.fillStyle = grad;
+    const radGrad = ctx.createRadialGradient(256, 256, 10, 256, 256, 250);
+    radGrad.addColorStop(0, colors[0]);
+    radGrad.addColorStop(1, colors[1]);
+    ctx.fillStyle = radGrad;
   } else {
-    const rad = ((angleDeg - 90) * Math.PI) / 180;
+    const rad = (angleDeg * Math.PI) / 180;
     const cx = 256;
     const cy = 256;
     const r = 256;
     const x0 = cx - Math.cos(rad) * r;
-    const y0 = cy - Math.sin(rad) * r;
+    const y0 = cy + Math.sin(rad) * r;
     const x1 = cx + Math.cos(rad) * r;
-    const y1 = cy + Math.sin(rad) * r;
-    const grad = ctx.createLinearGradient(x0, y0, x1, y1);
-    grad.addColorStop(0, colors[0]);
-    grad.addColorStop(1, colors[1]);
-    ctx.fillStyle = grad;
+    const y1 = cy - Math.sin(rad) * r;
+    const linGrad = ctx.createLinearGradient(x0, y0, x1, y1);
+    linGrad.addColorStop(0, colors[0]);
+    linGrad.addColorStop(1, colors[1]);
+    ctx.fillStyle = linGrad;
   }
 
   ctx.fillRect(0, 0, 512, 512);
@@ -2587,14 +2587,15 @@ function rebuildTextMesh() {
     return;
   }
 
-  // 'gradient' is NOT in needsCanvasCard — Latin 3D text handles gradients
-  // via UV-mapped texture on TextGeometry, preserving full 3D depth/bevel.
+  // 'gradient' and standard Latin fonts use true 3D TextGeometry (vector mesh)
+  // so depth, extrusion, bevels, and shadows are 100% real 3D geometry!
   const rawContent = state.text || ' ';
   const textLines = rawContent.split(/\r?\n/);
   const validLines = textLines.map((l) => (l.length > 0 ? l : ' '));
 
-  const isCustomFont = (state.fontFamily && state.fontFamily !== 'helvetiker');
-  const needsCanvasCard = isBanglaText(rawContent) || state.curveIntensity !== 0 || isCustomFont || state.colorMode === 'multicolor' || state.colorMode === 'pattern';
+  const isBangla = isBanglaText(rawContent);
+  const isMulticolorOrPattern = (state.colorMode === 'multicolor' || state.colorMode === 'pattern');
+  const needsCanvasCard = isBangla || isMulticolorOrPattern;
 
   if (!needsCanvasCard && !font) return;
 
@@ -2609,7 +2610,7 @@ function rebuildTextMesh() {
   applyRotation();
   scene.add(textMesh);
   updateQualityNote();
-  updateTextModeNote(isBanglaText(rawContent), state.curveIntensity !== 0);
+  updateTextModeNote(isBangla, false);
   updateShadowFrustum();
 }
 
