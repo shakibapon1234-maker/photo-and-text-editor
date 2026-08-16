@@ -26325,11 +26325,13 @@ function getGradientFillStyle(ctx, width, height) {
     const rad = angleDeg * Math.PI / 180;
     const cx = width / 2;
     const cy = height / 2;
-    const r = Math.max(width, height) / 2;
-    const x0 = cx - Math.cos(rad) * r;
-    const y0 = cy - Math.sin(rad) * r;
-    const x1 = cx + Math.cos(rad) * r;
-    const y1 = cy + Math.sin(rad) * r;
+    const dx = Math.cos(rad);
+    const dy = Math.sin(rad);
+    const halfSpan = Math.abs(dx) * width / 2 + Math.abs(dy) * height / 2;
+    const x0 = cx - dx * halfSpan;
+    const y0 = cy - dy * halfSpan;
+    const x1 = cx + dx * halfSpan;
+    const y1 = cy + dy * halfSpan;
     const grad = ctx.createLinearGradient(x0, y0, x1, y1);
     grad.addColorStop(0, colors[0]);
     grad.addColorStop(1, colors[1]);
@@ -28261,6 +28263,7 @@ function saveStudioState() {
       colorStart: state.colorStart,
       colorEnd: state.colorEnd,
       gradientPreset: state.gradientPreset,
+      gradientType: state.gradientType,
       gradientAngle: state.gradientAngle,
       posX: state.posX,
       posY: state.posY,
@@ -28317,6 +28320,11 @@ function loadStudioState() {
     if (saved.gradientPreset && gradientPresetSelect) {
       state.gradientPreset = saved.gradientPreset;
       gradientPresetSelect.value = saved.gradientPreset;
+      if (customGradientControls) customGradientControls.hidden = saved.gradientPreset !== "custom";
+    }
+    if (saved.gradientType && gradientTypeSelect) {
+      state.gradientType = saved.gradientType;
+      gradientTypeSelect.value = saved.gradientType;
     }
     if (saved.gradientAngle !== void 0 && gradientAngleRange) {
       state.gradientAngle = saved.gradientAngle;
