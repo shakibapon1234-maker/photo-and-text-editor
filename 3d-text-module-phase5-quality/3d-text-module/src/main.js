@@ -52,8 +52,24 @@ const stickerBgColorPicker = document.getElementById('stickerBgColorPicker');
 const stickerTextColorPicker = document.getElementById('stickerTextColorPicker');
 const stickerBorderWidthRange = document.getElementById('stickerBorderWidthRange');
 const stickerBorderWidthValue = document.getElementById('stickerBorderWidthValue');
-const stickerBorderColorPicker = document.getElementById('stickerBorderColorPicker');
-const stickerShadowCheckbox = document.getElementById('stickerShadowCheckbox');
+const sticker3DModeGrid = document.getElementById('sticker3DModeGrid');
+const stickerIndependentControls = document.getElementById('stickerIndependentControls');
+const stickerTextScaleRange = document.getElementById('stickerTextScaleRange');
+const stickerTextScaleValue = document.getElementById('stickerTextScaleValue');
+const stickerBoxScaleRange = document.getElementById('stickerBoxScaleRange');
+const stickerBoxScaleValue = document.getElementById('stickerBoxScaleValue');
+const stickerBoxTiltRange = document.getElementById('stickerBoxTiltRange');
+const stickerBoxTiltValue = document.getElementById('stickerBoxTiltValue');
+const stickerTextTiltRange = document.getElementById('stickerTextTiltRange');
+const stickerTextTiltValue = document.getElementById('stickerTextTiltValue');
+const stickerTextOffsetYRange = document.getElementById('stickerTextOffsetYRange');
+const stickerTextOffsetYValue = document.getElementById('stickerTextOffsetYValue');
+const stickerWith3DTextCheckbox = document.getElementById('stickerWith3DTextCheckbox');
+const sticker3DNote = document.getElementById('sticker3DNote');
+const sportsBlockColors = document.getElementById('sportsBlockColors');
+const strokeOuterColorPicker = document.getElementById('strokeOuterColorPicker');
+const strokeMidColorPicker = document.getElementById('strokeMidColorPicker');
+const strokeFillColorPicker = document.getElementById('strokeFillColorPicker');
 const curveSection = document.getElementById('curveSection');
 const curveIntensityRange = document.getElementById('curveIntensityRange');
 const curveIntensityValue = document.getElementById('curveIntensityValue');
@@ -519,6 +535,16 @@ const state = {
   stickerBorderWidth: parseInt(stickerBorderWidthRange?.value || '0', 10),
   stickerBorderColor: stickerBorderColorPicker?.value || '#ffffff',
   stickerShadow: stickerShadowCheckbox?.checked || false,
+  stickerMode: 'standing', // 'standing' (3D letters standing on floor/plate) | 'wall' | 'flat'
+  stickerWith3DText: true, // when true: 3D extruded text
+  stickerTextScale: 100,
+  stickerBoxScale: 100,
+  stickerBoxTilt: 0,
+  stickerTextTilt: 0,
+  stickerTextOffsetY: 0,
+  strokeOuterColor: '#6b0000',  // sports-block outermost stroke color
+  strokeMidColor: '#ffd700',    // sports-block middle stroke color
+  strokeFillColor: '#ffffff',   // sports-block text fill color
   curveIntensity: Number(curveIntensityRange.value),
   curveDirection: 'up',
   curveSpacing: Number(curveSpacingRange.value) / 100,
@@ -1148,6 +1174,56 @@ function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
             ctx.fillText(cluster, 0, 0);
           }
         }
+        ctx.restore();
+      });
+    });
+    return { canvas, aspect: canvasW / canvasH };
+  }
+
+  // ---- SPORTS BLOCK / LETTER OUTLINE (new: multi-layer stroke per letter) ----
+  // Each letter rendered with 3 stacked ctx.strokeText() layers before fill:
+  //   outerStroke (thickest, dark) → midStroke (medium, gold) → fill (white/light)
+  // This creates the classic sports-jersey / game-banner outlined text look
+  // where the color follows the exact contour of every glyph.
+  if (state.colorMode === 'pattern' && state.patternPreset === 'sportsBlock') {
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const outerCol = state.strokeOuterColor || '#6b0000';
+    const midCol   = state.strokeMidColor   || '#ffd700';
+    const fillCol  = state.strokeFillColor  || '#ffffff';
+    const fs = CANVAS_TEXT_FONT_PX;
+
+    perLine.forEach(({ clusters, layout }, i) => {
+      const y = maxBulge + CANVAS_TEXT_PAD_PX + CANVAS_TEXT_LINE_HEIGHT_PX * i + CANVAS_TEXT_LINE_HEIGHT_PX / 2;
+      clusters.forEach((cluster, ci) => {
+        const c = layout.chars[ci];
+        if (!c) return;
+        ctx.save();
+        ctx.translate(canvasW / 2 + c.x, y + c.y);
+        ctx.rotate(c.rotation);
+
+        // Layer 1 — thick outer dark stroke
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = outerCol;
+        ctx.lineWidth = fs * 0.28;
+        ctx.strokeText(cluster, 0, 0);
+
+        // Layer 2 — medium gold/mid stroke
+        ctx.strokeStyle = midCol;
+        ctx.lineWidth = fs * 0.16;
+        ctx.strokeText(cluster, 0, 0);
+
+        // Layer 3 — bright fill
+        ctx.fillStyle = fillCol;
+        ctx.fillText(cluster, 0, 0);
+
+        // Optional top highlight shimmer
+        const shimGrad = ctx.createLinearGradient(0, -fs * 0.55, 0, -fs * 0.1);
+        shimGrad.addColorStop(0, 'rgba(255,255,255,0.55)');
+        shimGrad.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = shimGrad;
+        ctx.fillText(cluster, 0, 0);
+
         ctx.restore();
       });
     });
@@ -1786,31 +1862,32 @@ const STICKER_PAD_RATIO = 0.28; // base padding between shape edge and text, rel
 // headroom that must NOT be treated as part of the "body" the text centers
 // in).
 const STICKER_SHAPE_SIZING = {
-  circle: { square: true, padMul: 1.0 },
+  circle: { square: false, padMul: 1.0 },
   roundedRect: { square: false, padMul: 1.0 },
-  wavyBanner: { square: false, padMul: 1.2 },
-  thoughtCloud: { square: true, padMul: 1.3, tailRatio: 0.25 },
-  speechOval: { square: false, padMul: 1.25, tailRatio: 0.22 },
-  glassPlate: { square: false, padMul: 1.1 },
-  waterRipple: { square: true, padMul: 1.2 },
+  wavyBanner: { square: false, padMul: 1.15 },
+  thoughtCloud: { square: false, padMul: 1.2, tailRatio: 0.22 },
+  speechOval: { square: false, padMul: 1.2, tailRatio: 0.2 },
+  glassPlate: { square: false, padMul: 1.05 },
+  waterRipple: { square: false, padMul: 1.1 },
   whiteCutout: { square: false, padMul: 1.05 },
-  starburst: { square: true, padMul: 1.15 },
-  stamp: { square: true, padMul: 1.08 },
+  starburst: { square: false, padMul: 1.15 },
+  stamp: { square: false, padMul: 1.08 },
   ribbon: { square: false, padMul: 1.15, pointExtraW: 0.22 },
-  speech: { square: false, padMul: 1.0, tailRatio: 0.22 },
-  hexagon: { square: true, padMul: 1.15 },
-  diamond: { square: true, padMul: 1.35 },
+  speech: { square: false, padMul: 1.0, tailRatio: 0.2 },
+  hexagon: { square: false, padMul: 1.1 },
+  diamond: { square: false, padMul: 1.2 },
   lowerThird: { square: false, padMul: 1.0 },
-  pill: { square: false, padMul: 1.1 },
-  heart: { square: true, padMul: 1.3 },
-  neonFrame: { square: false, padMul: 1.15 },
-  radiant: { square: true, padMul: 1.7 },
-  starSpray: { square: true, padMul: 1.85 },
-  letterBlocks: { square: false, padMul: 1.2 },
-  paintSplash: { square: false, padMul: 1.45 },
-  steelPlate: { square: false, padMul: 1.25 },
-  woodenBlocks: { square: false, padMul: 1.15 },
-  redTiles: { square: false, padMul: 1.15 },
+  pill: { square: false, padMul: 1.05 },
+  heart: { square: false, padMul: 1.2 },
+  neonFrame: { square: false, padMul: 1.1 },
+  radiant: { square: false, padMul: 1.3 },
+  starSpray: { square: false, padMul: 1.4 },
+  letterBlocks: { square: false, padMul: 1.15 },
+  letterContour: { square: false, padMul: 0.95 },
+  paintSplash: { square: false, padMul: 1.3 },
+  steelPlate: { square: false, padMul: 1.15 },
+  woodenBlocks: { square: false, padMul: 1.1 },
+  redTiles: { square: false, padMul: 1.1 },
 };
 
 // curveOpts (PLAN_3 §3.2 — curve works *inside* badges too):
@@ -1826,7 +1903,26 @@ function drawStickerCanvasTexture(
   curveOpts = { curveIntensity: 0 },
   borderOpts = {}
 ) {
-  const { borderWidth = 0, borderColor = '#ffffff', shadow = false } = borderOpts;
+  const { borderWidth = 0, borderColor = '#ffffff', shadow = false, targetAspect = null } = borderOpts;
+
+  // When 3D text mode is active and targetAspect is provided, render the badge canvas
+  // directly at the exact aspect ratio needed to enclose the 3D text.
+  if (state.stickerWith3DText && targetAspect) {
+    const canvasW = 1024;
+    const canvasH = Math.max(128, Math.round(1024 / targetAspect));
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvasW, canvasH);
+
+    ctx.save();
+    drawStickerShape(ctx, shape, canvasW, canvasH, 0, bgColor, borderWidth, borderColor, shadow);
+    ctx.restore();
+
+    return { canvas, aspect: targetAspect };
+  }
+
   const lines = (text || ' ').split(/\r?\n/).map((l) => (l.length > 0 ? l : ' '));
 
   const measureCtx = document.createElement('canvas').getContext('2d');
@@ -1868,6 +1964,11 @@ function drawStickerCanvasTexture(
   ctx.save();
   drawStickerShape(ctx, shape, canvasW, bodyH, tailPx, bgColor, borderWidth, borderColor, shadow);
   ctx.restore();
+
+  // If 3D text on badge is enabled, skip 2D canvas text so the real 3D extruded text is clean and sharp
+  if (state.stickerWith3DText) {
+    return { canvas, aspect: canvasW / canvasH };
+  }
 
   // 2) label text, centered within the body (offset for speech bubble icon)
   ctx.save();
@@ -2721,11 +2822,11 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
       ctx.fill();
       break;
     case 'hexagon':
-      drawHexagonPath(ctx, cx, cy, outerR * 0.95, outerR * 0.95);
+      drawHexagonPath(ctx, cx, cy, (w / 2) * 0.95, (bodyH / 2) * 0.95);
       ctx.fill();
       break;
     case 'diamond':
-      drawDiamondPath(ctx, cx, cy, outerR * 0.96, outerR * 0.96);
+      drawDiamondPath(ctx, cx, cy, (w / 2) * 0.96, (bodyH / 2) * 0.96);
       ctx.fill();
       break;
     case 'lowerThird':
@@ -2736,7 +2837,7 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
       ctx.fill();
       break;
     case 'heart':
-      drawHeartPath(ctx, cx, cy, outerR * 0.72, outerR * 0.72);
+      drawHeartPath(ctx, cx, cy, (w / 2) * 0.72, (bodyH / 2) * 0.85);
       ctx.fill();
       break;
     case 'neonFrame':
@@ -2747,14 +2848,14 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
       ctx.fill();
       break;
     case 'starburst':
-      drawStarPolygonPath(ctx, cx, cy, outerR, outerR * 0.72, 14);
+      drawStarPolygonPath(ctx, cx, cy, (w / 2) * 0.95, (bodyH / 2) * 0.72, 14);
       ctx.fill();
-      ctx.lineWidth = Math.max(3, outerR * 0.05);
+      ctx.lineWidth = Math.max(3, Math.min(w, bodyH) * 0.05);
       ctx.strokeStyle = '#111111';
       ctx.stroke();
       break;
     case 'stamp':
-      drawScallopedCirclePath(ctx, cx, cy, outerR, outerR * 0.92, 20);
+      drawScallopedCirclePath(ctx, cx, cy, (w / 2) * 0.95, (bodyH / 2) * 0.92, 20);
       ctx.fill();
       drawRubberStampFrame(ctx, w, bodyH, color === '#e5484d' ? '#c62828' : color);
       break;
@@ -2808,6 +2909,20 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
       drawRedTilesBackground(ctx, w, bodyH, state.stickerText);
       break;
     }
+    case 'letterContour': {
+      // Arched / sports-style envelope wrapping the text tightly
+      const pad = Math.min(w, bodyH) * 0.06;
+      ctx.fillStyle = color || '#4a0404';
+      drawRoundedRectPath(ctx, pad, pad, w - pad * 2, bodyH - pad * 2, Math.min(w, bodyH) * 0.24);
+      ctx.fill();
+
+      // Gold inner accent border
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = Math.max(3, Math.min(w, bodyH) * 0.032);
+      drawRoundedRectPath(ctx, pad + 5, pad + 5, w - (pad + 5) * 2, bodyH - (pad + 5) * 2, Math.min(w, bodyH) * 0.18);
+      ctx.stroke();
+      break;
+    }
     case 'circle':
     default:
       ctx.beginPath();
@@ -2852,11 +2967,11 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
         ctx.stroke();
         break;
       case 'hexagon':
-        drawHexagonPath(ctx, cx, cy, outerR * 0.95, outerR * 0.95);
+        drawHexagonPath(ctx, cx, cy, (w / 2) * 0.95, (bodyH / 2) * 0.95);
         ctx.stroke();
         break;
       case 'diamond':
-        drawDiamondPath(ctx, cx, cy, outerR * 0.96, outerR * 0.96);
+        drawDiamondPath(ctx, cx, cy, (w / 2) * 0.96, (bodyH / 2) * 0.96);
         ctx.stroke();
         break;
       case 'lowerThird':
@@ -2867,7 +2982,7 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
         ctx.stroke();
         break;
       case 'heart':
-        drawHeartPath(ctx, cx, cy, outerR * 0.72, outerR * 0.72);
+        drawHeartPath(ctx, cx, cy, (w / 2) * 0.72, (bodyH / 2) * 0.85);
         ctx.stroke();
         break;
       case 'neonFrame':
@@ -2876,15 +2991,16 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
         break;
       case 'roundedRect':
       case 'letterBlocks':
+      case 'letterContour':
         drawRoundedRectPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.16);
         ctx.stroke();
         break;
       case 'starburst':
-        drawStarPolygonPath(ctx, cx, cy, outerR, outerR * 0.72, 14);
+        drawStarPolygonPath(ctx, cx, cy, (w / 2) * 0.95, (bodyH / 2) * 0.72, 14);
         ctx.stroke();
         break;
       case 'stamp':
-        drawScallopedCirclePath(ctx, cx, cy, outerR, outerR * 0.92, 20);
+        drawScallopedCirclePath(ctx, cx, cy, (w / 2) * 0.95, (bodyH / 2) * 0.92, 20);
         ctx.stroke();
         break;
       case 'ribbon':
@@ -2897,8 +3013,8 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
         break;
       case 'radiant':
       case 'starSpray': {
-        const coreR = outerR * 0.55;
-        drawStarPolygonPath(ctx, cx, cy, outerR, coreR * 0.98, 20);
+        const coreR = Math.min(w, bodyH) * 0.28;
+        drawStarPolygonPath(ctx, cx, cy, Math.min(w, bodyH) / 2, coreR * 0.98, 20);
         ctx.stroke();
         break;
       }
@@ -2915,11 +3031,200 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
 }
 
 function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, borderOpts) {
+  const group = new THREE.Group();
+  const textStr = (text && text.trim().length > 0) ? text : (state.stickerText || 'Warisha Fashion');
+  const textDepth = Math.max(3, state.depth);
+
+  const is3D = state.stickerMode === 'standing' || state.stickerMode === 'wall' || state.stickerWith3DText;
+
+  if (is3D) {
+    if (!font) {
+      loadAndSetFont(state.fontFamily || 'helvetiker');
+    }
+    if (font) {
+      const q = QUALITY_PRESETS[state.quality];
+      const lines3D = textStr.split(/\r?\n/).map(l => (l.length > 0 ? l : ' '));
+      const tScale = (state.stickerTextScale || 100) / 100;
+      const bScale = (state.stickerBoxScale || 100) / 100;
+      const fontSize3D = (state.size * 0.75) * tScale;
+      const lineHeight3D = fontSize3D * 1.32;
+      const totalH3D = (lines3D.length - 1) * lineHeight3D;
+
+      // Build 3D text material (gradient or solid)
+      let mat3D;
+      if (state.colorMode === 'gradient') {
+        const gradTex = createGradientTexture(state);
+        mat3D = buildMaterialWithTexture(state.materialType, '#ffffff', gradTex);
+        group.userData.gradTex3D = gradTex;
+      } else {
+        mat3D = buildMaterial(state.materialType, state.stickerTextColor || state.color || '#ffffff');
+      }
+
+      const text3DGroup = new THREE.Group();
+      const hasCurvedOrSpacing = (state.curveIntensity && Math.abs(state.curveIntensity) > 2) || (state.curveSpacing && Math.abs(state.curveSpacing - 1) > 0.05);
+
+      lines3D.forEach((lineStr, idx) => {
+        const hasText = lineStr.trim().length > 0;
+        const content = hasText ? lineStr : ' ';
+        const lineY3D = (totalH3D / 2) - (idx * lineHeight3D);
+
+        if (hasCurvedOrSpacing && hasText) {
+          const chars = splitGraphemes(content);
+          const charWidths = chars.map((ch) => {
+            if (ch === ' ') return fontSize3D * 0.45;
+            const g = new TextGeometry(ch, {
+              font,
+              size: fontSize3D,
+              depth: textDepth,
+              curveSegments: q.curveSegments,
+              bevelEnabled: true,
+              bevelThickness: Math.max(0.8, textDepth * 0.05),
+              bevelSize: Math.max(0.4, textDepth * 0.025),
+              bevelSegments: q.bevelSegments,
+            });
+            g.computeBoundingBox();
+            const w = (g.boundingBox && !isNaN(g.boundingBox.max.x)) ? Math.max(fontSize3D * 0.2, g.boundingBox.max.x - g.boundingBox.min.x + fontSize3D * 0.05) : fontSize3D * 0.5;
+            g.dispose();
+            return w;
+          });
+
+          const arcLayout = computeArcLayout(charWidths, {
+            curveIntensity: state.curveIntensity || 0,
+            direction: state.curveDirection || 'up',
+            spacing: state.curveSpacing || 1.0,
+          });
+
+          chars.forEach((ch, ci) => {
+            if (!ch || ch.trim().length === 0) return;
+            const cPos = arcLayout.chars[ci];
+            if (!cPos) return;
+
+            const charGeo = new TextGeometry(ch, {
+              font,
+              size: fontSize3D,
+              depth: textDepth,
+              curveSegments: q.curveSegments,
+              bevelEnabled: true,
+              bevelThickness: Math.max(0.8, textDepth * 0.05),
+              bevelSize: Math.max(0.4, textDepth * 0.025),
+              bevelSegments: q.bevelSegments,
+            });
+            charGeo.computeBoundingBox();
+            if (charGeo.boundingBox && !isNaN(charGeo.boundingBox.min.x)) {
+              const bb = charGeo.boundingBox;
+              const cx = (bb.max.x + bb.min.x) / 2;
+              const cz = (bb.max.z + bb.min.z) / 2;
+              charGeo.translate(-cx, -fontSize3D * 0.35, -cz);
+            }
+            assignGeometryUVs(charGeo);
+
+            const charMesh = new THREE.Mesh(charGeo, mat3D);
+            charMesh.castShadow = state.shadowsOn;
+            charMesh.receiveShadow = state.shadowsOn;
+            charMesh.position.set(cPos.x, lineY3D + cPos.y, 0);
+            charMesh.rotation.z = cPos.rotation;
+            text3DGroup.add(charMesh);
+          });
+        } else {
+          // Straight line 3D Text (entire line geometry with unified baseline)
+          try {
+            const lineGeo = new TextGeometry(content, {
+              font,
+              size: fontSize3D,
+              depth: textDepth,
+              curveSegments: q.curveSegments,
+              bevelEnabled: true,
+              bevelThickness: Math.max(0.8, textDepth * 0.05),
+              bevelSize: Math.max(0.4, textDepth * 0.025),
+              bevelSegments: q.bevelSegments,
+            });
+            lineGeo.computeBoundingBox();
+            if (lineGeo.boundingBox && !isNaN(lineGeo.boundingBox.min.x)) {
+              lineGeo.center();
+            }
+            assignGeometryUVs(lineGeo);
+            const lineMesh = new THREE.Mesh(lineGeo, mat3D);
+            lineMesh.castShadow = state.shadowsOn;
+            lineMesh.receiveShadow = state.shadowsOn;
+            lineMesh.position.set(0, lineY3D, 0);
+            text3DGroup.add(lineMesh);
+          } catch (e) {
+            console.warn('3D text on badge failed for line:', content, e);
+          }
+        }
+      });
+
+      // Measure 3D text bounds to dynamically size the background box
+      const textBBox = new THREE.Box3().setFromObject(text3DGroup);
+      const centerVec = new THREE.Vector3();
+      textBBox.getCenter(centerVec);
+      const text3DW = Math.max(fontSize3D * 1.5, textBBox.max.x - textBBox.min.x);
+      const text3DH = Math.max(fontSize3D * 0.9, textBBox.max.y - textBBox.min.y);
+
+      // Safe padding around 3D text scaled by bScale
+      const padX = (text3DW * 0.12 + fontSize3D * 0.35) * bScale;
+      const padY = (text3DH * 0.28 + fontSize3D * 0.45) * bScale;
+      let worldWidth = (text3DW + padX * 2) * bScale + (borderOpts.borderWidth || 0) * 1.2;
+      let worldHeight = (text3DH + padY * 2) * bScale + (borderOpts.borderWidth || 0) * 1.2;
+
+      // In standing mode, the base floor plate has ample surface depth
+      if (state.stickerMode === 'standing') {
+        worldHeight = Math.max(worldHeight, textDepth * 2.8 + 24);
+      }
+
+      worldWidth = Math.max(worldWidth, worldHeight * 1.15);
+
+      const aspect = worldWidth / worldHeight;
+      const { canvas } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts, { ...borderOpts, targetAspect: aspect });
+      const frontTex = makeCardTexture(canvas, false);
+      const backTex = makeCardTexture(canvas, true);
+
+      const badgeDepth = Math.max(2, Math.min(8, state.depth * 0.25));
+      const badgeGeometry = new THREE.BoxGeometry(worldWidth, worldHeight, badgeDepth);
+      const badgeMaterials = buildCanvasCardMaterials(frontTex, backTex, true);
+      const badgeMesh = new THREE.Mesh(badgeGeometry, badgeMaterials);
+      badgeMesh.castShadow = state.shadowsOn;
+      badgeMesh.receiveShadow = state.shadowsOn;
+
+      const boxTiltRad = THREE.MathUtils.degToRad(state.stickerBoxTilt || 0);
+      const textTiltRad = THREE.MathUtils.degToRad(state.stickerTextTilt || 0);
+      const offsetY = Number(state.stickerTextOffsetY || 0);
+
+      if (state.stickerMode === 'standing') {
+        // Floor / Pedestal: Base lies flat horizontally as a standing platform
+        badgeMesh.rotation.x = -Math.PI / 2 + boxTiltRad;
+        badgeMesh.position.set(0, -badgeDepth / 2, 0);
+
+        // 3D Text stands upright on top of the base plate
+        text3DGroup.rotation.x = textTiltRad;
+        text3DGroup.position.set(-centerVec.x, (text3DH / 2) + offsetY, 0);
+      } else {
+        // Plate mounted (Wall style)
+        badgeMesh.rotation.x = boxTiltRad;
+        badgeMesh.position.set(0, 0, -badgeDepth / 2);
+
+        text3DGroup.rotation.x = textTiltRad;
+        text3DGroup.position.set(-centerVec.x, -centerVec.y + offsetY, textDepth / 2 + 1);
+      }
+
+      group.add(badgeMesh);
+      group.add(text3DGroup);
+      group.userData.frontTex = frontTex;
+      group.userData.backTex = backTex;
+
+      renderMode = 'canvas';
+      textMesh = group;
+      textMesh.material = badgeMaterials;
+      return;
+    }
+  }
+
+  // ── FLAT 2D BADGE FALLBACK ───────────────────────────────────────────────────
   const { canvas, aspect } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts, borderOpts);
   const frontTex = makeCardTexture(canvas, false);
   const backTex = makeCardTexture(canvas, true);
 
-  const worldHeight = state.size * 1.6; // badges read a bit larger than plain text at the same "সাইজ" value
+  const worldHeight = state.size * 1.6;
   const worldWidth = worldHeight * aspect;
   const depth = Math.max(1, state.depth);
 
@@ -2929,7 +3234,6 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
   mesh.castShadow = state.shadowsOn;
   mesh.receiveShadow = state.shadowsOn;
 
-  const group = new THREE.Group();
   group.add(mesh);
   group.userData.frontTex = frontTex;
   group.userData.backTex = backTex;
@@ -3523,6 +3827,73 @@ stickerShadowCheckbox.addEventListener('change', () => {
   if (state.contentMode === 'sticker') scheduleRebuild();
 });
 
+if (sticker3DModeGrid) {
+  sticker3DModeGrid.addEventListener('click', (e) => {
+    const btn = e.target.closest('.preset-btn');
+    if (!btn) return;
+    state.stickerMode = btn.dataset.stickerMode;
+    state.stickerWith3DText = state.stickerMode !== 'flat';
+    setActivePreset(sticker3DModeGrid, 'stickerMode', state.stickerMode);
+    if (stickerIndependentControls) stickerIndependentControls.hidden = state.stickerMode === 'flat';
+    if (state.contentMode === 'sticker') rebuildTextMesh();
+    saveStudioStateDebounced();
+  });
+}
+
+if (stickerTextScaleRange) {
+  stickerTextScaleRange.addEventListener('input', () => {
+    state.stickerTextScale = Number(stickerTextScaleRange.value);
+    if (stickerTextScaleValue) stickerTextScaleValue.textContent = `${state.stickerTextScale}%`;
+    if (state.contentMode === 'sticker') scheduleRebuild();
+    saveStudioStateDebounced();
+  });
+}
+
+if (stickerBoxScaleRange) {
+  stickerBoxScaleRange.addEventListener('input', () => {
+    state.stickerBoxScale = Number(stickerBoxScaleRange.value);
+    if (stickerBoxScaleValue) stickerBoxScaleValue.textContent = `${state.stickerBoxScale}%`;
+    if (state.contentMode === 'sticker') scheduleRebuild();
+    saveStudioStateDebounced();
+  });
+}
+
+if (stickerBoxTiltRange) {
+  stickerBoxTiltRange.addEventListener('input', () => {
+    state.stickerBoxTilt = Number(stickerBoxTiltRange.value);
+    if (stickerBoxTiltValue) stickerBoxTiltValue.textContent = `${state.stickerBoxTilt}°`;
+    if (state.contentMode === 'sticker') scheduleRebuild();
+    saveStudioStateDebounced();
+  });
+}
+
+if (stickerTextTiltRange) {
+  stickerTextTiltRange.addEventListener('input', () => {
+    state.stickerTextTilt = Number(stickerTextTiltRange.value);
+    if (stickerTextTiltValue) stickerTextTiltValue.textContent = `${state.stickerTextTilt}°`;
+    if (state.contentMode === 'sticker') scheduleRebuild();
+    saveStudioStateDebounced();
+  });
+}
+
+if (stickerTextOffsetYRange) {
+  stickerTextOffsetYRange.addEventListener('input', () => {
+    state.stickerTextOffsetY = Number(stickerTextOffsetYRange.value);
+    if (stickerTextOffsetYValue) stickerTextOffsetYValue.textContent = state.stickerTextOffsetY;
+    if (state.contentMode === 'sticker') scheduleRebuild();
+    saveStudioStateDebounced();
+  });
+}
+
+if (stickerWith3DTextCheckbox) {
+  stickerWith3DTextCheckbox.addEventListener('change', () => {
+    state.stickerWith3DText = stickerWith3DTextCheckbox.checked;
+    if (sticker3DNote) sticker3DNote.style.display = state.stickerWith3DText ? 'block' : 'none';
+    if (state.contentMode === 'sticker') scheduleRebuild();
+    saveStudioStateDebounced();
+  });
+}
+
 // ---------- PLAN_3 §3: curved text wiring (Phase B3) ----------
 // Shared by Text and Sticker content modes — rebuildTextMesh() itself reads
 // state.contentMode to decide which mesh to (re)build, so a single
@@ -3662,6 +4033,16 @@ function saveStudioState() {
       stickerBorderWidth: state.stickerBorderWidth,
       stickerBorderColor: state.stickerBorderColor,
       stickerShadow: state.stickerShadow,
+      stickerMode: state.stickerMode,
+      stickerWith3DText: state.stickerWith3DText,
+      stickerTextScale: state.stickerTextScale,
+      stickerBoxScale: state.stickerBoxScale,
+      stickerBoxTilt: state.stickerBoxTilt,
+      stickerTextTilt: state.stickerTextTilt,
+      stickerTextOffsetY: state.stickerTextOffsetY,
+      strokeOuterColor: state.strokeOuterColor,
+      strokeMidColor: state.strokeMidColor,
+      strokeFillColor: state.strokeFillColor,
       cubeFace1: state.cubeFace1,
       cubeFace2: state.cubeFace2,
       cubeFace3: state.cubeFace3,
@@ -3901,6 +4282,54 @@ function loadStudioState() {
     if (saved.stickerShadow !== undefined && stickerShadowCheckbox) {
       state.stickerShadow = saved.stickerShadow;
       stickerShadowCheckbox.checked = saved.stickerShadow;
+    }
+    if (saved.stickerMode && sticker3DModeGrid) {
+      state.stickerMode = saved.stickerMode;
+      state.stickerWith3DText = state.stickerMode !== 'flat';
+      setActivePreset(sticker3DModeGrid, 'stickerMode', state.stickerMode);
+      if (stickerIndependentControls) stickerIndependentControls.hidden = state.stickerMode === 'flat';
+    }
+    if (saved.stickerTextScale !== undefined && stickerTextScaleRange) {
+      state.stickerTextScale = saved.stickerTextScale;
+      stickerTextScaleRange.value = saved.stickerTextScale;
+      if (stickerTextScaleValue) stickerTextScaleValue.textContent = `${saved.stickerTextScale}%`;
+    }
+    if (saved.stickerBoxScale !== undefined && stickerBoxScaleRange) {
+      state.stickerBoxScale = saved.stickerBoxScale;
+      stickerBoxScaleRange.value = saved.stickerBoxScale;
+      if (stickerBoxScaleValue) stickerBoxScaleValue.textContent = `${saved.stickerBoxScale}%`;
+    }
+    if (saved.stickerBoxTilt !== undefined && stickerBoxTiltRange) {
+      state.stickerBoxTilt = saved.stickerBoxTilt;
+      stickerBoxTiltRange.value = saved.stickerBoxTilt;
+      if (stickerBoxTiltValue) stickerBoxTiltValue.textContent = `${saved.stickerBoxTilt}°`;
+    }
+    if (saved.stickerTextTilt !== undefined && stickerTextTiltRange) {
+      state.stickerTextTilt = saved.stickerTextTilt;
+      stickerTextTiltRange.value = saved.stickerTextTilt;
+      if (stickerTextTiltValue) stickerTextTiltValue.textContent = `${saved.stickerTextTilt}°`;
+    }
+    if (saved.stickerTextOffsetY !== undefined && stickerTextOffsetYRange) {
+      state.stickerTextOffsetY = saved.stickerTextOffsetY;
+      stickerTextOffsetYRange.value = saved.stickerTextOffsetY;
+      if (stickerTextOffsetYValue) stickerTextOffsetYValue.textContent = saved.stickerTextOffsetY;
+    }
+    if (saved.strokeOuterColor && strokeOuterColorPicker) {
+      state.strokeOuterColor = saved.strokeOuterColor;
+      strokeOuterColorPicker.value = saved.strokeOuterColor;
+    }
+    if (saved.strokeMidColor && strokeMidColorPicker) {
+      state.strokeMidColor = saved.strokeMidColor;
+      strokeMidColorPicker.value = saved.strokeMidColor;
+    }
+    if (saved.strokeFillColor && strokeFillColorPicker) {
+      state.strokeFillColor = saved.strokeFillColor;
+      strokeFillColorPicker.value = saved.strokeFillColor;
+    }
+    if (saved.patternPreset && patternPresetSelect) {
+      state.patternPreset = saved.patternPreset;
+      patternPresetSelect.value = saved.patternPreset;
+      if (sportsBlockColors) sportsBlockColors.hidden = state.patternPreset !== 'sportsBlock';
     }
     if (saved.cubeFace1 !== undefined && cubeFace1Input) {
       state.cubeFace1 = saved.cubeFace1;
@@ -4699,13 +5128,40 @@ if (comicOutlineToggle) {
 if (patternPresetSelect) {
   patternPresetSelect.addEventListener('change', () => {
     state.patternPreset = patternPresetSelect.value;
+    if (sportsBlockColors) {
+      sportsBlockColors.hidden = state.patternPreset !== 'sportsBlock';
+    }
     if (state.colorMode === 'pattern') scheduleRebuild();
+    saveStudioStateDebounced();
   });
 }
 if (festiveDecorToggle) {
   festiveDecorToggle.addEventListener('change', () => {
     state.festiveDecor = festiveDecorToggle.checked;
     if (state.colorMode === 'pattern') scheduleRebuild();
+    saveStudioStateDebounced();
+  });
+}
+
+if (strokeOuterColorPicker) {
+  strokeOuterColorPicker.addEventListener('input', () => {
+    state.strokeOuterColor = strokeOuterColorPicker.value;
+    if (state.colorMode === 'pattern' && state.patternPreset === 'sportsBlock') scheduleRebuild();
+    saveStudioStateDebounced();
+  });
+}
+if (strokeMidColorPicker) {
+  strokeMidColorPicker.addEventListener('input', () => {
+    state.strokeMidColor = strokeMidColorPicker.value;
+    if (state.colorMode === 'pattern' && state.patternPreset === 'sportsBlock') scheduleRebuild();
+    saveStudioStateDebounced();
+  });
+}
+if (strokeFillColorPicker) {
+  strokeFillColorPicker.addEventListener('input', () => {
+    state.strokeFillColor = strokeFillColorPicker.value;
+    if (state.colorMode === 'pattern' && state.patternPreset === 'sportsBlock') scheduleRebuild();
+    saveStudioStateDebounced();
   });
 }
 

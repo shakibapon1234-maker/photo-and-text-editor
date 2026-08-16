@@ -135,11 +135,51 @@
         <h3>স্টিকার/ব্যাজ টেক্সট</h3>
         <label class="field" style="align-items: flex-start;">
           <span style="margin-top: 6px;">কন্টেন্ট</span>
-          <textarea id="stickerTextInput" rows="2" placeholder="ব্যাজের ভিতরের লেখা" style="resize: vertical; min-height: 52px; font-family: inherit;">yes!</textarea>
+          <textarea id="stickerTextInput" rows="2" placeholder="ব্যাজের ভিতরের লেখা" style="resize: vertical; min-height: 52px; font-family: inherit;">Warisha Fashion</textarea>
         </label>
+
+        <label class="field" style="margin-top:8px;">
+          <span>টেক্সট স্টাইল ও পজিশন</span>
+          <div class="preset-grid" id="sticker3DModeGrid" style="grid-template-columns: 1fr 1fr 1fr;">
+            <button type="button" class="preset-btn active" data-sticker-mode="standing">🏛️ ফ্লোরে দাঁড়ানো (Standing 3D)</button>
+            <button type="button" class="preset-btn" data-sticker-mode="wall">🏷️ প্লেটে সাঁটা (Plate Mounted)</button>
+            <button type="button" class="preset-btn" data-sticker-mode="flat">📄 সাধারণ ফ্ল্যাট (2D)</button>
+          </div>
+        </label>
+
+        <!-- Independent controls for Box and Text -->
+        <div id="stickerIndependentControls" style="margin-top:10px; padding:10px; background:rgba(255,255,255,0.04); border-radius:8px; border:1px solid rgba(255,255,255,0.08);">
+          <h4 style="margin:0 0 8px 0; font-size:12px; color:#ffd700; text-transform:uppercase; letter-spacing:0.5px;">বক্স ও টেক্সটের আলাদা সাইজ ও রোটেট</h4>
+          <label class="field">
+            <span>টেক্সট সাইজ (Text Scale)</span>
+            <input type="range" id="stickerTextScaleRange" min="30" max="200" value="100" />
+            <span class="field-value" id="stickerTextScaleValue">100%</span>
+          </label>
+          <label class="field">
+            <span>বক্স সাইজ / স্পেস (Box Scale)</span>
+            <input type="range" id="stickerBoxScaleRange" min="50" max="250" value="100" />
+            <span class="field-value" id="stickerBoxScaleValue">100%</span>
+          </label>
+          <label class="field">
+            <span>বক্স টিল্ট / ঢাল (Box Tilt)</span>
+            <input type="range" id="stickerBoxTiltRange" min="-90" max="90" value="0" />
+            <span class="field-value" id="stickerBoxTiltValue">0°</span>
+          </label>
+          <label class="field">
+            <span>টেক্সট টিল্ট / ঢাল (Text Tilt)</span>
+            <input type="range" id="stickerTextTiltRange" min="-90" max="90" value="0" />
+            <span class="field-value" id="stickerTextTiltValue">0°</span>
+          </label>
+          <label class="field">
+            <span>টেক্সট উচ্চতা (Height on Floor)</span>
+            <input type="range" id="stickerTextOffsetYRange" min="-100" max="100" value="0" />
+            <span class="field-value" id="stickerTextOffsetYValue">0</span>
+          </label>
+        </div>
 
         <h3 style="margin-top:14px;">ব্যাজ শেপ</h3>
         <div class="preset-grid" id="stickerShapeGrid">
+          <button type="button" class="preset-btn" data-sticker-shape="letterContour">🏆 লেটার আউটলাইন শেপ (Letter Contour)</button>
           <button type="button" class="preset-btn active" data-sticker-shape="circle">গোল স্টিকার (Peeled)</button>
           <button type="button" class="preset-btn" data-sticker-shape="roundedRect">রাউন্ড-রেক্ট ব্যাজ</button>
           <button type="button" class="preset-btn" data-sticker-shape="wavyBanner">🌊 ওয়েভি ব্যানার</button>
@@ -187,6 +227,11 @@
           <span>ড্রপ-শ্যাডো</span>
           <input type="checkbox" id="stickerShadowCheckbox" />
         </label>
+        <label class="field checkbox-field" style="margin-top:8px; border-top:1px solid rgba(255,255,255,0.1); padding-top:8px;">
+          <input type="checkbox" id="stickerWith3DTextCheckbox" />
+          <span>🔥 থ্রিডি টেক্সট ব্যাজের উপরে (3D Text on Badge)</span>
+        </label>
+        <p class="field-note" id="sticker3DNote" style="display:none;">ব্যাজের সামনে সত্যিকারের ৩D এক্সট্রুড টেক্সট ভাসবে। ফন্ট নির্বাচন, গভীরতা ও কালার উপরের কন্ট্রোল থেকে কাজ করবে।</p>
         <p class="field-note">সাইজ ও গভীরতা নিচের "সাইজ ও গভীরতা" প্যানেল থেকে, আর হালকা ৩ডি টিল্ট/লাইটিং/শ্যাডো "Rotate / Tilt" ও অন্যান্য প্যানেল থেকেই কন্ট্রোল হয় — এখানে আলাদা করে দিতে হয় না।</p>
       </section>
 
@@ -338,12 +383,30 @@
               <option value="cyberGrid">🌐 Cyber Matrix Grid (নিয়ন হাই-টেক)</option>
               <option value="marble">🏛️ Luxury White Marble (মার্বেল টেক্সচার)</option>
               <option value="wood">🪵 Rich Woodgrain (উডেন ফিনিশ)</option>
+              <option value="sportsBlock">🏆 Sports Block Letter Outline (লেটার আউটলাইন)</option>
             </select>
           </label>
           <label class="field checkbox-field" style="margin-top: 4px;">
             <input type="checkbox" id="festiveDecorToggle" checked />
             <span>স্পেশাল ইফেক্ট (HUD রিং / তুষার ক্যাপ / গ্লো)</span>
           </label>
+
+          <!-- Sports Block color pickers (shown only when sportsBlock preset is selected) -->
+          <div id="sportsBlockColors" hidden>
+            <p class="field-note" style="margin-bottom:6px;">লেটার আউটলাইনের রং নির্বাচন করুন:</p>
+            <label class="field">
+              <span>বাইরের রং (Outer)</span>
+              <input type="color" id="strokeOuterColorPicker" value="#6b0000" />
+            </label>
+            <label class="field">
+              <span>মধ্যের রং (Mid / Gold)</span>
+              <input type="color" id="strokeMidColorPicker" value="#ffd700" />
+            </label>
+            <label class="field">
+              <span>ভেতরের রং (Fill / White)</span>
+              <input type="color" id="strokeFillColorPicker" value="#ffffff" />
+            </label>
+          </div>
         </div>
 
         <div id="gradientColorGroup">
