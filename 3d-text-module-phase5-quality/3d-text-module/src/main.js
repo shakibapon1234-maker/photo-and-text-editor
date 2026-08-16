@@ -2754,14 +2754,18 @@ function applyReflectionToggle() {
 // ---------- Phase 3: animation playback ----------
 // `applyPresetOffset` is the single place that turns a preset's {pos, rot,
 // scaleMul, opacityMul} into an actual mesh transform. It always layers the
-// offset on TOP of the current slider-configured base rotation (state.rotX/Y/Z),
-// so rotating the mesh manually while a preset is selected changes what the
-// animation lands on, not just its starting pose.
+// offset on TOP of the current slider-configured base position and rotation,
+// so manually placing or rotating the object changes where the animation
+// lands, not just its starting pose.
 function applyPresetOffset(preset, t) {
   if (!textMesh) return;
   const { pos, rot, scaleMul, opacityMul } = preset.apply(t);
 
-  textMesh.position.set(pos[0], pos[1], pos[2]);
+  textMesh.position.set(
+    (state.posX || 0) + pos[0],
+    (state.posY || 0) + pos[1],
+    (state.posZ || 0) + pos[2]
+  );
   textMesh.rotation.set(
     THREE.MathUtils.degToRad(state.rotX) + rot[0],
     THREE.MathUtils.degToRad(state.rotY) + rot[1],
@@ -2786,7 +2790,7 @@ function applyPresetOffset(preset, t) {
 
 function resetMeshToBaseTransform() {
   if (!textMesh) return;
-  textMesh.position.set(0, 0, 0);
+  applyPosition();
   textMesh.scale.set(1, 1, 1);
   applyRotation();
   const baseOpacity = getBaseOpacity();
