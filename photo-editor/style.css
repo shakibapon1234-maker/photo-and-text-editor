@@ -2420,6 +2420,87 @@ kbd {
     transform: translateY(-1px);
 }
 
+/* ===== Bulk Export: SEO Filename + Format + Recipe ===== */
+.filename-pattern-row,
+.recipe-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.filename-pattern-row input[type="text"],
+.recipe-row input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 13px;
+    transition: border-color 0.15s;
+}
+.filename-pattern-row input[type="text"]:focus,
+.recipe-row input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+.filename-pattern-row select,
+.recipe-row select {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+}
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.btn-danger {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    color: #fff;
+    border: none;
+}
+.btn-danger:hover {
+    opacity: 0.88;
+    transform: translateY(-1px);
+}
+.bulk-format-select {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    margin-top: 6px;
+}
+.bulk-format-select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+.recipe-saved-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: rgba(34,197,94,0.15);
+    color: #22c55e;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 6px;
+    animation: fadeOut 2s ease forwards 1.5s;
+}
+@keyframes fadeOut {
+    to { opacity: 0; transform: translateY(-4px); }
+}
+
 /* ===== Phase 17: Collage / Grid Maker ===== */
 .collage-upload-area {
     border: 2px dashed var(--border-color);

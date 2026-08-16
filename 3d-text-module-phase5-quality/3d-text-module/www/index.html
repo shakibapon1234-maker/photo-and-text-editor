@@ -23,6 +23,15 @@
   <div class="workspace">
     <div class="viewport" id="viewport">
       <canvas id="scene-canvas"></canvas>
+      <div class="viewport-shortcuts-hint">
+        <span><span class="badge-key">Ctrl</span> + Drag মুভ</span>
+        <span class="divider">•</span>
+        <span><span class="badge-key">Shift</span> + Drag রোটেট</span>
+        <span class="divider">•</span>
+        <span><b>রাইট-ক্লিক</b> মুভ</span>
+        <span class="divider">•</span>
+        <span><span class="badge-key">M</span>/<span class="badge-key">R</span>/<span class="badge-key">O</span> মোড</span>
+      </div>
     </div>
 
     <aside class="panel">
@@ -349,14 +358,27 @@
             </select>
           </label>
 
-          <label class="field">
-            <span>১ম কালার (Color 1)</span>
-            <input type="color" id="colorStartPicker" value="#ffd700" />
-          </label>
-          <label class="field">
-            <span>২য় কালার (Color 2)</span>
-            <input type="color" id="colorEndPicker" value="#ff4500" />
-          </label>
+          <div class="color-stop-row">
+            <div class="color-info">
+              <span>১ম কালার</span>
+              <input type="color" id="colorStartPicker" value="#ffd700" title="১ম কালার সিলেক্ট করুন" />
+            </div>
+            <div class="color-slider-wrap">
+              <input type="range" id="gradientStop1Range" min="0" max="100" value="0" title="১ম কালারের বিস্তার / অনুপাত (Stop 1)" />
+              <span class="field-value" id="gradientStop1Value">0%</span>
+            </div>
+          </div>
+
+          <div class="color-stop-row">
+            <div class="color-info">
+              <span>২য় কালার</span>
+              <input type="color" id="colorEndPicker" value="#ff4500" title="২য় কালার সিলেক্ট করুন" />
+            </div>
+            <div class="color-slider-wrap">
+              <input type="range" id="gradientStop2Range" min="0" max="100" value="100" title="২য় কালারের বিস্তার / অনুপাত (Stop 2)" />
+              <span class="field-value" id="gradientStop2Value">100%</span>
+            </div>
+          </div>
 
           <label class="field">
             <span>টাইপ</span>

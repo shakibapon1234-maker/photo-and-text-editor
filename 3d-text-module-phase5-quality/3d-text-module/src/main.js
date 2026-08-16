@@ -140,6 +140,10 @@ const gradientTypeSelect = document.getElementById('gradientTypeSelect');
 const customGradientControls = document.getElementById('customGradientControls');
 const colorStartPicker = document.getElementById('colorStartPicker');
 const colorEndPicker = document.getElementById('colorEndPicker');
+const gradientStop1Range = document.getElementById('gradientStop1Range');
+const gradientStop1Value = document.getElementById('gradientStop1Value');
+const gradientStop2Range = document.getElementById('gradientStop2Range');
+const gradientStop2Value = document.getElementById('gradientStop2Value');
 const gradientAngleRange = document.getElementById('gradientAngleRange');
 const gradientAngleValue = document.getElementById('gradientAngleValue');
 
@@ -490,6 +494,8 @@ const state = {
   gradientType: gradientTypeSelect?.value || 'linear',
   colorStart: colorStartPicker?.value || '#ffd700',
   colorEnd: colorEndPicker?.value || '#ff4500',
+  gradientStop1: Number(gradientStop1Range?.value || 0),
+  gradientStop2: Number(gradientStop2Range?.value || 100),
   gradientAngle: Number(gradientAngleRange?.value || 90),
   multicolorPalette: multicolorPaletteSelect?.value || 'comic',
   comicOutline: comicOutlineToggle ? comicOutlineToggle.checked : true,
@@ -636,6 +642,8 @@ function createGradientTexture(gradState = state) {
   const preset = gradState.gradientPreset || 'gold';
   const type = gradState.gradientType || 'linear';
   const angleDeg = Number(gradState.gradientAngle ?? 90);
+  const stop1 = Math.max(0, Math.min(100, Number(gradState.gradientStop1 ?? 0))) / 100;
+  const stop2 = Math.max(0, Math.min(100, Number(gradState.gradientStop2 ?? 100))) / 100;
 
   if (preset === 'electricCyan') colors = ['#00f5ff', '#0072ff'];
   else if (preset === 'gold') colors = ['#ffd700', '#ff4500'];
@@ -645,13 +653,20 @@ function createGradientTexture(gradState = state) {
   else if (preset === 'emerald') colors = ['#11998e', '#38ef7d'];
   else if (preset === 'fire') colors = ['#ff416c', '#ff4b2b'];
   else if (preset === 'custom') {
-    colors = [gradState.colorStart || '#000000', gradState.colorEnd || '#ffffff'];
+    colors = [gradState.colorStart || '#ffd700', gradState.colorEnd || '#ffffff'];
   }
 
+  const p1 = Math.min(stop1, stop2);
+  const p2 = Math.max(stop1, stop2);
+  const firstColor = stop1 <= stop2 ? colors[0] : colors[1];
+  const secondColor = stop1 <= stop2 ? colors[1] : colors[0];
+
   if (type === 'radial') {
-    const radGrad = ctx.createRadialGradient(256, 256, 10, 256, 256, 250);
-    radGrad.addColorStop(0, colors[0]);
-    radGrad.addColorStop(1, colors[1]);
+    const radGrad = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
+    if (p1 > 0) radGrad.addColorStop(0, firstColor);
+    radGrad.addColorStop(p1, firstColor);
+    radGrad.addColorStop(p2, secondColor);
+    if (p2 < 1) radGrad.addColorStop(1, secondColor);
     ctx.fillStyle = radGrad;
   } else {
     const rad = (angleDeg * Math.PI) / 180;
@@ -663,8 +678,10 @@ function createGradientTexture(gradState = state) {
     const x1 = cx + Math.cos(rad) * r;
     const y1 = cy - Math.sin(rad) * r;
     const linGrad = ctx.createLinearGradient(x0, y0, x1, y1);
-    linGrad.addColorStop(0, colors[0]);
-    linGrad.addColorStop(1, colors[1]);
+    if (p1 > 0) linGrad.addColorStop(0, firstColor);
+    linGrad.addColorStop(p1, firstColor);
+    linGrad.addColorStop(p2, secondColor);
+    if (p2 < 1) linGrad.addColorStop(1, secondColor);
     ctx.fillStyle = linGrad;
   }
 
@@ -736,9 +753,11 @@ function getFontStack(family) {
 }
 
 function getGradientFillStyle(ctx, width, height) {
-  let colors = ['#ffd700', '#ff4500'];
+  let colors = [state.colorStart || '#ffd700', state.colorEnd || '#ff4500'];
   let type = state.gradientType || 'linear';
   let angleDeg = Number(state.gradientAngle ?? 90);
+  const stop1 = Math.max(0, Math.min(100, Number(state.gradientStop1 ?? 0))) / 100;
+  const stop2 = Math.max(0, Math.min(100, Number(state.gradientStop2 ?? 100))) / 100;
 
   if (state.gradientPreset === 'electricCyan') colors = ['#00f5ff', '#0072ff'];
   else if (state.gradientPreset === 'gold') colors = ['#ffd700', '#ff4500'];
@@ -748,13 +767,21 @@ function getGradientFillStyle(ctx, width, height) {
   else if (state.gradientPreset === 'emerald') colors = ['#11998e', '#38ef7d'];
   else if (state.gradientPreset === 'fire') colors = ['#ff416c', '#ff4b2b'];
   else if (state.gradientPreset === 'custom') {
-    colors = [state.colorStart || '#ff0000', state.colorEnd || '#ffffff'];
+    colors = [state.colorStart || '#ffd700', state.colorEnd || '#ffffff'];
   }
 
+  const p1 = Math.min(stop1, stop2);
+  const p2 = Math.max(stop1, stop2);
+  const firstColor = stop1 <= stop2 ? colors[0] : colors[1];
+  const secondColor = stop1 <= stop2 ? colors[1] : colors[0];
+
   if (type === 'radial') {
-    const grad = ctx.createRadialGradient(width / 2, height / 2, 10, width / 2, height / 2, Math.max(width, height) / 2);
-    grad.addColorStop(0, colors[0]);
-    grad.addColorStop(1, colors[1]);
+    const r = Math.max(width, height) / 2;
+    const grad = ctx.createRadialGradient(width / 2, height / 2, 0, width / 2, height / 2, r);
+    if (p1 > 0) grad.addColorStop(0, firstColor);
+    grad.addColorStop(p1, firstColor);
+    grad.addColorStop(p2, secondColor);
+    if (p2 < 1) grad.addColorStop(1, secondColor);
     return grad;
   } else {
     const rad = ((angleDeg - 90) * Math.PI) / 180;
@@ -766,8 +793,10 @@ function getGradientFillStyle(ctx, width, height) {
     const x1 = cx + Math.cos(rad) * r;
     const y1 = cy + Math.sin(rad) * r;
     const grad = ctx.createLinearGradient(x0, y0, x1, y1);
-    grad.addColorStop(0, colors[0]);
-    grad.addColorStop(1, colors[1]);
+    if (p1 > 0) grad.addColorStop(0, firstColor);
+    grad.addColorStop(p1, firstColor);
+    grad.addColorStop(p2, secondColor);
+    if (p2 < 1) grad.addColorStop(1, secondColor);
     return grad;
   }
 }
@@ -3070,6 +3099,8 @@ function saveStudioState() {
       color: state.color,
       colorStart: state.colorStart,
       colorEnd: state.colorEnd,
+      gradientStop1: state.gradientStop1,
+      gradientStop2: state.gradientStop2,
       gradientPreset: state.gradientPreset,
       gradientType: state.gradientType,
       gradientAngle: state.gradientAngle,
@@ -3147,6 +3178,16 @@ function loadStudioState() {
     if (saved.colorEnd && colorEndPicker) {
       state.colorEnd = saved.colorEnd;
       colorEndPicker.value = saved.colorEnd;
+    }
+    if (saved.gradientStop1 !== undefined && gradientStop1Range) {
+      state.gradientStop1 = saved.gradientStop1;
+      gradientStop1Range.value = saved.gradientStop1;
+      if (gradientStop1Value) gradientStop1Value.textContent = `${saved.gradientStop1}%`;
+    }
+    if (saved.gradientStop2 !== undefined && gradientStop2Range) {
+      state.gradientStop2 = saved.gradientStop2;
+      gradientStop2Range.value = saved.gradientStop2;
+      if (gradientStop2Value) gradientStop2Value.textContent = `${saved.gradientStop2}%`;
     }
     if (saved.gradientPreset && gradientPresetSelect) {
       state.gradientPreset = saved.gradientPreset;
@@ -3254,65 +3295,107 @@ function loadStudioState() {
     }
   } catch (_) {}
 }
-// ---------- Direct Drag Pointer Manipulation (Natural 1:1 Move / Rotate / Orbit) ----------
+// ---------- Direct Drag Pointer Manipulation (Natural 1:1 Move / Rotate / Orbit with Shortcuts) ----------
 let isPointerDragging = false;
+let pointerDragAction = 'move'; // 'move' | 'rotate' | 'orbit'
 let previousPointerPos = { x: 0, y: 0 };
+let isSpaceHeld = false;
+
+// Prevent context menu on right click in viewport so right-click drag is completely smooth
+viewportEl.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+});
 
 viewportEl.addEventListener('pointerdown', (e) => {
-  if (e.button !== 0) return; // Left click only
   if (!state.dragEnabled) return;
-  if (state.dragMode === 'orbit') return;
+
+  // Determine action:
+  // 1. Right Click (button 2) or Middle Click (button 1) -> ALWAYS Drag to Move/Pan
+  // 2. Left Click (button 0):
+  //    - If Shift key held -> Force Drag to Rotate
+  //    - If Ctrl / Alt / Meta / Space held -> Force Drag to Move
+  //    - Otherwise -> use state.dragMode ('move' | 'rotate' | 'orbit')
+  let activeAction = state.dragMode;
+
+  if (e.button === 2 || e.button === 1) {
+    activeAction = 'move';
+    e.preventDefault();
+  } else if (e.button === 0) {
+    if (e.shiftKey) {
+      activeAction = 'rotate';
+    } else if (e.ctrlKey || e.altKey || e.metaKey || isSpaceHeld) {
+      activeAction = 'move';
+    }
+  } else {
+    return;
+  }
+
+  if (activeAction === 'orbit') {
+    controls.enabled = true;
+    isPointerDragging = false;
+    return;
+  }
 
   isPointerDragging = true;
+  pointerDragAction = activeAction;
   previousPointerPos = { x: e.clientX, y: e.clientY };
   controls.enabled = false;
   viewportEl.style.cursor = 'grabbing';
 });
 
 window.addEventListener('pointermove', (e) => {
-  if (!isPointerDragging || !state.dragEnabled || state.dragMode === 'orbit') return;
+  if (isPointerDragging) {
+    const deltaX = e.clientX - previousPointerPos.x;
+    const deltaY = e.clientY - previousPointerPos.y;
+    previousPointerPos = { x: e.clientX, y: e.clientY };
 
-  const deltaX = e.clientX - previousPointerPos.x;
-  const deltaY = e.clientY - previousPointerPos.y;
-  previousPointerPos = { x: e.clientX, y: e.clientY };
+    if (pointerDragAction === 'move') {
+      // Exact 1:1 screen-to-world conversion at camera distance
+      const vH = 2 * Math.tan(((camera.fov || 45) * Math.PI) / 360) * Math.abs(camera.position.z || 220);
+      const scale = (viewportEl.clientHeight && viewportEl.clientHeight > 0) ? (vH / viewportEl.clientHeight) : 0.45;
 
-  if (state.dragMode === 'move') {
-    // Exact 1:1 screen-to-world conversion at camera distance
-    const vH = 2 * Math.tan(((camera.fov || 45) * Math.PI) / 360) * Math.abs(camera.position.z || 220);
-    const scale = (viewportEl.clientHeight && viewportEl.clientHeight > 0) ? (vH / viewportEl.clientHeight) : 0.45;
+      state.posX = Math.round(state.posX + deltaX * scale);
+      state.posY = Math.round(state.posY - deltaY * scale);
 
-    state.posX = Math.round(state.posX + deltaX * scale);
-    state.posY = Math.round(state.posY - deltaY * scale);
+      state.posX = Math.max(-400, Math.min(400, state.posX));
+      state.posY = Math.max(-300, Math.min(300, state.posY));
 
-    state.posX = Math.max(-400, Math.min(400, state.posX));
-    state.posY = Math.max(-300, Math.min(300, state.posY));
+      if (posXRange) posXRange.value = state.posX;
+      if (posXValue) posXValue.textContent = `${state.posX}px`;
+      if (posYRange) posYRange.value = state.posY;
+      if (posYValue) posYValue.textContent = `${state.posY}px`;
 
-    if (posXRange) posXRange.value = state.posX;
-    if (posXValue) posXValue.textContent = `${state.posX}px`;
-    if (posYRange) posYRange.value = state.posY;
-    if (posYValue) posYValue.textContent = `${state.posY}px`;
+      applyPosition();
+      saveStudioStateDebounced();
+    } else if (pointerDragAction === 'rotate') {
+      let newRotY = (state.rotY + deltaX * 0.5) % 360;
+      if (newRotY > 180) newRotY -= 360;
+      if (newRotY < -180) newRotY -= 360;
 
-    applyPosition();
-    saveStudioStateDebounced();
-  } else if (state.dragMode === 'rotate') {
-    let newRotY = (state.rotY + deltaX * 0.5) % 360;
-    if (newRotY > 180) newRotY -= 360;
-    if (newRotY < -180) newRotY -= 360;
+      let newRotX = (state.rotX + deltaY * 0.5) % 360;
+      if (newRotX > 180) newRotX -= 360;
+      if (newRotX < -180) newRotX -= 360;
 
-    let newRotX = (state.rotX + deltaY * 0.5) % 360;
-    if (newRotX > 180) newRotX -= 360;
-    if (newRotX < -180) newRotX -= 360;
+      state.rotX = Math.round(newRotX);
+      state.rotY = Math.round(newRotY);
 
-    state.rotX = Math.round(newRotX);
-    state.rotY = Math.round(newRotY);
+      if (rotXRange) rotXRange.value = state.rotX;
+      if (rotXValue) rotXValue.textContent = `${state.rotX}°`;
+      if (rotYRange) rotYRange.value = state.rotY;
+      if (rotYValue) rotYValue.textContent = `${state.rotY}°`;
 
-    if (rotXRange) rotXRange.value = state.rotX;
-    if (rotXValue) rotXValue.textContent = `${state.rotX}°`;
-    if (rotYRange) rotYRange.value = state.rotY;
-    if (rotYValue) rotYValue.textContent = `${state.rotY}°`;
-
-    applyRotation();
-    saveStudioStateDebounced();
+      applyRotation();
+      saveStudioStateDebounced();
+    }
+  } else if (state.dragEnabled && (e.target === viewportEl || viewportEl.contains(e.target))) {
+    // Dynamic hover cursor based on modifier keys
+    if (e.shiftKey) {
+      viewportEl.style.cursor = 'crosshair';
+    } else if (e.ctrlKey || e.altKey || e.metaKey || isSpaceHeld) {
+      viewportEl.style.cursor = 'move';
+    } else {
+      viewportEl.style.cursor = state.dragMode !== 'orbit' ? 'grab' : 'default';
+    }
   }
 });
 
@@ -3329,6 +3412,50 @@ window.addEventListener('pointerup', stopPointerDrag);
 window.addEventListener('pointercancel', stopPointerDrag);
 window.addEventListener('mouseup', stopPointerDrag);
 window.addEventListener('blur', stopPointerDrag);
+
+// Global Keyboard Shortcuts (M: Move, R: Rotate, O/C: Orbit, Space: Quick Pan)
+window.addEventListener('keydown', (e) => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) {
+    return;
+  }
+
+  if (e.code === 'Space' && !isSpaceHeld) {
+    isSpaceHeld = true;
+    if (state.dragEnabled && !isPointerDragging) {
+      viewportEl.style.cursor = 'move';
+    }
+  }
+
+  if (e.key === 'm' || e.key === 'M' || e.key === 'g' || e.key === 'G') {
+    state.dragMode = 'move';
+    if (dragModeSelect) dragModeSelect.value = 'move';
+    controls.enabled = false;
+    viewportEl.style.cursor = 'grab';
+    saveStudioStateDebounced();
+  } else if (e.key === 'r' || e.key === 'R') {
+    state.dragMode = 'rotate';
+    if (dragModeSelect) dragModeSelect.value = 'rotate';
+    controls.enabled = false;
+    viewportEl.style.cursor = 'grab';
+    saveStudioStateDebounced();
+  } else if (e.key === 'o' || e.key === 'O' || e.key === 'c' || e.key === 'C') {
+    state.dragMode = 'orbit';
+    if (dragModeSelect) dragModeSelect.value = 'orbit';
+    controls.enabled = true;
+    viewportEl.style.cursor = 'default';
+    saveStudioStateDebounced();
+  }
+});
+
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'Space') {
+    isSpaceHeld = false;
+  }
+  if (!isPointerDragging && state.dragEnabled) {
+    viewportEl.style.cursor = state.dragMode !== 'orbit' ? 'grab' : 'default';
+  }
+});
 
 if (posXRange) {
   posXRange.addEventListener('input', () => {
@@ -3778,17 +3905,37 @@ if (gradientPresetSelect) {
       const [c1, c2] = GRADIENT_PRESET_COLORS[state.gradientPreset];
       state.colorStart = c1;
       state.colorEnd = c2;
+      state.gradientStop1 = 0;
+      state.gradientStop2 = 100;
       if (colorStartPicker) colorStartPicker.value = c1;
       if (colorEndPicker) colorEndPicker.value = c2;
+      if (gradientStop1Range) gradientStop1Range.value = 0;
+      if (gradientStop1Value) gradientStop1Value.textContent = '0%';
+      if (gradientStop2Range) gradientStop2Range.value = 100;
+      if (gradientStop2Value) gradientStop2Value.textContent = '100%';
     }
-    scheduleRebuild();
+    if (state.colorMode === 'gradient') {
+      if (isBanglaText(state.text) || state.contentMode !== 'text') {
+        scheduleRebuild();
+      } else {
+        applyMaterialColor();
+      }
+    }
+    saveStudioStateDebounced();
   });
 }
 
 if (gradientTypeSelect) {
   gradientTypeSelect.addEventListener('change', () => {
     state.gradientType = gradientTypeSelect.value;
-    scheduleRebuild();
+    if (state.colorMode === 'gradient') {
+      if (isBanglaText(state.text) || state.contentMode !== 'text') {
+        scheduleRebuild();
+      } else {
+        applyMaterialColor();
+      }
+    }
+    saveStudioStateDebounced();
   });
 }
 
@@ -3797,7 +3944,14 @@ if (colorStartPicker) {
     state.colorStart = colorStartPicker.value;
     state.gradientPreset = 'custom';
     if (gradientPresetSelect) gradientPresetSelect.value = 'custom';
-    if (state.colorMode === 'gradient') scheduleRebuild();
+    if (state.colorMode === 'gradient') {
+      if (isBanglaText(state.text) || state.contentMode !== 'text') {
+        scheduleRebuild();
+      } else {
+        applyMaterialColor();
+      }
+    }
+    saveStudioStateDebounced();
   });
 }
 
@@ -3806,7 +3960,48 @@ if (colorEndPicker) {
     state.colorEnd = colorEndPicker.value;
     state.gradientPreset = 'custom';
     if (gradientPresetSelect) gradientPresetSelect.value = 'custom';
-    if (state.colorMode === 'gradient') scheduleRebuild();
+    if (state.colorMode === 'gradient') {
+      if (isBanglaText(state.text) || state.contentMode !== 'text') {
+        scheduleRebuild();
+      } else {
+        applyMaterialColor();
+      }
+    }
+    saveStudioStateDebounced();
+  });
+}
+
+if (gradientStop1Range) {
+  gradientStop1Range.addEventListener('input', () => {
+    state.gradientStop1 = Number(gradientStop1Range.value);
+    if (gradientStop1Value) gradientStop1Value.textContent = `${state.gradientStop1}%`;
+    state.gradientPreset = 'custom';
+    if (gradientPresetSelect) gradientPresetSelect.value = 'custom';
+    if (state.colorMode === 'gradient') {
+      if (isBanglaText(state.text) || state.contentMode !== 'text') {
+        scheduleRebuild();
+      } else {
+        applyMaterialColor();
+      }
+    }
+    saveStudioStateDebounced();
+  });
+}
+
+if (gradientStop2Range) {
+  gradientStop2Range.addEventListener('input', () => {
+    state.gradientStop2 = Number(gradientStop2Range.value);
+    if (gradientStop2Value) gradientStop2Value.textContent = `${state.gradientStop2}%`;
+    state.gradientPreset = 'custom';
+    if (gradientPresetSelect) gradientPresetSelect.value = 'custom';
+    if (state.colorMode === 'gradient') {
+      if (isBanglaText(state.text) || state.contentMode !== 'text') {
+        scheduleRebuild();
+      } else {
+        applyMaterialColor();
+      }
+    }
+    saveStudioStateDebounced();
   });
 }
 

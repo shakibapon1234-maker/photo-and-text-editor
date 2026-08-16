@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="bn">
 
 <head>
@@ -1401,6 +1401,49 @@
                     <p class="wm-hint" id="bulkUpscaleHint">"আপস্কেল" ট্যাবের লোকাল সেকশনে যে ফ্যাক্টর/শার্পনেস সেট করা আছে, সেটাই প্রতিটা ছবিতে প্রয়োগ হবে (প্রিসেট সাইজে বসানোর আগে)</p>
                 </div>
 
+                
+                <!-- SEO ফাইলনেম প্যাটার্ন -->
+                <div class="form-group" id="bulkFilenameWrap" style="display:none;">
+                    <label>📝 SEO ফাইলনেম প্যাটার্ন</label>
+                    <div class="filename-pattern-row" style="margin-top:6px;">
+                        <input type="text" id="bulkFilenamePrefix" placeholder="warisha-saree (ইংরেজিতে)" maxlength="60">
+                        <select id="bulkFilenameStyle">
+                            <option value="prefix_num">prefix-001, prefix-002…</option>
+                            <option value="prefix_preset">prefix_presetid</option>
+                            <option value="original">মূল ফাইলনাম (ডিফল্ট)</option>
+                        </select>
+                    </div>
+                    <p class="wm-hint" style="margin-top:5px;">"warisha-saree" দিলে: <strong>warisha-saree-001_1080x1350.jpg</strong>, warisha-saree-002…</p>
+                </div>
+
+                <!-- আউটপুট ফরম্যাট -->
+                <div class="form-group" id="bulkFormatWrap" style="display:none;">
+                    <label>📦 আউটপুট ফরম্যাট</label>
+                    <select id="bulkOutputFormat" class="bulk-format-select">
+                        <option value="auto">Auto — JPEG / স্বচ্ছ ছবিতে PNG (ডিফল্ট)</option>
+                        <option value="webp">WebP — সবচেয়ে ছোট, ওয়েব-অপটিমাইজড (JPEG চেয়ে ২৫-৩৫% ছোট)</option>
+                        <option value="jpg">JPEG — ছোট, সব প্ল্যাটফর্মে চলে</option>
+                        <option value="png">PNG — স্বচ্ছতা সমর্থিত, বড় ফাইল</option>
+                    </select>
+                    <p class="wm-hint" style="margin-top:5px;">WebP বেছে নিলে ফাইল সাইজ ছোট — ফেসবুক ও ওয়েবসাইটে দ্রুত লোড হয়</p>
+                </div>
+
+                <!-- রেসিপি সেভ / লোড -->
+                <div class="form-group" id="bulkRecipeWrap" style="display:none;">
+                    <label>⭐ সেটিংস রেসিপি — সেভ ও লোড</label>
+                    <div class="recipe-row" style="margin-top:6px;">
+                        <input type="text" id="bulkRecipeName" placeholder="রেসিপির নাম (যেমন: AcadeFlow Product)" maxlength="50">
+                        <button type="button" class="btn btn-secondary btn-sm" id="bulkSaveRecipeBtn">💾 সেভ</button>
+                    </div>
+                    <div class="recipe-row" style="margin-top:8px;">
+                        <select id="bulkRecipeSelect">
+                            <option value="">— সেভ করা রেসিপি লোড করুন —</option>
+                        </select>
+                        <button type="button" class="btn btn-secondary btn-sm" id="bulkLoadRecipeBtn">📂 লোড</button>
+                        <button type="button" class="btn btn-danger btn-sm" id="bulkDeleteRecipeBtn" title="এই রেসিপি মুছুন">🗑️</button>
+                    </div>
+                    <p class="wm-hint" style="margin-top:5px;">প্রিসেট, মোড, ফরম্যাট, BG-remove, ফাইলনাম প্যাটার্ন — সব একসাথে সেভ হবে</p>
+                </div>
                 <div class="bulk-progress" id="bulkProgress" style="display:none;">
                     <div class="bulk-progress-bar"><div class="bulk-progress-fill" id="bulkProgressFill"></div></div>
                     <span id="bulkProgressLabel">প্রসেস হচ্ছে... 0 / 0</span>
