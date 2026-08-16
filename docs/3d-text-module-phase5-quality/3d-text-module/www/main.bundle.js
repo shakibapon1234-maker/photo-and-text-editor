@@ -25414,7 +25414,7 @@ var ANIMATION_PRESETS = {
   },
   fadeIn: {
     label: "Fade In",
-    apply: (t) => ({ pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: t })
+    apply: (t) => ({ pos: [0, 0, (1 - t) * -45], rot: [0, 0, 0], scaleMul: 0.88 + 0.12 * t, opacityMul: t })
   },
   popIn: {
     label: "Pop In",
@@ -25569,7 +25569,7 @@ var ANIMATION_PRESETS = {
     label: "Pulse (\u09B8\u09CD\u09AA\u09A8\u09CD\u09A6\u09A8)",
     continuous: true,
     apply: (t) => {
-      const scale = 1 + Math.sin(t * Math.PI * 2) * 0.12;
+      const scale = 1 + Math.sin(t * Math.PI * 2) * 0.14;
       return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: scale, opacityMul: 1 };
     }
   },
@@ -25577,7 +25577,7 @@ var ANIMATION_PRESETS = {
     label: "Float (\u09AD\u09BE\u09B8\u09AE\u09BE\u09A8)",
     continuous: true,
     apply: (t) => {
-      const y = Math.sin(t * Math.PI * 2) * 18;
+      const y = Math.sin(t * Math.PI * 2) * 22;
       return { pos: [0, y, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: 1 };
     }
   },
@@ -25585,33 +25585,46 @@ var ANIMATION_PRESETS = {
     label: "Glow Pulse (\u099C\u09CD\u09AC\u09B2\u09BE-\u09A8\u09C7\u09AD\u09BE)",
     continuous: true,
     apply: (t) => {
-      const opacity = 0.45 + 0.55 * ((Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) / 2);
-      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: opacity };
+      const wave = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) / 2;
+      const scale = 1 + wave * 0.16;
+      const y = Math.sin(t * Math.PI * 2) * 8;
+      const opacity = 0.65 + 0.35 * wave;
+      const emissiveMul = 0.4 + 1.6 * wave;
+      return { pos: [0, y, 0], rot: [Math.sin(t * Math.PI * 2) * 0.06, 0, 0], scaleMul: scale, opacityMul: opacity, emissiveMul };
     }
   },
   breathe: {
     label: "\u{1FAC1} Breathe (\u09B6\u09CD\u09AC\u09BE\u09B8-\u09AA\u09CD\u09B0\u09B6\u09CD\u09AC\u09BE\u09B8)",
     continuous: true,
     apply: (t) => {
-      const scale = 1 + Math.sin(t * Math.PI * 2) * 0.04;
-      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: scale, opacityMul: 1 };
+      const wave = Math.sin(t * Math.PI * 2);
+      const scale = 1 + wave * 0.1;
+      const z = wave * 28;
+      const y = wave * 6;
+      return { pos: [0, y, z], rot: [0, 0, 0], scaleMul: scale, opacityMul: 1 };
     }
   },
   neonFlash: {
-    label: "\u{1F4A1} Neon Spark (\u09A8\u09BF\u09AF\u09BC\u09A8 \u09B8\u09CD\u09AA\u09BE\u09B0\u09CD\u0995/\u09AB\u09CD\u09B2\u09BE\u09B6)",
+    label: "\u{1F4A1} Neon Flash (\u09A8\u09BF\u09AF\u09BC\u09A8 \u09AB\u09CD\u09B2\u09BE\u09B6/\u09B8\u09CD\u09AA\u09BE\u09B0\u09CD\u0995)",
     continuous: true,
     apply: (t) => {
-      const phase = t * 4 % 1;
-      const flicker = phase < 0.15 ? 0.2 + 0.8 * (phase / 0.15) : 1;
-      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: flicker };
+      const p = t * 8 % 1;
+      const strobe = (Math.sin(t * Math.PI * 16) > 0 ? 1 : 0.15) * (p > 0.4 ? 1 : 0.35);
+      const scale = 1 + (strobe > 0.6 ? 0.08 : -0.05);
+      const emissiveMul = strobe > 0.6 ? 2.5 : 0.2;
+      return { pos: [0, 0, 0], rot: [0, 0, Math.sin(t * 50) * 0.02 * (1 - strobe)], scaleMul: scale, opacityMul: strobe, emissiveMul };
     }
   },
   shineSweep: {
-    label: "\u{1F31F} Shine Sweep (\u09AE\u09C7\u099F\u09BE\u09B2\u09BF\u0995 \u0997\u09CD\u09B2\u09CB)",
+    label: "\u{1F31F} Shine Sweep (\u09AE\u09C7\u099F\u09BE\u09B2\u09BF\u0995 \u0997\u09CD\u09B2\u09CB \u0993 \u09B8\u09C1\u0987\u09AA)",
     continuous: true,
     apply: (t) => {
-      const surge = 1 + Math.pow(Math.sin(t * Math.PI), 2) * 0.08;
-      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: surge, opacityMul: 1 };
+      const rotY = Math.sin(t * Math.PI * 2) * 0.35;
+      const rotX = Math.cos(t * Math.PI * 2) * 0.1;
+      const posX = Math.sin(t * Math.PI * 2) * 20;
+      const scale = 1 + Math.pow(Math.sin(t * Math.PI), 2) * 0.08;
+      const emissiveMul = 0.8 + 1.2 * Math.pow(Math.sin(t * Math.PI), 2);
+      return { pos: [posX, 0, 0], rot: [rotX, rotY, 0], scaleMul: scale, opacityMul: 1, emissiveMul };
     }
   }
 };
@@ -29212,43 +29225,54 @@ function applyReflectionToggle() {
 }
 function applyPresetOffset(preset, t) {
   if (!textMesh) return;
-  const { pos, rot, scaleMul, opacityMul } = preset.apply(t);
+  const { pos, rot, scaleMul, opacityMul, emissiveMul } = preset.apply(t);
   textMesh.position.set(
-    (state.posX || 0) + pos[0],
-    (state.posY || 0) + pos[1],
-    (state.posZ || 0) + pos[2]
+    (state.posX || 0) + (pos ? pos[0] : 0),
+    (state.posY || 0) + (pos ? pos[1] : 0),
+    (state.posZ || 0) + (pos ? pos[2] : 0)
   );
   textMesh.rotation.set(
-    MathUtils.degToRad(state.rotX) + rot[0],
-    MathUtils.degToRad(state.rotY) + rot[1],
-    MathUtils.degToRad(state.rotZ) + rot[2]
+    MathUtils.degToRad(state.rotX) + (rot ? rot[0] : 0),
+    MathUtils.degToRad(state.rotY) + (rot ? rot[1] : 0),
+    MathUtils.degToRad(state.rotZ) + (rot ? rot[2] : 0)
   );
-  const s = Math.max(0, scaleMul);
+  const s = Math.max(0, scaleMul !== void 0 ? scaleMul : 1);
   textMesh.scale.set(s, s, s);
   const baseOpacity = getBaseOpacity();
-  const finalOpacity = Math.min(1, Math.max(0, opacityMul)) * baseOpacity;
+  const rawOp = opacityMul !== void 0 ? opacityMul : 1;
+  const finalOpacity = Math.min(1, Math.max(0, rawOp)) * baseOpacity;
+  textMesh.visible = finalOpacity > 5e-3;
+  const baseNeonIntensity = state.materialType === "neon" ? (state.neonIntensity || 0.8) * 0.45 : 0.5;
   textMesh.traverse((child) => {
     if (child.isMesh && child.material) {
       const materials = Array.isArray(child.material) ? child.material : [child.material];
       materials.forEach((m) => {
         m.transparent = true;
         m.opacity = finalOpacity;
+        if (emissiveMul !== void 0 && m.emissive) {
+          m.emissiveIntensity = baseNeonIntensity * emissiveMul;
+        }
       });
     }
   });
 }
 function resetMeshToBaseTransform() {
   if (!textMesh) return;
+  textMesh.visible = true;
   applyPosition();
   textMesh.scale.set(1, 1, 1);
   applyRotation();
   const baseOpacity = getBaseOpacity();
+  const baseNeonIntensity = state.materialType === "neon" ? (state.neonIntensity || 0.8) * 0.45 : 0;
   textMesh.traverse((child) => {
     if (child.isMesh && child.material) {
       const materials = Array.isArray(child.material) ? child.material : [child.material];
       materials.forEach((m) => {
         m.transparent = m.map ? true : state.materialType === "glass";
         m.opacity = baseOpacity;
+        if (m.emissive) {
+          m.emissiveIntensity = baseNeonIntensity;
+        }
       });
     }
   });

@@ -76,7 +76,7 @@ export const ANIMATION_PRESETS = {
   },
   fadeIn: {
     label: 'Fade In',
-    apply: (t) => ({ pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: t }),
+    apply: (t) => ({ pos: [0, 0, (1 - t) * -45], rot: [0, 0, 0], scaleMul: 0.88 + 0.12 * t, opacityMul: t }),
   },
   popIn: {
     label: 'Pop In',
@@ -240,7 +240,7 @@ export const ANIMATION_PRESETS = {
     label: 'Pulse (স্পন্দন)',
     continuous: true,
     apply: (t) => {
-      const scale = 1 + Math.sin(t * Math.PI * 2) * 0.12;
+      const scale = 1 + Math.sin(t * Math.PI * 2) * 0.14;
       return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: scale, opacityMul: 1 };
     },
   },
@@ -248,7 +248,7 @@ export const ANIMATION_PRESETS = {
     label: 'Float (ভাসমান)',
     continuous: true,
     apply: (t) => {
-      const y = Math.sin(t * Math.PI * 2) * 18;
+      const y = Math.sin(t * Math.PI * 2) * 22;
       return { pos: [0, y, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: 1 };
     },
   },
@@ -256,38 +256,50 @@ export const ANIMATION_PRESETS = {
     label: 'Glow Pulse (জ্বলা-নেভা)',
     continuous: true,
     apply: (t) => {
-      // Opacity breathes between 0.45 and 1 once per cycle.
-      const opacity = 0.45 + 0.55 * ((Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) / 2);
-      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: opacity };
+      // Vibrant rhythmic expansion pulse: scale expands and contracts with glowing emissive surge
+      const wave = (Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) / 2; // 0 to 1
+      const scale = 1 + wave * 0.16;
+      const y = Math.sin(t * Math.PI * 2) * 8;
+      const opacity = 0.65 + 0.35 * wave;
+      const emissiveMul = 0.4 + 1.6 * wave;
+      return { pos: [0, y, 0], rot: [Math.sin(t * Math.PI * 2) * 0.06, 0, 0], scaleMul: scale, opacityMul: opacity, emissiveMul };
     },
   },
   breathe: {
     label: '🫁 Breathe (শ্বাস-প্রশ্বাস)',
     continuous: true,
     apply: (t) => {
-      // Very subtle scale drift — like a slow inhale/exhale. Range: 0.96–1.04.
-      const scale = 1 + Math.sin(t * Math.PI * 2) * 0.04;
-      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: scale, opacityMul: 1 };
+      // Organic deep breathing rhythm: chest-expansion scale and Z-depth forward inhale / backward exhale
+      const wave = Math.sin(t * Math.PI * 2);
+      const scale = 1 + wave * 0.10;
+      const z = wave * 28;
+      const y = wave * 6;
+      return { pos: [0, y, z], rot: [0, 0, 0], scaleMul: scale, opacityMul: 1 };
     },
   },
   neonFlash: {
-    label: '💡 Neon Spark (নিয়ন স্পার্ক/ফ্লাশ)',
+    label: '💡 Neon Flash (নিয়ন ফ্লাশ/স্পার্ক)',
     continuous: true,
     apply: (t) => {
-      // Rapid flicker: two fast pulses per cycle separated by a rest phase.
-      const phase = (t * 4) % 1; // 4 sub-pulses per cycle
-      const flicker = phase < 0.15 ? 0.2 + 0.8 * (phase / 0.15) : 1;
-      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: flicker };
+      // Electrical high-voltage strobe: rapid multi-burst pulse of brightness, scale jitter & neon flash
+      const p = (t * 8) % 1;
+      const strobe = (Math.sin(t * Math.PI * 16) > 0 ? 1 : 0.15) * (p > 0.4 ? 1 : 0.35);
+      const scale = 1 + (strobe > 0.6 ? 0.08 : -0.05);
+      const emissiveMul = strobe > 0.6 ? 2.5 : 0.2;
+      return { pos: [0, 0, 0], rot: [0, 0, (Math.sin(t * 50) * 0.02) * (1 - strobe)], scaleMul: scale, opacityMul: strobe, emissiveMul };
     },
   },
   shineSweep: {
-    label: '🌟 Shine Sweep (মেটালিক গ্লো)',
+    label: '🌟 Shine Sweep (মেটালিক গ্লো ও সুইপ)',
     continuous: true,
     apply: (t) => {
-      // Gentle scale surge that sweeps across once per cycle — mimics a
-      // metallic highlight moving over the surface.
-      const surge = 1 + Math.pow(Math.sin(t * Math.PI), 2) * 0.08;
-      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: surge, opacityMul: 1 };
+      // Dazzling 3D spotlight sweep: dynamic tilt rotation across Y/X axes that catches metallic bevel highlights
+      const rotY = Math.sin(t * Math.PI * 2) * 0.35; // sweeps 20 deg left to right
+      const rotX = Math.cos(t * Math.PI * 2) * 0.10;
+      const posX = Math.sin(t * Math.PI * 2) * 20;
+      const scale = 1 + Math.pow(Math.sin(t * Math.PI), 2) * 0.08;
+      const emissiveMul = 0.8 + 1.2 * Math.pow(Math.sin(t * Math.PI), 2);
+      return { pos: [posX, 0, 0], rot: [rotX, rotY, 0], scaleMul: scale, opacityMul: 1, emissiveMul };
     },
   },
 };

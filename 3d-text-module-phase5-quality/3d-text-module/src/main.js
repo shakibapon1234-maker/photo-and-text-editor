@@ -3947,34 +3947,42 @@ function applyReflectionToggle() {
 // `applyPresetOffset` is the single place that turns a preset's {pos, rot,
 // scaleMul, opacityMul} into an actual mesh transform. It always layers the
 // offset on TOP of the current slider-configured base position and rotation,
-// so manually placing or rotating the object changes where the animation
-// lands, not just its starting pose.
 function applyPresetOffset(preset, t) {
   if (!textMesh) return;
-  const { pos, rot, scaleMul, opacityMul } = preset.apply(t);
+  const { pos, rot, scaleMul, opacityMul, emissiveMul } = preset.apply(t);
 
   textMesh.position.set(
-    (state.posX || 0) + pos[0],
-    (state.posY || 0) + pos[1],
-    (state.posZ || 0) + pos[2]
+    (state.posX || 0) + (pos ? pos[0] : 0),
+    (state.posY || 0) + (pos ? pos[1] : 0),
+    (state.posZ || 0) + (pos ? pos[2] : 0)
   );
   textMesh.rotation.set(
-    THREE.MathUtils.degToRad(state.rotX) + rot[0],
-    THREE.MathUtils.degToRad(state.rotY) + rot[1],
-    THREE.MathUtils.degToRad(state.rotZ) + rot[2]
+    THREE.MathUtils.degToRad(state.rotX) + (rot ? rot[0] : 0),
+    THREE.MathUtils.degToRad(state.rotY) + (rot ? rot[1] : 0),
+    THREE.MathUtils.degToRad(state.rotZ) + (rot ? rot[2] : 0)
   );
 
-  const s = Math.max(0, scaleMul);
+  const s = Math.max(0, scaleMul !== undefined ? scaleMul : 1);
   textMesh.scale.set(s, s, s);
 
   const baseOpacity = getBaseOpacity();
-  const finalOpacity = Math.min(1, Math.max(0, opacityMul)) * baseOpacity;
+  const rawOp = opacityMul !== undefined ? opacityMul : 1;
+  const finalOpacity = Math.min(1, Math.max(0, rawOp)) * baseOpacity;
+
+  // Visibility toggle for complete fade-out / fade-in
+  textMesh.visible = finalOpacity > 0.005;
+
+  const baseNeonIntensity = state.materialType === 'neon' ? (state.neonIntensity || 0.8) * 0.45 : 0.5;
+
   textMesh.traverse((child) => {
     if (child.isMesh && child.material) {
       const materials = Array.isArray(child.material) ? child.material : [child.material];
       materials.forEach((m) => {
         m.transparent = true;
         m.opacity = finalOpacity;
+        if (emissiveMul !== undefined && m.emissive) {
+          m.emissiveIntensity = baseNeonIntensity * emissiveMul;
+        }
       });
     }
   });
@@ -3982,20 +3990,21 @@ function applyPresetOffset(preset, t) {
 
 function resetMeshToBaseTransform() {
   if (!textMesh) return;
+  textMesh.visible = true;
   applyPosition();
   textMesh.scale.set(1, 1, 1);
   applyRotation();
   const baseOpacity = getBaseOpacity();
+  const baseNeonIntensity = state.materialType === 'neon' ? (state.neonIntensity || 0.8) * 0.45 : 0;
   textMesh.traverse((child) => {
     if (child.isMesh && child.material) {
       const materials = Array.isArray(child.material) ? child.material : [child.material];
       materials.forEach((m) => {
-        // Canvas-card front/back faces (identified by having a `.map`) rely
-        // on alphaTest to cut out the background, so they must always stay
-        // transparent — unlike vector-mode/side materials, which are only
-        // transparent for the glass preset.
         m.transparent = m.map ? true : state.materialType === 'glass';
         m.opacity = baseOpacity;
+        if (m.emissive) {
+          m.emissiveIntensity = baseNeonIntensity;
+        }
       });
     }
   });
