@@ -173,4 +173,121 @@ export const ANIMATION_PRESETS = {
       return { pos: [0, fall, 0], rot: [0, 0, 0], scaleMul: 1 + squash, opacityMul: 1 };
     },
   },
+
+  // ---- Video Editor থেকে যোগ করা — Entry/Exit ----
+
+  slideUp: {
+    // Slides in from below upward — the mirror of dropIn (which comes from above).
+    label: 'Slide Up (নিচ থেকে উপরে)',
+    apply: (t) => ({ pos: [0, -220 * (1 - t), 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: t }),
+  },
+  slideDown: {
+    // Slides in from above downward — the mirror of riseUp.
+    label: 'Slide Down (উপর থেকে নিচে)',
+    apply: (t) => ({ pos: [0, 220 * (1 - t), 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: t }),
+  },
+  zoomOut: {
+    // Starts tiny (far away) and grows to fill — opposite of zoomBlast.
+    label: 'Zoom Out (ছোট থেকে বড়)',
+    apply: (t) => ({ pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 0.05 + 0.95 * t, opacityMul: t }),
+  },
+  zoomPop: {
+    // Quickly overshoot to 1.25× then settle — "snap in" energy. Keeps the
+    // t=1 contract: at t=1 the overshoot term is 0 (sin(π)=0) so scaleMul=1.
+    label: 'Zoom Pop (হঠাৎ পপ করে আসবে)',
+    apply: (t) => {
+      const overshoot = t < 1 ? Math.sin(t * Math.PI) * 0.3 * (1 - t) : 0;
+      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: t + overshoot, opacityMul: Math.min(1, t * 2) };
+    },
+  },
+  glitch: {
+    // Cyber-glitch: random-looking positional jitter + opacity flicker.
+    // Uses deterministic sin harmonics so it's reproducible frame-to-frame
+    // at a given `t` value (needed for export). Settles cleanly at t=1.
+    label: '⚡ Cyber Glitch (সাইবার গ্লিচ)',
+    apply: (t) => {
+      const decay = Math.max(0, 1 - t);
+      const jx = (Math.sin(t * 47.3) * 0.5 + Math.sin(t * 113.7) * 0.5) * decay * 18;
+      const jy = (Math.sin(t * 61.1) * 0.5 + Math.sin(t * 89.3) * 0.5) * decay * 12;
+      const flicker = t < 0.8 ? 0.5 + 0.5 * Math.abs(Math.sin(t * 60)) : 1;
+      return { pos: [jx, jy, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: flicker };
+    },
+  },
+  dvdBounce: {
+    // Screen-edge bounce: the text travels a diagonal path across the 3D
+    // space and reverses direction at each wall (like the classic DVD logo).
+    // At t=1 it returns to the origin — satisfies the neutral contract.
+    label: '🎯 Screen Bounce (স্ক্রিন জুড়ে বাউন্স)',
+    apply: (t) => {
+      // Full round-trip in X and Y using absolute-value "bounce" waves.
+      const cycles = 2;
+      const xWave = Math.abs(Math.sin(t * Math.PI * cycles)) * 180;
+      const yWave = Math.abs(Math.cos(t * Math.PI * cycles * 0.7)) * 120;
+      // Return to origin at t=1: multiply by (1-t)^0.1 to keep motion most
+      // of the way and only snap home in the last few percent.
+      const taper = t < 1 ? Math.pow(1 - t, 0.08) : 0;
+      return { pos: [xWave * taper, yWave * taper, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: 1 };
+    },
+  },
+
+  // ---- Continuous / Loop অ্যানিমেশন (Video Editor থেকে) ----
+  // These are designed to be played with loop=true. Each `apply(t)` describes
+  // one cycle (0→1), so looping re-enters cleanly at t=0. The `continuous`
+  // flag tells main.js to treat them as looping idle effects by default and
+  // to use a linear easing (so the cycle feels steady, not eased in/out).
+
+  pulse: {
+    label: 'Pulse (স্পন্দন)',
+    continuous: true,
+    apply: (t) => {
+      const scale = 1 + Math.sin(t * Math.PI * 2) * 0.12;
+      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: scale, opacityMul: 1 };
+    },
+  },
+  float: {
+    label: 'Float (ভাসমান)',
+    continuous: true,
+    apply: (t) => {
+      const y = Math.sin(t * Math.PI * 2) * 18;
+      return { pos: [0, y, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: 1 };
+    },
+  },
+  glowPulse: {
+    label: 'Glow Pulse (জ্বলা-নেভা)',
+    continuous: true,
+    apply: (t) => {
+      // Opacity breathes between 0.45 and 1 once per cycle.
+      const opacity = 0.45 + 0.55 * ((Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) / 2);
+      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: opacity };
+    },
+  },
+  breathe: {
+    label: '🫁 Breathe (শ্বাস-প্রশ্বাস)',
+    continuous: true,
+    apply: (t) => {
+      // Very subtle scale drift — like a slow inhale/exhale. Range: 0.96–1.04.
+      const scale = 1 + Math.sin(t * Math.PI * 2) * 0.04;
+      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: scale, opacityMul: 1 };
+    },
+  },
+  neonFlash: {
+    label: '💡 Neon Spark (নিয়ন স্পার্ক/ফ্লাশ)',
+    continuous: true,
+    apply: (t) => {
+      // Rapid flicker: two fast pulses per cycle separated by a rest phase.
+      const phase = (t * 4) % 1; // 4 sub-pulses per cycle
+      const flicker = phase < 0.15 ? 0.2 + 0.8 * (phase / 0.15) : 1;
+      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: flicker };
+    },
+  },
+  shineSweep: {
+    label: '🌟 Shine Sweep (মেটালিক গ্লো)',
+    continuous: true,
+    apply: (t) => {
+      // Gentle scale surge that sweeps across once per cycle — mimics a
+      // metallic highlight moving over the surface.
+      const surge = 1 + Math.pow(Math.sin(t * Math.PI), 2) * 0.08;
+      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: surge, opacityMul: 1 };
+    },
+  },
 };

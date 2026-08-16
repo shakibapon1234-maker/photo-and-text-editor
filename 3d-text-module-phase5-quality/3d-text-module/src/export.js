@@ -186,7 +186,9 @@ export async function exportPngSequence(deps, opts, callbacks = {}) {
   const zip = new deps.JSZip();
   const pad = String(frameCount).length;
   const preset = deps.ANIMATION_PRESETS[opts.presetId] || deps.ANIMATION_PRESETS.none;
-  const easingFn = deps.EASINGS[opts.easing] || deps.EASINGS.linear;
+  const easingFn = preset.continuous
+    ? deps.EASINGS.linear
+    : (deps.EASINGS[opts.easing] || deps.EASINGS.linear);
   const baseRotYRad = (deps.state.rotY * Math.PI) / 180;
 
   for (let i = 0; i < frameCount; i++) {
@@ -266,7 +268,9 @@ export async function exportGif(deps, opts, callbacks = {}) {
   const frameCount = estimateGifFrameCount(totalMs, opts.fps, isAnimated || isTurntable);
 
   const preset = deps.ANIMATION_PRESETS[opts.presetId] || deps.ANIMATION_PRESETS.none;
-  const easingFn = deps.EASINGS[opts.easing] || deps.EASINGS.linear;
+  const easingFn = preset.continuous
+    ? deps.EASINGS.linear
+    : (deps.EASINGS[opts.easing] || deps.EASINGS.linear);
   const baseRotYRad = (deps.state.rotY * Math.PI) / 180;
 
   // Chroma-key backing color for hard-edge transparency (see file-header

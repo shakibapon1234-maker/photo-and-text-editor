@@ -25508,6 +25508,111 @@ var ANIMATION_PRESETS = {
       const squash = t >= 1 ? 0 : Math.sin(landPhase * Math.PI) * 0.25;
       return { pos: [0, fall, 0], rot: [0, 0, 0], scaleMul: 1 + squash, opacityMul: 1 };
     }
+  },
+  // ---- Video Editor থেকে যোগ করা — Entry/Exit ----
+  slideUp: {
+    // Slides in from below upward — the mirror of dropIn (which comes from above).
+    label: "Slide Up (\u09A8\u09BF\u099A \u09A5\u09C7\u0995\u09C7 \u0989\u09AA\u09B0\u09C7)",
+    apply: (t) => ({ pos: [0, -220 * (1 - t), 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: t })
+  },
+  slideDown: {
+    // Slides in from above downward — the mirror of riseUp.
+    label: "Slide Down (\u0989\u09AA\u09B0 \u09A5\u09C7\u0995\u09C7 \u09A8\u09BF\u099A\u09C7)",
+    apply: (t) => ({ pos: [0, 220 * (1 - t), 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: t })
+  },
+  zoomOut: {
+    // Starts tiny (far away) and grows to fill — opposite of zoomBlast.
+    label: "Zoom Out (\u099B\u09CB\u099F \u09A5\u09C7\u0995\u09C7 \u09AC\u09A1\u09BC)",
+    apply: (t) => ({ pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 0.05 + 0.95 * t, opacityMul: t })
+  },
+  zoomPop: {
+    // Quickly overshoot to 1.25× then settle — "snap in" energy. Keeps the
+    // t=1 contract: at t=1 the overshoot term is 0 (sin(π)=0) so scaleMul=1.
+    label: "Zoom Pop (\u09B9\u09A0\u09BE\u09CE \u09AA\u09AA \u0995\u09B0\u09C7 \u0986\u09B8\u09AC\u09C7)",
+    apply: (t) => {
+      const overshoot = t < 1 ? Math.sin(t * Math.PI) * 0.3 * (1 - t) : 0;
+      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: t + overshoot, opacityMul: Math.min(1, t * 2) };
+    }
+  },
+  glitch: {
+    // Cyber-glitch: random-looking positional jitter + opacity flicker.
+    // Uses deterministic sin harmonics so it's reproducible frame-to-frame
+    // at a given `t` value (needed for export). Settles cleanly at t=1.
+    label: "\u26A1 Cyber Glitch (\u09B8\u09BE\u0987\u09AC\u09BE\u09B0 \u0997\u09CD\u09B2\u09BF\u099A)",
+    apply: (t) => {
+      const decay = Math.max(0, 1 - t);
+      const jx = (Math.sin(t * 47.3) * 0.5 + Math.sin(t * 113.7) * 0.5) * decay * 18;
+      const jy = (Math.sin(t * 61.1) * 0.5 + Math.sin(t * 89.3) * 0.5) * decay * 12;
+      const flicker = t < 0.8 ? 0.5 + 0.5 * Math.abs(Math.sin(t * 60)) : 1;
+      return { pos: [jx, jy, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: flicker };
+    }
+  },
+  dvdBounce: {
+    // Screen-edge bounce: the text travels a diagonal path across the 3D
+    // space and reverses direction at each wall (like the classic DVD logo).
+    // At t=1 it returns to the origin — satisfies the neutral contract.
+    label: "\u{1F3AF} Screen Bounce (\u09B8\u09CD\u0995\u09CD\u09B0\u09BF\u09A8 \u099C\u09C1\u09A1\u09BC\u09C7 \u09AC\u09BE\u0989\u09A8\u09CD\u09B8)",
+    apply: (t) => {
+      const cycles = 2;
+      const xWave = Math.abs(Math.sin(t * Math.PI * cycles)) * 180;
+      const yWave = Math.abs(Math.cos(t * Math.PI * cycles * 0.7)) * 120;
+      const taper = t < 1 ? Math.pow(1 - t, 0.08) : 0;
+      return { pos: [xWave * taper, yWave * taper, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: 1 };
+    }
+  },
+  // ---- Continuous / Loop অ্যানিমেশন (Video Editor থেকে) ----
+  // These are designed to be played with loop=true. Each `apply(t)` describes
+  // one cycle (0→1), so looping re-enters cleanly at t=0. The `continuous`
+  // flag tells main.js to treat them as looping idle effects by default and
+  // to use a linear easing (so the cycle feels steady, not eased in/out).
+  pulse: {
+    label: "Pulse (\u09B8\u09CD\u09AA\u09A8\u09CD\u09A6\u09A8)",
+    continuous: true,
+    apply: (t) => {
+      const scale = 1 + Math.sin(t * Math.PI * 2) * 0.12;
+      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: scale, opacityMul: 1 };
+    }
+  },
+  float: {
+    label: "Float (\u09AD\u09BE\u09B8\u09AE\u09BE\u09A8)",
+    continuous: true,
+    apply: (t) => {
+      const y = Math.sin(t * Math.PI * 2) * 18;
+      return { pos: [0, y, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: 1 };
+    }
+  },
+  glowPulse: {
+    label: "Glow Pulse (\u099C\u09CD\u09AC\u09B2\u09BE-\u09A8\u09C7\u09AD\u09BE)",
+    continuous: true,
+    apply: (t) => {
+      const opacity = 0.45 + 0.55 * ((Math.sin(t * Math.PI * 2 - Math.PI / 2) + 1) / 2);
+      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: opacity };
+    }
+  },
+  breathe: {
+    label: "\u{1FAC1} Breathe (\u09B6\u09CD\u09AC\u09BE\u09B8-\u09AA\u09CD\u09B0\u09B6\u09CD\u09AC\u09BE\u09B8)",
+    continuous: true,
+    apply: (t) => {
+      const scale = 1 + Math.sin(t * Math.PI * 2) * 0.04;
+      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: scale, opacityMul: 1 };
+    }
+  },
+  neonFlash: {
+    label: "\u{1F4A1} Neon Spark (\u09A8\u09BF\u09AF\u09BC\u09A8 \u09B8\u09CD\u09AA\u09BE\u09B0\u09CD\u0995/\u09AB\u09CD\u09B2\u09BE\u09B6)",
+    continuous: true,
+    apply: (t) => {
+      const phase = t * 4 % 1;
+      const flicker = phase < 0.15 ? 0.2 + 0.8 * (phase / 0.15) : 1;
+      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: flicker };
+    }
+  },
+  shineSweep: {
+    label: "\u{1F31F} Shine Sweep (\u09AE\u09C7\u099F\u09BE\u09B2\u09BF\u0995 \u0997\u09CD\u09B2\u09CB)",
+    continuous: true,
+    apply: (t) => {
+      const surge = 1 + Math.pow(Math.sin(t * Math.PI), 2) * 0.08;
+      return { pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: surge, opacityMul: 1 };
+    }
   }
 };
 
@@ -25602,7 +25707,7 @@ async function exportPngSequence(deps, opts, callbacks = {}) {
   const zip = new deps.JSZip();
   const pad = String(frameCount).length;
   const preset = deps.ANIMATION_PRESETS[opts.presetId] || deps.ANIMATION_PRESETS.none;
-  const easingFn = deps.EASINGS[opts.easing] || deps.EASINGS.linear;
+  const easingFn = preset.continuous ? deps.EASINGS.linear : deps.EASINGS[opts.easing] || deps.EASINGS.linear;
   const baseRotYRad = deps.state.rotY * Math.PI / 180;
   for (let i = 0; i < frameCount; i++) {
     const tMs = frameCount > 1 ? i / (frameCount - 1) * totalMs : totalMs;
@@ -25648,7 +25753,7 @@ async function exportGif(deps, opts, callbacks = {}) {
   const totalMs = isAnimated ? opts.durationMs + opts.delayMs : opts.noPresetDurationMs;
   const frameCount = estimateGifFrameCount(totalMs, opts.fps, isAnimated || isTurntable);
   const preset = deps.ANIMATION_PRESETS[opts.presetId] || deps.ANIMATION_PRESETS.none;
-  const easingFn = deps.EASINGS[opts.easing] || deps.EASINGS.linear;
+  const easingFn = preset.continuous ? deps.EASINGS.linear : deps.EASINGS[opts.easing] || deps.EASINGS.linear;
   const baseRotYRad = deps.state.rotY * Math.PI / 180;
   const KEY_COLOR = "#ff00fe";
   const KEY_COLOR_NUM = 16711934;
@@ -26289,14 +26394,16 @@ function buildMaterial(type, colorHex) {
         depthWrite: true
       });
     case "neon": {
+      const rawIntensity = typeof state.neonIntensity === "number" ? state.neonIntensity : 0.8;
+      const intensity = Math.max(0.1, Math.min(2.5, rawIntensity)) * 0.45;
       const mat = new MeshPhysicalMaterial({
         color,
-        roughness: 0.08,
-        metalness: 0.1,
+        roughness: 0.22,
+        metalness: 0.15,
         emissive: color,
-        emissiveIntensity: state.neonIntensity,
-        clearcoat: 1,
-        clearcoatRoughness: 0.05,
+        emissiveIntensity: intensity,
+        clearcoat: 0.85,
+        clearcoatRoughness: 0.1,
         envMapIntensity: refIntensity * 0.5
       });
       return mat;
@@ -28087,6 +28194,238 @@ function drawRedTilesBackground(ctx, w, h, text) {
   }
   ctx.restore();
 }
+function drawCyberCutBackground(ctx, w, h, color) {
+  ctx.save();
+  const pad = 6;
+  const cut = Math.min(24, Math.min(w, h) * 0.22);
+  const x = pad, y = pad, bw = w - pad * 2, bh = h - pad * 2;
+  function makeCutPath() {
+    ctx.beginPath();
+    ctx.moveTo(x + cut, y);
+    ctx.lineTo(x + bw, y);
+    ctx.lineTo(x + bw, y + bh - cut);
+    ctx.lineTo(x + bw - cut, y + bh);
+    ctx.lineTo(x, y + bh);
+    ctx.lineTo(x, y + cut);
+    ctx.closePath();
+  }
+  ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
+  makeCutPath();
+  ctx.fill();
+  ctx.strokeStyle = color || "#00f0ff";
+  ctx.lineWidth = 3;
+  makeCutPath();
+  ctx.stroke();
+  ctx.fillStyle = "#fde047";
+  ctx.fillRect(x + bw - 16, y, 16, 3);
+  ctx.fillRect(x, y + bh - 3, 16, 3);
+  ctx.restore();
+}
+function drawShimmerBorderBackground(ctx, w, h, color) {
+  ctx.save();
+  const r = Math.min(16, Math.min(w, h) * 0.2);
+  ctx.fillStyle = "rgba(20, 24, 33, 0.85)";
+  drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, r);
+  ctx.fill();
+  const shimmer = ctx.createLinearGradient(0, 0, w, h);
+  shimmer.addColorStop(0, "#38bdf8");
+  shimmer.addColorStop(0.3, color || "#ec4899");
+  shimmer.addColorStop(0.7, "#fbbf24");
+  shimmer.addColorStop(1, "#a855f7");
+  ctx.shadowColor = color || "#ec4899";
+  ctx.shadowBlur = 12;
+  ctx.strokeStyle = shimmer;
+  ctx.lineWidth = 3.5;
+  drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, r);
+  ctx.stroke();
+  ctx.restore();
+}
+function drawBracketFrameBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.fillStyle = "rgba(10, 15, 26, 0.7)";
+  ctx.fillRect(8, 8, w - 16, h - 16);
+  const bColor = color || "#38bdf8";
+  ctx.strokeStyle = bColor;
+  ctx.lineWidth = 3.5;
+  ctx.shadowColor = bColor;
+  ctx.shadowBlur = 8;
+  const bLen = Math.min(26, Math.min(w, h) * 0.35);
+  ctx.beginPath();
+  ctx.moveTo(6, 6 + bLen);
+  ctx.lineTo(6, 6);
+  ctx.lineTo(6 + bLen, 6);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(w - 6 - bLen, 6);
+  ctx.lineTo(w - 6, 6);
+  ctx.lineTo(w - 6, 6 + bLen);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(6, h - 6 - bLen);
+  ctx.lineTo(6, h - 6);
+  ctx.lineTo(6 + bLen, h - 6);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(w - 6 - bLen, h - 6);
+  ctx.lineTo(w - 6, h - 6);
+  ctx.lineTo(w - 6, h - 6 - bLen);
+  ctx.stroke();
+  ctx.restore();
+}
+function drawDoubleBorderBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.fillStyle = color || "#1e1b4b";
+  drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, 8);
+  ctx.fill();
+  ctx.strokeStyle = "#f8fafc";
+  ctx.lineWidth = 3;
+  drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, 8);
+  ctx.stroke();
+  ctx.strokeStyle = "#f59e0b";
+  ctx.lineWidth = 1.5;
+  drawRoundedRectPath(ctx, 10, 10, w - 20, h - 20, 5);
+  ctx.stroke();
+  ctx.restore();
+}
+function drawMarkerBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = color || "#facc15";
+  ctx.beginPath();
+  ctx.moveTo(w * 0.02, h * 0.18);
+  ctx.lineTo(w * 0.98, h * 0.12);
+  ctx.lineTo(w * 0.96, h * 0.88);
+  ctx.lineTo(w * 0.04, h * 0.92);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+function drawTornPaperBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.fillStyle = color || "#fef08a";
+  ctx.shadowColor = "rgba(0,0,0,0.3)";
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 4;
+  ctx.beginPath();
+  ctx.moveTo(8, 12);
+  const steps = 14;
+  for (let i = 0; i <= steps; i++) {
+    const px2 = 8 + i / steps * (w - 16);
+    const py2 = 10 + (i % 2 === 0 ? -3 : 3);
+    ctx.lineTo(px2, py2);
+  }
+  ctx.lineTo(w - 6, h - 12);
+  for (let i = steps; i >= 0; i--) {
+    const px2 = 8 + i / steps * (w - 16);
+    const py2 = h - 10 + (i % 2 === 0 ? 3 : -3);
+    ctx.lineTo(px2, py2);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+function drawPlaneBannerBackground(ctx, w, h, color) {
+  ctx.save();
+  const halfH = h / 2;
+  const pw = w * 0.18;
+  const planeX = w - pw - 6;
+  ctx.fillStyle = color || "#3b82f6";
+  ctx.beginPath();
+  ctx.moveTo(8, 10);
+  ctx.lineTo(planeX - 12, 10);
+  ctx.lineTo(planeX - 12, h - 10);
+  ctx.lineTo(8, h - 10);
+  ctx.lineTo(18, halfH);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#ef4444";
+  ctx.beginPath();
+  ctx.moveTo(planeX, halfH);
+  ctx.lineTo(planeX + pw * 0.6, halfH - 12);
+  ctx.lineTo(planeX + pw, halfH);
+  ctx.lineTo(planeX + pw * 0.6, halfH + 12);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.7)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(planeX - 12, halfH);
+  ctx.lineTo(planeX, halfH);
+  ctx.stroke();
+  ctx.restore();
+}
+function drawRunningBorderBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.fillStyle = "rgba(15, 23, 42, 0.82)";
+  drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, 10);
+  ctx.fill();
+  const neonColor = color || "#22c55e";
+  ctx.shadowColor = neonColor;
+  ctx.shadowBlur = 16;
+  ctx.strokeStyle = neonColor;
+  ctx.lineWidth = 3.5;
+  drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, 10);
+  ctx.stroke();
+  ctx.restore();
+}
+function drawScrollBannerBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.fillStyle = color || "#fef3c7";
+  const curlW = Math.min(22, w * 0.12);
+  ctx.fillRect(curlW, 8, w - curlW * 2, h - 16);
+  ctx.fillStyle = "#d97706";
+  ctx.beginPath();
+  ctx.ellipse(curlW, h / 2, curlW * 0.8, h / 2 - 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(w - curlW, h / 2, curlW * 0.8, h / 2 - 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+function drawSixPointStarBackground(ctx, w, h, color) {
+  ctx.save();
+  const cx = w / 2, cy = h / 2;
+  const rOuter = Math.min(w, h) * 0.48;
+  const rInner = rOuter * 0.58;
+  ctx.fillStyle = color || "#eab308";
+  drawStarPolygonPath(ctx, cx, cy, rOuter, rInner, 6);
+  ctx.fill();
+  ctx.strokeStyle = "#ca8a04";
+  ctx.lineWidth = 3;
+  drawStarPolygonPath(ctx, cx, cy, rOuter, rInner, 6);
+  ctx.stroke();
+  ctx.restore();
+}
+function drawBadgeDotBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.fillStyle = color || "#334155";
+  drawRoundedRectPath(ctx, 6, 6, w - 12, h - 12, Math.min(w, h) * 0.25);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.lineWidth = 2;
+  drawRoundedRectPath(ctx, 6, 6, w - 12, h - 12, Math.min(w, h) * 0.25);
+  ctx.stroke();
+  const dotR = Math.max(6, Math.min(w, h) * 0.09);
+  ctx.shadowColor = "#ef4444";
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = "#ef4444";
+  ctx.beginPath();
+  ctx.arc(w - 14, 14, dotR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+function drawGlowAuraBackground(ctx, w, h, color) {
+  ctx.save();
+  const cx = w / 2, cy = h / 2;
+  const auraGrad = ctx.createRadialGradient(cx, cy, Math.min(w, h) * 0.1, cx, cy, Math.max(w, h) * 0.52);
+  auraGrad.addColorStop(0, color || "#6366f1");
+  auraGrad.addColorStop(0.7, "rgba(99, 102, 241, 0.35)");
+  auraGrad.addColorStop(1, "rgba(99, 102, 241, 0)");
+  ctx.fillStyle = auraGrad;
+  drawRoundedRectPath(ctx, 0, 0, w, h, 16);
+  ctx.fill();
+  ctx.restore();
+}
 function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, borderColor = "#ffffff", shadow = false) {
   const cx = w / 2;
   const cy = bodyH / 2;
@@ -28225,6 +28564,43 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
       ctx.stroke();
       break;
     }
+    // ---- Video Editor থেকে যুক্ত করা ১২টি টেক্সট বক্স ও ব্যাজ ----
+    case "cyberCut":
+      drawCyberCutBackground(ctx, w, bodyH, color);
+      break;
+    case "shimmerBorder":
+      drawShimmerBorderBackground(ctx, w, bodyH, color);
+      break;
+    case "bracketFrame":
+      drawBracketFrameBackground(ctx, w, bodyH, color);
+      break;
+    case "doubleBorder":
+      drawDoubleBorderBackground(ctx, w, bodyH, color);
+      break;
+    case "marker":
+      drawMarkerBackground(ctx, w, bodyH, color);
+      break;
+    case "tornPaper":
+      drawTornPaperBackground(ctx, w, bodyH, color);
+      break;
+    case "planeBanner":
+      drawPlaneBannerBackground(ctx, w, bodyH, color);
+      break;
+    case "runningBorder":
+      drawRunningBorderBackground(ctx, w, bodyH, color);
+      break;
+    case "scrollBanner":
+      drawScrollBannerBackground(ctx, w, bodyH, color);
+      break;
+    case "sixPointStar":
+      drawSixPointStarBackground(ctx, w, bodyH, color);
+      break;
+    case "badgeDot":
+      drawBadgeDotBackground(ctx, w, bodyH, color);
+      break;
+    case "glowAura":
+      drawGlowAuraBackground(ctx, w, bodyH, color);
+      break;
     case "circle":
     default:
       ctx.beginPath();
@@ -28293,7 +28669,25 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
       case "roundedRect":
       case "letterBlocks":
       case "letterContour":
+      case "cyberCut":
+      case "shimmerBorder":
+      case "bracketFrame":
+      case "doubleBorder":
+      case "runningBorder":
+      case "badgeDot":
+      case "scrollBanner":
         drawRoundedRectPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.16);
+        ctx.stroke();
+        break;
+      case "marker":
+      case "tornPaper":
+      case "planeBanner":
+      case "glowAura":
+        drawRoundedRectPath(ctx, 2, 2, w - 4, bodyH - 4, 12);
+        ctx.stroke();
+        break;
+      case "sixPointStar":
+        drawStarPolygonPath(ctx, cx, cy, w / 2 * 0.95, bodyH / 2 * 0.58, 6);
         ctx.stroke();
         break;
       case "starburst":
@@ -28887,9 +29281,9 @@ function tickAnimation(now) {
   let rawT = animState.durationMs > 0 ? elapsed / animState.durationMs : 1;
   if (rawT >= 1) {
     if (animState.loop) {
-      animState.startTime = now;
+      animState.startTime = preset.continuous ? now - animState.delayMs : now;
       applyPresetOffset(preset, 0);
-      updateProgressUI(0, "\u09B2\u09C1\u09AA \u099A\u09B2\u099B\u09C7\u2026");
+      updateProgressUI(0, preset.continuous ? "\u099A\u09B2\u099B\u09C7\u2026 (\u09B2\u09C1\u09AA)" : "\u09B2\u09C1\u09AA \u099A\u09B2\u099B\u09C7\u2026");
       return;
     }
     applyPresetOffset(preset, 1);
@@ -28898,9 +29292,9 @@ function tickAnimation(now) {
     animPlayBtn.textContent = "\u09AA\u09CD\u09B2\u09C7";
     return;
   }
-  const easingFn = EASINGS[animState.easing] || EASINGS.linear;
+  const easingFn = preset.continuous ? EASINGS.linear : EASINGS[animState.easing] || EASINGS.linear;
   applyPresetOffset(preset, easingFn(rawT));
-  updateProgressUI(rawT, "\u09AA\u09CD\u09B2\u09C7 \u09B9\u099A\u09CD\u099B\u09C7\u2026");
+  updateProgressUI(rawT, animState.loop && preset.continuous ? "\u099A\u09B2\u099B\u09C7\u2026 (\u09B2\u09C1\u09AA)" : "\u09AA\u09CD\u09B2\u09C7 \u09B9\u099A\u09CD\u099B\u09C7\u2026");
 }
 function setActivePreset(grid, datasetKey, value) {
   for (const btn of grid.querySelectorAll(".preset-btn")) {
@@ -28991,6 +29385,12 @@ contentModeGrid.addEventListener("click", (e) => {
   imageContentSection.hidden = state.contentMode !== "image";
   stickerContentSection.hidden = state.contentMode !== "sticker";
   if (cubeContentSection) cubeContentSection.hidden = state.contentMode !== "cube";
+  const activeSec = state.contentMode === "text" ? textContentSection : state.contentMode === "image" ? imageContentSection : state.contentMode === "sticker" ? stickerContentSection : state.contentMode === "cube" ? cubeContentSection : null;
+  if (activeSec) {
+    activeSec.classList.remove("collapsed");
+    const arrow = activeSec.querySelector(".accordion-arrow");
+    if (arrow) arrow.textContent = "\u25BC";
+  }
   curveSection.hidden = state.contentMode === "image" || state.contentMode === "cube";
   stopAnimation();
   rebuildTextMesh();
@@ -29935,7 +30335,25 @@ animPresetGrid.addEventListener("click", (e) => {
   setActivePreset(animPresetGrid, "anim", animState.presetId);
   const isNone = animState.presetId === "none";
   animPlayBtn.disabled = isNone;
-  if (isNone) stopAnimation();
+  if (isNone) {
+    stopAnimation();
+    updateExportSourceNote();
+    saveStudioStateDebounced();
+    return;
+  }
+  const selectedPreset = ANIMATION_PRESETS[animState.presetId];
+  if (selectedPreset && selectedPreset.continuous) {
+    animState.loop = true;
+    if (animLoopToggle) animLoopToggle.checked = true;
+    if (animState.durationMs < 1e3) {
+      animState.durationMs = 2e3;
+      animDurationRange.value = 2e3;
+      animDurationValue.textContent = "2.0s";
+    }
+    animState.easing = "linear";
+    if (animEasingSelect) animEasingSelect.value = "linear";
+  }
+  playAnimation();
   updateExportSourceNote();
   saveStudioStateDebounced();
 });
@@ -30301,6 +30719,28 @@ if (bgFileInput) {
     reader.readAsDataURL(file);
   });
 }
+function initPanelAccordion() {
+  const sections = document.querySelectorAll(".panel .panel-section");
+  sections.forEach((sec) => {
+    const h3 = sec.querySelector("h3");
+    if (!h3) return;
+    if (!h3.querySelector(".accordion-arrow")) {
+      const arrow = document.createElement("span");
+      arrow.className = "accordion-arrow";
+      arrow.textContent = "\u25BC";
+      h3.appendChild(arrow);
+    }
+    h3.addEventListener("click", (e) => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "BUTTON" || e.target.tagName === "SELECT") return;
+      sec.classList.toggle("collapsed");
+      const arrow = h3.querySelector(".accordion-arrow");
+      if (arrow) {
+        arrow.textContent = sec.classList.contains("collapsed") ? "\u25C0" : "\u25BC";
+      }
+    });
+  });
+}
+initPanelAccordion();
 loadStudioState();
 setActivePreset(contentModeGrid, "content", state.contentMode);
 setActivePreset(curveDirectionGrid, "curveDirection", state.curveDirection);

@@ -108,7 +108,7 @@
         <img id="imagePreviewThumb" class="image-preview-thumb" alt="প্রিভিউ" hidden />
         <p class="field-note" id="imageNote">এখনো কোনো ছবি নির্বাচন করা হয়নি।</p>
 
-        <h3 style="margin-top:14px;">পিকচার স্টাইল (Word-এর মতো ফ্রেম)</h3>
+        <h3>পিকচার স্টাইল (Word-এর মতো ফ্রেম)</h3>
         <div class="preset-grid" id="pictureStyleGrid">
           <button type="button" class="preset-btn active" data-picture-style="none">কোনো ফ্রেম না</button>
           <button type="button" class="preset-btn" data-picture-style="simpleWhite">সাদা বর্ডার</button>
@@ -177,7 +177,7 @@
           </label>
         </div>
 
-        <h3 style="margin-top:14px;">ব্যাজ শেপ</h3>
+        <h3>ব্যাজ শেপ</h3>
         <div class="preset-grid" id="stickerShapeGrid">
           <button type="button" class="preset-btn" data-sticker-shape="letterContour">🏆 লেটার আউটলাইন শেপ (Letter Contour)</button>
           <button type="button" class="preset-btn active" data-sticker-shape="circle">গোল স্টিকার (Peeled)</button>
@@ -204,6 +204,19 @@
           <button type="button" class="preset-btn" data-sticker-shape="woodenBlocks">🪵 ৩D কাঠের লেটার ব্লক (Wooden Cubes)</button>
           <button type="button" class="preset-btn" data-sticker-shape="redTiles">🔲 রেড স্ক্র্যাবল টাইল ব্লক (Red Game Tiles)</button>
           <button type="button" class="preset-btn" data-sticker-shape="letterBlocks">3D Letter Blocks</button>
+          <!-- Video Editor থেকে যুক্ত করা ১২টি টেক্সট বক্স ও ব্যাজ -->
+          <button type="button" class="preset-btn" data-sticker-shape="cyberCut">⚡ Cyber Cut (সাইবার কাট বক্স)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="shimmerBorder">✨ Shimmer Border (শিমার গ্লো)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="bracketFrame">🎯 Corner Brackets (HUD ফ্রেম)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="doubleBorder">🖼️ Double Frame (ডাবল বর্ডার)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="marker">🖍️ Marker (হাইলাইটার মার্কার)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="tornPaper">📜 Torn Paper (ছেঁড়া কাগজ ব্যানার)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="planeBanner">✈️ Plane Banner (প্লেন ব্যানার)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="runningBorder">🟢 Running Border (ইলেকট্রিক বর্ডার)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="scrollBanner">📜 Scroll Banner (স্ক্রল ব্যানার)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="sixPointStar">⭐ 6-Point Star (৬-কোণা তারা)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="badgeDot">🔴 Alert Dot Badge (নোটিফিকেশন ডট)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="glowAura">💫 Glow Aura (সফট গ্লো বক্স)</button>
         </div>
 
         <label class="field" style="margin-top:10px;">
@@ -463,8 +476,8 @@
 
         <label class="field" id="neonIntensityField" hidden>
           <span>Glow তীব্রতা</span>
-          <input type="range" id="neonIntensityRange" min="0.5" max="4" step="0.1" value="1.8" />
-          <span class="field-value" id="neonIntensityValue">1.8</span>
+          <input type="range" id="neonIntensityRange" min="0.1" max="2.0" step="0.1" value="0.8" />
+          <span class="field-value" id="neonIntensityValue">0.8</span>
         </label>
       </section>
 
@@ -572,6 +585,20 @@
           <button type="button" class="preset-btn" data-anim="swingIn">Swing In</button>
           <button type="button" class="preset-btn" data-anim="diagonalIn">Diagonal In</button>
           <button type="button" class="preset-btn" data-anim="squashDrop">Drop In (স্কোয়াশ)</button>
+          <!-- Video Editor থেকে যোগ করা — Entry/Exit -->
+          <button type="button" class="preset-btn" data-anim="slideUp">Slide Up ⭡</button>
+          <button type="button" class="preset-btn" data-anim="slideDown">Slide Down ⭣</button>
+          <button type="button" class="preset-btn" data-anim="zoomOut">Zoom Out</button>
+          <button type="button" class="preset-btn" data-anim="zoomPop">Zoom Pop</button>
+          <button type="button" class="preset-btn" data-anim="glitch">⚡ Glitch</button>
+          <button type="button" class="preset-btn" data-anim="dvdBounce">🎯 Screen Bounce</button>
+          <!-- Video Editor থেকে যোগ করা — Continuous/Loop -->
+          <button type="button" class="preset-btn" data-anim="pulse">🔁 Pulse</button>
+          <button type="button" class="preset-btn" data-anim="float">🌊 Float</button>
+          <button type="button" class="preset-btn" data-anim="glowPulse">✨ Glow Pulse</button>
+          <button type="button" class="preset-btn" data-anim="breathe">🫁 Breathe</button>
+          <button type="button" class="preset-btn" data-anim="neonFlash">💡 Neon Flash</button>
+          <button type="button" class="preset-btn" data-anim="shineSweep">🌟 Shine Sweep</button>
         </div>
       </section>
 

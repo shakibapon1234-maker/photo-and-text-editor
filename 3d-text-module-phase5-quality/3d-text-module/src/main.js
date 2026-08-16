@@ -639,14 +639,17 @@ function buildMaterial(type, colorHex) {
       });
 
     case 'neon': {
+      // Balanced emissive so the letter contours, gradient, and 3D bevels stay sharp and legible
+      const rawIntensity = typeof state.neonIntensity === 'number' ? state.neonIntensity : 0.8;
+      const intensity = Math.max(0.1, Math.min(2.5, rawIntensity)) * 0.45;
       const mat = new THREE.MeshPhysicalMaterial({
         color: color,
-        roughness: 0.08,
-        metalness: 0.1,
+        roughness: 0.22,
+        metalness: 0.15,
         emissive: color,
-        emissiveIntensity: state.neonIntensity,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.05,
+        emissiveIntensity: intensity,
+        clearcoat: 0.85,
+        clearcoatRoughness: 0.1,
         envMapIntensity: refIntensity * 0.5,
       });
       return mat;
@@ -2788,6 +2791,277 @@ function drawRedTilesBackground(ctx, w, h, text) {
   ctx.restore();
 }
 
+// 22. Cyber Cut Box (Cyberpunk chamfered box)
+function drawCyberCutBackground(ctx, w, h, color) {
+  ctx.save();
+  const pad = 6;
+  const cut = Math.min(24, Math.min(w, h) * 0.22);
+  const x = pad, y = pad, bw = w - pad * 2, bh = h - pad * 2;
+
+  function makeCutPath() {
+    ctx.beginPath();
+    ctx.moveTo(x + cut, y);
+    ctx.lineTo(x + bw, y);
+    ctx.lineTo(x + bw, y + bh - cut);
+    ctx.lineTo(x + bw - cut, y + bh);
+    ctx.lineTo(x, y + bh);
+    ctx.lineTo(x, y + cut);
+    ctx.closePath();
+  }
+
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+  makeCutPath();
+  ctx.fill();
+
+  ctx.strokeStyle = color || '#00f0ff';
+  ctx.lineWidth = 3;
+  makeCutPath();
+  ctx.stroke();
+
+  // Tech accent corner marks
+  ctx.fillStyle = '#fde047';
+  ctx.fillRect(x + bw - 16, y, 16, 3);
+  ctx.fillRect(x, y + bh - 3, 16, 3);
+  ctx.restore();
+}
+
+// 23. Shimmer Glow Border Box
+function drawShimmerBorderBackground(ctx, w, h, color) {
+  ctx.save();
+  const r = Math.min(16, Math.min(w, h) * 0.2);
+  ctx.fillStyle = 'rgba(20, 24, 33, 0.85)';
+  drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, r);
+  ctx.fill();
+
+  const shimmer = ctx.createLinearGradient(0, 0, w, h);
+  shimmer.addColorStop(0, '#38bdf8');
+  shimmer.addColorStop(0.3, color || '#ec4899');
+  shimmer.addColorStop(0.7, '#fbbf24');
+  shimmer.addColorStop(1, '#a855f7');
+
+  ctx.shadowColor = color || '#ec4899';
+  ctx.shadowBlur = 12;
+  ctx.strokeStyle = shimmer;
+  ctx.lineWidth = 3.5;
+  drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, r);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// 24. Corner Brackets (HUD Frame)
+function drawBracketFrameBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(10, 15, 26, 0.7)';
+  ctx.fillRect(8, 8, w - 16, h - 16);
+
+  const bColor = color || '#38bdf8';
+  ctx.strokeStyle = bColor;
+  ctx.lineWidth = 3.5;
+  ctx.shadowColor = bColor;
+  ctx.shadowBlur = 8;
+  const bLen = Math.min(26, Math.min(w, h) * 0.35);
+
+  // 4 corner L-brackets
+  ctx.beginPath(); ctx.moveTo(6, 6 + bLen); ctx.lineTo(6, 6); ctx.lineTo(6 + bLen, 6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w - 6 - bLen, 6); ctx.lineTo(w - 6, 6); ctx.lineTo(w - 6, 6 + bLen); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(6, h - 6 - bLen); ctx.lineTo(6, h - 6); ctx.lineTo(6 + bLen, h - 6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(w - 6 - bLen, h - 6); ctx.lineTo(w - 6, h - 6); ctx.lineTo(w - 6, h - 6 - bLen); ctx.stroke();
+  ctx.restore();
+}
+
+// 25. Double Frame Box
+function drawDoubleBorderBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.fillStyle = color || '#1e1b4b';
+  drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, 8);
+  ctx.fill();
+
+  ctx.strokeStyle = '#f8fafc';
+  ctx.lineWidth = 3;
+  drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, 8);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 1.5;
+  drawRoundedRectPath(ctx, 10, 10, w - 20, h - 20, 5);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// 26. Highlighter Marker Stroke
+function drawMarkerBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = color || '#facc15';
+  ctx.beginPath();
+  ctx.moveTo(w * 0.02, h * 0.18);
+  ctx.lineTo(w * 0.98, h * 0.12);
+  ctx.lineTo(w * 0.96, h * 0.88);
+  ctx.lineTo(w * 0.04, h * 0.92);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// 27. Torn Paper Banner
+function drawTornPaperBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.fillStyle = color || '#fef08a';
+  ctx.shadowColor = 'rgba(0,0,0,0.3)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 4;
+
+  ctx.beginPath();
+  ctx.moveTo(8, 12);
+  const steps = 14;
+  for (let i = 0; i <= steps; i++) {
+    const px = 8 + (i / steps) * (w - 16);
+    const py = 10 + (i % 2 === 0 ? -3 : 3);
+    ctx.lineTo(px, py);
+  }
+  ctx.lineTo(w - 6, h - 12);
+  for (let i = steps; i >= 0; i--) {
+    const px = 8 + (i / steps) * (w - 16);
+    const py = h - 10 + (i % 2 === 0 ? 3 : -3);
+    ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+// 28. Airplane Banner Trail
+function drawPlaneBannerBackground(ctx, w, h, color) {
+  ctx.save();
+  const halfH = h / 2;
+  const pw = w * 0.18;
+  const planeX = w - pw - 6;
+
+  // Banner ribbon
+  ctx.fillStyle = color || '#3b82f6';
+  ctx.beginPath();
+  ctx.moveTo(8, 10);
+  ctx.lineTo(planeX - 12, 10);
+  ctx.lineTo(planeX - 12, h - 10);
+  ctx.lineTo(8, h - 10);
+  ctx.lineTo(18, halfH);
+  ctx.closePath();
+  ctx.fill();
+
+  // Airplane icon
+  ctx.fillStyle = '#ef4444';
+  ctx.beginPath();
+  ctx.moveTo(planeX, halfH);
+  ctx.lineTo(planeX + pw * 0.6, halfH - 12);
+  ctx.lineTo(planeX + pw, halfH);
+  ctx.lineTo(planeX + pw * 0.6, halfH + 12);
+  ctx.closePath();
+  ctx.fill();
+
+  // Tow cable
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(planeX - 12, halfH);
+  ctx.lineTo(planeX, halfH);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// 29. Electric Running Border Box
+function drawRunningBorderBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.82)';
+  drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, 10);
+  ctx.fill();
+
+  const neonColor = color || '#22c55e';
+  ctx.shadowColor = neonColor;
+  ctx.shadowBlur = 16;
+  ctx.strokeStyle = neonColor;
+  ctx.lineWidth = 3.5;
+  drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, 10);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// 30. Scroll Parchment Banner
+function drawScrollBannerBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.fillStyle = color || '#fef3c7';
+  const curlW = Math.min(22, w * 0.12);
+
+  ctx.fillRect(curlW, 8, w - curlW * 2, h - 16);
+
+  // Left curl
+  ctx.fillStyle = '#d97706';
+  ctx.beginPath();
+  ctx.ellipse(curlW, h / 2, curlW * 0.8, h / 2 - 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Right curl
+  ctx.beginPath();
+  ctx.ellipse(w - curlW, h / 2, curlW * 0.8, h / 2 - 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// 31. Six Point Star Badge
+function drawSixPointStarBackground(ctx, w, h, color) {
+  ctx.save();
+  const cx = w / 2, cy = h / 2;
+  const rOuter = Math.min(w, h) * 0.48;
+  const rInner = rOuter * 0.58;
+
+  ctx.fillStyle = color || '#eab308';
+  drawStarPolygonPath(ctx, cx, cy, rOuter, rInner, 6);
+  ctx.fill();
+
+  ctx.strokeStyle = '#ca8a04';
+  ctx.lineWidth = 3;
+  drawStarPolygonPath(ctx, cx, cy, rOuter, rInner, 6);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// 32. Notification Badge with Red Dot
+function drawBadgeDotBackground(ctx, w, h, color) {
+  ctx.save();
+  ctx.fillStyle = color || '#334155';
+  drawRoundedRectPath(ctx, 6, 6, w - 12, h - 12, Math.min(w, h) * 0.25);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 2;
+  drawRoundedRectPath(ctx, 6, 6, w - 12, h - 12, Math.min(w, h) * 0.25);
+  ctx.stroke();
+
+  // Pulsing Red Alert Dot
+  const dotR = Math.max(6, Math.min(w, h) * 0.09);
+  ctx.shadowColor = '#ef4444';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = '#ef4444';
+  ctx.beginPath();
+  ctx.arc(w - 14, 14, dotR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// 33. Soft Glow Aura Box
+function drawGlowAuraBackground(ctx, w, h, color) {
+  ctx.save();
+  const cx = w / 2, cy = h / 2;
+  const auraGrad = ctx.createRadialGradient(cx, cy, Math.min(w, h) * 0.1, cx, cy, Math.max(w, h) * 0.52);
+  auraGrad.addColorStop(0, color || '#6366f1');
+  auraGrad.addColorStop(0.7, 'rgba(99, 102, 241, 0.35)');
+  auraGrad.addColorStop(1, 'rgba(99, 102, 241, 0)');
+
+  ctx.fillStyle = auraGrad;
+  drawRoundedRectPath(ctx, 0, 0, w, h, 16);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, borderColor = '#ffffff', shadow = false) {
   const cx = w / 2;
   const cy = bodyH / 2;
@@ -2931,6 +3205,44 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
       ctx.stroke();
       break;
     }
+    // ---- Video Editor থেকে যুক্ত করা ১২টি টেক্সট বক্স ও ব্যাজ ----
+    case 'cyberCut':
+      drawCyberCutBackground(ctx, w, bodyH, color);
+      break;
+    case 'shimmerBorder':
+      drawShimmerBorderBackground(ctx, w, bodyH, color);
+      break;
+    case 'bracketFrame':
+      drawBracketFrameBackground(ctx, w, bodyH, color);
+      break;
+    case 'doubleBorder':
+      drawDoubleBorderBackground(ctx, w, bodyH, color);
+      break;
+    case 'marker':
+      drawMarkerBackground(ctx, w, bodyH, color);
+      break;
+    case 'tornPaper':
+      drawTornPaperBackground(ctx, w, bodyH, color);
+      break;
+    case 'planeBanner':
+      drawPlaneBannerBackground(ctx, w, bodyH, color);
+      break;
+    case 'runningBorder':
+      drawRunningBorderBackground(ctx, w, bodyH, color);
+      break;
+    case 'scrollBanner':
+      drawScrollBannerBackground(ctx, w, bodyH, color);
+      break;
+    case 'sixPointStar':
+      drawSixPointStarBackground(ctx, w, bodyH, color);
+      break;
+    case 'badgeDot':
+      drawBadgeDotBackground(ctx, w, bodyH, color);
+      break;
+    case 'glowAura':
+      drawGlowAuraBackground(ctx, w, bodyH, color);
+      break;
+
     case 'circle':
     default:
       ctx.beginPath();
@@ -3000,7 +3312,25 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
       case 'roundedRect':
       case 'letterBlocks':
       case 'letterContour':
+      case 'cyberCut':
+      case 'shimmerBorder':
+      case 'bracketFrame':
+      case 'doubleBorder':
+      case 'runningBorder':
+      case 'badgeDot':
+      case 'scrollBanner':
         drawRoundedRectPath(ctx, 0, 0, w, bodyH, Math.min(w, bodyH) * 0.16);
+        ctx.stroke();
+        break;
+      case 'marker':
+      case 'tornPaper':
+      case 'planeBanner':
+      case 'glowAura':
+        drawRoundedRectPath(ctx, 2, 2, w - 4, bodyH - 4, 12);
+        ctx.stroke();
+        break;
+      case 'sixPointStar':
+        drawStarPolygonPath(ctx, cx, cy, (w / 2) * 0.95, (bodyH / 2) * 0.58, 6);
         ctx.stroke();
         break;
       case 'starburst':
@@ -3707,9 +4037,13 @@ function tickAnimation(now) {
 
   if (rawT >= 1) {
     if (animState.loop) {
-      animState.startTime = now; // re-enter, including the delay window again
+      // For continuous presets, re-start immediately without the delay phase
+      // so the loop feels seamless (no frozen pause between cycles).
+      animState.startTime = preset.continuous
+        ? now - animState.delayMs   // skip delay on re-entry
+        : now;                       // normal: include delay window again
       applyPresetOffset(preset, 0);
-      updateProgressUI(0, 'লুপ চলছে…');
+      updateProgressUI(0, preset.continuous ? 'চলছে… (লুপ)' : 'লুপ চলছে…');
       return;
     }
     applyPresetOffset(preset, 1);
@@ -3719,9 +4053,13 @@ function tickAnimation(now) {
     return;
   }
 
-  const easingFn = EASINGS[animState.easing] || EASINGS.linear;
+  // Continuous presets use linear easing so each cycle feels steady and
+  // rhythmic — an eased-in/out cycle would feel stuttery on loop.
+  const easingFn = preset.continuous
+    ? EASINGS.linear
+    : (EASINGS[animState.easing] || EASINGS.linear);
   applyPresetOffset(preset, easingFn(rawT));
-  updateProgressUI(rawT, 'প্লে হচ্ছে…');
+  updateProgressUI(rawT, animState.loop && preset.continuous ? 'চলছে… (লুপ)' : 'প্লে হচ্ছে…');
 }
 
 // ---------- UI: preset button active-state helper ----------
@@ -3829,6 +4167,16 @@ contentModeGrid.addEventListener('click', (e) => {
   imageContentSection.hidden = state.contentMode !== 'image';
   stickerContentSection.hidden = state.contentMode !== 'sticker';
   if (cubeContentSection) cubeContentSection.hidden = state.contentMode !== 'cube';
+  // Auto-expand the active content section
+  const activeSec = state.contentMode === 'text' ? textContentSection
+    : state.contentMode === 'image' ? imageContentSection
+    : state.contentMode === 'sticker' ? stickerContentSection
+    : state.contentMode === 'cube' ? cubeContentSection : null;
+  if (activeSec) {
+    activeSec.classList.remove('collapsed');
+    const arrow = activeSec.querySelector('.accordion-arrow');
+    if (arrow) arrow.textContent = '▼';
+  }
   // PLAN_3 §3.2: curve control is shared by Text and Sticker, hidden for Image and Cube.
   curveSection.hidden = state.contentMode === 'image' || state.contentMode === 'cube';
   stopAnimation(); // switching the active object mid-playback would animate a stale mesh
@@ -4838,7 +5186,33 @@ animPresetGrid.addEventListener('click', (e) => {
   setActivePreset(animPresetGrid, 'anim', animState.presetId);
   const isNone = animState.presetId === 'none';
   animPlayBtn.disabled = isNone;
-  if (isNone) stopAnimation();
+
+  if (isNone) {
+    stopAnimation();
+    updateExportSourceNote();
+    saveStudioStateDebounced();
+    return;
+  }
+
+  // Continuous presets (pulse, float, glowPulse, etc.) work best with loop
+  // enabled and a steady cycle duration — auto-configure them on selection
+  // so the user gets an immediately usable effect.
+  const selectedPreset = ANIMATION_PRESETS[animState.presetId];
+  if (selectedPreset && selectedPreset.continuous) {
+    animState.loop = true;
+    if (animLoopToggle) animLoopToggle.checked = true;
+    if (animState.durationMs < 1000) {
+      animState.durationMs = 2000;
+      animDurationRange.value = 2000;
+      animDurationValue.textContent = '2.0s';
+    }
+    animState.easing = 'linear';
+    if (animEasingSelect) animEasingSelect.value = 'linear';
+  }
+
+  // Instantly play animation preview on screen on click!
+  playAnimation();
+
   updateExportSourceNote();
   saveStudioStateDebounced();
 });
@@ -5289,6 +5663,32 @@ if (bgFileInput) {
     reader.readAsDataURL(file);
   });
 }
+
+// ---------- Accordion Collapsible Panel Sections ----------
+function initPanelAccordion() {
+  const sections = document.querySelectorAll('.panel .panel-section');
+  sections.forEach((sec) => {
+    const h3 = sec.querySelector('h3');
+    if (!h3) return;
+
+    if (!h3.querySelector('.accordion-arrow')) {
+      const arrow = document.createElement('span');
+      arrow.className = 'accordion-arrow';
+      arrow.textContent = '▼';
+      h3.appendChild(arrow);
+    }
+
+    h3.addEventListener('click', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
+      sec.classList.toggle('collapsed');
+      const arrow = h3.querySelector('.accordion-arrow');
+      if (arrow) {
+        arrow.textContent = sec.classList.contains('collapsed') ? '◀' : '▼';
+      }
+    });
+  });
+}
+initPanelAccordion();
 
 // ---------- load saved state and initial preset UI state ----------
 loadStudioState();
