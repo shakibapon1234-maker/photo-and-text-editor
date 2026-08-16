@@ -258,15 +258,22 @@ function updateShadowFrustum() {
   const box = new THREE.Box3().setFromObject(textMesh);
   if (box.isEmpty()) return;
   const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
   const half = Math.max(60, (Math.max(size.x, size.y, size.z) / 2) * 1.4);
   for (const l of lights.children) {
     if (l.isDirectionalLight && l.shadow) {
+      // Keep the shadow camera centred on the moved object. Otherwise a
+      // dragged mesh can sit outside the map and only cast a thin sliver.
+      l.target.position.copy(center);
+      if (!l.target.parent) scene.add(l.target);
+      l.target.updateMatrixWorld();
       const cam = l.shadow.camera;
       cam.left = -half;
       cam.right = half;
       cam.top = half;
       cam.bottom = -half;
       cam.updateProjectionMatrix();
+      l.shadow.needsUpdate = true;
     }
   }
 }
@@ -447,6 +454,7 @@ scene.add(lights);
 
 function clearLights() {
   for (const l of [...lights.children]) {
+    if (l.isDirectionalLight && l.target?.parent) l.target.parent.remove(l.target);
     lights.remove(l);
     if (l.dispose) l.dispose();
   }
@@ -3035,6 +3043,7 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
   const textStr = (text && text.trim().length > 0) ? text : (state.stickerText || 'Warisha Fashion');
   const textDepth = Math.max(3, state.depth);
 
+  const usesIndividualLetterTiles = shape === 'woodenBlocks' || shape === 'redTiles';
   const is3D = state.stickerMode === 'standing' || state.stickerMode === 'wall' || state.stickerWith3DText;
 
   if (is3D) {
@@ -3050,18 +3059,33 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
       const lineHeight3D = fontSize3D * 1.32;
       const totalH3D = (lines3D.length - 1) * lineHeight3D;
 
-      // Build 3D text material (gradient or solid)
+      // Build the 3D badge text material for every colour mode. Previously
+      // only gradient read the main colour-mode state; solid always fell back
+      // to the badge's default white and multicolour/pattern had no path.
       let mat3D;
+      let multicolorPalette = null;
       if (state.colorMode === 'gradient') {
         const gradTex = createGradientTexture(state);
         mat3D = buildMaterialWithTexture(state.materialType, '#ffffff', gradTex);
         group.userData.gradTex3D = gradTex;
+      } else if (state.colorMode === 'pattern') {
+        const patTex = createPatternCanvasTexture();
+        mat3D = buildMaterialWithTexture(state.materialType, '#ffffff', patTex);
+        group.userData.patTex3D = patTex;
+      } else if (state.colorMode === 'multicolor') {
+        multicolorPalette = getMulticolorPalette();
       } else {
-        mat3D = buildMaterial(state.materialType, state.stickerTextColor || state.color || '#ffffff');
+        mat3D = buildMaterial(state.materialType, state.color || '#ffffff');
       }
 
       const text3DGroup = new THREE.Group();
-      const hasCurvedOrSpacing = (state.curveIntensity && Math.abs(state.curveIntensity) > 2) || (state.curveSpacing && Math.abs(state.curveSpacing - 1) > 0.05);
+      // Tile templates need one real 3D letter per tile even with straight,
+      // normally-spaced text. Other badges only split into letters for curve
+      // or character-spacing layouts.
+      const hasCurvedOrSpacing = usesIndividualLetterTiles || state.colorMode === 'multicolor' ||
+        (state.curveIntensity && Math.abs(state.curveIntensity) > 2) ||
+        (state.curveSpacing && Math.abs(state.curveSpacing - 1) > 0.05);
+      let letterColorIndex = 0;
 
       lines3D.forEach((lineStr, idx) => {
         const hasText = lineStr.trim().length > 0;
@@ -3118,7 +3142,11 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
             }
             assignGeometryUVs(charGeo);
 
-            const charMesh = new THREE.Mesh(charGeo, mat3D);
+            const charMat = multicolorPalette
+              ? buildMaterial(state.materialType, multicolorPalette[letterColorIndex % multicolorPalette.length])
+              : mat3D;
+            letterColorIndex++;
+            const charMesh = new THREE.Mesh(charGeo, charMat);
             charMesh.castShadow = state.shadowsOn;
             charMesh.receiveShadow = state.shadowsOn;
             charMesh.position.set(cPos.x, lineY3D + cPos.y, 0);
@@ -3174,6 +3202,31 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
 
       worldWidth = Math.max(worldWidth, worldHeight * 1.15);
 
+      if (usesIndividualLetterTiles) {
+        // Match the centres used by drawWoodenBlocksBackground() and
+        // drawRedTilesBackground(), so every extruded glyph stands on (or is
+        // mounted to) its own corresponding tile instead of floating as a
+        // separate word above the row.
+        const tileLetters = Array.from(textStr).filter((ch) => ch.trim().length > 0);
+        const count = tileLetters.length;
+        const canvasW = 1024;
+        const canvasH = canvasW / (worldWidth / worldHeight);
+        const isWooden = shape === 'woodenBlocks';
+        const gap = isWooden ? Math.max(6, canvasW * 0.015) : Math.max(8, canvasW * 0.018);
+        const availableWidth = canvasW * (isWooden ? 0.88 : 0.90);
+        const tileWidth = Math.min(
+          (availableWidth - (count - 1) * gap) / count,
+          canvasH * (isWooden ? 0.82 : 0.85)
+        );
+        const rowStartX = (canvasW - (count * tileWidth + (count - 1) * gap)) / 2;
+        text3DGroup.children.forEach((letter, index) => {
+          const tileCenterX = rowStartX + index * (tileWidth + gap) + tileWidth / 2;
+          letter.position.x = (tileCenterX / canvasW - 0.5) * worldWidth;
+          letter.position.y = 0;
+          letter.rotation.z = 0;
+        });
+      }
+
       const aspect = worldWidth / worldHeight;
       const { canvas } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts, { ...borderOpts, targetAspect: aspect });
       const frontTex = makeCardTexture(canvas, false);
@@ -3189,6 +3242,7 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
       const boxTiltRad = THREE.MathUtils.degToRad(state.stickerBoxTilt || 0);
       const textTiltRad = THREE.MathUtils.degToRad(state.stickerTextTilt || 0);
       const offsetY = Number(state.stickerTextOffsetY || 0);
+      const textBaseX = usesIndividualLetterTiles ? 0 : -centerVec.x;
 
       if (state.stickerMode === 'standing') {
         // Floor / Pedestal: Base lies flat horizontally as a standing platform
@@ -3197,14 +3251,20 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
 
         // 3D Text stands upright on top of the base plate
         text3DGroup.rotation.x = textTiltRad;
-        text3DGroup.position.set(-centerVec.x, (text3DH / 2) + offsetY, 0);
+        // Rest the glyphs on the tile/pedestal surface instead of centring
+        // their bounding box above it, which left a visible floating gap.
+        text3DGroup.position.set(textBaseX, -textBBox.min.y + offsetY, 0);
       } else {
         // Plate mounted (Wall style)
         badgeMesh.rotation.x = boxTiltRad;
         badgeMesh.position.set(0, 0, -badgeDepth / 2);
 
         text3DGroup.rotation.x = textTiltRad;
-        text3DGroup.position.set(-centerVec.x, -centerVec.y + offsetY, textDepth / 2 + 1);
+        text3DGroup.position.set(
+          textBaseX,
+          (usesIndividualLetterTiles ? 0 : -centerVec.y) + offsetY,
+          textDepth / 2 + 1
+        );
       }
 
       group.add(badgeMesh);
@@ -4679,7 +4739,11 @@ autoRotateToggle.addEventListener('change', () => {
 
 colorPicker.addEventListener('input', () => {
   state.color = colorPicker.value;
-  applyMaterial();
+  // A standing/wall badge has a background card plus a separate group of
+  // extruded letters. Rebuild that group so Solid Color updates the letters,
+  // not only the background card material.
+  if (state.contentMode === 'sticker' && state.stickerWith3DText) scheduleRebuild();
+  else applyMaterial();
   saveStudioStateDebounced();
 });
 
@@ -4689,14 +4753,18 @@ materialPresetGrid.addEventListener('click', (e) => {
   state.materialType = btn.dataset.material;
   setActivePreset(materialPresetGrid, 'material', state.materialType);
   neonIntensityField.hidden = state.materialType !== 'neon';
-  applyMaterial();
+  if (state.contentMode === 'sticker' && state.stickerWith3DText) scheduleRebuild();
+  else applyMaterial();
   saveStudioStateDebounced();
 });
 
 neonIntensityRange.addEventListener('input', () => {
   state.neonIntensity = Number(neonIntensityRange.value);
   neonIntensityValue.textContent = state.neonIntensity.toFixed(1);
-  if (state.materialType === 'neon') applyMaterial();
+  if (state.materialType === 'neon') {
+    if (state.contentMode === 'sticker' && state.stickerWith3DText) scheduleRebuild();
+    else applyMaterial();
+  }
   saveStudioStateDebounced();
 });
 
