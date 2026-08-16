@@ -1,0 +1,21 @@
+{
+  "name": "photo-and-3d-text-studio",
+  "version": "1.0.0",
+  "description": "Photo & 3D Text Studio Desktop & Web Application",
+  "main": "main-electron.js",
+  "scripts": {
+    "start": "node server.js",
+    "desktop": "electron ."
+  },
+  "keywords": [
+    "photo-editor",
+    "3d-text",
+    "electron",
+    "canvas"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^43.4.0"
+  }
+}
