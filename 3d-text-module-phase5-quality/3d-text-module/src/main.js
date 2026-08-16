@@ -1245,14 +1245,18 @@ function registerBundledCanvasFont() {
     console.warn('registerBundledCanvasFont failed', e);
   }
 }
-
 // BoxGeometry material slot order is [+x, -x, +y, -y, +z, -z]. Front (+z,
 // facing the default camera) and back (-z) get the text texture as `.map`
 // with alphaTest so background pixels are fully discarded (no
 // transparency-sorting artifacts); the 4 side slots get a plain material of
 // the current preset, standing in for the card's extruded edge.
 function buildCanvasCardMaterials(frontTex, backTex, isImage = false) {
-  const sideMat = buildMaterial(state.materialType, state.color);
+  // For transparent text cards, side faces are transparent to prevent ugly solid box borders around text
+  // Sticker shapes need transparent sides (their custom shapes clip through the box sides).
+  // Text/image canvas cards keep visible colored sides for a proper 3D look.
+  const sideMat = (state.contentMode === 'sticker')
+    ? new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+    : buildMaterial(state.materialType, state.color);
 
   // For text card with gradient or photo card, faceColor is #ffffff to preserve exact texture gradient/photo colors.
   // For solid text card, faceColor is state.color!
@@ -1568,72 +1572,167 @@ function disposeTextMesh() {
   textMesh = null;
 }
 
+function createPatternCanvasTexture() {
+  const pCanvas = document.createElement('canvas');
+  pCanvas.width = 512;
+  pCanvas.height = 512;
+  const pCtx = pCanvas.getContext('2d');
+  const patStyle = getPatternFillStyle(pCtx, 200, 200, state.color);
+  pCtx.fillStyle = patStyle;
+  pCtx.fillRect(0, 0, 512, 512);
+  const tex = new THREE.CanvasTexture(pCanvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 2);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 4;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function assignGeometryUVs(geometry) {
+  if (!geometry || !geometry.attributes.position) return;
+  geometry.computeBoundingBox();
+  if (!geometry.boundingBox) return;
+  const pos = geometry.attributes.position;
+  const min = geometry.boundingBox.min;
+  const max = geometry.boundingBox.max;
+  const spanX = Math.max(0.0001, max.x - min.x);
+  const spanY = Math.max(0.0001, max.y - min.y);
+  const uvs = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    uvs[i * 2] = (x - min.x) / spanX;
+    uvs[i * 2 + 1] = (y - min.y) / spanY;
+  }
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+}
+
 function buildVectorTextMesh(validLines) {
   const q = QUALITY_PRESETS[state.quality];
   const lineHeight = state.size * 1.35;
 
   const group = new THREE.Group();
-  let material;
+  let defaultMaterial;
   if (state.colorMode === 'gradient') {
     const gradTex = createGradientTexture(state);
-    material = buildMaterialWithTexture(state.materialType, '#ffffff', gradTex);
+    defaultMaterial = buildMaterialWithTexture(state.materialType, '#ffffff', gradTex);
     group.userData.gradTex = gradTex;
+  } else if (state.colorMode === 'pattern') {
+    const patTex = createPatternCanvasTexture();
+    defaultMaterial = buildMaterialWithTexture(state.materialType, '#ffffff', patTex);
+    group.userData.patTex = patTex;
   } else {
-    material = buildMaterial(state.materialType, state.color);
+    defaultMaterial = buildMaterial(state.materialType, state.color);
   }
 
+  const palette = getMulticolorPalette();
   const totalLinesHeight = (validLines.length - 1) * lineHeight;
+  const hasCurvedOrSpacing = (state.curveIntensity && Math.abs(state.curveIntensity) > 0) || (state.curveSpacing && Math.abs(state.curveSpacing - 1) > 0.01);
+  const isPerCharMode = hasCurvedOrSpacing || state.colorMode === 'multicolor';
+
+  let globalCharIdx = 0;
 
   validLines.forEach((lineStr, idx) => {
     const hasText = lineStr.trim().length > 0;
     const content = hasText ? lineStr : ' ';
+    const lineY = (totalLinesHeight / 2) - (idx * lineHeight);
 
-    const geometry = new TextGeometry(content, {
-      font,
-      size: state.size,
-      depth: state.depth,
-      curveSegments: q.curveSegments,
-      bevelEnabled: true,
-      bevelThickness: Math.max(1, state.depth * 0.06),
-      bevelSize: Math.max(0.5, state.depth * 0.03),
-      bevelSegments: q.bevelSegments,
-    });
+    if (isPerCharMode && hasText) {
+      // Per-character 3D TextGeometry: maintains 100% thick, heavy 3D vector geometry with bevel & depth
+      const chars = splitGraphemes(content);
+      const charWidths = chars.map((ch) => {
+        if (ch === ' ') return state.size * 0.45;
+        const g = new TextGeometry(ch, {
+          font,
+          size: state.size,
+          depth: state.depth,
+          curveSegments: q.curveSegments,
+          bevelEnabled: true,
+          bevelThickness: Math.max(1, state.depth * 0.06),
+          bevelSize: Math.max(0.5, state.depth * 0.03),
+          bevelSegments: q.bevelSegments,
+        });
+        g.computeBoundingBox();
+        const w = (g.boundingBox && !isNaN(g.boundingBox.max.x)) ? Math.max(state.size * 0.2, g.boundingBox.max.x - g.boundingBox.min.x + state.size * 0.1) : state.size * 0.5;
+        g.dispose();
+        return w;
+      });
 
-    geometry.computeBoundingBox();
-    if (hasText && geometry.boundingBox && !isNaN(geometry.boundingBox.min.x)) {
-      geometry.center();
+      const arcLayout = computeArcLayout(charWidths, {
+        curveIntensity: state.curveIntensity || 0,
+        direction: state.curveDirection || 'up',
+        spacing: state.curveSpacing || 1.0,
+      });
+
+      chars.forEach((ch, ci) => {
+        if (!ch || ch.trim().length === 0) {
+          globalCharIdx++;
+          return;
+        }
+        const cPos = arcLayout.chars[ci];
+        if (!cPos) return;
+
+        const charGeo = new TextGeometry(ch, {
+          font,
+          size: state.size,
+          depth: state.depth,
+          curveSegments: q.curveSegments,
+          bevelEnabled: true,
+          bevelThickness: Math.max(1, state.depth * 0.06),
+          bevelSize: Math.max(0.5, state.depth * 0.03),
+          bevelSegments: q.bevelSegments,
+        });
+
+        charGeo.computeBoundingBox();
+        if (charGeo.boundingBox && !isNaN(charGeo.boundingBox.min.x)) {
+          charGeo.center();
+        }
+        assignGeometryUVs(charGeo);
+
+        const charMat = (state.colorMode === 'multicolor')
+          ? buildMaterial(state.materialType, palette[globalCharIdx % palette.length])
+          : defaultMaterial;
+        globalCharIdx++;
+
+        const charMesh = new THREE.Mesh(charGeo, charMat);
+        charMesh.castShadow = state.shadowsOn;
+        charMesh.receiveShadow = state.shadowsOn;
+        charMesh.position.set(cPos.x, lineY + cPos.y, 0);
+        charMesh.rotation.z = -cPos.rotation;
+        group.add(charMesh);
+      });
+    } else {
+      const geometry = new TextGeometry(content, {
+        font,
+        size: state.size,
+        depth: state.depth,
+        curveSegments: q.curveSegments,
+        bevelEnabled: true,
+        bevelThickness: Math.max(1, state.depth * 0.06),
+        bevelSize: Math.max(0.5, state.depth * 0.03),
+        bevelSegments: q.bevelSegments,
+      });
+
       geometry.computeBoundingBox();
-    }
-
-    if (geometry.boundingBox) {
-      const pos = geometry.attributes.position;
-      const min = geometry.boundingBox.min;
-      const max = geometry.boundingBox.max;
-      const spanX = Math.max(0.0001, max.x - min.x);
-      const spanY = Math.max(0.0001, max.y - min.y);
-      const uvs = new Float32Array(pos.count * 2);
-      for (let i = 0; i < pos.count; i++) {
-        const x = pos.getX(i);
-        const y = pos.getY(i);
-        uvs[i * 2] = (x - min.x) / spanX;
-        uvs[i * 2 + 1] = (y - min.y) / spanY;
+      if (hasText && geometry.boundingBox && !isNaN(geometry.boundingBox.min.x)) {
+        geometry.center();
+        geometry.computeBoundingBox();
       }
-      geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+      assignGeometryUVs(geometry);
+
+      const lineMesh = new THREE.Mesh(geometry, defaultMaterial);
+      lineMesh.castShadow = state.shadowsOn;
+      lineMesh.receiveShadow = state.shadowsOn;
+      lineMesh.position.y = lineY;
+      group.add(lineMesh);
     }
-
-    const lineMesh = new THREE.Mesh(geometry, material);
-    lineMesh.castShadow = state.shadowsOn;
-    lineMesh.receiveShadow = state.shadowsOn;
-
-    // Vertical placement: centered around Y = 0
-    lineMesh.position.y = (totalLinesHeight / 2) - (idx * lineHeight);
-
-    group.add(lineMesh);
   });
 
   renderMode = 'vector';
   textMesh = group;
-  textMesh.material = material;
+  textMesh.material = defaultMaterial;
 }
 
 function buildCanvasCardTextMesh(validLines) {
@@ -1717,6 +1816,10 @@ const STICKER_SHAPE_SIZING = {
   radiant: { square: true, padMul: 1.7 },
   starSpray: { square: true, padMul: 1.85 },
   letterBlocks: { square: false, padMul: 1.2 },
+  paintSplash: { square: false, padMul: 1.45 },
+  steelPlate: { square: false, padMul: 1.25 },
+  woodenBlocks: { square: false, padMul: 1.15 },
+  redTiles: { square: false, padMul: 1.15 },
 };
 
 // curveOpts (PLAN_3 §3.2 — curve works *inside* badges too):
@@ -1783,6 +1886,76 @@ function drawStickerCanvasTexture(
   ctx.textBaseline = 'middle';
   const textCenterX = shape === 'speech' ? canvasW / 2 + Math.min(canvasW, bodyH) * 0.08 : canvasW / 2;
   const startY = bodyH / 2 - textBlockH / 2 + maxBulge + lineHeightPx / 2;
+  if (shape === 'woodenBlocks' || shape === 'redTiles') {
+    const raw = (text || ' ').trim();
+    const cleanChars = raw.split('').filter((c) => c.trim().length > 0);
+    const count = Math.max(1, cleanChars.length);
+    const gap = shape === 'woodenBlocks' ? Math.max(6, canvasW * 0.015) : Math.max(8, canvasW * 0.018);
+    const totalGaps = (count - 1) * gap;
+    const availW = shape === 'woodenBlocks' ? canvasW * 0.88 : canvasW * 0.90;
+    const boxW = Math.min((availW - totalGaps) / count, bodyH * (shape === 'woodenBlocks' ? 0.82 : 0.85));
+    const startX = (canvasW - (count * boxW + totalGaps)) / 2;
+    const centerY = bodyH / 2;
+
+    ctx.save();
+    ctx.font = "800 " + Math.round(boxW * 0.65) + "px " + STICKER_FONT_STACK;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    cleanChars.forEach((ch, idx) => {
+      const charX = startX + idx * (boxW + gap) + boxW / 2;
+      if (shape === 'woodenBlocks') {
+        ctx.fillStyle = '#241407';
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.4)';
+        ctx.shadowOffsetY = 1.5;
+        ctx.shadowBlur = 1;
+        ctx.fillText(ch, charX, centerY);
+      } else {
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+        ctx.shadowOffsetY = 2;
+        ctx.shadowBlur = 3;
+        ctx.fillText(ch, charX, centerY);
+      }
+    });
+    ctx.restore();
+    return { canvas, aspect: canvasW / canvasH };
+  }
+
+  if (shape === 'steelPlate') {
+    ctx.save();
+    ctx.font = "800 " + Math.round(STICKER_FONT_PX * 0.92) + "px " + STICKER_FONT_STACK;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    perLine.forEach(({ clusters, layout }, i) => {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      drawCurvedLine(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i + 2);
+      ctx.fillStyle = '#0f172a';
+      drawCurvedLine(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i);
+    });
+    ctx.restore();
+    return { canvas, aspect: canvasW / canvasH };
+  }
+
+  if (shape === 'paintSplash') {
+    ctx.save();
+    ctx.font = "900 " + STICKER_FONT_PX + "px " + STICKER_FONT_STACK;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    perLine.forEach(({ clusters, layout }, i) => {
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+      ctx.shadowBlur = 18;
+      ctx.shadowOffsetY = 8;
+      ctx.fillStyle = '#ffffff';
+      drawCurvedLine(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i);
+      ctx.shadowColor = 'transparent';
+      ctx.fillStyle = '#ffffff';
+      drawCurvedLine(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i);
+    });
+    ctx.restore();
+    return { canvas, aspect: canvasW / canvasH };
+  }
+
   perLine.forEach(({ clusters, layout }, i) => {
     drawCurvedLine(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i);
   });
@@ -2221,6 +2394,300 @@ function drawNeonFrameBackground(ctx, w, h, color) {
   ctx.restore();
 }
 
+// 18. Paint Splash Background (UNIQUE style)
+function drawPaintSplashBackground(ctx, w, h) {
+  ctx.save();
+  const cx = w / 2;
+  const cy = h / 2;
+
+  const strokes = [
+    { c: '#9c27b0', sx: -0.42, sy: -0.28, ex: 0.15, ey: -0.40, w: 0.28, rot: -0.15 },
+    { c: '#e91e63', sx: -0.48, sy: -0.10, ex: 0.38, ey: -0.22, w: 0.35, rot: -0.08 },
+    { c: '#00bcd4', sx: -0.38, sy: 0.15, ex: 0.45, ey: -0.05, w: 0.32, rot: -0.05 },
+    { c: '#00e5ff', sx: -0.25, sy: 0.28, ex: 0.48, ey: 0.18, w: 0.30, rot: 0.05 },
+    { c: '#76ff03', sx: -0.15, sy: -0.35, ex: 0.25, ey: -0.10, w: 0.22, rot: 0.20 },
+    { c: '#ffd600', sx: -0.35, sy: 0.38, ex: 0.20, ey: 0.42, w: 0.36, rot: 0.12 },
+    { c: '#ff3d00', sx: 0.10, sy: 0.05, ex: 0.48, ey: 0.32, w: 0.26, rot: 0.25 },
+  ];
+
+  strokes.forEach(({ c, sx, sy, ex, ey, w: sw, rot }) => {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rot);
+    const startX = sx * w;
+    const startY = sy * h;
+    const endX = ex * w;
+    const endY = ey * h;
+    const strokeW = sw * h;
+
+    ctx.shadowColor = 'rgba(0,0,0,0.18)';
+    ctx.shadowBlur = 16;
+    ctx.strokeStyle = c;
+    ctx.lineWidth = strokeW;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.quadraticCurveTo((startX + endX) / 2, (startY + endY) / 2, endX, endY);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    const bristleCount = 6;
+    for (let b = 0; b < bristleCount; b++) {
+      const offset = (b / bristleCount - 0.5) * (strokeW * 0.85);
+      ctx.strokeStyle = (b % 2 === 0) ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.15)';
+      ctx.lineWidth = Math.max(1.5, strokeW * 0.05);
+      ctx.beginPath();
+      ctx.moveTo(startX, startY + offset);
+      ctx.lineTo(endX, endY + offset);
+      ctx.stroke();
+    }
+    ctx.restore();
+  });
+
+  const dropletColors = ['#e91e63', '#00e5ff', '#ffd600', '#76ff03', '#9c27b0', '#ff3d00'];
+  for (let i = 0; i < 20; i++) {
+    const angle = (i / 20) * Math.PI * 2 + (i % 3) * 0.2;
+    const dist = (0.38 + (i % 4) * 0.04) * Math.min(w, h);
+    const dx = cx + Math.cos(angle) * dist * 1.35;
+    const dy = cy + Math.sin(angle) * dist;
+    const r = (3 + (i % 3) * 3);
+
+    ctx.save();
+    ctx.fillStyle = dropletColors[i % dropletColors.length];
+    ctx.beginPath();
+    ctx.arc(dx, dy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+// 19. Steel Engraved Industrial Plate (LIFETIME style)
+function drawSteelPlateBackground(ctx, w, h, color) {
+  ctx.save();
+  const pad = Math.max(8, Math.min(w, h) * 0.05);
+  const chamfer = Math.max(16, Math.min(w, h) * 0.12);
+
+  function drawSteelPath(x, y, pw, ph, ch) {
+    ctx.beginPath();
+    ctx.moveTo(x + ch, y);
+    ctx.lineTo(x + pw - ch, y);
+    ctx.lineTo(x + pw, y + ch);
+    ctx.lineTo(x + pw, y + ph - ch);
+    ctx.lineTo(x + pw - ch, y + ph);
+    ctx.lineTo(x + ch, y + ph);
+    ctx.lineTo(x, y + ph - ch);
+    ctx.lineTo(x, y + ch);
+    ctx.closePath();
+  }
+
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+  ctx.shadowBlur = 20;
+  ctx.shadowOffsetY = 8;
+  ctx.fillStyle = '#64748b';
+  drawSteelPath(pad, pad, w - pad * 2, h - pad * 2, chamfer);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+
+  const steelGrad = ctx.createLinearGradient(0, 0, w, h);
+  steelGrad.addColorStop(0, '#f8fafc');
+  steelGrad.addColorStop(0.2, '#cbd5e1');
+  steelGrad.addColorStop(0.45, '#94a3b8');
+  steelGrad.addColorStop(0.55, '#f1f5f9');
+  steelGrad.addColorStop(0.8, '#64748b');
+  steelGrad.addColorStop(1, '#e2e8f0');
+  ctx.fillStyle = steelGrad;
+  drawSteelPath(pad, pad, w - pad * 2, h - pad * 2, chamfer);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.lineWidth = 3;
+  drawSteelPath(pad + 1, pad + 1, w - pad * 2 - 2, h - pad * 2 - 2, chamfer);
+  ctx.stroke();
+
+  const innerInset = Math.max(12, Math.min(w, h) * 0.08);
+  const innerCh = chamfer * 0.75;
+  const innerGrad = ctx.createLinearGradient(0, innerInset, 0, h - innerInset);
+  innerGrad.addColorStop(0, '#e2e8f0');
+  innerGrad.addColorStop(0.3, '#cbd5e1');
+  innerGrad.addColorStop(0.7, '#94a3b8');
+  innerGrad.addColorStop(1, '#f1f5f9');
+  ctx.fillStyle = innerGrad;
+  drawSteelPath(pad + innerInset, pad + innerInset, w - (pad + innerInset) * 2, h - (pad + innerInset) * 2, innerCh);
+  ctx.fill();
+
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 4;
+  drawSteelPath(pad + innerInset, pad + innerInset, w - (pad + innerInset) * 2, h - (pad + innerInset) * 2, innerCh);
+  ctx.stroke();
+
+  const archW = (w - (pad + innerInset) * 2) * 0.65;
+  const archH = Math.max(14, h * 0.14);
+  const archX = (w - archW) / 2;
+  const archY = pad + innerInset;
+  const orangeGrad = ctx.createLinearGradient(archX, archY, archX + archW, archY);
+  orangeGrad.addColorStop(0, '#ea580c');
+  orangeGrad.addColorStop(0.5, '#f97316');
+  orangeGrad.addColorStop(1, '#ea580c');
+  ctx.fillStyle = orangeGrad;
+  ctx.beginPath();
+  ctx.moveTo(archX, archY);
+  ctx.bezierCurveTo(archX + archW * 0.25, archY - archH * 0.8, archX + archW * 0.75, archY - archH * 0.8, archX + archW, archY);
+  ctx.lineTo(archX + archW * 0.9, archY + archH * 0.6);
+  ctx.bezierCurveTo(archX + archW * 0.7, archY + archH * 0.1, archX + archW * 0.3, archY + archH * 0.1, archX + archW * 0.1, archY + archH * 0.6);
+  ctx.closePath();
+  ctx.fill();
+
+  const rivetPoints = [
+    [pad + chamfer * 0.6, pad + chamfer * 0.6],
+    [w - pad - chamfer * 0.6, pad + chamfer * 0.6],
+    [pad + chamfer * 0.6, h - pad - chamfer * 0.6],
+    [w - pad - chamfer * 0.6, h - pad - chamfer * 0.6],
+  ];
+  rivetPoints.forEach(([rx, ry]) => {
+    const rr = Math.max(5, Math.min(w, h) * 0.032);
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath(); ctx.arc(rx, ry, rr + 1.5, 0, Math.PI * 2); ctx.fill();
+    const rGrad = ctx.createRadialGradient(rx - rr * 0.3, ry - rr * 0.3, 1, rx, ry, rr);
+    rGrad.addColorStop(0, '#ffffff');
+    rGrad.addColorStop(0.5, '#94a3b8');
+    rGrad.addColorStop(1, '#475569');
+    ctx.fillStyle = rGrad;
+    ctx.beginPath(); ctx.arc(rx, ry, rr, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(rx - rr * 0.6, ry); ctx.lineTo(rx + rr * 0.6, ry);
+    ctx.moveTo(rx, ry - rr * 0.6); ctx.lineTo(rx, ry + rr * 0.6);
+    ctx.stroke();
+  });
+
+  ctx.restore();
+}
+
+// 20. 3D Wooden Letter Blocks (INCOME style)
+function drawWoodenBlocksBackground(ctx, w, h, text) {
+  ctx.save();
+  const raw = (text || 'INCOME').trim();
+  const cleanChars = raw.split('').filter((c) => c.trim().length > 0);
+  const count = Math.max(1, cleanChars.length);
+  const blockGap = Math.max(6, w * 0.015);
+  const totalGaps = (count - 1) * blockGap;
+  const availW = w * 0.88;
+  const blockW = Math.min((availW - totalGaps) / count, h * 0.82);
+  const blockH = blockW;
+  const startX = (w - (count * blockW + totalGaps)) / 2;
+  const startY = (h - blockH) / 2;
+
+  for (let i = 0; i < count; i++) {
+    const bx = startX + i * (blockW + blockGap);
+    const by = startY;
+    const br = Math.max(6, blockW * 0.1);
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    drawRoundedRectPath(ctx, bx + 4, by + 6, blockW, blockH, br);
+    ctx.fill();
+
+    const woodGrad = ctx.createLinearGradient(bx, by, bx, by + blockH);
+    woodGrad.addColorStop(0, '#edd1a6');
+    woodGrad.addColorStop(0.3, '#deb887');
+    woodGrad.addColorStop(0.7, '#d2a679');
+    woodGrad.addColorStop(1, '#b88650');
+    ctx.fillStyle = woodGrad;
+    drawRoundedRectPath(ctx, bx, by, blockW, blockH, br);
+    ctx.fill();
+
+    ctx.save();
+    ctx.beginPath();
+    drawRoundedRectPath(ctx, bx, by, blockW, blockH, br);
+    ctx.clip();
+    for (let g = 0; g < 9; g++) {
+      const gy = by + (g / 9) * blockH;
+      ctx.strokeStyle = g % 2 === 0 ? 'rgba(120, 70, 25, 0.18)' : 'rgba(255, 245, 220, 0.22)';
+      ctx.lineWidth = Math.max(1.5, blockW * 0.025);
+      ctx.beginPath();
+      ctx.moveTo(bx, gy + Math.sin(g + i) * 6);
+      ctx.bezierCurveTo(bx + blockW * 0.3, gy + Math.cos(g) * 8, bx + blockW * 0.7, gy - Math.sin(g) * 8, bx + blockW, gy + Math.cos(g + i) * 6);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+    ctx.lineWidth = Math.max(2, blockW * 0.04);
+    ctx.beginPath();
+    ctx.moveTo(bx + br, by);
+    ctx.lineTo(bx + blockW - br, by);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(80, 45, 15, 0.45)';
+    ctx.beginPath();
+    ctx.moveTo(bx + blockW, by + br);
+    ctx.lineTo(bx + blockW, by + blockH - br);
+    ctx.lineTo(bx + br, by + blockH);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// 21. 3D Red Game / Scrabble Tiles (PROFIT / LOSS style)
+function drawRedTilesBackground(ctx, w, h, text) {
+  ctx.save();
+  const raw = (text || 'PROFIT').trim();
+  const cleanChars = raw.split('').filter((c) => c.trim().length > 0);
+  const count = Math.max(1, cleanChars.length);
+  const tileGap = Math.max(8, w * 0.018);
+  const totalGaps = (count - 1) * tileGap;
+  const availW = w * 0.90;
+  const tileW = Math.min((availW - totalGaps) / count, h * 0.85);
+  const tileH = tileW;
+  const startX = (w - (count * tileW + totalGaps)) / 2;
+  const startY = (h - tileH) / 2;
+
+  for (let i = 0; i < count; i++) {
+    const tx = startX + i * (tileW + tileGap);
+    const ty = startY;
+    const tr = Math.max(8, tileW * 0.16);
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    drawRoundedRectPath(ctx, tx + 4, ty + 8, tileW, tileH, tr);
+    ctx.fill();
+
+    const redGrad = ctx.createLinearGradient(tx, ty, tx, ty + tileH);
+    redGrad.addColorStop(0, '#ff4d4d');
+    redGrad.addColorStop(0.25, '#ef233c');
+    redGrad.addColorStop(0.7, '#d90429');
+    redGrad.addColorStop(1, '#9b001a');
+    ctx.fillStyle = redGrad;
+    drawRoundedRectPath(ctx, tx, ty, tileW, tileH, tr);
+    ctx.fill();
+
+    const dishPad = Math.max(6, tileW * 0.12);
+    const dishGrad = ctx.createLinearGradient(tx + dishPad, ty + dishPad, tx + dishPad, ty + tileH - dishPad);
+    dishGrad.addColorStop(0, '#d90429');
+    dishGrad.addColorStop(0.5, '#ef233c');
+    dishGrad.addColorStop(1, '#ff4d4d');
+    ctx.fillStyle = dishGrad;
+    drawRoundedRectPath(ctx, tx + dishPad, ty + dishPad, tileW - dishPad * 2, tileH - dishPad * 2, tr * 0.6);
+    ctx.fill();
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(tx + tileW * 0.35, ty + tileH * 0.22, tileW * 0.22, tileH * 0.08, -Math.PI / 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = Math.max(1.5, tileW * 0.03);
+    drawRoundedRectPath(ctx, tx + 1, ty + 1, tileW - 2, tileH - 2, tr);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, borderColor = '#ffffff', shadow = false) {
   const cx = w / 2;
   const cy = bodyH / 2;
@@ -2332,6 +2799,22 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
     }
     case 'letterBlocks': {
       drawLetterBlocksBackground(ctx, w, bodyH, color);
+      break;
+    }
+    case 'paintSplash': {
+      drawPaintSplashBackground(ctx, w, bodyH);
+      break;
+    }
+    case 'steelPlate': {
+      drawSteelPlateBackground(ctx, w, bodyH, color);
+      break;
+    }
+    case 'woodenBlocks': {
+      drawWoodenBlocksBackground(ctx, w, bodyH, state.stickerText);
+      break;
+    }
+    case 'redTiles': {
+      drawRedTilesBackground(ctx, w, bodyH, state.stickerText);
       break;
     }
     case 'circle':
@@ -2582,7 +3065,7 @@ function rebuildTextMesh() {
       }
     );
     applyRotation();
-    scene.add(textMesh);
+    if (textMesh) scene.add(textMesh);
     updateQualityNote();
     updateTextModeNote(false);
     updateShadowFrustum();
@@ -2593,7 +3076,7 @@ function rebuildTextMesh() {
     disposeTextMesh();
     buildCubeBoxMesh();
     applyRotation();
-    scene.add(textMesh);
+    if (textMesh) scene.add(textMesh);
     updateQualityNote();
     if (typeof updateTextModeNote === 'function') updateTextModeNote(false);
     updateShadowFrustum();
@@ -2609,37 +3092,33 @@ function rebuildTextMesh() {
     }
     buildImageCardMesh(state.imageElement);
     applyRotation();
-    scene.add(textMesh);
+    if (textMesh) scene.add(textMesh);
     updateQualityNote();
     updateTextModeNote(false);
     updateShadowFrustum();
     return;
   }
 
-  // 'gradient' and standard Latin fonts use true 3D TextGeometry (vector mesh)
-  // so depth, extrusion, bevels, and shadows are 100% real 3D geometry!
   const rawContent = state.text || ' ';
   const textLines = rawContent.split(/\r?\n/);
   const validLines = textLines.map((l) => (l.length > 0 ? l : ' '));
 
   const isBangla = isBanglaText(rawContent);
-  const isMulticolorOrPattern = (state.colorMode === 'multicolor' || state.colorMode === 'pattern');
-  const needsCanvasCard = isBangla || isMulticolorOrPattern;
-
-  if (!needsCanvasCard && !font) return;
 
   disposeTextMesh();
 
-  if (needsCanvasCard) {
+  // Canvas card mode: ONLY for Bangla text (requires canvas 2D shaper for complex Indic script ligatures)
+  // All English/Latin text, numbers, symbols always render in 100% TRUE 3D VECTOR GEOMETRY with bevel & depth!
+  if (isBangla) {
     buildCanvasCardTextMesh(validLines);
   } else {
     buildVectorTextMesh(validLines);
   }
 
   applyRotation();
-  scene.add(textMesh);
+  if (textMesh) scene.add(textMesh);
   updateQualityNote();
-  updateTextModeNote(isBangla, false);
+  updateTextModeNote(isBangla);
   updateShadowFrustum();
 }
 
@@ -2663,24 +3142,21 @@ function updateQualityNote() {
       }
     });
   }
-  const triLabel = triCount > 0 ? triCount.toLocaleString('bn-BD') : '\u2014';
+  const triLabel = triCount > 0 ? triCount.toLocaleString('bn-BD') : '—';
   qualityNote.textContent =
     `বর্তমান: ~${triLabel} ট্রায়াঙ্গেল, পিক্সেল-রেশিও সর্বোচ্চ ${q.pixelRatioCap}x, শ্যাডো ম্যাপ ${q.shadowMapSize}px। ` +
     `লো-এন্ড ডিভাইস/কম-শক্তির পিসিতে ল্যাগ হলে "Low" বেছে নিন।`;
 }
 
-function updateTextModeNote(isBangla, curveOn = false) {
+function updateTextModeNote(isBangla) {
   if (!textModeNote) return;
-  if (isBangla && curveOn) {
-    textModeNote.textContent = '\u09ac\u09be\u0982\u09b2\u09be \u09b2\u09c7\u0996\u09be \u09b6\u09a8\u09be\u0995\u09cd\u09a4 \u09b9\u09af\u09bc\u09c7\u099b\u09c7 \u2014 \u099b\u09ac\u09bf-\u099f\u09c7\u0995\u09cd\u09b8\u099a\u09be\u09b0 \u0995\u09be\u09b0\u09cd\u09a1 \u09ae\u09cb\u09a1\u09c7 \u09b0\u09c7\u09a8\u09cd\u09a1\u09be\u09b0 \u09b9\u099a\u09cd\u099b\u09c7\u0964 \u0995\u09be\u09b0\u09cd\u09ad \u099a\u09be\u09b2\u09c1 \u09a5\u09be\u0995\u09be\u09af\u09bc \u09aa\u09cd\u09b0\u09a4\u09bf\u099f\u09be \u0985\u0995\u09cd\u09b7\u09b0 \u0986\u09b2\u09be\u09a6\u09be\u09ad\u09be\u09ac\u09c7 \u09ac\u09b8\u09be\u09a8\u09cb \u09b9\u099a\u09cd\u099b\u09c7\u0964';
-  } else if (isBangla) {
-    textModeNote.textContent = '\u09ac\u09be\u0982\u09b2\u09be \u09b2\u09c7\u0996\u09be \u09b6\u09a8\u09be\u0995\u09cd\u09a4 \u09b9\u09af\u09bc\u09c7\u099b\u09c7 \u2014 \u099b\u09ac\u09bf-\u099f\u09c7\u0995\u09cd\u09b8\u099a\u09be\u09b0 \u0995\u09be\u09b0\u09cd\u09a1 \u09ae\u09cb\u09a1\u09c7 \u09b0\u09c7\u09a8\u09cd\u09a1\u09be\u09b0 \u09b9\u099a\u09cd\u099b\u09c7\u0964';
-  } else if (curveOn) {
-    textModeNote.textContent = '\u0995\u09be\u09b0\u09cd\u09ad \u099a\u09be\u09b2\u09c1 \u09a5\u09be\u0995\u09be\u09af\u09bc \u099b\u09ac\u09bf-\u099f\u09c7\u0995\u09cd\u09b8\u099a\u09be\u09b0 \u0995\u09be\u09b0\u09cd\u09a1 \u09ae\u09cb\u09a1\u09c7 \u09b0\u09c7\u09a8\u09cd\u09a1\u09be\u09b0 \u09b9\u099a\u09cd\u099b\u09c7\u0964';
+  if (isBangla) {
+    textModeNote.textContent = 'বাংলা লিপি শনাক্ত — হাই-রেজোলিউশন ছবি-টেক্সচার কার্ড মোডে রেন্ডার হচ্ছে।';
+    textModeNote.hidden = false;
   } else {
     textModeNote.textContent = '';
+    textModeNote.hidden = true;
   }
-  textModeNote.hidden = !(isBangla || curveOn);
 }
 
 function applyPosition() {
@@ -2950,6 +3426,7 @@ contentModeGrid.addEventListener('click', (e) => {
   curveSection.hidden = state.contentMode === 'image' || state.contentMode === 'cube';
   stopAnimation(); // switching the active object mid-playback would animate a stale mesh
   rebuildTextMesh();
+  saveStudioStateDebounced();
   updateExportSourceNote();
 });
 
@@ -2973,6 +3450,7 @@ stickerShapeGrid.addEventListener('click', (e) => {
   state.stickerShape = btn.dataset.stickerShape;
   setActivePreset(stickerShapeGrid, 'stickerShape', state.stickerShape);
   if (state.contentMode === 'sticker') rebuildTextMesh();
+  saveStudioStateDebounced();
 });
 
 stickerBgColorPicker.addEventListener('input', () => {
@@ -3049,6 +3527,7 @@ imageFileInput.addEventListener('change', () => {
         `${file.name} — মূল ${img.naturalWidth}×${img.naturalHeight}px, ` +
         `বর্তমান কোয়ালিটি প্রিসেট অনুযায়ী টেক্সচার সর্বোচ্চ ${capPx}px-এ ব্যবহার হবে।`;
       rebuildTextMesh();
+      saveStudioStateDebounced();
     };
     img.onerror = () => {
       imageNote.textContent = 'ছবিটা লোড করা যায়নি — ফাইলটা কি ঠিক আছে দেখুন।';
@@ -3068,6 +3547,7 @@ pictureStyleGrid.addEventListener('click', (e) => {
   state.pictureStyle = btn.dataset.pictureStyle;
   setActivePreset(pictureStyleGrid, 'pictureStyle', state.pictureStyle);
   if (state.contentMode === 'image' && state.imageElement) rebuildTextMesh();
+  saveStudioStateDebounced();
 });
 
 depthRange.addEventListener('input', () => {
@@ -3104,8 +3584,13 @@ function saveStudioState() {
       gradientPreset: state.gradientPreset,
       gradientType: state.gradientType,
       gradientAngle: state.gradientAngle,
+      multicolorPalette: state.multicolorPalette,
+      comicOutline: state.comicOutline,
+      patternPreset: state.patternPreset,
+      festiveDecor: state.festiveDecor,
       posX: state.posX,
       posY: state.posY,
+      posZ: state.posZ,
       rotX: state.rotX,
       rotY: state.rotY,
       rotZ: state.rotZ,
@@ -3123,8 +3608,44 @@ function saveStudioState() {
       shadowsOn: state.shadowsOn,
       shadowIntensity: state.shadowIntensity,
       reflectionsOn: state.reflectionsOn,
+      reflectionIntensity: state.reflectionIntensity,
       quality: state.quality,
+      neonIntensity: state.neonIntensity,
+      autoRotate: state.autoRotate,
+      stickerText: state.stickerText,
+      stickerShape: state.stickerShape,
+      stickerBgColor: state.stickerBgColor,
+      stickerTextColor: state.stickerTextColor,
+      stickerBorderWidth: state.stickerBorderWidth,
+      stickerBorderColor: state.stickerBorderColor,
+      stickerShadow: state.stickerShadow,
+      cubeFace1: state.cubeFace1,
+      cubeFace2: state.cubeFace2,
+      cubeFace3: state.cubeFace3,
+      cubeColor: state.cubeColor,
+      cubeTextColor: state.cubeTextColor,
+      cubeTextBorder: state.cubeTextBorder,
+      pictureStyle: state.pictureStyle,
     };
+    try {
+      if (state.bgImageElement && state.bgImageElement.src && state.bgImageElement.src.startsWith('data:')) {
+        toSave.bgImageDataUrl = state.bgImageElement.src;
+      }
+    } catch (_) {}
+    try {
+      if (state.imageElement && state.imageElement.src && state.imageElement.src.startsWith('data:')) {
+        toSave.imageDataUrl = state.imageElement.src;
+      }
+    } catch (_) {}
+    try {
+      if (animState) {
+        toSave.animPreset = animState.presetId;
+        toSave.animDuration = animState.durationMs;
+        toSave.animDelay = animState.delayMs;
+        toSave.animEasing = animState.easing;
+        toSave.animLoop = animState.loop;
+      }
+    } catch (_) {}
     localStorage.setItem('3d_studio_saved_state', JSON.stringify(toSave));
   } catch (_) {}
 }
@@ -3292,6 +3813,146 @@ function loadStudioState() {
     if (saved.reflectionsOn !== undefined && reflectionToggle) {
       state.reflectionsOn = saved.reflectionsOn;
       reflectionToggle.checked = saved.reflectionsOn;
+    }
+    if (saved.reflectionIntensity !== undefined && reflectionIntensityRange) {
+      state.reflectionIntensity = saved.reflectionIntensity;
+      reflectionIntensityRange.value = saved.reflectionIntensity;
+      if (reflectionIntensityValue) reflectionIntensityValue.textContent = saved.reflectionIntensity;
+    }
+    if (saved.neonIntensity !== undefined && neonIntensityRange) {
+      state.neonIntensity = saved.neonIntensity;
+      neonIntensityRange.value = saved.neonIntensity;
+      if (neonIntensityValue) neonIntensityValue.textContent = saved.neonIntensity;
+    }
+    if (saved.posZ !== undefined) state.posZ = saved.posZ;
+    if (saved.autoRotate !== undefined && autoRotateToggle) {
+      state.autoRotate = saved.autoRotate;
+      autoRotateToggle.checked = saved.autoRotate;
+    }
+    if (saved.stickerText !== undefined && stickerTextInput) {
+      state.stickerText = saved.stickerText;
+      stickerTextInput.value = saved.stickerText;
+    }
+    if (saved.stickerShape && stickerShapeGrid) {
+      state.stickerShape = saved.stickerShape;
+      setActivePreset(stickerShapeGrid, 'stickerShape', saved.stickerShape);
+    }
+    if (saved.stickerBgColor !== undefined && stickerBgColorPicker) {
+      state.stickerBgColor = saved.stickerBgColor;
+      stickerBgColorPicker.value = saved.stickerBgColor;
+    }
+    if (saved.stickerTextColor !== undefined && stickerTextColorPicker) {
+      state.stickerTextColor = saved.stickerTextColor;
+      stickerTextColorPicker.value = saved.stickerTextColor;
+    }
+    if (saved.stickerBorderWidth !== undefined && stickerBorderWidthRange) {
+      state.stickerBorderWidth = saved.stickerBorderWidth;
+      stickerBorderWidthRange.value = saved.stickerBorderWidth;
+      if (stickerBorderWidthValue) stickerBorderWidthValue.textContent = `${saved.stickerBorderWidth}px`;
+    }
+    if (saved.stickerBorderColor !== undefined && stickerBorderColorPicker) {
+      state.stickerBorderColor = saved.stickerBorderColor;
+      stickerBorderColorPicker.value = saved.stickerBorderColor;
+    }
+    if (saved.stickerShadow !== undefined && stickerShadowCheckbox) {
+      state.stickerShadow = saved.stickerShadow;
+      stickerShadowCheckbox.checked = saved.stickerShadow;
+    }
+    if (saved.cubeFace1 !== undefined && cubeFace1Input) {
+      state.cubeFace1 = saved.cubeFace1;
+      cubeFace1Input.value = saved.cubeFace1;
+    }
+    if (saved.cubeFace2 !== undefined && cubeFace2Input) {
+      state.cubeFace2 = saved.cubeFace2;
+      cubeFace2Input.value = saved.cubeFace2;
+    }
+    if (saved.cubeFace3 !== undefined && cubeFace3Input) {
+      state.cubeFace3 = saved.cubeFace3;
+      cubeFace3Input.value = saved.cubeFace3;
+    }
+    if (saved.cubeColor !== undefined && cubeColorPicker) {
+      state.cubeColor = saved.cubeColor;
+      cubeColorPicker.value = saved.cubeColor;
+    }
+    if (saved.cubeTextColor !== undefined && cubeTextColorPicker) {
+      state.cubeTextColor = saved.cubeTextColor;
+      cubeTextColorPicker.value = saved.cubeTextColor;
+    }
+    if (saved.cubeTextBorder !== undefined && cubeTextBorderPicker) {
+      state.cubeTextBorder = saved.cubeTextBorder;
+      cubeTextBorderPicker.value = saved.cubeTextBorder;
+    }
+    if (saved.multicolorPalette && multicolorPaletteSelect) {
+      state.multicolorPalette = saved.multicolorPalette;
+      multicolorPaletteSelect.value = saved.multicolorPalette;
+    }
+    if (saved.comicOutline !== undefined && comicOutlineToggle) {
+      state.comicOutline = saved.comicOutline;
+      comicOutlineToggle.checked = saved.comicOutline;
+    }
+    if (saved.patternPreset && patternPresetSelect) {
+      state.patternPreset = saved.patternPreset;
+      patternPresetSelect.value = saved.patternPreset;
+    }
+    if (saved.festiveDecor !== undefined && festiveDecorToggle) {
+      state.festiveDecor = saved.festiveDecor;
+      festiveDecorToggle.checked = saved.festiveDecor;
+    }
+    if (saved.pictureStyle && pictureStyleGrid) {
+      state.pictureStyle = saved.pictureStyle;
+      setActivePreset(pictureStyleGrid, 'pictureStyle', saved.pictureStyle);
+    }
+    if (saved.animPreset && animPresetGrid) {
+      animState.presetId = saved.animPreset;
+      setActivePreset(animPresetGrid, 'anim', saved.animPreset);
+      if (animPlayBtn) animPlayBtn.disabled = saved.animPreset === 'none';
+    }
+    if (saved.animDuration !== undefined && animDurationRange) {
+      animState.durationMs = saved.animDuration;
+      animDurationRange.value = saved.animDuration;
+      if (animDurationValue) animDurationValue.textContent = `${(saved.animDuration / 1000).toFixed(1)}s`;
+    }
+    if (saved.animDelay !== undefined && animDelayRange) {
+      animState.delayMs = saved.animDelay;
+      animDelayRange.value = saved.animDelay;
+      if (animDelayValue) animDelayValue.textContent = `${(saved.animDelay / 1000).toFixed(1)}s`;
+    }
+    if (saved.animEasing && animEasingSelect) {
+      animState.easing = saved.animEasing;
+      animEasingSelect.value = saved.animEasing;
+    }
+    if (saved.animLoop !== undefined && animLoopToggle) {
+      animState.loop = saved.animLoop;
+      animLoopToggle.checked = saved.animLoop;
+    }
+    if (saved.bgImageDataUrl) {
+      try {
+        const img = new Image();
+        img.onload = () => {
+          state.bgImageElement = img;
+          if (bgModeSelect) bgModeSelect.value = 'image';
+          state.bgMode = 'image';
+          if (bgColorGroup) bgColorGroup.hidden = true;
+          if (bgImageGroup) bgImageGroup.hidden = false;
+          if (bgPreviewThumb) { bgPreviewThumb.src = img.src; bgPreviewThumb.hidden = false; }
+          if (bgImageNote) bgImageNote.textContent = `${img.naturalWidth}×${img.naturalHeight}px — সংরক্ষিত ব্যাকগ্রাউন্ড`;
+          updateSceneBackground();
+          rebuildTextMesh();
+        };
+        img.src = saved.bgImageDataUrl;
+      } catch (_) {}
+    }
+    if (saved.imageDataUrl) {
+      try {
+        const img = new Image();
+        img.onload = () => {
+          state.imageElement = img;
+          if (imagePreviewThumb) { imagePreviewThumb.src = img.src; imagePreviewThumb.hidden = false; }
+          if (imageNote) imageNote.textContent = `${img.naturalWidth}×${img.naturalHeight}px — সংরক্ষিত ছবি`;
+          if (state.contentMode === 'image' && state.pictureStyle) rebuildTextMesh();
+        };
+        img.src = saved.imageDataUrl;
+      } catch (_) {}
     }
   } catch (_) {}
 }
@@ -3513,6 +4174,7 @@ if (dragModeSelect) {
     state.dragMode = dragModeSelect.value;
     controls.enabled = state.dragMode === 'orbit';
     viewportEl.style.cursor = state.dragEnabled && state.dragMode !== 'orbit' ? 'grab' : 'default';
+    saveStudioStateDebounced();
   });
 }
 
@@ -3521,6 +4183,7 @@ if (dragEnabledToggle) {
     state.dragEnabled = dragEnabledToggle.checked;
     controls.enabled = !state.dragEnabled || state.dragMode === 'orbit';
     viewportEl.style.cursor = state.dragEnabled && state.dragMode !== 'orbit' ? 'grab' : 'default';
+    saveStudioStateDebounced();
   });
 }
 
@@ -3538,11 +4201,13 @@ rotZRange.addEventListener('input', () => {
 autoRotateToggle.addEventListener('change', () => {
   state.autoRotate = autoRotateToggle.checked;
   updateExportSourceNote();
+  saveStudioStateDebounced();
 });
 
 colorPicker.addEventListener('input', () => {
   state.color = colorPicker.value;
   applyMaterial();
+  saveStudioStateDebounced();
 });
 
 materialPresetGrid.addEventListener('click', (e) => {
@@ -3552,12 +4217,14 @@ materialPresetGrid.addEventListener('click', (e) => {
   setActivePreset(materialPresetGrid, 'material', state.materialType);
   neonIntensityField.hidden = state.materialType !== 'neon';
   applyMaterial();
+  saveStudioStateDebounced();
 });
 
 neonIntensityRange.addEventListener('input', () => {
   state.neonIntensity = Number(neonIntensityRange.value);
   neonIntensityValue.textContent = state.neonIntensity.toFixed(1);
   if (state.materialType === 'neon') applyMaterial();
+  saveStudioStateDebounced();
 });
 
 lightingPresetGrid.addEventListener('click', (e) => {
@@ -3566,28 +4233,33 @@ lightingPresetGrid.addEventListener('click', (e) => {
   state.lightingPreset = btn.dataset.lighting;
   setActivePreset(lightingPresetGrid, 'lighting', state.lightingPreset);
   buildLightingPreset(state.lightingPreset);
+  saveStudioStateDebounced();
 });
 
 shadowToggle.addEventListener('change', () => {
   state.shadowsOn = shadowToggle.checked;
   applyShadowToggle();
+  saveStudioStateDebounced();
 });
 
 shadowIntensityRange.addEventListener('input', () => {
   state.shadowIntensity = Number(shadowIntensityRange.value);
   shadowIntensityValue.textContent = state.shadowIntensity.toFixed(2);
   applyShadowToggle();
+  saveStudioStateDebounced();
 });
 
 reflectionToggle.addEventListener('change', () => {
   state.reflectionsOn = reflectionToggle.checked;
   applyReflectionToggle();
+  saveStudioStateDebounced();
 });
 
 reflectionIntensityRange.addEventListener('input', () => {
   state.reflectionIntensity = Number(reflectionIntensityRange.value);
   reflectionIntensityValue.textContent = state.reflectionIntensity.toFixed(1);
   applyReflectionToggle();
+  saveStudioStateDebounced();
 });
 
 resetCameraBtn.addEventListener('click', () => {
@@ -3614,6 +4286,7 @@ qualityPresetGrid.addEventListener('click', (e) => {
   state.quality = btn.dataset.quality;
   setActivePreset(qualityPresetGrid, 'quality', state.quality);
   applyQuality();
+  saveStudioStateDebounced();
 });
 
 // ---------- Phase 3: animation panel wiring ----------
@@ -3626,26 +4299,31 @@ animPresetGrid.addEventListener('click', (e) => {
   animPlayBtn.disabled = isNone;
   if (isNone) stopAnimation();
   updateExportSourceNote();
+  saveStudioStateDebounced();
 });
 
 animDurationRange.addEventListener('input', () => {
   animState.durationMs = Number(animDurationRange.value);
   animDurationValue.textContent = `${(animState.durationMs / 1000).toFixed(1)}s`;
   updateExportSourceNote();
+  saveStudioStateDebounced();
 });
 
 animDelayRange.addEventListener('input', () => {
   animState.delayMs = Number(animDelayRange.value);
   animDelayValue.textContent = `${(animState.delayMs / 1000).toFixed(1)}s`;
   updateExportSourceNote();
+  saveStudioStateDebounced();
 });
 
 animEasingSelect.addEventListener('change', () => {
   animState.easing = animEasingSelect.value;
+  saveStudioStateDebounced();
 });
 
 animLoopToggle.addEventListener('change', () => {
   animState.loop = animLoopToggle.checked;
+  saveStudioStateDebounced();
 });
 
 animPlayBtn.addEventListener('click', playAnimation);
@@ -4045,6 +4723,7 @@ if (bgModeSelect) {
     if (bgColorGroup) bgColorGroup.hidden = state.bgMode !== 'color';
     if (bgImageGroup) bgImageGroup.hidden = state.bgMode !== 'image';
     updateSceneBackground();
+    saveStudioStateDebounced();
   });
 }
 
@@ -4052,6 +4731,7 @@ if (bgColorPicker) {
   bgColorPicker.addEventListener('input', () => {
     state.bgColor = bgColorPicker.value;
     if (state.bgMode === 'color') updateSceneBackground();
+    saveStudioStateDebounced();
   });
 }
 
@@ -4077,6 +4757,8 @@ if (bgFileInput) {
         }
         if (bgImageNote) bgImageNote.textContent = `✓ ছবি যুক্ত হয়েছে: ${file.name} (${img.naturalWidth}×${img.naturalHeight}px)`;
         updateSceneBackground();
+        rebuildTextMesh();
+        saveStudioStateDebounced();
       };
       img.src = reader.result;
     };
@@ -4099,6 +4781,7 @@ updateSceneBackground();
 scene.environment = state.reflectionsOn ? envTexture : null;
 updateWebmSupportNote();
 updateExportSourceNote();
+rebuildTextMesh();
 
 // ---------- render loop ----------
 function animate(now) {
