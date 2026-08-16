@@ -26135,7 +26135,7 @@ var textMesh = null;
 var state = {
   contentMode: "text",
   // PLAN_3 §1: 'text' | 'image' | 'sticker' — mutually exclusive, one active object at a time
-  fontFamily: fontSelect?.value || "Grand Hotel",
+  fontFamily: fontSelect?.value || "helvetiker",
   colorMode: colorModeSelect?.value || "gradient",
   gradientPreset: gradientPresetSelect?.value || "gold",
   gradientType: gradientTypeSelect?.value || "linear",
@@ -26171,7 +26171,7 @@ var state = {
   curveIntensity: Number(curveIntensityRange.value),
   curveDirection: "up",
   curveSpacing: Number(curveSpacingRange.value) / 100,
-  text: textInput.value,
+  text: textInput.value || "Warisha Fashion",
   depth: Number(depthRange.value),
   size: Number(sizeRange.value),
   rotX: Number(rotXRange.value),
@@ -28422,7 +28422,6 @@ function loadStudioState() {
     if (saved.gradientPreset && gradientPresetSelect) {
       state.gradientPreset = saved.gradientPreset;
       gradientPresetSelect.value = saved.gradientPreset;
-      if (customGradientControls) customGradientControls.hidden = saved.gradientPreset !== "custom";
     }
     if (saved.gradientType && gradientTypeSelect) {
       state.gradientType = saved.gradientType;
@@ -28926,10 +28925,25 @@ if (colorModeSelect) {
     scheduleRebuild();
   });
 }
+var GRADIENT_PRESET_COLORS = {
+  gold: ["#ffd700", "#ff4500"],
+  electricCyan: ["#00f5ff", "#0072ff"],
+  fire: ["#ff416c", "#ff4b2b"],
+  neon: ["#00f2fe", "#4facfe"],
+  purple: ["#ff0844", "#ffb199"],
+  silver: ["#e6e9f0", "#eef1f5"],
+  emerald: ["#11998e", "#38ef7d"]
+};
 if (gradientPresetSelect) {
   gradientPresetSelect.addEventListener("change", () => {
     state.gradientPreset = gradientPresetSelect.value;
-    if (customGradientControls) customGradientControls.hidden = state.gradientPreset !== "custom";
+    if (GRADIENT_PRESET_COLORS[state.gradientPreset]) {
+      const [c1, c2] = GRADIENT_PRESET_COLORS[state.gradientPreset];
+      state.colorStart = c1;
+      state.colorEnd = c2;
+      if (colorStartPicker) colorStartPicker.value = c1;
+      if (colorEndPicker) colorEndPicker.value = c2;
+    }
     scheduleRebuild();
   });
 }
@@ -28942,12 +28956,16 @@ if (gradientTypeSelect) {
 if (colorStartPicker) {
   colorStartPicker.addEventListener("input", () => {
     state.colorStart = colorStartPicker.value;
+    state.gradientPreset = "custom";
+    if (gradientPresetSelect) gradientPresetSelect.value = "custom";
     if (state.colorMode === "gradient") scheduleRebuild();
   });
 }
 if (colorEndPicker) {
   colorEndPicker.addEventListener("input", () => {
     state.colorEnd = colorEndPicker.value;
+    state.gradientPreset = "custom";
+    if (gradientPresetSelect) gradientPresetSelect.value = "custom";
     if (state.colorMode === "gradient") scheduleRebuild();
   });
 }

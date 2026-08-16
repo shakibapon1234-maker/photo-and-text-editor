@@ -70,21 +70,21 @@
         <h3>টেক্সট</h3>
         <label class="field" style="align-items: flex-start;">
           <span style="margin-top: 6px;">কন্টেন্ট</span>
-          <textarea id="textInput" rows="2" placeholder="লেখা লিখুন (Enter দিয়ে একাধিক লাইন)" style="resize: vertical; min-height: 52px; font-family: inherit;">Style</textarea>
+          <textarea id="textInput" rows="2" placeholder="লেখা লিখুন (Enter দিয়ে একাধিক লাইন)" style="resize: vertical; min-height: 52px; font-family: inherit;">Warisha Fashion</textarea>
         </label>
         <label class="field" style="margin-top: 8px;">
           <span>ফন্ট (Font)</span>
           <select id="fontSelect">
-            <option value="Grand Hotel" selected>✨ Grand Hotel (Retro Cursive - 'Style')</option>
+            <option value="helvetiker" selected>✨ Helvetiker (আসল 3D ভেক্টর এক্সট্রুড - Real 3D Text)</option>
+            <option value="Grand Hotel">Grand Hotel (Retro Cursive)</option>
             <option value="Pacifico">Pacifico (Bold Vintage Script)</option>
             <option value="Lobster">Lobster (Classic Retro Script)</option>
             <option value="Satisfy">Satisfy (Smooth Cursive)</option>
             <option value="Yellowtail">Yellowtail (Brush Script)</option>
-            <option value="Montserrat">Montserrat (Bold Sans - 'DESIGN')</option>
+            <option value="Montserrat">Montserrat (Bold Sans)</option>
             <option value="Playfair Display">Playfair Display (Classic Serif)</option>
             <option value="Bungee">Bungee (3D Heavy Display)</option>
             <option value="Noto Sans Bengali">Noto Sans Bengali (বাংলা ফন্ট)</option>
-            <option value="helvetiker">Helvetiker (Vector 3D Default)</option>
           </select>
         </label>
         <p class="field-note" id="textModeNote" hidden>—</p>
@@ -292,8 +292,8 @@
 
         <div id="solidColorGroup" hidden>
           <label class="field">
-            <span>সলিড কালার</span>
-            <input type="color" id="colorPicker" value="#c97f2e" />
+            <span>টেক্সট কালার (Solid Color)</span>
+            <input type="color" id="colorPicker" value="#ffd700" />
           </label>
         </div>
 
@@ -336,42 +336,41 @@
 
         <div id="gradientColorGroup">
           <label class="field">
-            <span>প্রিসেট</span>
+            <span>গ্রেডিয়েন্ট প্রিসেট</span>
             <select id="gradientPresetSelect">
-              <option value="electricCyan">⚡ Electric Neon Cyan (ইলেকট্রিক নিয়ন সায়ান - স্ক্রিনশট ১ ও ২)</option>
-              <option value="gold" selected>💛 Gold / Sunset ('Style' স্ক্রিনশট)</option>
-              <option value="neon">💙 Neon Cyan</option>
-              <option value="purple">💜 Sunset Purple</option>
-              <option value="silver">🤍 Metallic Silver</option>
+              <option value="gold" selected>💛 Gold / Sunset ('Warisha Fashion' ৩D)</option>
+              <option value="electricCyan">⚡ Electric Neon Cyan (নিয়ন সায়ান)</option>
+              <option value="fire">❤️ Fire Red & Orange (লাল ও কমলা)</option>
+              <option value="neon">💙 Neon Cyan Blue</option>
+              <option value="purple">💜 Sunset Purple & Pink</option>
+              <option value="silver">🤍 Metallic Silver & White</option>
               <option value="emerald">💚 Emerald Green</option>
-              <option value="fire">❤️ Fire Red</option>
-              <option value="custom">⚙️ কাস্টম গ্রেডিয়েন্ট (Custom)</option>
+              <option value="custom">⚙️ কাস্টম কালার (Custom 2-Color)</option>
             </select>
+          </label>
+
+          <label class="field">
+            <span>১ম কালার (Color 1)</span>
+            <input type="color" id="colorStartPicker" value="#ffd700" />
+          </label>
+          <label class="field">
+            <span>২য় কালার (Color 2)</span>
+            <input type="color" id="colorEndPicker" value="#ff4500" />
           </label>
 
           <label class="field">
             <span>টাইপ</span>
             <select id="gradientTypeSelect">
-              <option value="linear" selected>Linear (সোজা)</option>
-              <option value="radial">Radial (বৃত্তাকার)</option>
+              <option value="linear" selected>Linear (সোজা গ্রেডিয়েন্ট)</option>
+              <option value="radial">Radial (বৃত্তাকার গ্রেডিয়েন্ট)</option>
             </select>
           </label>
 
-          <div id="customGradientControls">
-            <label class="field">
-              <span>শুরু কালার</span>
-              <input type="color" id="colorStartPicker" value="#ffd700" />
-            </label>
-            <label class="field">
-              <span>শেষ কালার</span>
-              <input type="color" id="colorEndPicker" value="#ff4500" />
-            </label>
-            <label class="field">
-              <span>এঙ্গেল (Angle)</span>
-              <input type="range" id="gradientAngleRange" min="0" max="360" step="15" value="90" />
-              <span class="field-value" id="gradientAngleValue">90°</span>
-            </label>
-          </div>
+          <label class="field">
+            <span>এঙ্গেল (Angle)</span>
+            <input type="range" id="gradientAngleRange" min="0" max="360" step="15" value="90" />
+            <span class="field-value" id="gradientAngleValue">90°</span>
+          </label>
         </div>
 
         <label class="field" id="neonIntensityField" hidden>
