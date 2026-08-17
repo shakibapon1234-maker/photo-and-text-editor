@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="bn">
 
 <head>
@@ -910,13 +910,13 @@
 
                         <div class="wm-section">
                             <label class="wm-toggle">
-                                <input type="checkbox" id="wmTextEnabled">
+                                <input type="checkbox" id="wmTextEnabled" checked>
                                 <span>📝 টেক্সট ওয়াটারমার্ক</span>
                             </label>
-                            <div class="wm-fields" id="wmTextFields" style="display:none;">
+                            <div class="wm-fields" id="wmTextFields" style="display:block;">
                                 <div class="form-group">
                                     <label>টেক্সট</label>
-                                    <input type="text" id="wmText" placeholder="© আপনার নাম / ব্র্যান্ড" maxlength="80">
+                                    <input type="text" id="wmText" value="Warisha Fashion" placeholder="© আপনার নাম / ব্র্যান্ড" maxlength="80">
                                 </div>
                                 <div class="form-group">
                                     <label>ফন্ট সাইজ: <strong id="wmFontSizeValue">6</strong>%</label>
@@ -960,7 +960,7 @@
                         <!-- Phase 16: quick ad text templates -->
                         <div class="wm-section">
                             <h4 style="margin:8px 0 6px;font-size:13px;color:var(--text-secondary);">⚡ কুইক টেমপ্লেট</h4>
-                            <div class="preset-grid preset-grid-3" id="wmTemplateGrid">
+                        <div class="preset-grid preset-grid-3" id="wmTemplateGrid">
                                 <button type="button" class="preset-btn" data-wm-template="new-collection">🆕 নতুন কালেকশন</button>
                                 <button type="button" class="preset-btn" data-wm-template="special-offer">🔥 স্পেশাল অফার</button>
                                 <button type="button" class="preset-btn" data-wm-template="price-tag">৳___ মাত্র</button>
@@ -1019,12 +1019,49 @@
                 <!-- Upscale Tool -->
                 <div class="tool-content" id="tab-upscale">
 
-                    <!-- METHOD 1: AI Upscale via DeepAI torch-srgan -->
-                    <div class="tool-card bg-method-card open" id="upcard-ai">
+                    <!-- METHOD 2: Local canvas-based upscale (Free, instant, open by default) -->
+                    <div class="tool-card bg-method-card open" id="upcard-local">
                         <button type="button" class="bg-method-header" aria-expanded="true">
+                            <div class="bg-method-icon">🖼️</div>
+                            <div class="bg-method-title">
+                                <h3>লোকাল আপস্কেল (ফ্রি ও অফলাইন)</h3>
+                                <p class="tool-desc">কোনো API key বা ইন্টারনেট লাগে না — সম্পূর্ণ অফলাইনে, তাৎক্ষণিক রেজোলিউশন বাড়ায়।</p>
+                            </div>
+                            <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="bg-method-body">
+                        <div class="form-row-2col">
+                            <div class="form-group">
+                                <label>কতটুকু বড় করবেন</label>
+                                <select id="upFactor">
+                                    <option value="1.5">1.5x</option>
+                                    <option value="2" selected>2x</option>
+                                    <option value="3">3x</option>
+                                    <option value="4">4x</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>শার্পনেস: <strong id="upSharpenValue">20</strong></label>
+                                <input type="range" id="upSharpen" min="0" max="100" value="20" class="range-slider">
+                                <div class="range-labels"><span>নরম</span><span>তীক্ষ্ণ</span></div>
+                            </div>
+                        </div>
+                        <p class="tool-desc" style="margin-top:0;">বড় ছবিতে (৪x পর্যন্ত) কিছুটা সময় লাগতে পারে।</p>
+                        <button class="btn btn-primary btn-action" id="upLocalBtn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            লোকাল আপস্কেল করুন
+                        </button>
+                        </div>
+                    </div>
+
+                    <!-- METHOD 1: AI Upscale via DeepAI torch-srgan -->
+                    <div class="tool-card bg-method-card" id="upcard-ai">
+                        <button type="button" class="bg-method-header" aria-expanded="false">
                             <div class="bg-method-icon">🤖</div>
                             <div class="bg-method-title">
-                                <h3>AI আপস্কেল (ক্লাউড)</h3>
+                                <h3>AI আপস্কেল (ক্লাউড API)</h3>
                                 <p class="tool-desc">DeepAI Super Resolution API — রেজোলিউশন ৪x বাড়ায়, ডিটেইল যোগ করে। API key লাগবে।</p>
                             </div>
                             <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>

@@ -2575,3 +2575,26 @@ kbd {
     text-overflow: ellipsis;
 }
 
+.tool-tabs {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(230, 149, 33, 0.4) transparent;
+}
+.tool-tabs::-webkit-scrollbar {
+    width: 4px;
+}
+.tool-tabs::-webkit-scrollbar-thumb {
+    background: rgba(230, 149, 33, 0.3);
+    border-radius: 4px;
+}
+.tool-tabs::-webkit-scrollbar-thumb:hover {
+    background: rgba(230, 149, 33, 0.6);
+}
+
+.collage-help-notice {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.collage-help-notice button:hover {
+    filter: brightness(1.15);
+}
+
+

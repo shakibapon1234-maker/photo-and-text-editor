@@ -20,6 +20,9 @@
     const collagePresetWrap = document.getElementById('collagePresetWrap');
     const collagePresetGrid = document.getElementById('collagePresetGrid');
     const collageGenerateBtn = document.getElementById('collageGenerateBtn');
+    const collageOpenBulkBtn = document.getElementById('collageOpenBulkBtn');
+    const collageResultWrap = document.getElementById('collageResultWrap');
+    const collageDownloadBtn = document.getElementById('collageDownloadBtn');
 
     if (!collageFileInput || !collageUploadArea) return;
 
@@ -27,6 +30,16 @@
     let collageLayout = '2x2';
     let collagePreset = null;
     let nextCollageId = 1;
+    let lastGeneratedBlob = null;
+    let lastGeneratedName = '';
+
+    // Quick trigger for bulk modal
+    if (collageOpenBulkBtn) {
+        collageOpenBulkBtn.addEventListener('click', () => {
+            const bulkBtn = document.getElementById('bulkOpenBtn');
+            if (bulkBtn) bulkBtn.click();
+        });
+    }
 
     // ---------- Layout definitions ----------
     function getLayoutCells(layout) {
@@ -42,6 +55,7 @@
 
     // ---------- Preset grid ----------
     function buildCollagePresetGrid() {
+        if (!collagePresetGrid) return;
         collagePresetGrid.innerHTML = '';
         (window.SOCIAL_PRESETS || []).forEach((p, idx) => {
             const btn = document.createElement('button');
@@ -136,13 +150,18 @@
             collageGapWrap.style.display = 'none';
             collageBorderWrap.style.display = 'none';
             collagePresetWrap.style.display = 'none';
+            if (collageResultWrap) collageResultWrap.style.display = 'none';
         }
     }
 
     function updateGenerateButton() {
-        const cells = getLayoutCells(collageLayout).cells;
-        const ready = collageImages.length >= 2 && collageImages.length <= cells && collageImages.every(it => it.img) && collagePreset;
+        const ready = collageImages.length >= 2 && collageImages.every(it => it.img) && collagePreset;
         collageGenerateBtn.disabled = !ready;
+        if (!ready && collageImages.length > 0 && collageImages.length < 2) {
+            collageGenerateBtn.title = 'কোলাজ তৈরি করতে অন্তত ২টি ছবি দিন';
+        } else {
+            collageGenerateBtn.removeAttribute('title');
+        }
     }
 
     // ---------- Layout selection ----------
@@ -167,88 +186,135 @@
         collageBorderColor.style.display = collageBorderColorToggle.checked ? 'block' : 'none';
     });
 
+    function downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+    }
+
     // ---------- Generate ----------
     collageGenerateBtn.addEventListener('click', () => {
         if (!collageImages.length || !collagePreset) return;
-        const layout = getLayoutCells(collageLayout);
-        const gap = parseInt(collageGapRange.value, 10) || 0;
-        const border = parseInt(collageBorderRange.value, 10) || 0;
-        const useBorderColor = collageBorderColorToggle.checked;
-        const borderColor = collageBorderColor.value;
 
-        const outW = collagePreset.w;
-        const outH = collagePreset.h;
-        const out = document.createElement('canvas');
-        out.width = outW;
-        out.height = outH;
-        const octx = out.getContext('2d');
+        collageGenerateBtn.disabled = true;
+        collageGenerateBtn.innerHTML = '⏳ কোলাজ তৈরি হচ্ছে...';
 
-        // White background
-        octx.fillStyle = '#ffffff';
-        octx.fillRect(0, 0, outW, outH);
+        setTimeout(() => {
+            try {
+                const layout = getLayoutCells(collageLayout);
+                const gap = parseInt(collageGapRange.value, 10) || 0;
+                const border = parseInt(collageBorderRange.value, 10) || 0;
+                const useBorderColor = collageBorderColorToggle.checked;
+                const borderColor = collageBorderColor.value;
 
-        const cellW = (outW - gap * (layout.cols + 1) - border * 2) / layout.cols;
-        const cellH = (outH - gap * (layout.rows + 1) - border * 2) / layout.rows;
+                const outW = collagePreset.w;
+                const outH = collagePreset.h;
+                const out = document.createElement('canvas');
+                out.width = outW;
+                out.height = outH;
+                const octx = out.getContext('2d');
 
-        for (let i = 0; i < layout.cells; i++) {
-            const col = i % layout.cols;
-            const row = Math.floor(i / layout.cols);
-            const x = gap + border + col * (cellW + gap);
-            const y = gap + border + row * (cellH + gap);
+                // White background
+                octx.fillStyle = '#ffffff';
+                octx.fillRect(0, 0, outW, outH);
 
-            // Border fill
-            if (border > 0 && useBorderColor) {
-                octx.fillStyle = borderColor;
-                octx.fillRect(x - border, y - border, cellW + border * 2, cellH + border * 2);
-            }
+                const cellW = (outW - gap * (layout.cols + 1) - border * 2) / layout.cols;
+                const cellH = (outH - gap * (layout.rows + 1) - border * 2) / layout.rows;
 
-            // Draw image (object-fit: cover)
-            const img = collageImages[i] ? collageImages[i].img : null;
-            if (img) {
-                const srcW = img.naturalWidth || img.width;
-                const srcH = img.naturalHeight || img.height;
-                const srcRatio = srcW / srcH;
-                const cellRatio = cellW / cellH;
-                let sx, sy, sw, sh;
-                if (srcRatio > cellRatio) {
-                    sh = srcH;
-                    sw = sh * cellRatio;
-                    sx = (srcW - sw) / 2;
-                    sy = 0;
-                } else {
-                    sw = srcW;
-                    sh = sw / cellRatio;
-                    sx = 0;
-                    sy = (srcH - sh) / 2;
+                for (let i = 0; i < layout.cells; i++) {
+                    const col = i % layout.cols;
+                    const row = Math.floor(i / layout.cols);
+                    const x = gap + border + col * (cellW + gap);
+                    const y = gap + border + row * (cellH + gap);
+
+                    // Border fill
+                    if (border > 0 && useBorderColor) {
+                        octx.fillStyle = borderColor;
+                        octx.fillRect(x - border, y - border, cellW + border * 2, cellH + border * 2);
+                    }
+
+                    // Get image (if fewer images than cells, cycle or use available)
+                    const item = collageImages[i] || collageImages[i % collageImages.length];
+                    const img = item ? item.img : null;
+                    if (img) {
+                        const srcW = img.naturalWidth || img.width;
+                        const srcH = img.naturalHeight || img.height;
+                        const srcRatio = srcW / srcH;
+                        const cellRatio = cellW / cellH;
+                        let sx, sy, sw, sh;
+                        if (srcRatio > cellRatio) {
+                            sh = srcH;
+                            sw = sh * cellRatio;
+                            sx = (srcW - sw) / 2;
+                            sy = 0;
+                        } else {
+                            sw = srcW;
+                            sh = sw / cellRatio;
+                            sx = 0;
+                            sy = (srcH - sh) / 2;
+                        }
+                        octx.drawImage(img, sx, sy, sw, sh, x, y, cellW, cellH);
+                    }
                 }
-                octx.drawImage(img, sx, sy, sw, sh, x, y, cellW, cellH);
-            }
-        }
 
-        out.toBlob(blob => {
-            if (!blob) {
-                showToast('❌ কোলাজ তৈরি করা যায়নি', 'error');
-                return;
+                out.toBlob(blob => {
+                    collageGenerateBtn.innerHTML = '🖼️ কোলাজ তৈরি করুন';
+                    collageGenerateBtn.disabled = false;
+
+                    if (!blob) {
+                        showToast('❌ কোলাজ তৈরি করা যায়নি', 'error');
+                        return;
+                    }
+
+                    lastGeneratedBlob = blob;
+                    lastGeneratedName = `collage_${collageLayout}_${Date.now()}.png`;
+
+                    // 1. Immediately load into main editor canvas & workspace
+                    if (typeof window.setEditorImageFromBlob === 'function') {
+                        window.setEditorImageFromBlob(blob, lastGeneratedName, `কোলাজ তৈরি (${collageLayout})`);
+                    }
+
+                    // 2. Trigger automatic download
+                    downloadBlob(blob, lastGeneratedName);
+
+                    // 3. Show visual result box in panel
+                    if (collageResultWrap) {
+                        collageResultWrap.style.display = 'block';
+                        const thumb = document.getElementById('collageResultThumb');
+                        if (thumb) thumb.src = URL.createObjectURL(blob);
+                    }
+
+                    showToast('✅ কোলাজ তৈরি সম্পন্ন হয়েছে এবং প্রিভিউতে লোড হয়েছে!', 'success');
+                }, 'image/png');
+            } catch (err) {
+                collageGenerateBtn.innerHTML = '🖼️ কোলাজ তৈরি করুন';
+                collageGenerateBtn.disabled = false;
+                showToast('❌ সমস্যা: ' + err.message, 'error');
             }
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `collage_${collageLayout}_${Date.now()}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            setTimeout(() => URL.revokeObjectURL(url), 4000);
-            showToast('✅ কোলাজ ডাউনলোড হয়েছে!', 'success');
-        }, 'image/png');
+        }, 50);
     });
 
-    // ---------- Toast helper (reuse app's toast if present) ----------
+    if (collageDownloadBtn) {
+        collageDownloadBtn.addEventListener('click', () => {
+            if (lastGeneratedBlob) {
+                downloadBlob(lastGeneratedBlob, lastGeneratedName || 'collage.png');
+                showToast('✅ কোলাজ ডাউনলোড শুরু হয়েছে!', 'success');
+            }
+        });
+    }
+
+    // ---------- Toast helper ----------
     function showToast(msg, type) {
         const toast = document.getElementById('toast');
         if (toast) {
             toast.textContent = msg;
-            toast.className = 'toast show ' + (type === 'error' ? 'error' : '');
-            setTimeout(() => toast.classList.remove('show'), 3000);
+            toast.className = 'toast show ' + (type === 'error' ? 'error' : (type === 'success' ? 'success' : ''));
+            setTimeout(() => toast.classList.remove('show'), 3500);
         } else {
             alert(msg);
         }

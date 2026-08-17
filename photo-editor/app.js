@@ -3821,6 +3821,34 @@
             baDivider.style.left = pct + '%';
         }
 
+        // Expose a helper to load any generated blob (e.g. from Collage) directly into the main editor workspace
+        window.setEditorImageFromBlob = function (blob, fileName, label = 'কোলাজ তৈরি করা হয়েছে') {
+            const url = URL.createObjectURL(blob);
+            const img = new Image();
+            img.onload = function () {
+                originalImage = img;
+                originalWidth = img.naturalWidth;
+                originalHeight = img.naturalHeight;
+                aspectRatio = originalWidth / originalHeight;
+                if (previewImage) previewImage.src = url;
+                processedBlob = blob;
+
+                if (infoName) infoName.textContent = fileName || 'collage.png';
+                if (infoSize) infoSize.textContent = formatBytes(blob.size);
+                if (infoDimension) infoDimension.textContent = `${originalWidth} × ${originalHeight}`;
+                if (infoType) infoType.textContent = 'PNG';
+                if (currentPixels) currentPixels.textContent = formatPixels(originalWidth * originalHeight);
+                if (targetWidth) targetWidth.value = originalWidth;
+                if (targetHeight) targetHeight.value = originalHeight;
+
+                if (downloadSection) downloadSection.style.display = 'inline-flex';
+                pushHistory(blob, label);
+                document.dispatchEvent(new CustomEvent('app:historyrestored'));
+                updatePreview(blob);
+            };
+            img.src = url;
+        };
+
         function enterCompare() {
             if (typeof historyStack === 'undefined' || historyStack.length === 0) {
                 showToast('তুলনা করার মতো কোনো ইতিহাস নেই', 'error');
@@ -4031,6 +4059,11 @@
         const wmTemplateGrid = document.getElementById('wmTemplateGrid');
 
         if (!wmTextEnabled || !wmLogoEnabled || !applyWatermarkBtn || !wmOverlay) return;
+
+        // Default: Enable Text Watermark with Warisha Fashion so controls are immediately visible and usable
+        wmTextEnabled.checked = true;
+        if (wmTextFields) wmTextFields.style.display = 'block';
+        if (wmText && !wmText.value.trim()) wmText.value = 'Warisha Fashion';
 
         let wmTextPos = { fx: 0.88, fy: 0.88 };
         let wmLogoPos = { fx: 0.88, fy: 0.88 };
