@@ -1392,13 +1392,13 @@ select:focus {
    BACKGROUND REMOVE TAB STYLES
    ============================================ */
 
-#tab-bgremove {
+#tab-bgremove.active {
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
-#tab-bgremove {
+#tab-bgremove.active {
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -1407,7 +1407,7 @@ select:focus {
 /* Upscale tab reuses the same accordion-card look as BG-remove (see
    .bg-method-card etc. above/below) — only the tab-level layout needs
    its own rule since #tab-bgremove's is ID-scoped. */
-#tab-upscale {
+#tab-upscale.active {
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -2595,6 +2595,26 @@ kbd {
 }
 .collage-help-notice button:hover {
     filter: brightness(1.15);
+}
+
+/* ===== OCR Tool Styles ===== */
+.ocr-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.ocr-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent-gradient);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+#ocrTextResult:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(230, 149, 33, 0.15);
 }
 
 

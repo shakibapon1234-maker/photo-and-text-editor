@@ -4852,4 +4852,132 @@
         });
     })(); // end initPwaModule
 
-})();
+    // ============================================
+    // OCR Module (Image to Text)
+    // ============================================
+    (function initOcrModule() {
+        const ocrLanguage = document.getElementById('ocrLanguage');
+        const ocrUseCurrentImage = document.getElementById('ocrUseCurrentImage');
+        const ocrUploadWrap = document.getElementById('ocrUploadWrap');
+        const ocrFileInput = document.getElementById('ocrFileInput');
+        const ocrProgress = document.getElementById('ocrProgress');
+        const ocrProgressFill = document.getElementById('ocrProgressFill');
+        const ocrStatus = document.getElementById('ocrStatus');
+        const ocrRunBtn = document.getElementById('ocrRunBtn');
+        const ocrResult = document.getElementById('ocrResult');
+        const ocrTextResult = document.getElementById('ocrTextResult');
+        const ocrCopyBtn = document.getElementById('ocrCopyBtn');
+        const ocrClearBtn = document.getElementById('ocrClearBtn');
+
+        let isOcrRunning = false;
+
+        ocrUseCurrentImage.addEventListener('change', () => {
+            ocrUploadWrap.style.display = ocrUseCurrentImage.checked ? 'none' : 'block';
+        });
+
+        ocrFileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                ocrUseCurrentImage.checked = false;
+                ocrUploadWrap.style.display = 'block';
+            }
+        });
+
+        function getOcrImageSource() {
+            if (ocrUseCurrentImage.checked) {
+                const img = originalImage || previewImage;
+                if (!img || !img.src) {
+                    showToast('প্রথমে একটি ছবি আপলোড করুন', 'error');
+                    return null;
+                }
+                return img;
+            }
+            if (!ocrFileInput.files.length) {
+                showToast('অনুগ্রহ করে একটি ছবি আপলোড করুন', 'error');
+                return null;
+            }
+            return ocrFileInput.files[0];
+        }
+
+        ocrRunBtn.addEventListener('click', async () => {
+            if (isOcrRunning) return;
+
+            const imageSource = getOcrImageSource();
+            if (!imageSource) return;
+
+            const lang = ocrLanguage.value;
+            isOcrRunning = true;
+            ocrRunBtn.disabled = true;
+            ocrRunBtn.classList.add('loading');
+            ocrProgress.style.display = 'block';
+            ocrResult.style.display = 'none';
+            ocrProgressFill.style.width = '0%';
+            ocrStatus.textContent = 'প্রসেস করছে... (প্রথমবারে ল্যাঙ্গুয়েজ ডাউনলোড হতে পারে)';
+
+            try {
+                const worker = await Tesseract.createWorker(lang, 1, {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            const pct = Math.round((m.progress || 0) * 100);
+                            ocrProgressFill.style.width = pct + '%';
+                            ocrStatus.textContent = 'টেক্সট রিকগনাইজ করছে... ' + pct + '%';
+                        } else if (m.status === 'loading language traineddata') {
+                            ocrStatus.textContent = 'ল্যাঙ্গুয়েজ ডাটা লোড হচ্ছে...';
+                        } else if (m.status === 'initializing api') {
+                            ocrStatus.textContent = 'OCR ইঞ্জিন প্রস্তুত হচ্ছে...';
+                        } else {
+                            ocrStatus.textContent = m.status || 'প্রসেস করছে...';
+                        }
+                    }
+                });
+
+                const { data: { text } } = await worker.recognize(imageSource);
+                await worker.terminate();
+
+                ocrTextResult.value = text.trim();
+                ocrResult.style.display = 'block';
+                ocrProgressFill.style.width = '100%';
+                ocrStatus.textContent = 'সম্পন্ন!';
+
+                if (text.trim()) {
+                    showToast('✅ টেক্সট সফলভাবে এক্সট্র্যাক্টেড হয়েছে!', 'success');
+                } else {
+                    showToast('⚠️ কোনো টেক্সট খুঁজে পাওয়া যায়নি', 'info');
+                }
+            } catch (err) {
+                console.error('OCR error:', err);
+                showToast('❌ OCR ত্রুটি: ' + err.message, 'error');
+                ocrStatus.textContent = 'ত্রুটি হয়েছে';
+            } finally {
+                isOcrRunning = false;
+                ocrRunBtn.disabled = false;
+                ocrRunBtn.classList.remove('loading');
+            }
+        });
+
+        ocrCopyBtn.addEventListener('click', async () => {
+            const text = ocrTextResult.value;
+            if (!text) return;
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast('📋 টেক্সট কপি করা হয়েছে!', 'success');
+            } catch (err) {
+                showToast('❌ কপি করা যায়নি', 'error');
+            }
+        });
+
+        ocrClearBtn.addEventListener('click', () => {
+            ocrTextResult.value = '';
+            ocrResult.style.display = 'none';
+            ocrProgress.style.display = 'none';
+            ocrProgressFill.style.width = '0%';
+            ocrFileInput.value = '';
+            ocrStatus.textContent = 'প্রসেস করছে...';
+        });
+
+        document.addEventListener('app:tabchange', (e) => {
+            if (e.detail !== 'ocr') return;
+            ocrUploadWrap.style.display = ocrUseCurrentImage.checked ? 'none' : 'block';
+        });
+    })(); // end initOcrModule
+
+})(); // end main app IIFE

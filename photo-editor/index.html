@@ -10,6 +10,9 @@
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 
+    <!-- Tesseract.js for OCR (Image to Text) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
     <!-- PWA / অফলাইন সাপোর্ট -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#121316">
@@ -182,6 +185,16 @@
                             <rect x="3" y="14" width="7" height="7" />
                         </svg>
                         <span>কোলাজ</span>
+                    </button>
+                    <button class="tab-btn" data-tab="ocr">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                        </svg>
+                        <span>টেক্সট ও দেখাও</span>
                     </button>
                 </div>
 
@@ -1185,6 +1198,61 @@
                         </div>
 
                         <button class="btn btn-primary btn-action" id="collageGenerateBtn" disabled>🖼️ কোলাজ তৈরি করুন</button>
+                    </div>
+                </div>
+
+                <!-- OCR Tool -->
+                <div class="tool-content" id="tab-ocr">
+                    <div class="tool-card">
+                        <h3>📝 ইমেজ থেকে টেক্সট (OCR)</h3>
+                        <p class="tool-desc">ছবির মধ্যে থাকা লেখা বের করে নিন — বাংলা ও ইংরেজি দুটোই সাপোর্টেড</p>
+
+                        <div class="form-group">
+                            <label>ভাষা সিলেক্ট করুন</label>
+                            <select id="ocrLanguage">
+                                <option value="eng">English (ইংরেজি)</option>
+                                <option value="ben">বাংলা (Bangla)</option>
+                                <option value="eng+ben" selected>বাংলা + English (দুবই)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="ocrUseCurrentImage" checked>
+                                <span class="checkmark"></span>
+                                বর্তমান ছবি ব্যবহার করুন
+                            </label>
+                        </div>
+
+                        <div class="form-group" id="ocrUploadWrap" style="display:none;">
+                            <label>অথবা নতুন ছবি আপলোড করুন</label>
+                            <input type="file" id="ocrFileInput" accept="image/*">
+                        </div>
+
+                        <div id="ocrProgress" style="display:none; margin-bottom:16px;">
+                            <div class="ocr-progress-bar">
+                                <div class="ocr-progress-fill" id="ocrProgressFill"></div>
+                            </div>
+                            <p id="ocrStatus" style="font-size:13px;color:var(--text-secondary);margin-top:8px;">প্রসেস করছে...</p>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="ocrRunBtn" type="button">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            টেক্সট বের করুন
+                        </button>
+
+                        <div class="result-preview" id="ocrResult" style="display:none;">
+                            <div class="form-group">
+                                <label>এক্সট্র্যাক্টেড টেক্সট:</label>
+                                <textarea id="ocrTextResult" readonly rows="8" placeholder="এক্সট্র্যাক্টেড টেক্সট এখানে দেখাবে..." style="width:100%;background:var(--bg-input);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:12px;color:var(--text-primary);font-family:'Inter',sans-serif;font-size:14px;resize:vertical;outline:none;"></textarea>
+                            </div>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                <button class="btn btn-secondary" id="ocrCopyBtn" type="button">📋 কপি করুন</button>
+                                <button class="btn btn-ghost" id="ocrClearBtn" type="button">🧹 ক্লিয়ার</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
