@@ -1,4 +1,8 @@
 const { app, BrowserWindow, Menu } = require('electron');
+
+try {
+    app.setAppUserModelId('com.shakib.photostudio');
+} catch (_) {}
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
@@ -79,7 +83,9 @@ function startInternalServer(callback) {
 }
 
 function createWindow() {
+    const iconPath = path.join(__dirname, 'icon.png');
     mainWindow = new BrowserWindow({
+        icon: fs.existsSync(iconPath) ? iconPath : undefined,
         width: 1440,
         height: 900,
         minWidth: 1024,
