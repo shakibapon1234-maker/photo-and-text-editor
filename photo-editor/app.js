@@ -110,6 +110,7 @@
     const historyList = document.getElementById('historyList');
     const historyCloseBtn = document.getElementById('historyCloseBtn');
     const historyDoneBtn = document.getElementById('historyDoneBtn');
+    const clearAllEditsBtn = document.getElementById('clearAllEditsBtn');
     const revertOriginalBtn = document.getElementById('revertOriginalBtn');
     const resetSessionBtn = document.getElementById('resetSessionBtn');
     const undoPaintBucketBtn = document.getElementById('undoPaintBucketBtn');
@@ -1473,6 +1474,61 @@
         historyModalOverlay.addEventListener('click', (e) => {
             if (e.target === historyModalOverlay) closeHistoryModal();
         });
+    }
+
+    async function clearAllEdits() {
+        if (!historyStack || historyStack.length === 0 || !originalImage) {
+            showToast('কোনো ফটো ওপেন করা নেই', 'error');
+            return;
+        }
+        await restoreHistoryAt(0);
+        // Reset results display
+        if (fileSizeResult) fileSizeResult.style.display = 'none';
+        if (pixelResult) pixelResult.style.display = 'none';
+        if (dimensionResult) dimensionResult.style.display = 'none';
+        if (brightnessResult) brightnessResult.style.display = 'none';
+        if (cropResult) cropResult.style.display = 'none';
+
+        // Reset sliders & values
+        if (brightnessSlider) {
+            brightnessSlider.value = 100;
+            if (brightnessValue) brightnessValue.textContent = '100';
+            brightnessSlider.style.setProperty('--slider-percent', '33.3%');
+        }
+        if (contrastSlider) {
+            contrastSlider.value = 100;
+            if (contrastValue) contrastValue.textContent = '100';
+            contrastSlider.style.setProperty('--slider-percent', '33.3%');
+        }
+        if (saturationSlider) {
+            saturationSlider.value = 100;
+            if (saturationValue) saturationValue.textContent = '100';
+            saturationSlider.style.setProperty('--slider-percent', '33.3%');
+        }
+
+        presetGrayscale = 0;
+        presetSepia = 0;
+        presetHueRotate = 0;
+        if (presetBrightBtns) presetBrightBtns.forEach(b => b.classList.remove('active'));
+
+        if (cropX) cropX.value = 0;
+        if (cropY) cropY.value = 0;
+        if (cropWidth) cropWidth.value = originalWidth;
+        if (cropHeight) cropHeight.value = originalHeight;
+        if (typeof drawCropPreview === 'function') drawCropPreview();
+
+        if (typeof clearColorPreview === 'function') clearColorPreview();
+        if (bgLassoCanvas && typeof lassoCtx !== 'undefined' && lassoCtx) lassoCtx.clearRect(0, 0, bgLassoCanvas.width, bgLassoCanvas.height);
+        if (bgCloneCanvas && typeof cloneCtx !== 'undefined' && cloneCtx) cloneCtx.clearRect(0, 0, bgCloneCanvas.width, bgCloneCanvas.height);
+        if (bgEraseCanvas && typeof eraseCtx !== 'undefined' && eraseCtx) eraseCtx.clearRect(0, 0, bgEraseCanvas.width, bgEraseCanvas.height);
+        if (bgWandCanvas && typeof wandCtx !== 'undefined' && wandCtx) wandCtx.clearRect(0, 0, bgWandCanvas.width, bgWandCanvas.height);
+
+        renderHistoryList();
+        showToast('🧹 সব এডিট মুছে আপলোড করা মূল ফটোতে ফিরিয়ে আনা হয়েছে', 'success');
+    }
+
+    if (clearAllEditsBtn) {
+        clearAllEditsBtn.addEventListener('click', clearAllEdits);
     }
 
     if (revertOriginalBtn) {

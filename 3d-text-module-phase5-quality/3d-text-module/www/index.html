@@ -18,6 +18,7 @@
       <span class="phase-badge">PLAN_3 — কার্ভড টেক্সট (Phase B1-B3)</span>
     </div>
     <div class="topbar-note" id="statusNote">মডেল/ফন্ট লোড হচ্ছে…</div>
+    <button type="button" id="topbarResetBtn" title="সব এডিট মুছে স্টুডিও রিসেট করুন" style="margin-left:auto; background:rgba(245,158,11,0.15); border:1px solid #f59e0b; color:#fbbf24; padding:5px 14px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">🧹 রিসেট / ক্লিয়ার অল</button>
   </div>
 
   <div class="workspace">
@@ -35,10 +36,11 @@
     </div>
 
     <aside class="panel">
-      <section class="panel-section">
+      <!-- 1. Content Type (Strictly at the VERY TOP of all functions) -->
+      <section class="panel-section" id="contentModeSection">
         <h3>কন্টেন্ট টাইপ</h3>
         <div class="preset-grid" id="contentModeGrid">
-          <button type="button" class="preset-btn" data-content="text">টেক্সট</button>
+          <button type="button" class="preset-btn active" data-content="text">টেক্সট</button>
           <button type="button" class="preset-btn" data-content="image">ছবি</button>
           <button type="button" class="preset-btn" data-content="sticker">স্টিকার/ব্যাজ</button>
           <button type="button" class="preset-btn" data-content="cube">🧊 ৩D কিউব বক্স</button>
@@ -125,13 +127,11 @@
           <button type="button" class="preset-btn" data-picture-style="reflected">রিফ্লেকশন ফ্রেম</button>
           <button type="button" class="preset-btn" data-picture-style="polaroid">পোলারয়েড (ঘোরানো)</button>
         </div>
-        <p class="field-note">
-          গোলাকার/ডিম্বাকার স্টাইলে Depth স্বয়ংক্রিয়ভাবে কম রাখা হয় (কার্ডের কিনারা
-          চৌকো থেকে যায় বলে)। রিফ্লেকশন ফ্রেম আসল ছবির নিচে একটা ফিকে, উল্টানো কপি বসায়।
-        </p>
       </section>
 
       <section class="panel-section" id="stickerContentSection" hidden>
+        
+
         <h3>স্টিকার/ব্যাজ টেক্সট</h3>
         <label class="field" style="align-items: flex-start;">
           <span style="margin-top: 6px;">কন্টেন্ট</span>
@@ -179,13 +179,16 @@
 
         <h3>ব্যাজ শেপ</h3>
         <div class="preset-grid" id="stickerShapeGrid">
-          <button type="button" class="preset-btn" data-sticker-shape="letterContour">🏆 লেটার আউটলাইন শেপ (Letter Contour)</button>
-          <button type="button" class="preset-btn active" data-sticker-shape="circle">গোল স্টিকার (Peeled)</button>
+          <button type="button" class="preset-btn active" data-sticker-shape="puffyBubble" style="border-color:#ef4444; font-weight:700;">🎈 পাফি বাবল গ্লো (ORDER NOW Style Contour)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="textBox" style="border-color:#f59e0b; font-weight:700;">📦 টেক্সট বক্স (3D Text Box)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="letterContour" style="border-color:#ffd700; font-weight:700;">🏆 Warisha Plate (গোল্ডেন প্লেট)</button>
+          <button type="button" class="preset-btn" data-sticker-shape="glassPlate">🪟 ফ্রস্টেড গ্লাস প্লেট</button>
+          <button type="button" class="preset-btn" data-sticker-shape="neonFrame">⚡ নিয়ন সাইবার ফ্রেম</button>
+          <button type="button" class="preset-btn" data-sticker-shape="circle">গোল স্টিকার (Peeled)</button>
           <button type="button" class="preset-btn" data-sticker-shape="roundedRect">রাউন্ড-রেক্ট ব্যাজ</button>
           <button type="button" class="preset-btn" data-sticker-shape="wavyBanner">🌊 ওয়েভি ব্যানার</button>
           <button type="button" class="preset-btn" data-sticker-shape="thoughtCloud">💭 থট ক্লাউড</button>
           <button type="button" class="preset-btn" data-sticker-shape="speechOval">💬 স্পিচ বাবল (ওভাল)</button>
-          <button type="button" class="preset-btn" data-sticker-shape="glassPlate">🪟 ফ্রস্টেড গ্লাস প্লেট</button>
           <button type="button" class="preset-btn" data-sticker-shape="waterRipple">💧 ওয়াটার ড্রপ ও রীপল</button>
           <button type="button" class="preset-btn" data-sticker-shape="whiteCutout">🏷️ হোয়াইট স্টিকার বর্ডার</button>
           <button type="button" class="preset-btn" data-sticker-shape="starburst">Starburst (Red)</button>
@@ -197,26 +200,12 @@
           <button type="button" class="preset-btn" data-sticker-shape="lowerThird">🎬 লোয়ার-থার্ড ভিডিও বার</button>
           <button type="button" class="preset-btn" data-sticker-shape="pill">💊 ক্যাপসুল / পিল শেপ</button>
           <button type="button" class="preset-btn" data-sticker-shape="heart">❤️ লাভ হার্ট ব্যাজ</button>
-          <button type="button" class="preset-btn" data-sticker-shape="neonFrame">⚡ নিয়ন সাইবার ফ্রেম</button>
           <button type="button" class="preset-btn" data-sticker-shape="radiant">Celebration Burst</button>
           <button type="button" class="preset-btn" data-sticker-shape="paintSplash">🎨 রং তুলির ছোঁয়া (Paint Splash)</button>
           <button type="button" class="preset-btn" data-sticker-shape="steelPlate">🛡️ খোদাই করা স্টিল প্লেট (Steel Engraved)</button>
           <button type="button" class="preset-btn" data-sticker-shape="woodenBlocks">🪵 ৩D কাঠের লেটার ব্লক (Wooden Cubes)</button>
           <button type="button" class="preset-btn" data-sticker-shape="redTiles">🔲 রেড স্ক্র্যাবল টাইল ব্লক (Red Game Tiles)</button>
           <button type="button" class="preset-btn" data-sticker-shape="letterBlocks">3D Letter Blocks</button>
-          <!-- Video Editor থেকে যুক্ত করা ১২টি টেক্সট বক্স ও ব্যাজ -->
-          <button type="button" class="preset-btn" data-sticker-shape="cyberCut">⚡ Cyber Cut (সাইবার কাট বক্স)</button>
-          <button type="button" class="preset-btn" data-sticker-shape="shimmerBorder">✨ Shimmer Border (শিমার গ্লো)</button>
-          <button type="button" class="preset-btn" data-sticker-shape="bracketFrame">🎯 Corner Brackets (HUD ফ্রেম)</button>
-          <button type="button" class="preset-btn" data-sticker-shape="doubleBorder">🖼️ Double Frame (ডাবল বর্ডার)</button>
-          <button type="button" class="preset-btn" data-sticker-shape="marker">🖍️ Marker (হাইলাইটার মার্কার)</button>
-          <button type="button" class="preset-btn" data-sticker-shape="tornPaper">📜 Torn Paper (ছেঁড়া কাগজ ব্যানার)</button>
-          <button type="button" class="preset-btn" data-sticker-shape="planeBanner">✈️ Plane Banner (প্লেন ব্যানার)</button>
-          <button type="button" class="preset-btn" data-sticker-shape="runningBorder">🟢 Running Border (ইলেকট্রিক বর্ডার)</button>
-          <button type="button" class="preset-btn" data-sticker-shape="scrollBanner">📜 Scroll Banner (স্ক্রল ব্যানার)</button>
-          <button type="button" class="preset-btn" data-sticker-shape="sixPointStar">⭐ 6-Point Star (৬-কোণা তারা)</button>
-          <button type="button" class="preset-btn" data-sticker-shape="badgeDot">🔴 Alert Dot Badge (নোটিফিকেশন ডট)</button>
-          <button type="button" class="preset-btn" data-sticker-shape="glowAura">💫 Glow Aura (সফট গ্লো বক্স)</button>
         </div>
 
         <label class="field" style="margin-top:10px;">
@@ -244,11 +233,10 @@
           <input type="checkbox" id="stickerWith3DTextCheckbox" />
           <span>🔥 থ্রিডি টেক্সট ব্যাজের উপরে (3D Text on Badge)</span>
         </label>
-        <p class="field-note" id="sticker3DNote" style="display:none;">ব্যাজের সামনে সত্যিকারের ৩D এক্সট্রুড টেক্সট ভাসবে। ফন্ট নির্বাচন, গভীরতা ও কালার উপরের কন্ট্রোল থেকে কাজ করবে।</p>
-        <p class="field-note">সাইজ ও গভীরতা নিচের "সাইজ ও গভীরতা" প্যানেল থেকে, আর হালকা ৩ডি টিল্ট/লাইটিং/শ্যাডো "Rotate / Tilt" ও অন্যান্য প্যানেল থেকেই কন্ট্রোল হয় — এখানে আলাদা করে দিতে হয় না।</p>
+        <p class="field-note" id="sticker3DNote" style="display:none;">ব্যাজের সামনে সত্যিকারের ৩D এক্সট্রুড টেক্সট ভাসবে।</p>
       </section>
 
-      <section class="panel-section" id="curveSection">
+<section class="panel-section" id="curveSection">
         <h3>কার্ভড (বাঁকা) টেক্সট</h3>
         <label class="field">
           <span>Curve Intensity</span>

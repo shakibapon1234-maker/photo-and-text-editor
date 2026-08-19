@@ -773,6 +773,19 @@ function drawCurvedLine(ctx, clusters, layout, centerX, baselineY) {
     ctx.restore();
   });
 }
+
+function drawCurvedLineStroke(ctx, clusters, layout, centerX, baselineY) {
+  clusters.forEach((cluster, i) => {
+    const c = layout.chars[i];
+    if (!c) return;
+    ctx.save();
+    ctx.translate(centerX + c.x, baselineY + c.y);
+    ctx.rotate(c.rotation);
+    ctx.strokeText(cluster, 0, 0);
+    ctx.restore();
+  });
+}
+
 function getFontStack(family) {
   if (!family || family === 'helvetiker' || family === 'Noto Sans Bengali') {
     return CANVAS_TEXT_FONT_STACK;
@@ -1873,32 +1886,46 @@ const STICKER_PAD_RATIO = 0.28; // base padding between shape edge and text, rel
 // headroom that must NOT be treated as part of the "body" the text centers
 // in).
 const STICKER_SHAPE_SIZING = {
-  circle: { square: false, padMul: 1.0 },
+  circle: { square: true, padMul: 1.35 },
+  textBox: { square: false, padMul: 0.85 },
+  puffyBubble: { square: false, padMul: 0.95 },
   roundedRect: { square: false, padMul: 1.0 },
-  wavyBanner: { square: false, padMul: 1.15 },
-  thoughtCloud: { square: false, padMul: 1.2, tailRatio: 0.22 },
-  speechOval: { square: false, padMul: 1.2, tailRatio: 0.2 },
-  glassPlate: { square: false, padMul: 1.05 },
-  waterRipple: { square: false, padMul: 1.1 },
-  whiteCutout: { square: false, padMul: 1.05 },
-  starburst: { square: false, padMul: 1.15 },
-  stamp: { square: false, padMul: 1.08 },
-  ribbon: { square: false, padMul: 1.15, pointExtraW: 0.22 },
-  speech: { square: false, padMul: 1.0, tailRatio: 0.2 },
-  hexagon: { square: false, padMul: 1.1 },
-  diamond: { square: false, padMul: 1.2 },
-  lowerThird: { square: false, padMul: 1.0 },
-  pill: { square: false, padMul: 1.05 },
-  heart: { square: false, padMul: 1.2 },
-  neonFrame: { square: false, padMul: 1.1 },
-  radiant: { square: false, padMul: 1.3 },
-  starSpray: { square: false, padMul: 1.4 },
-  letterBlocks: { square: false, padMul: 1.15 },
+  wavyBanner: { square: false, padMul: 1.2 },
+  thoughtCloud: { square: false, padMul: 1.35, tailRatio: 0.22 },
+  speechOval: { square: false, padMul: 1.25, tailRatio: 0.2 },
+  glassPlate: { square: false, padMul: 1.1 },
+  waterRipple: { square: false, padMul: 1.2 },
+  whiteCutout: { square: false, padMul: 1.1 },
+  starburst: { square: false, padMul: 1.7 },
+  stamp: { square: false, padMul: 1.45 },
+  ribbon: { square: false, padMul: 1.25, pointExtraW: 0.22 },
+  speech: { square: false, padMul: 1.15, tailRatio: 0.2 },
+  hexagon: { square: false, padMul: 1.4 },
+  diamond: { square: false, padMul: 1.6 },
+  lowerThird: { square: false, padMul: 1.15 },
+  pill: { square: false, padMul: 1.15 },
+  heart: { square: false, padMul: 1.5 },
+  neonFrame: { square: false, padMul: 1.25 },
+  radiant: { square: false, padMul: 1.5 },
+  starSpray: { square: false, padMul: 1.55 },
+  letterBlocks: { square: false, padMul: 1.2 },
   letterContour: { square: false, padMul: 0.95 },
-  paintSplash: { square: false, padMul: 1.3 },
-  steelPlate: { square: false, padMul: 1.15 },
-  woodenBlocks: { square: false, padMul: 1.1 },
-  redTiles: { square: false, padMul: 1.1 },
+  paintSplash: { square: false, padMul: 1.5 },
+  steelPlate: { square: false, padMul: 1.25 },
+  woodenBlocks: { square: false, padMul: 1.15 },
+  redTiles: { square: false, padMul: 1.15 },
+  cyberCut: { square: false, padMul: 1.25 },
+  shimmerBorder: { square: false, padMul: 1.2 },
+  bracketFrame: { square: false, padMul: 1.2 },
+  doubleBorder: { square: false, padMul: 1.2 },
+  marker: { square: false, padMul: 1.2 },
+  tornPaper: { square: false, padMul: 1.25 },
+  planeBanner: { square: false, padMul: 1.4 },
+  runningBorder: { square: false, padMul: 1.2 },
+  scrollBanner: { square: false, padMul: 1.35 },
+  sixPointStar: { square: false, padMul: 1.6 },
+  badgeDot: { square: false, padMul: 1.2 },
+  glowAura: { square: false, padMul: 1.25 },
 };
 
 // curveOpts (PLAN_3 §3.2 — curve works *inside* badges too):
@@ -1951,7 +1978,7 @@ function drawStickerCanvasTexture(
   const sizing = STICKER_SHAPE_SIZING[shape] || STICKER_SHAPE_SIZING.circle;
   const extraPadding = (borderWidth || 0) * 2 + (shadow ? 24 : 0);
   let padPx = Math.max(textMaxWidthPx, textBlockH) * STICKER_PAD_RATIO * sizing.padMul + extraPadding;
-  if (shape === 'speech') padPx += STICKER_FONT_PX * 0.8; // extra room for alarm clock icon
+  
   let canvasW;
   let bodyH;
   if (sizing.square) {
@@ -1987,7 +2014,7 @@ function drawStickerCanvasTexture(
   ctx.fillStyle = textColor;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const textCenterX = shape === 'speech' ? canvasW / 2 + Math.min(canvasW, bodyH) * 0.08 : canvasW / 2;
+  const textCenterX = canvasW / 2;
   const startY = bodyH / 2 - textBlockH / 2 + maxBulge + lineHeightPx / 2;
   if (shape === 'woodenBlocks' || shape === 'redTiles') {
     const raw = (text || ' ').trim();
@@ -2055,6 +2082,101 @@ function drawStickerCanvasTexture(
       ctx.fillStyle = '#ffffff';
       drawCurvedLine(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i);
     });
+    ctx.restore();
+    return { canvas, aspect: canvasW / canvasH };
+  }
+
+    if (shape === 'puffyBubble') {
+    ctx.save();
+    const fs = STICKER_FONT_PX;
+    ctx.font = `900 ${fs}px "Montserrat", "Arial Black", "Bungee", system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    // 1. Soft Warm Outer Glow / Drop Shadow (hugs each letter)
+    ctx.save();
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.48)';
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 10;
+    ctx.strokeStyle = '#d7c7b2';
+    ctx.lineWidth = fs * 0.72;
+    perLine.forEach(({ clusters, layout }, i) => {
+      drawCurvedLineStroke(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i);
+    });
+    ctx.restore();
+
+    // 2. Puffy 3D Bottom Bevel Shading
+    ctx.save();
+    ctx.strokeStyle = '#cfbea6';
+    ctx.lineWidth = fs * 0.64;
+    perLine.forEach(({ clusters, layout }, i) => {
+      drawCurvedLineStroke(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i + 6);
+    });
+    ctx.restore();
+
+    // 3. Cream / Ivory Puffy Bubble Body
+    ctx.save();
+    const creamColor = bgColor && bgColor !== '#e5484d' && bgColor !== '#dc2626' ? bgColor : '#fff8ee';
+    ctx.strokeStyle = creamColor;
+    ctx.lineWidth = fs * 0.58;
+    perLine.forEach(({ clusters, layout }, i) => {
+      drawCurvedLineStroke(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i);
+      ctx.fillStyle = creamColor;
+      drawCurvedLine(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i);
+    });
+    ctx.restore();
+
+    // 4. Glossy Upper Pillowy Highlight
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+    ctx.lineWidth = fs * 0.36;
+    perLine.forEach(({ clusters, layout }, i) => {
+      drawCurvedLineStroke(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i - 3.5);
+    });
+    ctx.restore();
+
+    // 5. 3D Dark Red Bottom Bevel under text
+    ctx.save();
+    ctx.strokeStyle = '#7f1d1d';
+    ctx.lineWidth = fs * 0.16;
+    perLine.forEach(({ clusters, layout }, i) => {
+      drawCurvedLineStroke(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i + 4);
+    });
+    ctx.restore();
+
+    // 6. Vibrant 3D Red Gradient Text Fill + Specular Gloss Dots
+    ctx.save();
+    perLine.forEach(({ clusters, layout }, i) => {
+      const lineY = startY + lineHeightPx * i;
+      const redGrad = ctx.createLinearGradient(0, lineY - fs * 0.5, 0, lineY + fs * 0.5);
+      redGrad.addColorStop(0, '#ff3b30');
+      redGrad.addColorStop(0.5, textColor && textColor !== '#ffffff' ? textColor : '#dc2626');
+      redGrad.addColorStop(1, '#991b1b');
+      ctx.fillStyle = redGrad;
+      drawCurvedLine(ctx, clusters, layout, textCenterX, lineY);
+
+      // Dark Red Inner Stroke
+      ctx.strokeStyle = '#881337';
+      ctx.lineWidth = Math.max(2, fs * 0.035);
+      drawCurvedLineStroke(ctx, clusters, layout, textCenterX, lineY);
+
+      // Specular Gloss Circles on top of letter curves
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      clusters.forEach((ch, ci) => {
+        const c = layout.chars[ci];
+        if (!c) return;
+        const lowCh = ch.toLowerCase();
+        if (lowCh === 'o' || lowCh === 'd' || lowCh === 'p' || lowCh === 'q' || lowCh === 'r' || lowCh === 'a' || lowCh === 'b' || lowCh === 'e' || lowCh === 'c' || lowCh === 'w') {
+          ctx.beginPath();
+          ctx.arc(textCenterX + c.x - fs * 0.10, lineY + c.y - fs * 0.16, fs * 0.085, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+    });
+    ctx.restore();
+
     ctx.restore();
     return { canvas, aspect: canvasW / canvasH };
   }
@@ -2454,10 +2576,11 @@ function drawWaterRippleBackground(ctx, w, h, color) {
   ctx.restore();
 }
 
+
 // 16. Lower Third Video Bar
 function drawLowerThirdBackground(ctx, w, h, color) {
   ctx.save();
-  ctx.fillStyle = color;
+  ctx.fillStyle = color || '#0f172a';
   ctx.fillRect(0, 0, w, h);
 
   ctx.fillStyle = '#ff0055';
@@ -2474,16 +2597,18 @@ function drawLowerThirdBackground(ctx, w, h, color) {
   ctx.restore();
 }
 
-// 17. Neon Frame Box
+// 17. Neon Frame Box (Dynamic User Base Color + Cyan Electric Glow)
 function drawNeonFrameBackground(ctx, w, h, color) {
   ctx.save();
-  ctx.fillStyle = 'rgba(10, 15, 30, 0.85)';
+  const bgFill = (color && color !== '#e5484d') ? color : 'rgba(10, 15, 30, 0.92)';
+  ctx.fillStyle = bgFill;
   drawRoundedRectPath(ctx, 6, 6, w - 12, h - 12, 10);
   ctx.fill();
 
-  ctx.shadowColor = color || '#00e5ff';
+  const neonColor = '#00e5ff';
+  ctx.shadowColor = neonColor;
   ctx.shadowBlur = 24;
-  ctx.strokeStyle = color || '#00e5ff';
+  ctx.strokeStyle = neonColor;
   ctx.lineWidth = 4;
   drawRoundedRectPath(ctx, 8, 8, w - 16, h - 16, 8);
   ctx.stroke();
@@ -2497,7 +2622,7 @@ function drawNeonFrameBackground(ctx, w, h, color) {
   ctx.restore();
 }
 
-// 18. Paint Splash Background (UNIQUE style)
+// 18. Paint Splash Background (Artistic Acrylic Splatter)
 function drawPaintSplashBackground(ctx, w, h) {
   ctx.save();
   const cx = w / 2;
@@ -2809,11 +2934,11 @@ function drawCyberCutBackground(ctx, w, h, color) {
     ctx.closePath();
   }
 
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+  ctx.fillStyle = color || 'rgba(15, 23, 42, 0.88)';
   makeCutPath();
   ctx.fill();
 
-  ctx.strokeStyle = color || '#00f0ff';
+  ctx.strokeStyle = '#00f0ff';
   ctx.lineWidth = 3;
   makeCutPath();
   ctx.stroke();
@@ -2829,17 +2954,17 @@ function drawCyberCutBackground(ctx, w, h, color) {
 function drawShimmerBorderBackground(ctx, w, h, color) {
   ctx.save();
   const r = Math.min(16, Math.min(w, h) * 0.2);
-  ctx.fillStyle = 'rgba(20, 24, 33, 0.85)';
+  ctx.fillStyle = color || 'rgba(20, 24, 33, 0.85)';
   drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, r);
   ctx.fill();
 
   const shimmer = ctx.createLinearGradient(0, 0, w, h);
   shimmer.addColorStop(0, '#38bdf8');
-  shimmer.addColorStop(0.3, color || '#ec4899');
+  shimmer.addColorStop(0.3, '#ec4899');
   shimmer.addColorStop(0.7, '#fbbf24');
   shimmer.addColorStop(1, '#a855f7');
 
-  ctx.shadowColor = color || '#ec4899';
+  ctx.shadowColor = '#ec4899';
   ctx.shadowBlur = 12;
   ctx.strokeStyle = shimmer;
   ctx.lineWidth = 3.5;
@@ -2851,10 +2976,10 @@ function drawShimmerBorderBackground(ctx, w, h, color) {
 // 24. Corner Brackets (HUD Frame)
 function drawBracketFrameBackground(ctx, w, h, color) {
   ctx.save();
-  ctx.fillStyle = 'rgba(10, 15, 26, 0.7)';
+  ctx.fillStyle = color || 'rgba(10, 15, 26, 0.7)';
   ctx.fillRect(8, 8, w - 16, h - 16);
 
-  const bColor = color || '#38bdf8';
+  const bColor = '#38bdf8';
   ctx.strokeStyle = bColor;
   ctx.lineWidth = 3.5;
   ctx.shadowColor = bColor;
@@ -2891,7 +3016,7 @@ function drawDoubleBorderBackground(ctx, w, h, color) {
 // 26. Highlighter Marker Stroke
 function drawMarkerBackground(ctx, w, h, color) {
   ctx.save();
-  ctx.globalAlpha = 0.55;
+  ctx.globalAlpha = 0.65;
   ctx.fillStyle = color || '#facc15';
   ctx.beginPath();
   ctx.moveTo(w * 0.02, h * 0.18);
@@ -2971,11 +3096,11 @@ function drawPlaneBannerBackground(ctx, w, h, color) {
 // 29. Electric Running Border Box
 function drawRunningBorderBackground(ctx, w, h, color) {
   ctx.save();
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.82)';
+  ctx.fillStyle = color || 'rgba(15, 23, 42, 0.82)';
   drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, 10);
   ctx.fill();
 
-  const neonColor = color || '#22c55e';
+  const neonColor = '#22c55e';
   ctx.shadowColor = neonColor;
   ctx.shadowBlur = 16;
   ctx.strokeStyle = neonColor;
@@ -3062,6 +3187,112 @@ function drawGlowAuraBackground(ctx, w, h, color) {
   ctx.restore();
 }
 
+// 33b. 3D Text Box (User-named "টেক্সট বক্স" — Rounded 3D capsule plate with bevel)
+function drawTextBoxBackground(ctx, w, h, color) {
+  ctx.save();
+  const pad = Math.min(w, h) * 0.05;
+  const radius = Math.min(w - pad * 2, h - pad * 2) * 0.35;
+  const cx = w / 2, cy = h / 2;
+
+  // 1. Soft Drop Shadow
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+  ctx.shadowBlur = Math.max(16, Math.min(w, h) * 0.09);
+  ctx.shadowOffsetY = Math.max(6, Math.min(w, h) * 0.045);
+
+  // 2. Base Color Plate — uses vibrant user color with clean subtle shading
+  const baseColor = (color && color !== '#e5484d') ? color : '#fef6e4';
+  const baseGrad = ctx.createLinearGradient(0, pad, 0, h - pad);
+  baseGrad.addColorStop(0, baseColor);
+  baseGrad.addColorStop(1, baseColor);
+  ctx.fillStyle = baseGrad;
+  drawRoundedRectPath(ctx, pad, pad, w - pad * 2, h - pad * 2, radius);
+  ctx.fill();
+
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+
+  // 3. Subtle Bevel edge
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.22)';
+  ctx.lineWidth = Math.max(2, Math.min(w, h) * 0.024);
+  drawRoundedRectPath(ctx, pad + 1, pad + 1, w - (pad + 1) * 2, h - (pad + 1) * 2, radius * 0.95);
+  ctx.stroke();
+
+  // 4. Gloss highlight
+  const topGrad = ctx.createLinearGradient(0, pad, 0, cy);
+  topGrad.addColorStop(0, 'rgba(255, 255, 255, 0.45)');
+  topGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = topGrad;
+  drawRoundedRectPath(ctx, pad + 3, pad + 2, w - (pad + 3) * 2, (h - pad * 2) * 0.46, radius * 0.85);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// 34. Puffy Bubble Contour Glow (ORDER NOW Style)
+function drawPuffyBubbleBackground(ctx, w, h, color, text) {
+  const rawText = (text && text.trim().length > 0) ? text : (state.stickerText || 'ORDER\nNOW');
+  const lines = rawText.split(/\r?\n/).map(l => l.length > 0 ? l : ' ');
+  const cx = w / 2;
+
+  ctx.save();
+  const maxLineLen = Math.max(...lines.map(l => l.length), 4);
+  const fontPx = Math.max(32, Math.min(Math.round(h / (lines.length * 1.45)), Math.round(w / (maxLineLen * 0.78))));
+  ctx.font = `900 ${fontPx}px "Montserrat", "Arial Black", "Bungee", system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  const lineHeight = fontPx * 1.30;
+  const totalTextH = (lines.length - 1) * lineHeight;
+  const startY = (h / 2) - (totalTextH / 2);
+
+  // 1. Soft Warm Outer Glow / Drop Shadow
+  ctx.save();
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.50)';
+  ctx.shadowBlur = Math.max(16, fontPx * 0.32);
+  ctx.shadowOffsetY = Math.max(6, fontPx * 0.12);
+  ctx.strokeStyle = '#d7c7b2';
+  ctx.lineWidth = fontPx * 0.72;
+  lines.forEach((line, idx) => {
+    ctx.strokeText(line, cx, startY + idx * lineHeight);
+  });
+  ctx.restore();
+
+  // 2. Puffy 3D Bottom Bevel Shading
+  ctx.save();
+  ctx.strokeStyle = '#cfbea6';
+  ctx.lineWidth = fontPx * 0.64;
+  lines.forEach((line, idx) => {
+    ctx.strokeText(line, cx, startY + idx * lineHeight + fontPx * 0.07);
+  });
+  ctx.restore();
+
+  // 3. Cream / Ivory Puffy Bubble Body
+  ctx.save();
+  const creamColor = color && color !== '#e5484d' && color !== '#dc2626' ? color : '#fff8ee';
+  ctx.strokeStyle = creamColor;
+  ctx.lineWidth = fontPx * 0.58;
+  lines.forEach((line, idx) => {
+    ctx.strokeText(line, cx, startY + idx * lineHeight);
+    ctx.fillStyle = creamColor;
+    ctx.fillText(line, cx, startY + idx * lineHeight);
+  });
+  ctx.restore();
+
+  // 4. Glossy Upper Pillowy Highlight
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+  ctx.lineWidth = fontPx * 0.36;
+  lines.forEach((line, idx) => {
+    ctx.strokeText(line, cx, startY + idx * lineHeight - fontPx * 0.04);
+  });
+  ctx.restore();
+
+  ctx.restore();
+}
+
 function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, borderColor = '#ffffff', shadow = false) {
   const cx = w / 2;
   const cy = bodyH / 2;
@@ -3076,6 +3307,13 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
 
   ctx.fillStyle = color;
   switch (shape) {
+    case 'textBox':
+      drawTextBoxBackground(ctx, w, bodyH, color);
+      break;
+    case 'puffyBubble':
+      // puffyBubble is rendered entirely in the canvas texture drawing branch below;
+      // we just fill transparent here so drawStickerShape doesn't overdraw it.
+      break;
     case 'wavyBanner':
       drawWavyBannerPath(ctx, 4, 4, w - 8, bodyH - 8);
       ctx.fill();
@@ -3148,13 +3386,12 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
     case 'speech':
       drawSpeechBubblePath(ctx, 0, 0, w, bodyH, tailPx, Math.min(w, bodyH) * 0.18);
       ctx.fill();
-      drawAlarmClockIcon(ctx, Math.min(w, bodyH) * 0.04, Math.min(w, bodyH) * 0.06, Math.min(w, bodyH) * 0.22, '#d32f2f');
       break;
     case 'radiant': {
       drawCelebrationRays(ctx, cx, cy, outerR);
       const coreW = w * 0.75;
       const coreH = bodyH * 0.55;
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = color || '#ffffff';
       drawRoundedRectPath(ctx, (w - coreW) / 2, (bodyH - coreH) / 2, coreW, coreH, 8);
       ctx.fill();
       drawConfettiStars(ctx, cx, cy, outerR, color);
@@ -3394,18 +3631,19 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
       // to the badge's default white and multicolour/pattern had no path.
       let mat3D;
       let multicolorPalette = null;
-      if (state.colorMode === 'gradient') {
+      const activeTextColor = textColor || state.stickerTextColor || '#ffffff';
+      if (state.colorMode === 'gradient' && state.contentMode !== 'sticker') {
         const gradTex = createGradientTexture(state);
         mat3D = buildMaterialWithTexture(state.materialType, '#ffffff', gradTex);
         group.userData.gradTex3D = gradTex;
-      } else if (state.colorMode === 'pattern') {
+      } else if (state.colorMode === 'pattern' && state.contentMode !== 'sticker') {
         const patTex = createPatternCanvasTexture();
         mat3D = buildMaterialWithTexture(state.materialType, '#ffffff', patTex);
         group.userData.patTex3D = patTex;
-      } else if (state.colorMode === 'multicolor') {
+      } else if (state.colorMode === 'multicolor' && state.contentMode !== 'sticker') {
         multicolorPalette = getMulticolorPalette();
       } else {
-        mat3D = buildMaterial(state.materialType, state.color || '#ffffff');
+        mat3D = buildMaterial(state.materialType, activeTextColor);
       }
 
       const text3DGroup = new THREE.Group();
@@ -3512,6 +3750,7 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
         }
       });
 
+            text3DGroup.updateMatrixWorld(true);
       // Measure 3D text bounds to dynamically size the background box
       const textBBox = new THREE.Box3().setFromObject(text3DGroup);
       const centerVec = new THREE.Vector3();
@@ -3519,18 +3758,25 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
       const text3DW = Math.max(fontSize3D * 1.5, textBBox.max.x - textBBox.min.x);
       const text3DH = Math.max(fontSize3D * 0.9, textBBox.max.y - textBBox.min.y);
 
-      // Safe padding around 3D text scaled by bScale
-      const padX = (text3DW * 0.12 + fontSize3D * 0.35) * bScale;
-      const padY = (text3DH * 0.28 + fontSize3D * 0.45) * bScale;
-      let worldWidth = (text3DW + padX * 2) * bScale + (borderOpts.borderWidth || 0) * 1.2;
-      let worldHeight = (text3DH + padY * 2) * bScale + (borderOpts.borderWidth || 0) * 1.2;
+      // Dynamic shape-aware padding to ensure 3D text NEVER overflows badge bounds
+      const shapeSizing = STICKER_SHAPE_SIZING[shape] || { padMul: 1.0 };
+      const padMul = shapeSizing.padMul || 1.0;
+      let padX, padY;
+      if (shape === 'textBox' || shape === 'puffyBubble') {
+        padX = (text3DW * 0.06 + fontSize3D * 0.22) * bScale;
+        padY = (text3DH * 0.08 + fontSize3D * 0.18) * bScale;
+      } else {
+        padX = (text3DW * 0.10 + fontSize3D * 0.35) * padMul * bScale;
+        padY = (text3DH * 0.12 + fontSize3D * 0.30) * padMul * bScale;
+      }
+      let worldWidth = (text3DW + padX * 2) + (borderOpts.borderWidth || 0) * 1.2;
+      let worldHeight = (text3DH + padY * 2) + (borderOpts.borderWidth || 0) * 1.2;
 
       // In standing mode, the base floor plate has ample surface depth
       if (state.stickerMode === 'standing') {
         worldHeight = Math.max(worldHeight, textDepth * 2.8 + 24);
+        worldWidth = Math.max(worldWidth, worldHeight * 1.15);
       }
-
-      worldWidth = Math.max(worldWidth, worldHeight * 1.15);
 
       if (usesIndividualLetterTiles) {
         // Match the centres used by drawWoodenBlocksBackground() and
@@ -4504,10 +4750,11 @@ function loadStudioState() {
     const saved = JSON.parse(raw);
     if (!saved) return;
 
-    if (saved.text !== undefined && textInput) {
-      state.text = saved.text;
-      textInput.value = saved.text;
-    }
+    const savedSharedText = (saved.stickerText && saved.stickerText.trim().length > 0) ? saved.stickerText : (saved.text || 'Warisha Fashion');
+    state.text = savedSharedText;
+    state.stickerText = savedSharedText;
+    if (textInput) textInput.value = savedSharedText;
+    if (stickerTextInput) stickerTextInput.value = savedSharedText;
     if (saved.fontFamily && fontSelect) {
       state.fontFamily = saved.fontFamily;
       fontSelect.value = saved.fontFamily;
@@ -4671,9 +4918,11 @@ function loadStudioState() {
       state.autoRotate = saved.autoRotate;
       autoRotateToggle.checked = saved.autoRotate;
     }
-    if (saved.stickerText !== undefined && stickerTextInput) {
+    if (saved.stickerText !== undefined) {
       state.stickerText = saved.stickerText;
-      stickerTextInput.value = saved.stickerText;
+      state.text = saved.stickerText;
+      if (stickerTextInput) stickerTextInput.value = saved.stickerText;
+      if (textInput) textInput.value = saved.stickerText;
     }
     if (saved.stickerShape && stickerShapeGrid) {
       state.stickerShape = saved.stickerShape;
@@ -5746,3 +5995,64 @@ function animate(now) {
   renderer.render(scene, camera);
 }
 animate();
+
+// ---------- Reset 3D Text Studio to Defaults ----------
+function reset3DStudio() {
+  state.contentMode = 'text';
+  state.text = 'Warisha Fashion';
+  state.stickerText = 'Warisha Fashion';
+  state.fontFamily = 'helvetiker';
+  state.size = 70;
+  state.depth = 18;
+  state.colorMode = 'gradient';
+  state.gradientPreset = 'gold';
+  state.color = '#ffd700';
+  state.materialType = 'glossy';
+  state.stickerShape = 'puffyBubble';
+  state.stickerMode = 'standing';
+  state.stickerWith3DText = true;
+  state.stickerBgColor = '#fef6e4';
+  state.stickerTextColor = '#dc2626';
+  state.stickerBorderWidth = 0;
+  state.stickerBorderColor = '#ffffff';
+  state.stickerShadow = false;
+  state.stickerTextScale = 100;
+  state.stickerBoxScale = 100;
+  state.stickerBoxTilt = 0;
+  state.stickerTextTilt = 0;
+  state.stickerTextOffsetY = 0;
+  state.curveIntensity = 0;
+  state.curveSpacing = 1.0;
+  state.rotX = 0;
+  state.rotY = 20;
+  state.rotZ = 0;
+  state.posX = 0;
+  state.posY = 0;
+
+  if (textInput) textInput.value = state.text;
+  if (stickerTextInput) stickerTextInput.value = state.stickerText;
+  if (sizeRange) sizeRange.value = 70;
+  if (depthRange) depthRange.value = 18;
+  if (rotXRange) rotXRange.value = 0;
+  if (rotYRange) rotYRange.value = 20;
+  if (rotZRange) rotZRange.value = 0;
+  if (posXRange) posXRange.value = 0;
+  if (posYRange) posYRange.value = 0;
+
+  if (contentModeGrid) setActivePreset(contentModeGrid, 'content', 'text');
+  if (textContentSection) textContentSection.hidden = false;
+  if (imageContentSection) imageContentSection.hidden = true;
+  if (stickerContentSection) stickerContentSection.hidden = true;
+  if (cubeContentSection) cubeContentSection.hidden = true;
+
+  try { localStorage.removeItem('studio_state_plan3'); } catch(_) {}
+  rebuildTextMesh();
+}
+
+const reset3DStudioBtn = document.getElementById('reset3DStudioBtn');
+if (reset3DStudioBtn) reset3DStudioBtn.addEventListener('click', reset3DStudio);
+
+const topbarResetBtn = document.getElementById('topbarResetBtn');
+if (topbarResetBtn) topbarResetBtn.addEventListener('click', reset3DStudio);
+
+window.reset3DStudio = reset3DStudio;

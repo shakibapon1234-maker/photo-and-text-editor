@@ -116,9 +116,11 @@ body {
 
 /* ===== App Container ===== */
 .app-container {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 0 20px 40px;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 8px 16px 24px;
+    box-sizing: border-box;
 }
 
 /* ===== Upload Section ===== */
@@ -211,13 +213,12 @@ body {
 /* ===== Editor Section ===== */
 .editor-section {
     display: grid;
-    /* Phase 2: preview column is now flexible instead of a fixed 380px
-       sidebar, so the preview can breathe on wide screens while the
-       tools panel keeps a sane minimum width. */
-    grid-template-columns: minmax(360px, 1.15fr) minmax(380px, 1fr);
-    gap: 24px;
-    animation: fadeInUp 0.5s ease;
+    grid-template-columns: var(--sidebar-width, 450px) 14px 1fr;
+    gap: 0;
+    animation: fadeInUp 0.4s ease;
     align-items: start;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 @keyframes fadeInUp {
@@ -232,16 +233,93 @@ body {
     }
 }
 
+/* ===== Tools Panel (Photoshop-style dock + scrollable pane) =====
+   Sticky like the preview card, but capped to the viewport height with
+   internal scrolling, so a long tool (BG remove, with 7 methods) never
+   forces the whole page to grow — only this card's own content scrolls. */
+.tools-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: sticky;
+    top: 10px;
+    max-height: calc(100vh - 20px);
+    z-index: 20;
+    padding-right: 8px;
+    min-width: 0;
+}
+
+
+/* ===== Splitter Resizer Handle (Drag to Resize) ===== */
+.resizer-handle {
+    width: 14px;
+    cursor: col-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    min-height: 400px;
+    z-index: 25;
+    user-select: none;
+    touch-action: none;
+    position: relative;
+    transition: background 0.15s ease;
+    border-radius: 4px;
+}
+
+.resizer-bar {
+    width: 4px;
+    height: 64px;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.resizer-handle:hover,
+.resizer-handle.dragging {
+    background: rgba(230, 149, 33, 0.12);
+}
+
+.resizer-handle:hover .resizer-bar,
+.resizer-handle.dragging .resizer-bar {
+    background: var(--accent-primary);
+    box-shadow: 0 0 12px var(--accent-glow), 0 0 4px var(--accent-primary);
+    height: 100px;
+    width: 5px;
+}
+
+.tools-panel-body {
+    display: flex;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+}
+
+/* Download button sits outside the scrollable pane, at the panel's fixed
+   footer, so it's always reachable without scrolling through a tool. */
+.tools-panel .download-section {
+    flex-shrink: 0;
+}
+
 /* ===== Preview Panel ===== */
+.preview-panel {
+    padding-left: 8px;
+    width: 100%;
+    min-width: 0;
+}
+
 .preview-card {
-    background: rgba(28, 29, 32, 0.6);
-    backdrop-filter: blur(15px);
+    background: rgba(24, 25, 29, 0.75);
+    backdrop-filter: blur(16px);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
-    padding: 20px;
+    padding: 16px 20px 20px;
     box-shadow: var(--shadow-md);
     position: sticky;
-    top: 20px;
+    top: 10px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .preview-header {
@@ -256,11 +334,49 @@ body {
     font-weight: 600;
 }
 
+
 .preview-header-actions {
     display: flex;
     align-items: center;
-    gap: 4px;
+    flex-wrap: wrap;
+    gap: 6px;
 }
+
+.preview-header .download-section {
+    display: inline-flex;
+    margin-left: 6px;
+}
+
+.btn-download {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 7px 16px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-md);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(16, 185, 129, 0.35);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+}
+
+.btn-download:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.55);
+    transform: translateY(-1px);
+}
+
+.btn-download:active {
+    transform: translateY(0);
+}
+
 
 #previewFloatBtn.active {
     color: var(--accent-primary);
@@ -326,20 +442,25 @@ body {
 
 .preview-image-wrapper {
     width: 100%;
-    /* Phase 2: fixed 4:3 cap removed — height now follows the image's own
-       proportions (up to a sane viewport-relative cap) instead of forcing
-       every photo into a letterboxed 4:3 box. */
-    min-height: 220px;
-    max-height: min(70vh, 640px);
+    min-height: 440px;
+    max-height: calc(100vh - 190px);
     height: auto;
     border-radius: var(--radius-md);
     overflow: hidden;
-    background: var(--bg-primary);
+    background: #141518;
+    background-image: 
+        linear-gradient(45deg, #191b20 25%, transparent 25%), 
+        linear-gradient(-45deg, #191b20 25%, transparent 25%), 
+        linear-gradient(45deg, transparent 75%, #191b20 75%), 
+        linear-gradient(-45deg, transparent 75%, #191b20 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    margin-bottom: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
 }
 
 .preview-image-wrapper img {
@@ -398,23 +519,23 @@ body {
 }
 
 /* ===== Tool Tabs =====
-   A wrapping grid of icon-over-label buttons (Photoshop/Premiere tool-dock
-   style), not a flex row forced onto one line. The previous version used
-   `display:flex` + `flex:1` + `white-space:nowrap` on every tab: flex items
-   don't shrink below their own text's natural width by default, so with six
-   Bangla labels + icons the row's total width regularly exceeded the panel
-   and tabs spilled past the card edge on desktop. A wrapping grid with
-   min-width:0 on each cell fixes that structurally instead of hiding labels
-   below 800px and hoping it never overflows above that. */
+   Photoshop-style tool dock: a vertical icon rail that stays put while only
+   the panel beside it scrolls, so switching tools never sends the person
+   back to the top of a long page. (Collapses to a horizontal strip on
+   narrow screens — see the responsive block below.) */
 .tool-tabs {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
-    gap: 4px;
-    background: rgba(16, 17, 19, 0.6);
-    padding: 4px;
+    grid-auto-flow: row;
+    grid-template-columns: 1fr;
+    gap: 5px;
+    background: rgba(16, 17, 19, 0.7);
+    padding: 8px 6px;
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
-    margin-bottom: 20px;
+    flex-shrink: 0;
+    width: 88px;
+    align-content: flex-start;
+    overflow-y: auto;
 }
 
 .tab-btn {
@@ -424,13 +545,13 @@ body {
     align-items: center;
     justify-content: center;
     gap: 5px;
-    padding: 10px 6px;
+    padding: 10px 4px;
     background: transparent;
     border: none;
     border-radius: var(--radius-sm);
     color: var(--text-secondary);
     font-family: 'Inter', sans-serif;
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 500;
     line-height: 1.2;
     cursor: pointer;
@@ -456,6 +577,33 @@ body {
 
 .tab-btn svg {
     flex-shrink: 0;
+}
+
+/* The scrollable pane next to the tool dock. Only this area scrolls when a
+   tool's content is tall (e.g. BG remove) — the dock and the rest of the
+   page stay where they are. */
+.tool-panels {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-active) transparent;
+}
+
+.tool-panels::-webkit-scrollbar {
+    width: 6px;
+}
+
+.tool-panels::-webkit-scrollbar-thumb {
+    background: rgba(230, 149, 33, 0.3);
+    border-radius: 3px;
+}
+
+.tool-panels::-webkit-scrollbar-thumb:hover {
+    background: rgba(230, 149, 33, 0.5);
 }
 
 /* ===== Tool Content ===== */
@@ -914,15 +1062,57 @@ select:focus {
 .btn-download {
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
     color: white;
-    padding: 16px 32px;
-    font-size: 15px;
-    width: 100%;
     box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
 }
 
 .btn-download:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 25px rgba(16, 185, 129, 0.45);
+}
+
+/* ===== Rotate / Flip Toolbar (Phase 7) ===== */
+.rotate-flip-card {
+    margin-bottom: 20px;
+}
+
+.rotate-flip-toolbar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+}
+
+.btn-rotate-flip {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 14px 10px;
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-rotate-flip .rf-icon {
+    font-size: 22px;
+    line-height: 1;
+    color: var(--accent-secondary);
+}
+
+.btn-rotate-flip:hover {
+    border-color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.1);
+    transform: translateY(-1px);
+}
+
+.btn-rotate-flip.loading {
+    pointer-events: none;
+    opacity: 0.6;
 }
 
 /* ===== Crop Canvas ===== */
@@ -1002,6 +1192,11 @@ select:focus {
     background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), var(--bg-card));
 }
 
+.toast.info {
+    border-color: rgba(59, 130, 246, 0.4);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), var(--bg-card));
+}
+
 /* ===== Floating Preview Window (Phase 2) ===== */
 .preview-placeholder {
     display: flex;
@@ -1059,17 +1254,30 @@ select:focus {
 }
 
 /* ===== Responsive ===== */
-@media (max-width: 800px) {
+@media (max-width: 860px) {
     .editor-section {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr !important;
+        gap: 14px;
+    }
+
+    .resizer-handle {
+        display: none !important;
+    }
+
+    .preview-panel {
+        order: 1;
+        padding-left: 0;
+    }
+
+    .tools-panel {
+        order: 2;
+        padding-right: 0;
+        position: static;
+        max-height: none;
     }
 
     .preview-card {
         position: static;
-    }
-
-    .tool-tabs {
-        grid-template-columns: repeat(3, 1fr);
     }
 
     .pixel-presets,
@@ -1091,6 +1299,46 @@ select:focus {
     .link-icon {
         align-self: center;
         transform: rotate(90deg);
+    }
+
+    /* Tools panel on mobile: the vertical icon dock (great for wide screens)
+       would eat too much of a narrow screen's width, so it becomes a
+       horizontal, sticky-at-top icon strip instead — Photoshop's tool dock
+       turns into a mobile toolbar rather than disappearing. The panel below
+       it is no longer pinned to the viewport (that reads oddly once the
+       preview image is scrolled past), but it keeps its own capped height +
+       internal scroll, so a long tool like BG remove still doesn't balloon
+       the page — you scroll the panel once, not the whole page over and
+       over. */
+    .tools-panel {
+        position: static;
+        max-height: none;
+    }
+
+    .tools-panel-body {
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .tool-tabs {
+        width: auto;
+        display: flex;
+        flex-direction: row;
+        overflow-x: auto;
+        overflow-y: visible;
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: var(--bg-primary);
+    }
+
+    .tab-btn {
+        flex: 0 0 auto;
+        min-width: 76px;
+    }
+
+    .tool-panels {
+        max-height: 62vh;
     }
 }
 
@@ -1144,27 +1392,95 @@ select:focus {
    BACKGROUND REMOVE TAB STYLES
    ============================================ */
 
-#tab-bgremove {
+#tab-bgremove.active {
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
+#tab-bgremove.active {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Upscale tab reuses the same accordion-card look as BG-remove (see
+   .bg-method-card etc. above/below) — only the tab-level layout needs
+   its own rule since #tab-bgremove's is ID-scoped. */
+#tab-upscale.active {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Accordion: each method is a card whose header is a full-width button.
+   Only one body is visible at a time (state applied via .open by JS), so
+   the tallest tab in the app (7 methods) no longer forces one long scroll —
+   picking a method collapses the rest out of the way. */
 .bg-method-card {
+    padding: 0;
+    overflow: hidden;
     border-left: 3px solid var(--accent-primary);
     transition: var(--transition);
 }
 
 .bg-method-card:hover {
     border-left-color: var(--accent-secondary);
-    transform: translateX(2px);
+}
+
+.bg-method-card.open {
+    box-shadow: inset 0 0 0 1px var(--border-active);
 }
 
 .bg-method-header {
+    width: 100%;
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    margin-bottom: 14px;
+    padding: 16px 18px;
+    margin-bottom: 0;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    color: inherit;
+    transition: var(--transition);
+}
+
+.bg-method-header:hover {
+    background: rgba(230, 149, 33, 0.06);
+}
+
+.bg-method-title {
+    flex: 1;
+    min-width: 0;
+}
+
+.bg-method-title .tool-desc {
+    margin-bottom: 0;
+}
+
+.bg-method-chevron {
+    flex-shrink: 0;
+    margin-top: 3px;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.bg-method-card.open .bg-method-chevron {
+    transform: rotate(180deg);
+    color: var(--accent-primary);
+}
+
+.bg-method-body {
+    display: none;
+    padding: 0 18px 20px;
+}
+
+.bg-method-card.open .bg-method-body {
+    display: block;
+    animation: fadeIn 0.2s ease;
 }
 
 .bg-method-icon {
@@ -1512,3 +1828,793 @@ kbd {
 #wandBtn.active {
     outline: 2px solid var(--accent);
 }
+
+/* ===== History Modal & Drawer ===== */
+.history-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(5px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.history-modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    width: 500px;
+    max-width: 92vw;
+    max-height: 82vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+.history-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+.history-modal-header h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.history-close-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 24px;
+    cursor: pointer;
+    line-height: 1;
+}
+.history-close-btn:hover {
+    color: var(--text-primary);
+}
+.history-modal-body {
+    padding: 16px 20px;
+    flex: 1;
+    overflow-y: auto;
+}
+.history-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+.history-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-radius: var(--radius-md);
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: var(--transition);
+}
+.history-item:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--accent-primary);
+}
+.history-item.active {
+    background: rgba(230, 149, 33, 0.18);
+    border-color: var(--accent-primary);
+    font-weight: 600;
+}
+.history-item-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+.history-item-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+}
+.history-item.active .history-item-badge {
+    background: var(--accent-primary);
+    color: #000;
+    font-weight: 700;
+}
+.history-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+/* ================================================================
+   Social Media Auto-Size Tool
+   ================================================================ */
+.social-preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+
+.preset-btn-social {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 12px 12px;
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.preset-btn-social strong {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.preset-btn-social small {
+    font-size: 11px;
+    color: var(--accent-secondary, var(--accent-primary));
+    font-weight: 600;
+}
+
+.preset-btn-social em {
+    font-size: 11px;
+    font-style: normal;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.preset-btn-social:hover {
+    border-color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.1);
+    transform: translateY(-1px);
+}
+
+.preset-btn-social.active {
+    border-color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.15);
+    box-shadow: 0 0 10px rgba(230, 149, 33, 0.2);
+}
+
+.social-mode-group {
+    margin-top: 4px;
+}
+
+.mode-toggle {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.mode-option {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: var(--transition);
+    text-align: center;
+}
+
+.mode-option small {
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.mode-option input[type="radio"] {
+    display: none;
+}
+
+.mode-option.active,
+.mode-option:has(input:checked) {
+    border-color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.15);
+    color: var(--text-primary);
+}
+
+.mode-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* ================================================================
+   Bulk Resize
+   ================================================================ */
+.btn-bulk-open {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 10px 18px;
+    justify-content: center;
+    margin-left: auto;
+}
+
+@media (max-width: 720px) {
+    .app-header {
+        flex-wrap: wrap;
+        row-gap: 10px;
+    }
+    .btn-bulk-open {
+        margin-left: 0;
+        width: 100%;
+    }
+}
+
+.btn-bulk-open:hover {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.08);
+}
+
+.bulk-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(5px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.bulk-modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    width: 640px;
+    max-width: 96vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+
+.bulk-modal-body {
+    padding: 16px 20px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.bulk-upload-area {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 24px 16px;
+    text-align: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: var(--transition);
+    margin-bottom: 16px;
+}
+
+.bulk-upload-area:hover,
+.bulk-upload-area.drag-over {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.06);
+}
+
+.bulk-upload-area svg {
+    margin-bottom: 8px;
+}
+
+.bulk-upload-area p {
+    font-size: 13px;
+    margin: 0;
+}
+
+.bulk-thumbs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.bulk-thumb {
+    position: relative;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    aspect-ratio: 1 / 1;
+    background: var(--bg-input);
+}
+
+.bulk-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.bulk-thumb .bulk-thumb-remove {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bulk-thumb .bulk-thumb-name {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 9px;
+    padding: 2px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bulk-thumb .bulk-thumb-status {
+    position: absolute;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 18px;
+}
+
+.bulk-thumb.done .bulk-thumb-status {
+    display: flex;
+}
+
+.bulk-progress {
+    margin-top: 10px;
+}
+
+.bulk-progress-bar {
+    width: 100%;
+    height: 8px;
+    border-radius: 6px;
+    background: var(--bg-input);
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    margin-bottom: 6px;
+}
+
+.bulk-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent-gradient);
+    transition: width 0.2s ease;
+}
+
+.bulk-progress span {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* ===== Watermark Tool (Phase 9) ===== */
+.wm-section {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    margin-bottom: 16px;
+}
+
+.wm-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.wm-toggle input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent-primary);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.wm-fields {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-color);
+}
+
+.wm-position-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    max-width: 150px;
+}
+
+.wm-position-grid button {
+    width: 100%;
+    aspect-ratio: 1;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    padding: 0;
+}
+
+.wm-position-grid button::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transform: translate(-50%, -50%);
+}
+
+.wm-position-grid button:hover {
+    border-color: var(--accent-primary);
+}
+
+.wm-position-grid button.active {
+    border-color: var(--accent-primary);
+    background: rgba(230, 149, 33, 0.15);
+}
+
+.wm-position-grid button.active::after {
+    background: var(--accent-primary);
+}
+
+.wm-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 10px;
+    line-height: 1.5;
+}
+
+/* Live drag-to-position overlay, sits on top of previewImage inside
+   #previewImageWrapper — same "absolute layer over the image" approach
+   as the BG-remove module's lasso/clone/erase canvases. */
+.wm-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 14;
+    pointer-events: none;
+}
+
+.wm-handle {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    cursor: move;
+    pointer-events: auto;
+    user-select: none;
+    touch-action: none;
+}
+
+.wm-handle-text {
+    white-space: nowrap;
+    font-weight: 700;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.wm-handle-logo img {
+    display: block;
+    pointer-events: none;
+}
+
+.wm-handle.dragging {
+    outline: 2px dashed var(--accent-primary);
+    outline-offset: 3px;
+}
+
+/* ===== Phase 12: PWA — ইনস্টল বাটন + আপডেট ব্যানার ===== */
+.btn-pwa-install {
+    display: none;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-pwa-install.show {
+    display: inline-flex;
+}
+
+.pwa-update-banner {
+    position: fixed;
+    left: 50%;
+    bottom: 30px;
+    transform: translateX(-50%) translateY(120px);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--accent-primary);
+    box-shadow: var(--shadow-lg);
+    border-radius: var(--radius-md);
+    padding: 12px 16px 12px 20px;
+    z-index: 1001;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    max-width: calc(100vw - 32px);
+}
+
+.pwa-update-banner.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.pwa-update-banner span {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.pwa-update-banner .btn {
+    white-space: nowrap;
+}
+
+/* ===== Phase 15: Warisha Product Pipeline button ===== */
+.btn-warisha-pipeline {
+    background: linear-gradient(135deg, #f59e0b, #ec4899);
+    color: #fff;
+    border: none;
+    font-weight: 600;
+    width: 100%;
+}
+.btn-warisha-pipeline:hover {
+    opacity: 0.92;
+    transform: translateY(-1px);
+}
+
+/* ===== Bulk Export: SEO Filename + Format + Recipe ===== */
+.filename-pattern-row,
+.recipe-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.filename-pattern-row input[type="text"],
+.recipe-row input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 13px;
+    transition: border-color 0.15s;
+}
+.filename-pattern-row input[type="text"]:focus,
+.recipe-row input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+.filename-pattern-row select,
+.recipe-row select {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+}
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.btn-danger {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    color: #fff;
+    border: none;
+}
+.btn-danger:hover {
+    opacity: 0.88;
+    transform: translateY(-1px);
+}
+.bulk-format-select {
+    width: 100%;
+    padding: 8px 10px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    margin-top: 6px;
+}
+.bulk-format-select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+}
+.recipe-saved-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: rgba(34,197,94,0.15);
+    color: #22c55e;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 6px;
+    animation: fadeOut 2s ease forwards 1.5s;
+}
+@keyframes fadeOut {
+    to { opacity: 0; transform: translateY(-4px); }
+}
+
+/* ===== Phase 17: Collage / Grid Maker ===== */
+.collage-upload-area {
+    border: 2px dashed var(--border-color);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg-input);
+}
+.collage-upload-area:hover {
+    border-color: var(--accent-primary);
+    background: rgba(245, 158, 11, 0.04);
+}
+.collage-upload-area.drag-over {
+    border-color: var(--accent-primary);
+    background: rgba(245, 158, 11, 0.08);
+}
+.collage-upload-area p {
+    font-size: 13px;
+    margin: 8px 0 0;
+    color: var(--text-secondary);
+}
+.collage-thumbs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+.collage-thumb {
+    position: relative;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    aspect-ratio: 1 / 1;
+    background: var(--bg-input);
+}
+.collage-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.collage-thumb-remove {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.65);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.collage-thumb-name {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    font-size: 9px;
+    padding: 2px 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tool-tabs {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(230, 149, 33, 0.4) transparent;
+}
+.tool-tabs::-webkit-scrollbar {
+    width: 4px;
+}
+.tool-tabs::-webkit-scrollbar-thumb {
+    background: rgba(230, 149, 33, 0.3);
+    border-radius: 4px;
+}
+.tool-tabs::-webkit-scrollbar-thumb:hover {
+    background: rgba(230, 149, 33, 0.6);
+}
+
+.collage-help-notice {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+.collage-help-notice button:hover {
+    filter: brightness(1.15);
+}
+
+/* ===== OCR Tool Styles ===== */
+.ocr-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.ocr-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent-gradient);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+#ocrTextResult:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(230, 149, 33, 0.15);
+}
+
+

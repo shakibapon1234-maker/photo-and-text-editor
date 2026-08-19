@@ -26511,6 +26511,17 @@ function drawCurvedLine(ctx, clusters, layout, centerX, baselineY) {
     ctx.restore();
   });
 }
+function drawCurvedLineStroke(ctx, clusters, layout, centerX, baselineY) {
+  clusters.forEach((cluster, i) => {
+    const c = layout.chars[i];
+    if (!c) return;
+    ctx.save();
+    ctx.translate(centerX + c.x, baselineY + c.y);
+    ctx.rotate(c.rotation);
+    ctx.strokeText(cluster, 0, 0);
+    ctx.restore();
+  });
+}
 function getFontStack(family) {
   if (!family || family === "helvetiker" || family === "Noto Sans Bengali") {
     return CANVAS_TEXT_FONT_STACK;
@@ -27412,32 +27423,46 @@ var STICKER_FONT_STACK = CANVAS_TEXT_FONT_STACK;
 var STICKER_FONT_PX = 200;
 var STICKER_PAD_RATIO = 0.28;
 var STICKER_SHAPE_SIZING = {
-  circle: { square: false, padMul: 1 },
+  circle: { square: true, padMul: 1.35 },
+  textBox: { square: false, padMul: 0.85 },
+  puffyBubble: { square: false, padMul: 0.95 },
   roundedRect: { square: false, padMul: 1 },
-  wavyBanner: { square: false, padMul: 1.15 },
-  thoughtCloud: { square: false, padMul: 1.2, tailRatio: 0.22 },
-  speechOval: { square: false, padMul: 1.2, tailRatio: 0.2 },
-  glassPlate: { square: false, padMul: 1.05 },
-  waterRipple: { square: false, padMul: 1.1 },
-  whiteCutout: { square: false, padMul: 1.05 },
-  starburst: { square: false, padMul: 1.15 },
-  stamp: { square: false, padMul: 1.08 },
-  ribbon: { square: false, padMul: 1.15, pointExtraW: 0.22 },
-  speech: { square: false, padMul: 1, tailRatio: 0.2 },
-  hexagon: { square: false, padMul: 1.1 },
-  diamond: { square: false, padMul: 1.2 },
-  lowerThird: { square: false, padMul: 1 },
-  pill: { square: false, padMul: 1.05 },
-  heart: { square: false, padMul: 1.2 },
-  neonFrame: { square: false, padMul: 1.1 },
-  radiant: { square: false, padMul: 1.3 },
-  starSpray: { square: false, padMul: 1.4 },
-  letterBlocks: { square: false, padMul: 1.15 },
+  wavyBanner: { square: false, padMul: 1.2 },
+  thoughtCloud: { square: false, padMul: 1.35, tailRatio: 0.22 },
+  speechOval: { square: false, padMul: 1.25, tailRatio: 0.2 },
+  glassPlate: { square: false, padMul: 1.1 },
+  waterRipple: { square: false, padMul: 1.2 },
+  whiteCutout: { square: false, padMul: 1.1 },
+  starburst: { square: false, padMul: 1.7 },
+  stamp: { square: false, padMul: 1.45 },
+  ribbon: { square: false, padMul: 1.25, pointExtraW: 0.22 },
+  speech: { square: false, padMul: 1.15, tailRatio: 0.2 },
+  hexagon: { square: false, padMul: 1.4 },
+  diamond: { square: false, padMul: 1.6 },
+  lowerThird: { square: false, padMul: 1.15 },
+  pill: { square: false, padMul: 1.15 },
+  heart: { square: false, padMul: 1.5 },
+  neonFrame: { square: false, padMul: 1.25 },
+  radiant: { square: false, padMul: 1.5 },
+  starSpray: { square: false, padMul: 1.55 },
+  letterBlocks: { square: false, padMul: 1.2 },
   letterContour: { square: false, padMul: 0.95 },
-  paintSplash: { square: false, padMul: 1.3 },
-  steelPlate: { square: false, padMul: 1.15 },
-  woodenBlocks: { square: false, padMul: 1.1 },
-  redTiles: { square: false, padMul: 1.1 }
+  paintSplash: { square: false, padMul: 1.5 },
+  steelPlate: { square: false, padMul: 1.25 },
+  woodenBlocks: { square: false, padMul: 1.15 },
+  redTiles: { square: false, padMul: 1.15 },
+  cyberCut: { square: false, padMul: 1.25 },
+  shimmerBorder: { square: false, padMul: 1.2 },
+  bracketFrame: { square: false, padMul: 1.2 },
+  doubleBorder: { square: false, padMul: 1.2 },
+  marker: { square: false, padMul: 1.2 },
+  tornPaper: { square: false, padMul: 1.25 },
+  planeBanner: { square: false, padMul: 1.4 },
+  runningBorder: { square: false, padMul: 1.2 },
+  scrollBanner: { square: false, padMul: 1.35 },
+  sixPointStar: { square: false, padMul: 1.6 },
+  badgeDot: { square: false, padMul: 1.2 },
+  glowAura: { square: false, padMul: 1.25 }
 };
 function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = { curveIntensity: 0 }, borderOpts = {}) {
   const { borderWidth = 0, borderColor = "#ffffff", shadow = false, targetAspect = null } = borderOpts;
@@ -27469,7 +27494,6 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
   const sizing = STICKER_SHAPE_SIZING[shape] || STICKER_SHAPE_SIZING.circle;
   const extraPadding = (borderWidth || 0) * 2 + (shadow ? 24 : 0);
   let padPx = Math.max(textMaxWidthPx, textBlockH) * STICKER_PAD_RATIO * sizing.padMul + extraPadding;
-  if (shape === "speech") padPx += STICKER_FONT_PX * 0.8;
   let canvasW;
   let bodyH;
   if (sizing.square) {
@@ -27498,7 +27522,7 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
   ctx.fillStyle = textColor;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const textCenterX = shape === "speech" ? canvasW / 2 + Math.min(canvasW, bodyH) * 0.08 : canvasW / 2;
+  const textCenterX = canvasW / 2;
   const startY = bodyH / 2 - textBlockH / 2 + maxBulge + lineHeightPx / 2;
   if (shape === "woodenBlocks" || shape === "redTiles") {
     const raw = (text || " ").trim();
@@ -27562,6 +27586,83 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
       ctx.fillStyle = "#ffffff";
       drawCurvedLine(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i);
     });
+    ctx.restore();
+    return { canvas: canvas2, aspect: canvasW / canvasH };
+  }
+  if (shape === "puffyBubble") {
+    ctx.save();
+    const fs = STICKER_FONT_PX;
+    ctx.font = `900 ${fs}px "Montserrat", "Arial Black", "Bungee", system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.save();
+    ctx.shadowColor = "rgba(0, 0, 0, 0.48)";
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 10;
+    ctx.strokeStyle = "#d7c7b2";
+    ctx.lineWidth = fs * 0.72;
+    perLine.forEach(({ clusters, layout }, i) => {
+      drawCurvedLineStroke(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i);
+    });
+    ctx.restore();
+    ctx.save();
+    ctx.strokeStyle = "#cfbea6";
+    ctx.lineWidth = fs * 0.64;
+    perLine.forEach(({ clusters, layout }, i) => {
+      drawCurvedLineStroke(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i + 6);
+    });
+    ctx.restore();
+    ctx.save();
+    const creamColor = bgColor && bgColor !== "#e5484d" && bgColor !== "#dc2626" ? bgColor : "#fff8ee";
+    ctx.strokeStyle = creamColor;
+    ctx.lineWidth = fs * 0.58;
+    perLine.forEach(({ clusters, layout }, i) => {
+      drawCurvedLineStroke(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i);
+      ctx.fillStyle = creamColor;
+      drawCurvedLine(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i);
+    });
+    ctx.restore();
+    ctx.save();
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.92)";
+    ctx.lineWidth = fs * 0.36;
+    perLine.forEach(({ clusters, layout }, i) => {
+      drawCurvedLineStroke(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i - 3.5);
+    });
+    ctx.restore();
+    ctx.save();
+    ctx.strokeStyle = "#7f1d1d";
+    ctx.lineWidth = fs * 0.16;
+    perLine.forEach(({ clusters, layout }, i) => {
+      drawCurvedLineStroke(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i + 4);
+    });
+    ctx.restore();
+    ctx.save();
+    perLine.forEach(({ clusters, layout }, i) => {
+      const lineY = startY + lineHeightPx * i;
+      const redGrad = ctx.createLinearGradient(0, lineY - fs * 0.5, 0, lineY + fs * 0.5);
+      redGrad.addColorStop(0, "#ff3b30");
+      redGrad.addColorStop(0.5, textColor && textColor !== "#ffffff" ? textColor : "#dc2626");
+      redGrad.addColorStop(1, "#991b1b");
+      ctx.fillStyle = redGrad;
+      drawCurvedLine(ctx, clusters, layout, textCenterX, lineY);
+      ctx.strokeStyle = "#881337";
+      ctx.lineWidth = Math.max(2, fs * 0.035);
+      drawCurvedLineStroke(ctx, clusters, layout, textCenterX, lineY);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+      clusters.forEach((ch, ci) => {
+        const c = layout.chars[ci];
+        if (!c) return;
+        const lowCh = ch.toLowerCase();
+        if (lowCh === "o" || lowCh === "d" || lowCh === "p" || lowCh === "q" || lowCh === "r" || lowCh === "a" || lowCh === "b" || lowCh === "e" || lowCh === "c" || lowCh === "w") {
+          ctx.beginPath();
+          ctx.arc(textCenterX + c.x - fs * 0.1, lineY + c.y - fs * 0.16, fs * 0.085, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+    });
+    ctx.restore();
     ctx.restore();
     return { canvas: canvas2, aspect: canvasW / canvasH };
   }
@@ -27676,31 +27777,6 @@ function drawRubberStampFrame(ctx, w, h, color) {
   ctx.lineWidth = Math.max(2, Math.min(w, h) * 0.02);
   const inset = Math.max(10, Math.min(w, h) * 0.08);
   ctx.strokeRect(inset, inset, w - inset * 2, h - inset * 2);
-  ctx.restore();
-}
-function drawAlarmClockIcon(ctx, x, y, size, color) {
-  ctx.save();
-  ctx.fillStyle = color;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = Math.max(2, size * 0.08);
-  const r = size * 0.36;
-  const cx = x + size / 2;
-  const cy = y + size / 2 + size * 0.06;
-  ctx.beginPath();
-  ctx.arc(cx - r * 0.7, cy - r * 0.7, r * 0.32, Math.PI * 0.8, Math.PI * 1.8);
-  ctx.arc(cx + r * 0.7, cy - r * 0.7, r * 0.32, Math.PI * 1.2, Math.PI * 0.2);
-  ctx.stroke();
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(cx - r * 0.4, cy - r * 0.4);
-  ctx.moveTo(cx, cy);
-  ctx.lineTo(cx + r * 0.5, cy - r * 0.3);
-  ctx.stroke();
   ctx.restore();
 }
 function drawStarClusterSpray(ctx, cx, cy, outerR) {
@@ -27896,7 +27972,7 @@ function drawWaterRippleBackground(ctx, w, h, color) {
 }
 function drawLowerThirdBackground(ctx, w, h, color) {
   ctx.save();
-  ctx.fillStyle = color;
+  ctx.fillStyle = color || "#0f172a";
   ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = "#ff0055";
   ctx.fillRect(0, 0, Math.max(12, w * 0.03), h);
@@ -27912,12 +27988,14 @@ function drawLowerThirdBackground(ctx, w, h, color) {
 }
 function drawNeonFrameBackground(ctx, w, h, color) {
   ctx.save();
-  ctx.fillStyle = "rgba(10, 15, 30, 0.85)";
+  const bgFill = color && color !== "#e5484d" ? color : "rgba(10, 15, 30, 0.92)";
+  ctx.fillStyle = bgFill;
   drawRoundedRectPath(ctx, 6, 6, w - 12, h - 12, 10);
   ctx.fill();
-  ctx.shadowColor = color || "#00e5ff";
+  const neonColor = "#00e5ff";
+  ctx.shadowColor = neonColor;
   ctx.shadowBlur = 24;
-  ctx.strokeStyle = color || "#00e5ff";
+  ctx.strokeStyle = neonColor;
   ctx.lineWidth = 4;
   drawRoundedRectPath(ctx, 8, 8, w - 16, h - 16, 8);
   ctx.stroke();
@@ -28222,10 +28300,10 @@ function drawCyberCutBackground(ctx, w, h, color) {
     ctx.lineTo(x, y + cut);
     ctx.closePath();
   }
-  ctx.fillStyle = "rgba(15, 23, 42, 0.88)";
+  ctx.fillStyle = color || "rgba(15, 23, 42, 0.88)";
   makeCutPath();
   ctx.fill();
-  ctx.strokeStyle = color || "#00f0ff";
+  ctx.strokeStyle = "#00f0ff";
   ctx.lineWidth = 3;
   makeCutPath();
   ctx.stroke();
@@ -28237,15 +28315,15 @@ function drawCyberCutBackground(ctx, w, h, color) {
 function drawShimmerBorderBackground(ctx, w, h, color) {
   ctx.save();
   const r = Math.min(16, Math.min(w, h) * 0.2);
-  ctx.fillStyle = "rgba(20, 24, 33, 0.85)";
+  ctx.fillStyle = color || "rgba(20, 24, 33, 0.85)";
   drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, r);
   ctx.fill();
   const shimmer = ctx.createLinearGradient(0, 0, w, h);
   shimmer.addColorStop(0, "#38bdf8");
-  shimmer.addColorStop(0.3, color || "#ec4899");
+  shimmer.addColorStop(0.3, "#ec4899");
   shimmer.addColorStop(0.7, "#fbbf24");
   shimmer.addColorStop(1, "#a855f7");
-  ctx.shadowColor = color || "#ec4899";
+  ctx.shadowColor = "#ec4899";
   ctx.shadowBlur = 12;
   ctx.strokeStyle = shimmer;
   ctx.lineWidth = 3.5;
@@ -28255,9 +28333,9 @@ function drawShimmerBorderBackground(ctx, w, h, color) {
 }
 function drawBracketFrameBackground(ctx, w, h, color) {
   ctx.save();
-  ctx.fillStyle = "rgba(10, 15, 26, 0.7)";
+  ctx.fillStyle = color || "rgba(10, 15, 26, 0.7)";
   ctx.fillRect(8, 8, w - 16, h - 16);
-  const bColor = color || "#38bdf8";
+  const bColor = "#38bdf8";
   ctx.strokeStyle = bColor;
   ctx.lineWidth = 3.5;
   ctx.shadowColor = bColor;
@@ -28302,7 +28380,7 @@ function drawDoubleBorderBackground(ctx, w, h, color) {
 }
 function drawMarkerBackground(ctx, w, h, color) {
   ctx.save();
-  ctx.globalAlpha = 0.55;
+  ctx.globalAlpha = 0.65;
   ctx.fillStyle = color || "#facc15";
   ctx.beginPath();
   ctx.moveTo(w * 0.02, h * 0.18);
@@ -28369,10 +28447,10 @@ function drawPlaneBannerBackground(ctx, w, h, color) {
 }
 function drawRunningBorderBackground(ctx, w, h, color) {
   ctx.save();
-  ctx.fillStyle = "rgba(15, 23, 42, 0.82)";
+  ctx.fillStyle = color || "rgba(15, 23, 42, 0.82)";
   drawRoundedRectPath(ctx, 4, 4, w - 8, h - 8, 10);
   ctx.fill();
-  const neonColor = color || "#22c55e";
+  const neonColor = "#22c55e";
   ctx.shadowColor = neonColor;
   ctx.shadowBlur = 16;
   ctx.strokeStyle = neonColor;
@@ -28439,6 +28517,36 @@ function drawGlowAuraBackground(ctx, w, h, color) {
   ctx.fill();
   ctx.restore();
 }
+function drawTextBoxBackground(ctx, w, h, color) {
+  ctx.save();
+  const pad = Math.min(w, h) * 0.05;
+  const radius = Math.min(w - pad * 2, h - pad * 2) * 0.35;
+  const cx = w / 2, cy = h / 2;
+  ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+  ctx.shadowBlur = Math.max(16, Math.min(w, h) * 0.09);
+  ctx.shadowOffsetY = Math.max(6, Math.min(w, h) * 0.045);
+  const baseColor = color && color !== "#e5484d" ? color : "#fef6e4";
+  const baseGrad = ctx.createLinearGradient(0, pad, 0, h - pad);
+  baseGrad.addColorStop(0, baseColor);
+  baseGrad.addColorStop(1, baseColor);
+  ctx.fillStyle = baseGrad;
+  drawRoundedRectPath(ctx, pad, pad, w - pad * 2, h - pad * 2, radius);
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.22)";
+  ctx.lineWidth = Math.max(2, Math.min(w, h) * 0.024);
+  drawRoundedRectPath(ctx, pad + 1, pad + 1, w - (pad + 1) * 2, h - (pad + 1) * 2, radius * 0.95);
+  ctx.stroke();
+  const topGrad = ctx.createLinearGradient(0, pad, 0, cy);
+  topGrad.addColorStop(0, "rgba(255, 255, 255, 0.45)");
+  topGrad.addColorStop(1, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = topGrad;
+  drawRoundedRectPath(ctx, pad + 3, pad + 2, w - (pad + 3) * 2, (h - pad * 2) * 0.46, radius * 0.85);
+  ctx.fill();
+  ctx.restore();
+}
 function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, borderColor = "#ffffff", shadow = false) {
   const cx = w / 2;
   const cy = bodyH / 2;
@@ -28451,6 +28559,11 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
   }
   ctx.fillStyle = color;
   switch (shape) {
+    case "textBox":
+      drawTextBoxBackground(ctx, w, bodyH, color);
+      break;
+    case "puffyBubble":
+      break;
     case "wavyBanner":
       drawWavyBannerPath(ctx, 4, 4, w - 8, bodyH - 8);
       ctx.fill();
@@ -28523,13 +28636,12 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
     case "speech":
       drawSpeechBubblePath(ctx, 0, 0, w, bodyH, tailPx, Math.min(w, bodyH) * 0.18);
       ctx.fill();
-      drawAlarmClockIcon(ctx, Math.min(w, bodyH) * 0.04, Math.min(w, bodyH) * 0.06, Math.min(w, bodyH) * 0.22, "#d32f2f");
       break;
     case "radiant": {
       drawCelebrationRays(ctx, cx, cy, outerR);
       const coreW = w * 0.75;
       const coreH = bodyH * 0.55;
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = color || "#ffffff";
       drawRoundedRectPath(ctx, (w - coreW) / 2, (bodyH - coreH) / 2, coreW, coreH, 8);
       ctx.fill();
       drawConfettiStars(ctx, cx, cy, outerR, color);
@@ -28757,18 +28869,19 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
       const totalH3D = (lines3D.length - 1) * lineHeight3D;
       let mat3D;
       let multicolorPalette = null;
-      if (state.colorMode === "gradient") {
+      const activeTextColor = textColor || state.stickerTextColor || "#ffffff";
+      if (state.colorMode === "gradient" && state.contentMode !== "sticker") {
         const gradTex = createGradientTexture(state);
         mat3D = buildMaterialWithTexture(state.materialType, "#ffffff", gradTex);
         group.userData.gradTex3D = gradTex;
-      } else if (state.colorMode === "pattern") {
+      } else if (state.colorMode === "pattern" && state.contentMode !== "sticker") {
         const patTex = createPatternCanvasTexture();
         mat3D = buildMaterialWithTexture(state.materialType, "#ffffff", patTex);
         group.userData.patTex3D = patTex;
-      } else if (state.colorMode === "multicolor") {
+      } else if (state.colorMode === "multicolor" && state.contentMode !== "sticker") {
         multicolorPalette = getMulticolorPalette();
       } else {
-        mat3D = buildMaterial(state.materialType, state.color || "#ffffff");
+        mat3D = buildMaterial(state.materialType, activeTextColor);
       }
       const text3DGroup = new Group();
       const hasCurvedOrSpacing = usesIndividualLetterTiles || state.colorMode === "multicolor" || state.curveIntensity && Math.abs(state.curveIntensity) > 2 || state.curveSpacing && Math.abs(state.curveSpacing - 1) > 0.05;
@@ -28859,19 +28972,28 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
           }
         }
       });
+      text3DGroup.updateMatrixWorld(true);
       const textBBox = new Box3().setFromObject(text3DGroup);
       const centerVec = new Vector3();
       textBBox.getCenter(centerVec);
       const text3DW = Math.max(fontSize3D * 1.5, textBBox.max.x - textBBox.min.x);
       const text3DH = Math.max(fontSize3D * 0.9, textBBox.max.y - textBBox.min.y);
-      const padX = (text3DW * 0.12 + fontSize3D * 0.35) * bScale;
-      const padY = (text3DH * 0.28 + fontSize3D * 0.45) * bScale;
-      let worldWidth2 = (text3DW + padX * 2) * bScale + (borderOpts.borderWidth || 0) * 1.2;
-      let worldHeight2 = (text3DH + padY * 2) * bScale + (borderOpts.borderWidth || 0) * 1.2;
+      const shapeSizing = STICKER_SHAPE_SIZING[shape] || { padMul: 1 };
+      const padMul = shapeSizing.padMul || 1;
+      let padX, padY;
+      if (shape === "textBox" || shape === "puffyBubble") {
+        padX = (text3DW * 0.06 + fontSize3D * 0.22) * bScale;
+        padY = (text3DH * 0.08 + fontSize3D * 0.18) * bScale;
+      } else {
+        padX = (text3DW * 0.1 + fontSize3D * 0.35) * padMul * bScale;
+        padY = (text3DH * 0.12 + fontSize3D * 0.3) * padMul * bScale;
+      }
+      let worldWidth2 = text3DW + padX * 2 + (borderOpts.borderWidth || 0) * 1.2;
+      let worldHeight2 = text3DH + padY * 2 + (borderOpts.borderWidth || 0) * 1.2;
       if (state.stickerMode === "standing") {
         worldHeight2 = Math.max(worldHeight2, textDepth * 2.8 + 24);
+        worldWidth2 = Math.max(worldWidth2, worldHeight2 * 1.15);
       }
-      worldWidth2 = Math.max(worldWidth2, worldHeight2 * 1.15);
       if (usesIndividualLetterTiles) {
         const tileLetters = Array.from(textStr).filter((ch) => ch.trim().length > 0);
         const count = tileLetters.length;
@@ -29714,10 +29836,11 @@ function loadStudioState() {
     if (!raw) return;
     const saved = JSON.parse(raw);
     if (!saved) return;
-    if (saved.text !== void 0 && textInput) {
-      state.text = saved.text;
-      textInput.value = saved.text;
-    }
+    const savedSharedText = saved.stickerText && saved.stickerText.trim().length > 0 ? saved.stickerText : saved.text || "Warisha Fashion";
+    state.text = savedSharedText;
+    state.stickerText = savedSharedText;
+    if (textInput) textInput.value = savedSharedText;
+    if (stickerTextInput) stickerTextInput.value = savedSharedText;
     if (saved.fontFamily && fontSelect) {
       state.fontFamily = saved.fontFamily;
       fontSelect.value = saved.fontFamily;
@@ -29881,9 +30004,11 @@ function loadStudioState() {
       state.autoRotate = saved.autoRotate;
       autoRotateToggle.checked = saved.autoRotate;
     }
-    if (saved.stickerText !== void 0 && stickerTextInput) {
+    if (saved.stickerText !== void 0) {
       state.stickerText = saved.stickerText;
-      stickerTextInput.value = saved.stickerText;
+      state.text = saved.stickerText;
+      if (stickerTextInput) stickerTextInput.value = saved.stickerText;
+      if (textInput) textInput.value = saved.stickerText;
     }
     if (saved.stickerShape && stickerShapeGrid) {
       state.stickerShape = saved.stickerShape;
@@ -30804,6 +30929,62 @@ function animate(now) {
   renderer.render(scene, camera);
 }
 animate();
+function reset3DStudio() {
+  state.contentMode = "text";
+  state.text = "Warisha Fashion";
+  state.stickerText = "Warisha Fashion";
+  state.fontFamily = "helvetiker";
+  state.size = 70;
+  state.depth = 18;
+  state.colorMode = "gradient";
+  state.gradientPreset = "gold";
+  state.color = "#ffd700";
+  state.materialType = "glossy";
+  state.stickerShape = "puffyBubble";
+  state.stickerMode = "standing";
+  state.stickerWith3DText = true;
+  state.stickerBgColor = "#fef6e4";
+  state.stickerTextColor = "#dc2626";
+  state.stickerBorderWidth = 0;
+  state.stickerBorderColor = "#ffffff";
+  state.stickerShadow = false;
+  state.stickerTextScale = 100;
+  state.stickerBoxScale = 100;
+  state.stickerBoxTilt = 0;
+  state.stickerTextTilt = 0;
+  state.stickerTextOffsetY = 0;
+  state.curveIntensity = 0;
+  state.curveSpacing = 1;
+  state.rotX = 0;
+  state.rotY = 20;
+  state.rotZ = 0;
+  state.posX = 0;
+  state.posY = 0;
+  if (textInput) textInput.value = state.text;
+  if (stickerTextInput) stickerTextInput.value = state.stickerText;
+  if (sizeRange) sizeRange.value = 70;
+  if (depthRange) depthRange.value = 18;
+  if (rotXRange) rotXRange.value = 0;
+  if (rotYRange) rotYRange.value = 20;
+  if (rotZRange) rotZRange.value = 0;
+  if (posXRange) posXRange.value = 0;
+  if (posYRange) posYRange.value = 0;
+  if (contentModeGrid) setActivePreset(contentModeGrid, "content", "text");
+  if (textContentSection) textContentSection.hidden = false;
+  if (imageContentSection) imageContentSection.hidden = true;
+  if (stickerContentSection) stickerContentSection.hidden = true;
+  if (cubeContentSection) cubeContentSection.hidden = true;
+  try {
+    localStorage.removeItem("studio_state_plan3");
+  } catch (_) {
+  }
+  rebuildTextMesh();
+}
+var reset3DStudioBtn = document.getElementById("reset3DStudioBtn");
+if (reset3DStudioBtn) reset3DStudioBtn.addEventListener("click", reset3DStudio);
+var topbarResetBtn = document.getElementById("topbarResetBtn");
+if (topbarResetBtn) topbarResetBtn.addEventListener("click", reset3DStudio);
+window.reset3DStudio = reset3DStudio;
 /*! Bundled license information:
 
 jszip/dist/jszip.min.js:

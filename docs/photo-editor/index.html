@@ -9,6 +9,19 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+
+    <!-- Tesseract.js for OCR (Image to Text) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <!-- PWA / অফলাইন সাপোর্ট -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#121316">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Photo Editor">
+    <meta name="mobile-web-app-capable" content="yes">
 </head>
 
 <body>
@@ -28,6 +41,25 @@
                 <h1>Photo Editor by Shakib</h1>
             </div>
             <p class="tagline">ফটো সাইজ, পিক্সেল, ব্রাইটনেস এবং ক্রপ সহজেই এডিট করুন</p>
+            <button type="button" class="btn btn-ghost btn-pwa-install" id="pwaInstallBtn" title="অ্যাপ হিসেবে ইনস্টল করুন">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                📲 ইনস্টল করুন
+            </button>
+            <button type="button" class="btn btn-bulk-open" id="bulkOpenBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+                🗂️ বাল্ক রিসাইজ
+            </button>
         </header>
 
         <!-- Upload Section -->
@@ -51,91 +83,9 @@
         <!-- Main Editor Section (hidden initially) -->
         <div class="editor-section" id="editorSection" style="display:none;">
 
-            <!-- Preview & Info -->
-            <div class="preview-panel">
-                <div class="preview-card" id="previewCard">
-                    <div class="preview-header" id="previewHeader">
-                        <h3>📷 প্রিভিউ</h3>
-                        <div class="preview-header-actions">
-                            <button class="btn btn-ghost" id="undoBtn" title="পূর্বাবস্থায় ফিরুন (Ctrl+Z)" disabled>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg>
-                            </button>
-                            <button class="btn btn-ghost" id="redoBtn" title="আবার করুন (Ctrl+Y)" disabled>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h1"/></svg>
-                            </button>
-                            <button class="btn btn-ghost" id="compareBtn" title="আগে/পরে তুলনা করুন" disabled>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><path d="M8 8l-4 4 4 4"/><path d="M16 8l4 4-4 4"/></svg>
-                            </button>
-                            <button class="btn btn-ghost" id="previewFloatBtn" title="ফ্লোটিং উইন্ডো হিসেবে খুলুন">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                                    <rect x="12" y="12" width="7" height="7" rx="1" fill="currentColor" stroke="none" />
-                                </svg>
-                            </button>
-                            <button class="btn btn-ghost" id="changePhotoBtn" title="ফটো পরিবর্তন করুন">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <polyline points="1 4 1 10 7 10" />
-                                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-                                </svg>
-                                পরিবর্তন
-                            </button>
-                        </div>
-                    </div>
-                    <div class="zoom-toolbar" id="zoomToolbar">
-                        <button class="zoom-btn" id="zoomOutBtn" title="জুম আউট">−</button>
-                        <span class="zoom-level" id="zoomLevelLabel">ফিট</span>
-                        <button class="zoom-btn" id="zoomInBtn" title="জুম ইন">+</button>
-                        <span class="zoom-divider"></span>
-                        <button class="zoom-btn zoom-btn-text" id="zoomFitBtn" title="উইন্ডোতে ফিট করুন">Fit</button>
-                        <button class="zoom-btn zoom-btn-text" id="zoom100Btn" title="আসল সাইজ (১০০%)">100%</button>
-                    </div>
-                    <div class="preview-image-wrapper" id="previewImageWrapper" style="position:relative;">
-                        <img id="previewImage" src="" alt="Preview">
-                        <!-- Lasso overlay canvas -->
-                        <canvas id="bgLassoCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;z-index:10;display:none;"></canvas>
-                        <!-- Clone Stamp live-edit canvas (draws the real, full-res pixels; sits over previewImage while active) -->
-                        <canvas id="bgCloneCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;z-index:11;display:none;"></canvas>
-                        <!-- Erase/Restore Brush live-edit canvas (Phase 6) -->
-                        <canvas id="bgEraseCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;z-index:12;display:none;"></canvas>
-                        <!-- Magic Wand selection-preview canvas (Phase 6) -->
-                        <canvas id="bgWandCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;z-index:13;display:none;"></canvas>
-                        <!-- Before/After comparison overlay (Phase 6) -->
-                        <div class="before-after-overlay" id="baOverlay" style="display:none;">
-                            <img id="baBeforeImg" alt="আগে">
-                            <div class="ba-divider" id="baDivider"></div>
-                            <span class="ba-label ba-label-before">আগে</span>
-                            <span class="ba-label ba-label-after">পরে</span>
-                        </div>
-                    </div>
-                    <div class="image-info">
-                        <div class="info-item">
-                            <span class="info-label">ফাইলের নাম</span>
-                            <span class="info-value" id="infoName">-</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">সাইজ</span>
-                            <span class="info-value" id="infoSize">-</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">ডাইমেনশন</span>
-                            <span class="info-value" id="infoDimension">-</span>
-                        </div>
-                        <div class="info-item">
-                            <span class="info-label">টাইপ</span>
-                            <span class="info-value" id="infoType">-</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="preview-placeholder" id="previewPlaceholder" style="display:none;">
-                    <p>🗗 প্রিভিউ এখন ফ্লোটিং উইন্ডোতে খোলা আছে</p>
-                    <button class="btn btn-ghost" id="previewDockBtn">প্যানেলে ফিরিয়ে আনুন</button>
-                </div>
-            </div>
-
-            <!-- Tools Panel -->
+            <!-- Tools Panel (Left Sidebar Menu & Controls) -->
             <div class="tools-panel">
+              <div class="tools-panel-body">
                 <!-- Tool Tabs -->
                 <div class="tool-tabs">
                     <button class="tab-btn active" data-tab="filesize">
@@ -191,6 +141,15 @@
                         </svg>
                         <span>ক্রপ</span>
                     </button>
+                    <button class="tab-btn" data-tab="social">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="2" width="20" height="20" rx="4" />
+                            <circle cx="12" cy="12" r="3.2" />
+                            <path d="M17.2 6.8h.01" />
+                        </svg>
+                        <span>সোশ্যাল সাইজ</span>
+                    </button>
                     <button class="tab-btn" data-tab="bgremove">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -200,7 +159,48 @@
                         </svg>
                         <span>BG রিমুভ</span>
                     </button>
+                    <button class="tab-btn" data-tab="watermark">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2.7s6 6.2 6 10.8a6 6 0 0 1-12 0c0-4.6 6-10.8 6-10.8z" />
+                        </svg>
+                        <span>ওয়াটারমার্ক</span>
+                    </button>
+                    <button class="tab-btn" data-tab="upscale">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M15 3h6v6" />
+                            <path d="M9 21H3v-6" />
+                            <path d="M21 3l-7 7" />
+                            <path d="M3 21l7-7" />
+                        </svg>
+                        <span>আপস্কেল</span>
+                    </button>
+                    <button class="tab-btn" data-tab="collage">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="7" />
+                            <rect x="14" y="3" width="7" height="7" />
+                            <rect x="14" y="14" width="7" height="7" />
+                            <rect x="3" y="14" width="7" height="7" />
+                        </svg>
+                        <span>কোলাজ</span>
+                    </button>
+                    <button class="tab-btn" data-tab="ocr">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                        </svg>
+                        <span>টেক্সট ও দেখাও</span>
+                    </button>
                 </div>
+
+                <!-- Scrollable panel that holds whichever tool is active, so switching
+                     tools never requires scrolling the whole page — only this pane scrolls. -->
+                <div class="tool-panels" id="toolPanels">
 
                 <!-- File Size Tool -->
                 <div class="tool-content active" id="tab-filesize">
@@ -415,14 +415,20 @@
                         <div class="brightness-presets">
                             <label>প্রিসেট:</label>
                             <div class="preset-grid">
-                                <button class="preset-btn-bright" data-b="100" data-c="100" data-s="0">গ্রের
-                                    স্কেল</button>
+                                <button class="preset-btn-bright" data-b="100" data-c="100" data-s="0" data-g="1">সাদাকালো
+                                    <small>B&amp;W</small></button>
                                 <button class="preset-btn-bright" data-b="120" data-c="110"
                                     data-s="130">ভাইব্র্যান্ট</button>
-                                <button class="preset-btn-bright" data-b="90" data-c="120" data-s="80">ভিনটেজ</button>
+                                <button class="preset-btn-bright" data-b="90" data-c="120" data-s="80" data-sp="0.35">ভিনটেজ</button>
                                 <button class="preset-btn-bright" data-b="110" data-c="105" data-s="90">সফট</button>
                                 <button class="preset-btn-bright" data-b="80" data-c="130"
                                     data-s="110">ড্রামাটিক</button>
+                                <button class="preset-btn-bright" data-b="105" data-c="108" data-s="100" data-sp="1">সেপিয়া</button>
+                                <button class="preset-btn-bright" data-b="105" data-c="125" data-s="115">শার্প/ক্লিয়ার</button>
+                                <button class="preset-btn-bright" data-b="100" data-c="105" data-s="105" data-h="-20">ঠান্ডা
+                                    টোন</button>
+                                <button class="preset-btn-bright" data-b="105" data-c="105" data-s="110" data-h="15">গরম
+                                    টোন</button>
                                 <button class="preset-btn-bright" data-b="100" data-c="100" data-s="100">রিসেট</button>
                             </div>
                         </div>
@@ -433,6 +439,10 @@
                                 <strong id="newBrightness">-</strong>
                             </div>
                         </div>
+
+                        <button type="button" class="btn btn-secondary" id="autoEnhanceBtn" style="width:100%;margin-bottom:8px;">
+                            ✨ অটো ফিক্স (স্বয়ংক্রিয় ব্রাইটনেস/কন্ট্রাস্ট)
+                        </button>
 
                         <button class="btn btn-primary btn-action" id="applyBrightness">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -446,6 +456,29 @@
 
                 <!-- Crop Tool -->
                 <div class="tool-content" id="tab-crop">
+                    <div class="tool-card rotate-flip-card">
+                        <h3>🔄 রোটেট / ফ্লিপ</h3>
+                        <p class="tool-desc">বাটনে ক্লিক করলেই সাথে সাথে ছবি ঘুরে যাবে বা উল্টে যাবে</p>
+                        <div class="rotate-flip-toolbar">
+                            <button type="button" class="btn-rotate-flip" id="rotateLeftBtn" title="৯০° বামে ঘোরান">
+                                <span class="rf-icon" aria-hidden="true">↺</span>
+                                <span>৯০° বামে</span>
+                            </button>
+                            <button type="button" class="btn-rotate-flip" id="rotateRightBtn" title="৯০° ডানে ঘোরান">
+                                <span class="rf-icon" aria-hidden="true">↻</span>
+                                <span>৯০° ডানে</span>
+                            </button>
+                            <button type="button" class="btn-rotate-flip" id="flipHorizontalBtn" title="হরাইজন্টাল ফ্লিপ">
+                                <span class="rf-icon" aria-hidden="true">⇋</span>
+                                <span>হরাইজন্টাল ফ্লিপ</span>
+                            </button>
+                            <button type="button" class="btn-rotate-flip" id="flipVerticalBtn" title="ভার্টিক্যাল ফ্লিপ">
+                                <span class="rf-icon" aria-hidden="true">⇵</span>
+                                <span>ভার্টিক্যাল ফ্লিপ</span>
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="tool-card">
                         <h3>✂️ ক্রপ করুন</h3>
                         <p class="tool-desc">ফটোর নির্দিষ্ট অংশ কেটে নিন</p>
@@ -520,18 +553,82 @@
                     </div>
                 </div>
 
+                <!-- Social Media Auto-Size Tool -->
+                <div class="tool-content" id="tab-social">
+                    <div class="tool-card">
+                        <h3>📱 সোশ্যাল মিডিয়া সাইজ</h3>
+                        <p class="tool-desc">ফেসবুক ফিড, রিলস/স্টোরি অথবা অ্যাডের জন্য একদম সঠিক সাইজ অটো সিলেক্ট
+                            করুন — যাতে বুস্ট/অ্যাড চালানোর সময় সাইড দিয়ে ছবি কেটে না যায়</p>
+
+                        <div class="form-group">
+                            <label>প্ল্যাটফর্ম প্রিসেট বাছাই করুন</label>
+                            <div class="social-preset-grid" id="socialPresetGrid">
+                                <!-- filled by app.js from SOCIAL_PRESETS -->
+                            </div>
+                        </div>
+
+                        <div class="form-group social-mode-group">
+                            <label>মোড</label>
+                            <div class="mode-toggle">
+                                <label class="mode-option">
+                                    <input type="radio" name="socialMode" value="fit" checked>
+                                    <span>🖼️ ফিট <small>(কিছুই কাটবে না)</small></span>
+                                </label>
+                                <label class="mode-option">
+                                    <input type="radio" name="socialMode" value="fill">
+                                    <span>✂️ ফিল <small>(ক্রপ করে ভরাট)</small></span>
+                                </label>
+                            </div>
+                            <p class="mode-hint" id="socialModeHint">"ফিট" মোডে পুরো ছবিটাই থাকবে, খালি জায়গা
+                                ব্লার ব্যাকগ্রাউন্ড দিয়ে ভরাট হবে — এটাই বুস্ট/অ্যাড চালানোর সময় সাইড কেটে যাওয়া
+                                বন্ধ করার আসল সমাধান।</p>
+                        </div>
+
+                        <div class="checkbox-group" id="safeZoneToggleWrap" style="display:none;">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="showSafeZone" checked>
+                                <span class="checkmark"></span>
+                                রিলস/স্টোরি সেফ জোন গাইড দেখান (উপরে-নিচে প্রোফাইল/বাটনের জায়গা)
+                            </label>
+                        </div>
+
+                        <div class="crop-preview-container">
+                            <div class="crop-canvas-wrapper">
+                                <canvas id="socialCanvas"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="result-preview" id="socialResult" style="display:none;">
+                            <div class="result-info">
+                                <span>নতুন সাইজ:</span>
+                                <strong id="newSocialDimension">-</strong>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="applySocial">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            অ্যাপ্লাই করুন
+                        </button>
+                    </div>
+                </div>
+
                 <!-- ===== Background Remove Tab ===== -->
                 <div class="tool-content" id="tab-bgremove">
 
                     <!-- METHOD 1: AI Remove -->
-                    <div class="tool-card bg-method-card" id="bgcard-ai">
-                        <div class="bg-method-header">
+                    <div class="tool-card bg-method-card open" id="bgcard-ai">
+                        <button type="button" class="bg-method-header" aria-expanded="true">
                             <div class="bg-method-icon">🤖</div>
-                            <div>
+                            <div class="bg-method-title">
                                 <h3>AI অটো রিমুভ</h3>
                                 <p class="tool-desc">Remove.bg API — বিনামূল্যে ৫০টি/মাস। যেকোনো জটিল ব্যাকগ্রাউন্ড সরায়।</p>
                             </div>
-                        </div>
+                            <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="bg-method-body">
                         <div class="form-group">
                             <label>Remove.bg API Key</label>
                             <div class="api-link-row">
@@ -552,21 +649,32 @@
                             <div class="spinner"></div>
                             <span>AI প্রসেস করছে...</span>
                         </div>
+                        <div class="form-group" id="bgSolidReplaceWrap" style="margin-top:10px;display:none;">
+                            <label class="wm-toggle">
+                                <input type="checkbox" id="bgSolidReplaceToggle">
+                                <span>🎨 রিমুভের পর সলিড রঙ ব্যাকগ্রাউন্ড বসান</span>
+                            </label>
+                            <p class="wm-hint">চেক না করলে স্বচ্ছ (transparent) PNG থাকবে</p>
+                            <input type="color" id="bgSolidReplaceColor" value="#ffffff" style="margin-top:6px;">
+                        </div>
+                        </div>
                     </div>
 
                     <!-- METHOD 2: Color Tolerance Eraser -->
                     <div class="tool-card bg-method-card" id="bgcard-color">
-                        <div class="bg-method-header">
+                        <button type="button" class="bg-method-header" aria-expanded="false">
                             <div class="bg-method-icon">🎨</div>
-                            <div>
-                                <h3>রঙ-ভিত্তিক ইরেজার</h3>
-                                <p class="tool-desc">ব্যাকগ্রাউন্ডের রঙ বেছে নিন — সেই রঙের সব পিক্সেল মুছে যাবে।</p>
+                            <div class="bg-method-title">
+                                <h3>রঙ-ভিত্তিক ইরেজার (কালার ইরেজার)</h3>
+                                <p class="tool-desc">নির্দিষ্ট রঙ নিখুঁতভাবে রিমুভ করুন — মানুষ, জামাকাপড় ও ছায়া অক্ষত থাকবে।</p>
                             </div>
-                        </div>
+                            <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="bg-method-body">
                         <div class="form-group">
-                            <label>টার্গেট রঙ (ব্যাকগ্রাউন্ড রঙ)</label>
+                            <label>টার্গেট রঙ (যে রঙটি মুছতে চান)</label>
                             <div class="color-target-row">
-                                <input type="color" id="bgTargetColor" value="#ffffff" class="color-swatch-input">
+                                <input type="color" id="bgTargetColor" value="#1ea035" class="color-swatch-input">
                                 <button class="btn btn-ghost" id="bgEyedropperBtn" title="ছবি থেকে রঙ তুলুন">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l-1 1-8.5 8.5A2 2 0 0 0 2 13v2a2 2 0 0 0 2 2h2a2 2 0 0 0 1.41-.59L16 8l-4-4zM15 5l4 4"/><line x1="20" y1="22" x2="20" y2="16"/><line x1="17" y1="19" x2="23" y2="19"/></svg>
                                     আইড্রপার
@@ -574,33 +682,64 @@
                                 <span id="bgEyedropperStatus" class="eyedropper-status"></span>
                             </div>
                         </div>
-                        <div class="form-row-2col">
-                            <div class="form-group">
-                                <label>টলারেন্স: <strong id="bgToleranceVal">30</strong></label>
-                                <input type="range" id="bgTolerance" min="0" max="100" value="30" class="range-slider">
-                                <div class="range-labels"><span>সুনির্দিষ্ট</span><span>প্রশস্ত</span></div>
-                            </div>
-                            <div class="form-group">
-                                <label>এজ ফেদারিং: <strong id="bgFeatherVal">1</strong></label>
-                                <input type="range" id="bgFeather" min="0" max="10" value="1" class="range-slider">
-                                <div class="range-labels"><span>তীক্ষ্ণ</span><span>নরম</span></div>
+
+                        <!-- Mode selection -->
+                        <div class="form-group">
+                            <label>ইরেজ মোড</label>
+                            <div class="color-erase-modes" style="display:flex;gap:12px;margin-top:4px;flex-wrap:wrap;">
+                                <label class="radio-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+                                    <input type="radio" name="bgEraseScope" id="bgScopeGlobal" value="global" checked>
+                                    🌐 পুরো ছবি জুড়ে (Global)
+                                </label>
+                                <label class="radio-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+                                    <input type="radio" name="bgEraseScope" id="bgScopeContiguous" value="contiguous">
+                                    🔗 শুধুমাত্র সংযুক্ত এলাকা (Contiguous)
+                                </label>
                             </div>
                         </div>
-                        <button class="btn btn-primary btn-action" id="bgColorRemoveBtn">
+
+                        <div class="form-row-2col">
+                            <div class="form-group">
+                                <label>টলারেন্স (নির্ভুলতা): <strong id="bgToleranceVal">25</strong></label>
+                                <input type="range" id="bgTolerance" min="1" max="100" value="25" class="range-slider">
+                                <div class="range-labels"><span>সুনির্দিষ্ট (১)</span><span>স্বাভাবিক (২৫)</span><span>প্রশস্ত (১০০)</span></div>
+                            </div>
+                            <div class="form-group">
+                                <label>এজ ফেদারিং (স্মুথনেস): <strong id="bgFeatherVal">2</strong></label>
+                                <input type="range" id="bgFeather" min="0" max="10" value="2" class="range-slider">
+                                <div class="range-labels"><span>শার্প (০)</span><span>নরম এজ (১০)</span></div>
+                            </div>
+                        </div>
+
+                        <div class="form-group" style="margin-top:6px;display:flex;flex-direction:column;gap:6px;">
+                            <label class="checkbox-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+                                <input type="checkbox" id="bgDespill" checked>
+                                🌿 কালার স্পিল ক্লিন করুন (ধারের অতিরিক্ত সবুজ/নীল আভা দূর করে)
+                            </label>
+                            <label class="checkbox-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+                                <input type="checkbox" id="bgLivePreview" checked>
+                                👁️ লাইভ প্রিভিউ মাস্ক দেখুন (কোন কোন অংশ মুছবে তা সরাসরি দেখুন)
+                            </label>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="bgColorRemoveBtn" style="margin-top:10px;">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
                             রঙ-ভিত্তিক রিমুভ করুন
                         </button>
+                        </div>
                     </div>
 
                     <!-- METHOD 3: Lasso Selection -->
                     <div class="tool-card bg-method-card" id="bgcard-lasso">
-                        <div class="bg-method-header">
+                        <button type="button" class="bg-method-header" aria-expanded="false">
                             <div class="bg-method-icon">🪢</div>
-                            <div>
+                            <div class="bg-method-title">
                                 <h3>লাসো সিলেকশন</h3>
                                 <p class="tool-desc">বিষয়বস্তুর চারপাশে ড্র করুন — ফটোশপের মতো।</p>
                             </div>
-                        </div>
+                            <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="bg-method-body">
                         <div class="lasso-mode-btns">
                             <button class="btn lasso-mode-btn active" id="bgLassoFreeBtn">✏️ ফ্রিহ্যান্ড লাসো</button>
                             <button class="btn lasso-mode-btn" id="bgLassoPolyBtn">📐 পলিগন সিলেক্ট</button>
@@ -615,17 +754,20 @@
                             <button class="btn btn-danger btn-action" id="bgRemoveInsideBtn">❌ ভেতরেরটা রিমুভ করুন</button>
                             <button class="btn btn-ghost" id="bgCancelLassoBtn">বাতিল করুন</button>
                         </div>
+                        </div>
                     </div>
 
                     <!-- METHOD 4: Clone Stamp Tool -->
                     <div class="tool-card bg-method-card" id="bgcard-clone">
-                        <div class="bg-method-header">
+                        <button type="button" class="bg-method-header" aria-expanded="false">
                             <div class="bg-method-icon">🖌️</div>
-                            <div>
+                            <div class="bg-method-title">
                                 <h3>ক্লোন স্ট্যাম্প টুল</h3>
                                 <p class="tool-desc">ডেস্কটপে Alt/Option + ক্লিক, অথবা টাচ-ডিভাইসে আঙুল চেপে ধরে (long-press) সোর্স পয়েন্ট বাছাই করুন — তারপর ব্রাশ/আঙুল দিয়ে টানলে সেখান থেকে ঠিক একই অফসেটে পিক্সেল কপি হবে — দাগ/অবাঞ্ছিত অংশ মুছে ফেলতে।</p>
                             </div>
-                        </div>
+                            <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="bg-method-body">
                         <div class="form-group">
                             <label>ব্রাশ সাইজ: <strong id="cloneBrushSizeVal">40</strong>px</label>
                             <input type="range" id="cloneBrushSize" min="10" max="200" value="40" class="range-slider">
@@ -647,17 +789,20 @@
                             <button class="btn btn-primary btn-action" id="cloneApplyBtn">✅ প্রয়োগ করুন</button>
                             <button class="btn btn-ghost" id="cloneCancelBtn">বাতিল করুন</button>
                         </div>
+                        </div>
                     </div>
 
                     <!-- METHOD 5: Paint Bucket / Flood Fill -->
                     <div class="tool-card bg-method-card" id="bgcard-paint">
-                        <div class="bg-method-header">
+                        <button type="button" class="bg-method-header" aria-expanded="false">
                             <div class="bg-method-icon">🪣</div>
-                            <div>
+                            <div class="bg-method-title">
                                 <h3>পেইন্ট বাকেট</h3>
                                 <p class="tool-desc">রঙ বেছে ছবিতে ক্লিক করুন — কাছাকাছি রঙের এলাকা ভরে যাবে, ফটোশপের paint bucket-এর মতো।</p>
                             </div>
-                        </div>
+                            <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="bg-method-body">
                         <div class="form-group">
                             <label>ফিল রঙ</label>
                             <div style="display:flex;gap:10px;align-items:center;">
@@ -681,17 +826,24 @@
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11L8.5 0.5a2 2 0 0 0-2.82 0L.5 5.68a2 2 0 0 0 0 2.82L11 19c1.5 1.5 4 1 5.5-.5"/><path d="M5 2l16 16"/><circle cx="19" cy="17" r="3"/></svg>
                             পেইন্ট বাকেট চালু করুন
                         </button>
+                        <button class="btn btn-ghost btn-action" id="undoPaintBucketBtn" style="margin-top:8px; border:1px solid rgba(239,68,68,0.4); color:#ef4444; width:100%; display:flex; align-items:center; justify-content:center; gap:8px;" title="সর্বশেষ পেইন্ট ফিল বাতিল করে আগের অবস্থায় ফিরুন">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg>
+                            ↩️ পেইন্ট ফিল বাতিল করুন (Undo Fill)
+                        </button>
+                        </div>
                     </div>
 
                     <!-- METHOD 6: Manual Erase/Restore Brush -->
                     <div class="tool-card bg-method-card" id="bgcard-erase">
-                        <div class="bg-method-header">
+                        <button type="button" class="bg-method-header" aria-expanded="false">
                             <div class="bg-method-icon">🧽</div>
-                            <div>
+                            <div class="bg-method-title">
                                 <h3>ইরেজ/রিস্টোর ব্রাশ</h3>
                                 <p class="tool-desc">হাতে এঁকে ভুল জায়গা মুছুন (ইরেজ) অথবা আগের অবস্থা ফিরিয়ে আনুন (রিস্টোর) — এজ রিফাইনমেন্টের জন্য। শর্টকাট: <kbd>B</kbd></p>
                             </div>
-                        </div>
+                            <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="bg-method-body">
                         <div class="lasso-mode-btns">
                             <button class="btn lasso-mode-btn active" id="eraseModeEraseBtn">🧽 ইরেজ</button>
                             <button class="btn lasso-mode-btn" id="eraseModeRestoreBtn">↩️ রিস্টোর</button>
@@ -716,17 +868,20 @@
                             <button class="btn btn-primary btn-action" id="eraseApplyBtn">✅ প্রয়োগ করুন</button>
                             <button class="btn btn-ghost" id="eraseCancelBtn">বাতিল করুন</button>
                         </div>
+                        </div>
                     </div>
 
                     <!-- METHOD 7: Magic Wand Selection -->
                     <div class="tool-card bg-method-card" id="bgcard-wand">
-                        <div class="bg-method-header">
+                        <button type="button" class="bg-method-header" aria-expanded="false">
                             <div class="bg-method-icon">🪄</div>
-                            <div>
+                            <div class="bg-method-title">
                                 <h3>ম্যাজিক ওয়ান্ড সিলেকশন</h3>
                                 <p class="tool-desc">ছবিতে এক-ক্লিকে কাছাকাছি রঙের সংযুক্ত এলাকা সিলেক্ট করুন, তারপর রিমুভ বা রঙ ভরাট করুন। শর্টকাট: <kbd>W</kbd></p>
                             </div>
-                        </div>
+                            <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="bg-method-body">
                         <div class="form-group">
                             <label>টলারেন্স: <strong id="wandToleranceVal">30</strong></label>
                             <input type="range" id="wandTolerance" min="0" max="100" value="30" class="range-slider">
@@ -755,21 +910,476 @@
                             <button class="btn btn-secondary btn-action" id="wandFillBtn">🎨 সিলেকশনে রঙ ভরুন</button>
                             <button class="btn btn-ghost" id="wandCancelBtn">বাতিল করুন</button>
                         </div>
+                        </div>
                     </div>
 
                 </div>
 
-                <!-- Download Section -->
-                <div class="download-section" id="downloadSection" style="display:none;">
-                    <button class="btn btn-download" id="downloadBtn">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                            <polyline points="7 10 12 15 17 10" />
-                            <line x1="12" y1="15" x2="12" y2="3" />
-                        </svg>
-                        ডাউনলোড করুন
-                    </button>
+                <!-- Text / Logo Watermark (Phase 9) -->
+                <div class="tool-content" id="tab-watermark">
+                    <div class="tool-card">
+                        <h3>💧 টেক্সট / লোগো ওয়াটারমার্ক</h3>
+                        <p class="tool-desc">কাস্টম টেক্সট বা লোগো ছবির উপর বসান — নিচের গ্রিড থেকে পজিশন বাছাই করুন, অথবা প্রিভিউতে সরাসরি টেনে সরান</p>
+
+                        <div class="wm-section">
+                            <label class="wm-toggle">
+                                <input type="checkbox" id="wmTextEnabled" checked>
+                                <span>📝 টেক্সট ওয়াটারমার্ক</span>
+                            </label>
+                            <div class="wm-fields" id="wmTextFields" style="display:block;">
+                                <div class="form-group">
+                                    <label>টেক্সট</label>
+                                    <input type="text" id="wmText" value="Warisha Fashion" placeholder="© আপনার নাম / ব্র্যান্ড" maxlength="80">
+                                </div>
+                                <div class="form-group">
+                                    <label>ফন্ট সাইজ: <strong id="wmFontSizeValue">6</strong>%</label>
+                                    <input type="range" id="wmFontSize" min="2" max="20" value="6" class="range-slider">
+                                </div>
+                                <div class="form-group">
+                                    <label>ফন্ট</label>
+                                    <select id="wmFontFamily">
+                                        <option value="'Inter', sans-serif">সাধারণ (Sans)</option>
+                                        <option value="Georgia, serif">সেরিফ (Serif)</option>
+                                        <option value="'Courier New', monospace">মনোস্পেস (Mono)</option>
+                                        <option value="'Brush Script MT', cursive">হাতের লেখা (Script)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>রঙ</label>
+                                    <input type="color" id="wmTextColor" value="#ffffff">
+                                </div>
+                                <div class="form-group">
+                                    <label>অপাসিটি: <strong id="wmTextOpacityValue">80</strong>%</label>
+                                    <input type="range" id="wmTextOpacity" min="10" max="100" value="80" class="range-slider">
+                                </div>
+                                <div class="form-group">
+                                    <label>পজিশন</label>
+                                    <div class="wm-position-grid" id="wmTextPositionGrid">
+                                        <button type="button" data-fx="0.12" data-fy="0.12" title="উপরে-বামে"></button>
+                                        <button type="button" data-fx="0.5" data-fy="0.12" title="উপরে-মাঝে"></button>
+                                        <button type="button" data-fx="0.88" data-fy="0.12" title="উপরে-ডানে"></button>
+                                        <button type="button" data-fx="0.12" data-fy="0.5" title="মাঝে-বামে"></button>
+                                        <button type="button" data-fx="0.5" data-fy="0.5" title="একদম মাঝে"></button>
+                                        <button type="button" data-fx="0.88" data-fy="0.5" title="মাঝে-ডানে"></button>
+                                        <button type="button" data-fx="0.12" data-fy="0.88" title="নিচে-বামে"></button>
+                                        <button type="button" data-fx="0.5" data-fy="0.88" title="নিচে-মাঝে"></button>
+                                        <button type="button" class="active" data-fx="0.88" data-fy="0.88" title="নিচে-ডানে"></button>
+                                    </div>
+                                </div>
+                                <p class="wm-hint">টিপ: প্রিভিউতে টেক্সট ধরে টেনে ইচ্ছেমতো জায়গায় বসাতে পারবেন</p>
+                            </div>
+                        </div>
+
+                        <!-- Phase 16: quick ad text templates -->
+                        <div class="wm-section">
+                            <h4 style="margin:8px 0 6px;font-size:13px;color:var(--text-secondary);">⚡ কুইক টেমপ্লেট</h4>
+                        <div class="preset-grid preset-grid-3" id="wmTemplateGrid">
+                                <button type="button" class="preset-btn" data-wm-template="new-collection">🆕 নতুন কালেকশন</button>
+                                <button type="button" class="preset-btn" data-wm-template="special-offer">🔥 স্পেশাল অফার</button>
+                                <button type="button" class="preset-btn" data-wm-template="price-tag">৳___ মাত্র</button>
+                                <button type="button" class="preset-btn" data-wm-template="sale">🏷️ সেল!</button>
+                                <button type="button" class="preset-btn" data-wm-template="limited">⏳ লিমিটেড অফার</button>
+                                <button type="button" class="preset-btn" data-wm-template="free-shipping">🚚 ফ্রি ডেলিভারি</button>
+                            </div>
+                        </div>
+
+                        <div class="wm-section">
+                            <label class="wm-toggle">
+                                <input type="checkbox" id="wmLogoEnabled">
+                                <span>🖼️ লোগো ওয়াটারমার্ক</span>
+                            </label>
+                            <div class="wm-fields" id="wmLogoFields" style="display:none;">
+                                <div class="form-group">
+                                    <label>লোগো ছবি</label>
+                                    <input type="file" id="wmLogoFile" accept="image/*">
+                                </div>
+                                <div class="form-group">
+                                    <label>সাইজ: <strong id="wmLogoScaleValue">20</strong>%</label>
+                                    <input type="range" id="wmLogoScale" min="5" max="60" value="20" class="range-slider">
+                                </div>
+                                <div class="form-group">
+                                    <label>অপাসিটি: <strong id="wmLogoOpacityValue">90</strong>%</label>
+                                    <input type="range" id="wmLogoOpacity" min="10" max="100" value="90" class="range-slider">
+                                </div>
+                                <div class="form-group">
+                                    <label>পজিশন</label>
+                                    <div class="wm-position-grid" id="wmLogoPositionGrid">
+                                        <button type="button" data-fx="0.12" data-fy="0.12" title="উপরে-বামে"></button>
+                                        <button type="button" data-fx="0.5" data-fy="0.12" title="উপরে-মাঝে"></button>
+                                        <button type="button" data-fx="0.88" data-fy="0.12" title="উপরে-ডানে"></button>
+                                        <button type="button" data-fx="0.12" data-fy="0.5" title="মাঝে-বামে"></button>
+                                        <button type="button" data-fx="0.5" data-fy="0.5" title="একদম মাঝে"></button>
+                                        <button type="button" data-fx="0.88" data-fy="0.5" title="মাঝে-ডানে"></button>
+                                        <button type="button" data-fx="0.12" data-fy="0.88" title="নিচে-বামে"></button>
+                                        <button type="button" data-fx="0.5" data-fy="0.88" title="নিচে-মাঝে"></button>
+                                        <button type="button" class="active" data-fx="0.88" data-fy="0.88" title="নিচে-ডানে"></button>
+                                    </div>
+                                </div>
+                                <p class="wm-hint">টিপ: প্রিভিউতে লোগো ধরে টেনে ইচ্ছেমতো জায়গায় বসাতে পারবেন</p>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="applyWatermark">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            ওয়াটারমার্ক প্রয়োগ করুন
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Upscale Tool -->
+                <div class="tool-content" id="tab-upscale">
+
+                    <!-- METHOD 2: Local canvas-based upscale (Free, instant, open by default) -->
+                    <div class="tool-card bg-method-card open" id="upcard-local">
+                        <button type="button" class="bg-method-header" aria-expanded="true">
+                            <div class="bg-method-icon">🖼️</div>
+                            <div class="bg-method-title">
+                                <h3>লোকাল আপস্কেল (ফ্রি ও অফলাইন)</h3>
+                                <p class="tool-desc">কোনো API key বা ইন্টারনেট লাগে না — সম্পূর্ণ অফলাইনে, তাৎক্ষণিক রেজোলিউশন বাড়ায়।</p>
+                            </div>
+                            <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="bg-method-body">
+                        <div class="form-row-2col">
+                            <div class="form-group">
+                                <label>কতটুকু বড় করবেন</label>
+                                <select id="upFactor">
+                                    <option value="1.5">1.5x</option>
+                                    <option value="2" selected>2x</option>
+                                    <option value="3">3x</option>
+                                    <option value="4">4x</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>শার্পনেস: <strong id="upSharpenValue">20</strong></label>
+                                <input type="range" id="upSharpen" min="0" max="100" value="20" class="range-slider">
+                                <div class="range-labels"><span>নরম</span><span>তীক্ষ্ণ</span></div>
+                            </div>
+                        </div>
+                        <p class="tool-desc" style="margin-top:0;">বড় ছবিতে (৪x পর্যন্ত) কিছুটা সময় লাগতে পারে।</p>
+                        <button class="btn btn-primary btn-action" id="upLocalBtn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            লোকাল আপস্কেল করুন
+                        </button>
+                        </div>
+                    </div>
+
+                    <!-- METHOD 1: AI Upscale via DeepAI torch-srgan -->
+                    <div class="tool-card bg-method-card" id="upcard-ai">
+                        <button type="button" class="bg-method-header" aria-expanded="false">
+                            <div class="bg-method-icon">🤖</div>
+                            <div class="bg-method-title">
+                                <h3>AI আপস্কেল (ক্লাউড API)</h3>
+                                <p class="tool-desc">DeepAI Super Resolution API — রেজোলিউশন ৪x বাড়ায়, ডিটেইল যোগ করে। API key লাগবে।</p>
+                            </div>
+                            <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="bg-method-body">
+                        <div class="form-group">
+                            <label>DeepAI API Key</label>
+                            <div class="api-link-row">
+                                <a href="https://deepai.org/" target="_blank" rel="noopener noreferrer" class="api-link">→ বিনামূল্যে API Key পাবেন</a>
+                                <button type="button" class="btn btn-ghost btn-copy-link" id="copyUpscaleApiLinkBtn" title="লিংক কপি করুন">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                    কপি
+                                </button>
+                            </div>
+                            <input type="password" id="upApiKey" placeholder="আপনার DeepAI API key" class="api-key-input">
+                            <small style="color:var(--text-secondary);margin-top:4px;display:block;">🔒 শুধুমাত্র আপনার ব্রাউজারে সংরক্ষিত থাকবে</small>
+                        </div>
+                        <button class="btn btn-primary btn-action" id="upAiBtn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm-1-5h2v2h-2zm0-8h2v6h-2z"/></svg>
+                            AI দিয়ে ৪x আপস্কেল করুন
+                        </button>
+                        <div class="bg-ai-loading" id="upAiLoading" style="display:none;">
+                            <div class="spinner"></div>
+                            <span>AI প্রসেস করছে... (কিছুটা সময় লাগতে পারে)</span>
+                        </div>
+                        </div>
+                    </div>
+
+                    <!-- METHOD 2: Local canvas-based upscale -->
+                    <div class="tool-card bg-method-card" id="upcard-local">
+                        <button type="button" class="bg-method-header" aria-expanded="false">
+                            <div class="bg-method-icon">🖼️</div>
+                            <div class="bg-method-title">
+                                <h3>লোকাল আপস্কেল</h3>
+                                <p class="tool-desc">কোনো API key বা ইন্টারনেট লাগে না — সম্পূর্ণ অফলাইনে, তাৎক্ষণিক কাজ করে।</p>
+                            </div>
+                            <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        </button>
+                        <div class="bg-method-body">
+                        <div class="form-row-2col">
+                            <div class="form-group">
+                                <label>কতটুকু বড় করবেন</label>
+                                <select id="upFactor">
+                                    <option value="1.5">1.5x</option>
+                                    <option value="2" selected>2x</option>
+                                    <option value="3">3x</option>
+                                    <option value="4">4x</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>শার্পনেস: <strong id="upSharpenValue">20</strong></label>
+                                <input type="range" id="upSharpen" min="0" max="100" value="20" class="range-slider">
+                                <div class="range-labels"><span>নরম</span><span>তীক্ষ্ণ</span></div>
+                            </div>
+                        </div>
+                        <p class="tool-desc" style="margin-top:0;">বড় ছবিতে (৪x পর্যন্ত) কিছুটা সময় লাগতে পারে, ব্রাউজার রেসপন্স করবে কিছুক্ষণের জন্য ধীর।</p>
+                        <button class="btn btn-primary btn-action" id="upLocalBtn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            লোকাল আপস্কেল করুন
+                        </button>
+                        </div>
+                    </div>
+
+                    <div class="result-preview" id="upResult" style="display:none;">
+                        <div class="result-info">
+                            <span id="upResultText">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Phase 17: Collage / Grid Maker -->
+                <div class="tool-content" id="tab-collage">
+                    <div class="tool-card">
+                        <h3>🖼️ কোলাজ / গ্রিড মেকার</h3>
+                        <p class="tool-desc">২-৬টা ছবি আপলোড করে গ্রিড লেআউটে একসাথে বসানো — সোশ্যাল প্রিসেট সাইজে এক্সপোর্ট করুন</p>
+
+                        <div class="form-group">
+                            <label>ছবি আপলোড করুন (২-৬টা)</label>
+                            <div class="collage-upload-area" id="collageUploadArea">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="17 8 12 3 7 8" />
+                                    <line x1="12" y1="3" x2="12" y2="15" />
+                                </svg>
+                                <p>এখানে ক্লিক করুন অথবা টেনে আনুন</p>
+                                <input type="file" id="collageFileInput" accept="image/*" multiple hidden>
+                            </div>
+                            <div class="collage-thumbs" id="collageThumbs"></div>
+                        </div>
+
+                        <div class="form-group" id="collageLayoutWrap" style="display:none;">
+                            <label>লেআউট</label>
+                            <div class="preset-grid preset-grid-3" id="collageLayoutGrid">
+                                <button type="button" class="preset-btn active" data-collage-layout="2x2">২x২</button>
+                                <button type="button" class="preset-btn" data-collage-layout="3x1">৩x১</button>
+                                <button type="button" class="preset-btn" data-collage-layout="1x3">১x৩</button>
+                                <button type="button" class="preset-btn" data-collage-layout="2x3">২x৩</button>
+                                <button type="button" class="preset-btn" data-collage-layout="3x2">৩x২</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="collageGapWrap" style="display:none;">
+                            <label>গ্যাপ (px): <strong id="collageGapValue">10</strong></label>
+                            <input type="range" id="collageGapRange" min="0" max="40" step="2" value="10" class="range-slider">
+                        </div>
+
+                        <div class="form-group" id="collageBorderWrap" style="display:none;">
+                            <label>বর্ডার (px): <strong id="collageBorderValue">0</strong></label>
+                            <input type="range" id="collageBorderRange" min="0" max="20" step="1" value="0" class="range-slider">
+                            <label style="margin-top:6px;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;">
+                                <input type="checkbox" id="collageBorderColorToggle"> বর্ডার রঙ
+                            </label>
+                            <input type="color" id="collageBorderColor" value="#ffffff" style="margin-top:4px;display:none;">
+                        </div>
+
+                        <div class="form-group" id="collagePresetWrap" style="display:none;">
+                            <label>আউটপুট সাইজ</label>
+                            <div class="social-preset-grid" id="collagePresetGrid"></div>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="collageGenerateBtn" disabled>🖼️ কোলাজ তৈরি করুন</button>
+                    </div>
+                </div>
+
+                <!-- OCR Tool -->
+                <div class="tool-content" id="tab-ocr">
+                    <div class="tool-card">
+                        <h3>📝 ইমেজ থেকে টেক্সট (OCR)</h3>
+                        <p class="tool-desc">ছবির মধ্যে থাকা লেখা বের করে নিন — বাংলা ও ইংরেজি দুটোই সাপোর্টেড</p>
+
+                        <div class="form-group">
+                            <label>ভাষা সিলেক্ট করুন</label>
+                            <select id="ocrLanguage">
+                                <option value="eng">English (ইংরেজি)</option>
+                                <option value="ben">বাংলা (Bangla)</option>
+                                <option value="eng+ben" selected>বাংলা + English (দুবই)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="ocrUseCurrentImage" checked>
+                                <span class="checkmark"></span>
+                                বর্তমান ছবি ব্যবহার করুন
+                            </label>
+                        </div>
+
+                        <div class="form-group" id="ocrUploadWrap" style="display:none;">
+                            <label>অথবা নতুন ছবি আপলোড করুন</label>
+                            <input type="file" id="ocrFileInput" accept="image/*">
+                        </div>
+
+                        <div id="ocrProgress" style="display:none; margin-bottom:16px;">
+                            <div class="ocr-progress-bar">
+                                <div class="ocr-progress-fill" id="ocrProgressFill"></div>
+                            </div>
+                            <p id="ocrStatus" style="font-size:13px;color:var(--text-secondary);margin-top:8px;">প্রসেস করছে...</p>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="ocrRunBtn" type="button">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            টেক্সট বের করুন
+                        </button>
+
+                        <div class="result-preview" id="ocrResult" style="display:none;">
+                            <div class="form-group">
+                                <label>এক্সট্র্যাক্টেড টেক্সট:</label>
+                                <textarea id="ocrTextResult" readonly rows="8" placeholder="এক্সট্র্যাক্টেড টেক্সট এখানে দেখাবে..." style="width:100%;background:var(--bg-input);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:12px;color:var(--text-primary);font-family:'Inter',sans-serif;font-size:14px;resize:vertical;outline:none;"></textarea>
+                            </div>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                <button class="btn btn-secondary" id="ocrCopyBtn" type="button">📋 কপি করুন</button>
+                                <button class="btn btn-ghost" id="ocrClearBtn" type="button">🧹 ক্লিয়ার</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /.tool-panels -->
+              </div><!-- /.tools-panel-body -->
+
+                            </div><!-- /.tools-panel -->
+
+            <!-- Resizer Splitter Drag Handle -->
+            <div class="resizer-handle" id="resizerHandle" title="টেনে মেনু ও স্ক্রিনের সাইজ ছোট/বড় করুন">
+                <div class="resizer-bar"></div>
+            </div>
+
+            <!-- Preview & Info (Right Screen / Canvas Area) -->
+            <div class="preview-panel">
+                <div class="preview-card" id="previewCard">
+                    <div class="preview-header" id="previewHeader">
+                        <h3>📷 প্রিভিউ</h3>
+                        <div class="preview-header-actions">
+                            <button class="btn btn-ghost" id="undoBtn" title="পূর্বাবস্থায় ফিরুন (Ctrl+Z)" disabled>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-1"/></svg>
+                            </button>
+                            <button class="btn btn-ghost" id="redoBtn" title="আবার করুন (Ctrl+Y)" disabled>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h1"/></svg>
+                            </button>
+                            <button class="btn btn-ghost" id="historyToggleBtn" title="এডিট ইতিহাস দেখুন (History)">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                📜 ইতিহাস
+                            </button>
+                            <button class="btn btn-ghost" id="compareBtn" title="আগে/পরে তুলনা করুন" disabled>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="3" x2="12" y2="21"/><path d="M8 8l-4 4 4 4"/><path d="M16 8l4 4-4 4"/></svg>
+                            </button>
+                            <button class="btn btn-ghost" id="previewFloatBtn" title="ফ্লোটিং উইন্ডো হিসেবে খুলুন">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                                    <rect x="12" y="12" width="7" height="7" rx="1" fill="currentColor" stroke="none" />
+                                </svg>
+                            </button>
+                            <button class="btn btn-ghost" id="clearAllEditsBtn" title="সব এডিট মুছে আপলোড করা মূল ফটোতে ফিরে যান (Clear All Edits)" style="color:#f59e0b; font-weight:600;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                                🧹 সব এডিট মুছুন
+                            </button>
+                            <button class="btn btn-ghost" id="changePhotoBtn" title="ফটো পরিবর্তন করুন">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="1 4 1 10 7 10" />
+                                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                                </svg>
+                                পরিবর্তন
+                            </button>
+                            <button class="btn btn-ghost" id="resetSessionBtn" title="সংরক্ষিত সেশন মুছে নতুন ছবি শুরু করুন" style="color:#ef4444;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                                                নতুন ছবি
+                            </button>
+
+                            <!-- Download Button (Always accessible at top-right without scrolling) -->
+                            <div class="download-section" id="downloadSection">
+                                <button class="btn btn-download" id="downloadBtn" title="এডিট করা ছবি ডাউনলোড করুন">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                        <polyline points="7 10 12 15 17 10" />
+                                        <line x1="12" y1="15" x2="12" y2="3" />
+                                    </svg>
+                                    ডাউনলোড করুন
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="zoom-toolbar" id="zoomToolbar">
+                        <button class="zoom-btn" id="zoomOutBtn" title="জুম আউট">−</button>
+                        <span class="zoom-level" id="zoomLevelLabel">ফিট</span>
+                        <button class="zoom-btn" id="zoomInBtn" title="জুম ইন">+</button>
+                        <span class="zoom-divider"></span>
+                        <button class="zoom-btn zoom-btn-text" id="zoomFitBtn" title="উইন্ডোতে ফিট করুন">Fit</button>
+                        <button class="zoom-btn zoom-btn-text" id="zoom100Btn" title="আসল সাইজ (১০০%)">100%</button>
+                    </div>
+                    <div class="preview-image-wrapper" id="previewImageWrapper" style="position:relative;">
+                        <img id="previewImage" src="" alt="Preview">
+                        <!-- Color Eraser live-preview overlay canvas -->
+                        <canvas id="bgColorCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;z-index:9;display:none;pointer-events:none;"></canvas>
+                        <!-- Lasso overlay canvas -->
+                        <canvas id="bgLassoCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;z-index:10;display:none;"></canvas>
+                        <!-- Clone Stamp live-edit canvas (draws the real, full-res pixels; sits over previewImage while active) -->
+                        <canvas id="bgCloneCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;z-index:11;display:none;"></canvas>
+                        <!-- Erase/Restore Brush live-edit canvas (Phase 6) -->
+                        <canvas id="bgEraseCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;z-index:12;display:none;"></canvas>
+                        <!-- Magic Wand selection-preview canvas (Phase 6) -->
+                        <canvas id="bgWandCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;z-index:13;display:none;"></canvas>
+                        <!-- Before/After comparison overlay (Phase 6) -->
+                        <div class="before-after-overlay" id="baOverlay" style="display:none;">
+                            <img id="baBeforeImg" alt="আগে">
+                            <div class="ba-divider" id="baDivider"></div>
+                            <span class="ba-label ba-label-before">আগে</span>
+                            <span class="ba-label ba-label-after">পরে</span>
+                        </div>
+                        <!-- Watermark live-position overlay (Phase 9) -->
+                        <div class="wm-overlay" id="wmOverlay" style="display:none;">
+                            <div class="wm-handle wm-handle-text" id="wmTextHandle" style="display:none;"></div>
+                            <div class="wm-handle wm-handle-logo" id="wmLogoHandle" style="display:none;">
+                                <img id="wmLogoHandleImg" alt="Logo" draggable="false">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="image-info">
+                        <div class="info-item">
+                            <span class="info-label">ফাইলের নাম</span>
+                            <span class="info-value" id="infoName">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">সাইজ</span>
+                            <span class="info-value" id="infoSize">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">ডাইমেনশন</span>
+                            <span class="info-value" id="infoDimension">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">টাইপ</span>
+                            <span class="info-value" id="infoType">-</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="preview-placeholder" id="previewPlaceholder" style="display:none;">
+                    <p>🗗 প্রিভিউ এখন ফ্লোটিং উইন্ডোতে খোলা আছে</p>
+                    <button class="btn btn-ghost" id="previewDockBtn">প্যানেলে ফিরিয়ে আনুন</button>
                 </div>
             </div>
         </div>
@@ -780,6 +1390,12 @@
 
     <!-- Toast Notification -->
     <div class="toast" id="toast"></div>
+
+    <!-- Phase 12: PWA — নতুন ভার্সন এলে দেখানোর ব্যানার -->
+    <div class="pwa-update-banner" id="pwaUpdateBanner">
+        <span>🔄 নতুন ভার্সন পাওয়া গেছে</span>
+        <button type="button" class="btn btn-primary" id="pwaUpdateReloadBtn">রিফ্রেশ করুন</button>
+    </div>
 
     <!-- Eyedropper Magnifier Loupe -->
     <div id="eyedropperLoupe" class="eyedropper-loupe" style="display:none;">
@@ -795,7 +1411,166 @@
         </svg>
     </div>
 
+    <!-- History Panel Modal -->
+    <div class="history-modal-overlay" id="historyModalOverlay" style="display:none;">
+        <div class="history-modal">
+            <div class="history-modal-header">
+                <h3>📜 এডিট ইতিহাস (Edit History)</h3>
+                <button type="button" class="history-close-btn" id="historyCloseBtn">&times;</button>
+            </div>
+            <div class="history-modal-body">
+                <p class="history-subtitle">যেকোনো ধাপে ক্লিক করে সাথে সাথে সেই অবস্থায় ফিরে যান:</p>
+                <ul class="history-list" id="historyList">
+                    <!-- Dynamically populated by JS -->
+                </ul>
+            </div>
+            <div class="history-modal-footer">
+                <button class="btn btn-secondary" id="revertOriginalBtn">⏪ একদম শুরুতে ফিরুন (Original)</button>
+                <button class="btn btn-primary" id="historyDoneBtn">সম্পন্ন</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Resize Modal -->
+    <div class="bulk-modal-overlay" id="bulkModalOverlay" style="display:none;">
+        <div class="bulk-modal">
+            <div class="history-modal-header">
+                <h3>🗂️ বাল্ক রিসাইজ — একসাথে অনেক ছবি</h3>
+                <button type="button" class="history-close-btn" id="bulkCloseBtn">&times;</button>
+            </div>
+            <div class="bulk-modal-body">
+                <p class="history-subtitle">৫-৭টি (বা তার বেশি) ছবি একসাথে আপলোড করুন, একটা সাইজ প্রিসেট বাছাই করুন,
+                    আর সব ছবি একইসাথে ওই সাইজে কনভার্ট হয়ে ZIP আকারে ডাউনলোড হবে।</p>
+
+                <div class="bulk-upload-area" id="bulkUploadArea">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <p>একাধিক ছবি সিলেক্ট করতে এখানে ক্লিক করুন অথবা টেনে আনুন</p>
+                    <input type="file" id="bulkFileInput" accept="image/*" multiple hidden>
+                </div>
+
+                <div class="bulk-thumbs" id="bulkThumbs"></div>
+
+                <div class="form-group" id="bulkBgRemoveWrap" style="display:none;">
+                    <label class="wm-toggle">
+                        <input type="checkbox" id="bulkApplyBgRemove">
+                        <span>🪄 প্রতিটি ছবি থেকে AI দিয়ে ব্যাকগ্রাউন্ড রিমুভ করুন</span>
+                    </label>
+                    <p class="wm-hint" id="bulkBgRemoveHint">"ব্যাকগ্রাউন্ড রিমুভ" ট্যাবে আগে Remove.bg API Key দিন, তারপর এখানে টিক দিন</p>
+                    <div class="form-group" id="bulkBgColorWrap" style="display:none; margin-top:10px;">
+                        <label class="wm-toggle">
+                            <input type="checkbox" id="bulkBgReplaceColor">
+                            <span>🎨 রিমুভের পর সলিড রঙ ব্যাকগ্রাউন্ড বসান</span>
+                        </label>
+                        <p class="wm-hint">চেক না করলে ছবি স্বচ্ছ (transparent) PNG হিসেবে থাকবে</p>
+                        <input type="color" id="bulkBgColor" value="#ffffff" style="margin-top:6px;">
+                    </div>
+                </div>
+
+                <div class="form-group" id="bulkPresetWrap" style="display:none;">
+                    <label>প্ল্যাটফর্ম প্রিসেট বাছাই করুন</label>
+                    <div class="social-preset-grid" id="bulkPresetGrid"></div>
+                    <button type="button" class="btn btn-secondary btn-warisha-pipeline" id="bulkWarishaPipelineBtn" style="margin-top:8px;">
+                        🏷️ Warisha প্রোডাক্ট পাইপলাইন (এক-ক্লিক)
+                    </button>
+                    <p class="wm-hint" style="margin-top:4px;">BG-remove ✓, সাদা ব্যাকগ্রাউন্ড ✓, Square 1:1 ✓, ফিল মোড ✓ — সব একসাথে সেট হয়ে যাবে</p>
+                </div>
+
+                <div class="form-group social-mode-group" id="bulkModeWrap" style="display:none;">
+                    <label>মোড</label>
+                    <div class="mode-toggle">
+                        <label class="mode-option">
+                            <input type="radio" name="bulkMode" value="fit" checked>
+                            <span>🖼️ ফিট <small>(কিছুই কাটবে না)</small></span>
+                        </label>
+                        <label class="mode-option">
+                            <input type="radio" name="bulkMode" value="fill">
+                            <span>✂️ ফিল <small>(ক্রপ করে ভরাট)</small></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="bulkWatermarkWrap" style="display:none;">
+                    <label class="wm-toggle">
+                        <input type="checkbox" id="bulkApplyWatermark">
+                        <span>💧 একই ওয়াটারমার্ক প্রয়োগ করুন</span>
+                    </label>
+                    <p class="wm-hint" id="bulkWatermarkHint">"ওয়াটারমার্ক" ট্যাবে যা সেট করা আছে, ঠিক সেটাই প্রতিটা ছবিতে বসবে</p>
+                </div>
+
+                <div class="form-group" id="bulkUpscaleWrap" style="display:none;">
+                    <label class="wm-toggle">
+                        <input type="checkbox" id="bulkApplyUpscale">
+                        <span>🔍 প্রসেস করার আগে লোকাল আপস্কেল প্রয়োগ করুন</span>
+                    </label>
+                    <p class="wm-hint" id="bulkUpscaleHint">"আপস্কেল" ট্যাবের লোকাল সেকশনে যে ফ্যাক্টর/শার্পনেস সেট করা আছে, সেটাই প্রতিটা ছবিতে প্রয়োগ হবে (প্রিসেট সাইজে বসানোর আগে)</p>
+                </div>
+
+                
+                <!-- SEO ফাইলনেম প্যাটার্ন -->
+                <div class="form-group" id="bulkFilenameWrap" style="display:none;">
+                    <label>📝 SEO ফাইলনেম প্যাটার্ন</label>
+                    <div class="filename-pattern-row" style="margin-top:6px;">
+                        <input type="text" id="bulkFilenamePrefix" placeholder="warisha-saree (ইংরেজিতে)" maxlength="60">
+                        <select id="bulkFilenameStyle">
+                            <option value="prefix_num">prefix-001, prefix-002…</option>
+                            <option value="prefix_preset">prefix_presetid</option>
+                            <option value="original">মূল ফাইলনাম (ডিফল্ট)</option>
+                        </select>
+                    </div>
+                    <p class="wm-hint" style="margin-top:5px;">"warisha-saree" দিলে: <strong>warisha-saree-001_1080x1350.jpg</strong>, warisha-saree-002…</p>
+                </div>
+
+                <!-- আউটপুট ফরম্যাট -->
+                <div class="form-group" id="bulkFormatWrap" style="display:none;">
+                    <label>📦 আউটপুট ফরম্যাট</label>
+                    <select id="bulkOutputFormat" class="bulk-format-select">
+                        <option value="auto">Auto — JPEG / স্বচ্ছ ছবিতে PNG (ডিফল্ট)</option>
+                        <option value="webp">WebP — সবচেয়ে ছোট, ওয়েব-অপটিমাইজড (JPEG চেয়ে ২৫-৩৫% ছোট)</option>
+                        <option value="jpg">JPEG — ছোট, সব প্ল্যাটফর্মে চলে</option>
+                        <option value="png">PNG — স্বচ্ছতা সমর্থিত, বড় ফাইল</option>
+                    </select>
+                    <p class="wm-hint" style="margin-top:5px;">WebP বেছে নিলে ফাইল সাইজ ছোট — ফেসবুক ও ওয়েবসাইটে দ্রুত লোড হয়</p>
+                </div>
+
+                <!-- রেসিপি সেভ / লোড -->
+                <div class="form-group" id="bulkRecipeWrap" style="display:none;">
+                    <label>⭐ সেটিংস রেসিপি — সেভ ও লোড</label>
+                    <div class="recipe-row" style="margin-top:6px;">
+                        <input type="text" id="bulkRecipeName" placeholder="রেসিপির নাম (যেমন: AcadeFlow Product)" maxlength="50">
+                        <button type="button" class="btn btn-secondary btn-sm" id="bulkSaveRecipeBtn">💾 সেভ</button>
+                    </div>
+                    <div class="recipe-row" style="margin-top:8px;">
+                        <select id="bulkRecipeSelect">
+                            <option value="">— সেভ করা রেসিপি লোড করুন —</option>
+                        </select>
+                        <button type="button" class="btn btn-secondary btn-sm" id="bulkLoadRecipeBtn">📂 লোড</button>
+                        <button type="button" class="btn btn-danger btn-sm" id="bulkDeleteRecipeBtn" title="এই রেসিপি মুছুন">🗑️</button>
+                    </div>
+                    <p class="wm-hint" style="margin-top:5px;">প্রিসেট, মোড, ফরম্যাট, BG-remove, ফাইলনাম প্যাটার্ন — সব একসাথে সেভ হবে</p>
+                </div>
+                <div class="bulk-progress" id="bulkProgress" style="display:none;">
+                    <div class="bulk-progress-bar"><div class="bulk-progress-fill" id="bulkProgressFill"></div></div>
+                    <span id="bulkProgressLabel">প্রসেস হচ্ছে... 0 / 0</span>
+                </div>
+            </div>
+            <div class="history-modal-footer">
+                <button class="btn btn-secondary" id="bulkClearBtn">🗑️ সব মুছুন</button>
+                <button class="btn btn-primary" id="bulkProcessBtn" disabled>⬇️ প্রসেস করে ZIP ডাউনলোড করুন</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="social-presets.js"></script>
+    <script src="watermark.js"></script>
+    <script src="collage.js"></script>
     <script src="app.js"></script>
+    <script src="bulk.js"></script>
 </body>
 
 </html>

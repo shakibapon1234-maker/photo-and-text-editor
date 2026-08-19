@@ -1,0 +1,36 @@
+{
+  "name": "Photo Editor by Shakib",
+  "short_name": "Photo Editor",
+  "description": "লোকাল ফটো এডিটর — রিসাইজ, ব্রাইটনেস, ক্রপ, ব্যাকগ্রাউন্ড রিমুভ, ওয়াটারমার্ক, আপস্কেল ও আরও অনেক কিছু, সম্পূর্ণ অফলাইনে কাজ করে।",
+  "lang": "bn",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "id": "./index.html",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
+  "orientation": "any",
+  "background_color": "#121316",
+  "theme_color": "#121316",
+  "categories": ["photo", "utilities", "productivity"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

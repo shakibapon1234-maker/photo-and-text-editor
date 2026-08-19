@@ -143,6 +143,39 @@
       }
     }
 
+    function triggerGlobalClear() {
+      const isPhoto = document.getElementById('framePhoto').classList.contains('active');
+      if (isPhoto) {
+        try {
+          const frame = document.getElementById('framePhoto');
+          const doc = frame.contentDocument || frame.contentWindow.document;
+          const btn = doc.getElementById('clearAllEditsBtn');
+          if (btn) {
+            btn.click();
+          } else {
+            frame.contentWindow.location.reload();
+          }
+        } catch(e) {
+          console.warn('Clear photo error', e);
+        }
+      } else {
+        try {
+          const frame = document.getElementById('frame3d');
+          const win = frame.contentWindow;
+          if (win && typeof win.reset3DStudio === 'function') {
+            win.reset3DStudio();
+          } else {
+            const doc = frame.contentDocument || win.document;
+            const btn = doc.getElementById('reset3DStudioBtn') || doc.getElementById('topbarResetBtn');
+            if (btn) btn.click();
+            else win.location.reload();
+          }
+        } catch(e) {
+          console.warn('Clear 3D error', e);
+        }
+      }
+    }
+
     // Auto-restore active tab on refresh/page load
     document.addEventListener('DOMContentLoaded', () => {
       let savedTab = 'photo';
