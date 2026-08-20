@@ -80,6 +80,16 @@ esbuild
     const rootIndexHtml = path.join(__dirname, '..', '..', 'index.html');
     if (fs.existsSync(docsRootDir) && fs.existsSync(rootIndexHtml)) {
       fs.copyFileSync(rootIndexHtml, path.join(docsRootDir, 'index.html'));
+      // The suite launcher also exposes this light standalone Canvas tool.
+      // Copy it with the root page so the Logo Motion tab works on deployment.
+      const logoToolSource = path.join(__dirname, '..', '..', 'spinning-circle-animation.html');
+      if (fs.existsSync(logoToolSource)) {
+        fs.copyFileSync(logoToolSource, path.join(docsRootDir, 'spinning-circle-animation.html'));
+      }
+      const promoToolSource = path.join(__dirname, '..', '..', 'promo-motion-studio.html');
+      if (fs.existsSync(promoToolSource)) {
+        fs.copyFileSync(promoToolSource, path.join(docsRootDir, 'promo-motion-studio.html'));
+      }
       console.log(`Synced root index.html to docs/index.html`);
     }
   })
