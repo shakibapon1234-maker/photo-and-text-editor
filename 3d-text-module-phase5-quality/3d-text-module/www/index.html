@@ -28,6 +28,54 @@
         <button type="button" id="loadProjectBtn" class="project-action-btn" title="আগে সেভ করা Project file খুলুন">📂 প্রজেক্ট লোড</button>
         <input id="projectFileInput" type="file" accept=".warisha3d.json,application/json" hidden>
       </div>
+      <div class="voice-command-wrap">
+        <button type="button" id="voiceCommandBtn" class="voice-command-btn" title="ভয়েস কমান্ড দিন">🎤 ভয়েস কমান্ড</button>
+        <select id="voiceLanguageSelect" class="voice-language-select" aria-label="ভয়েস ভাষা">
+          <option value="bn-BD" selected>বাংলা</option>
+          <option value="en-US">English</option>
+        </select>
+        <span id="voiceCommandStatus" class="voice-command-status" aria-live="polite">বলুন: “টেক্সট কালার”</span>
+      </div>
+      <div class="text-command-wrap">
+        <button type="button" id="textCommandBtn" class="text-command-btn" aria-expanded="false" aria-controls="textCommandMenu">⌨ টেক্সট কমান্ড <span aria-hidden="true">▾</span></button>
+        <div id="textCommandMenu" class="text-command-menu" hidden role="menu" aria-label="টেক্সট কমান্ড">
+          <p>Navigation</p>
+          <button type="button" role="menuitem" data-text-command="টেক্সট">✏️ টেক্সট এডিট</button>
+          <button type="button" role="menuitem" data-text-command="ছবি">🖼️ ছবি</button>
+          <button type="button" role="menuitem" data-text-command="টেক্সট কালার">🎨 টেক্সট কালার</button>
+          <button type="button" role="menuitem" data-text-command="কালার টেমপ্লেট">🌈 কালার টেমপ্লেট</button>
+          <button type="button" role="menuitem" data-text-command="শেপ">🔷 শেপ</button>
+          <button type="button" role="menuitem" data-text-command="স্টিকার">🏷️ স্টিকার / ব্যাজ</button>
+          <button type="button" role="menuitem" data-text-command="কিউব">🧊 3D কিউব</button>
+          <button type="button" role="menuitem" data-text-command="সাইজ">↔️ সাইজ ও গভীরতা</button>
+          <button type="button" role="menuitem" data-text-command="পজিশন">✋ পজিশন</button>
+          <button type="button" role="menuitem" data-text-command="রোটেট">↻ রোটেট</button>
+          <button type="button" role="menuitem" data-text-command="ম্যাটেরিয়াল">💎 ম্যাটেরিয়াল</button>
+          <button type="button" role="menuitem" data-text-command="লাইটিং">💡 লাইটিং</button>
+          <button type="button" role="menuitem" data-text-command="ব্যাকগ্রাউন্ড">🖼️ ব্যাকগ্রাউন্ড</button>
+          <button type="button" role="menuitem" data-text-command="সেফ এরিয়া">📐 সেফ এরিয়া</button>
+          <button type="button" role="menuitem" data-text-command="কোয়ালিটি">⚡ কোয়ালিটি</button>
+          <button type="button" role="menuitem" data-text-command="ক্যামেরা">📷 ক্যামেরা</button>
+          <button type="button" role="menuitem" data-text-command="অ্যানিমেশন প্রিসেট">✨ অ্যানিমেশন</button>
+          <button type="button" role="menuitem" data-text-command="টাইমলাইন">⏱️ টাইমলাইন</button>
+          <button type="button" role="menuitem" data-text-command="এক্সপোর্ট">⬇️ এক্সপোর্ট</button>
+          <p>Quick actions</p>
+          <button type="button" role="menuitem" data-text-command="টাইপরাইটার">⌨️ Typewriter animation</button>
+          <button type="button" role="menuitem" data-text-command="ফেড ইন">🌫️ Fade In animation</button>
+          <button type="button" role="menuitem" data-text-command="অ্যানিমেশন বন্ধ">⏹️ Animation বন্ধ</button>
+          <button type="button" role="menuitem" data-text-command="অফার টেমপ্লেট">🔥 Offer template</button>
+          <button type="button" role="menuitem" data-text-command="দাম টেমপ্লেট">🏷️ Price template</button>
+          <button type="button" role="menuitem" data-text-command="নতুন টেমপ্লেট">✨ New Collection template</button>
+          <button type="button" role="menuitem" data-text-command="শপ নাউ টেমপ্লেট">🛍️ Shop Now template</button>
+          <button type="button" role="menuitem" data-text-command="লাল কালার">🔴 Bright Red</button>
+          <button type="button" role="menuitem" data-text-command="হলুদ কালার">🟡 Bright Yellow</button>
+          <button type="button" role="menuitem" data-text-command="সাদা কালার">⚪ Pure White</button>
+          <button type="button" role="menuitem" data-text-command="রিলস ফ্রেম">📱 9:16 Reels frame</button>
+          <button type="button" role="menuitem" data-text-command="স্কয়ার ফ্রেম">◻️ 1:1 Square frame</button>
+          <button type="button" role="menuitem" data-text-command="আনডু">↶ Undo</button>
+          <button type="button" role="menuitem" data-text-command="রিডু">↷ Redo</button>
+        </div>
+      </div>
     </div>
     <div class="topbar-note" id="statusNote" hidden>মডেল/ফন্ট লোড হচ্ছে…</div>
     <button type="button" id="topbarResetBtn" title="সব এডিট মুছে স্টুডিও রিসেট করুন" style="margin-left:auto; background:rgba(245,158,11,0.15); border:1px solid #f59e0b; color:#fbbf24; padding:5px 14px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">🧹 রিসেট / ক্লিয়ার অল</button>

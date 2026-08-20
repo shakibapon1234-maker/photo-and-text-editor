@@ -37,6 +37,11 @@ const colorTemplateMenu = document.getElementById('colorTemplateMenu');
 const saveProjectBtn = document.getElementById('saveProjectBtn');
 const loadProjectBtn = document.getElementById('loadProjectBtn');
 const projectFileInput = document.getElementById('projectFileInput');
+const voiceCommandBtn = document.getElementById('voiceCommandBtn');
+const voiceLanguageSelect = document.getElementById('voiceLanguageSelect');
+const voiceCommandStatus = document.getElementById('voiceCommandStatus');
+const textCommandBtn = document.getElementById('textCommandBtn');
+const textCommandMenu = document.getElementById('textCommandMenu');
 
 // ---------- DOM refs ----------
 const canvas = document.getElementById('scene-canvas');
@@ -6362,6 +6367,193 @@ const shapeStudio = initShapeStudio({
   isActive: () => state.contentMode === 'shape',
 });
 window.__shapeStudio = shapeStudio;
+
+// ---------- Voice navigation (browser Web Speech API, no API key) ----------
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let voiceRecognition = null;
+
+function setVoiceStatus(message, listening = false) {
+  if (voiceCommandStatus) voiceCommandStatus.textContent = message;
+  if (voiceCommandBtn) {
+    voiceCommandBtn.classList.toggle('is-listening', listening);
+    voiceCommandBtn.textContent = listening ? '🔴 শুনছি…' : '🎤 ভয়েস কমান্ড';
+  }
+}
+
+function revealVoiceSection(element) {
+  const section = element?.closest?.('.panel-section') || element;
+  if (!section) return false;
+  section.hidden = false;
+  section.classList.remove('collapsed');
+  const arrow = section.querySelector?.('.accordion-arrow');
+  if (arrow) arrow.textContent = '▼';
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const focusTarget = section.querySelector('textarea, input, select, button');
+  setTimeout(() => focusTarget?.focus({ preventScroll: true }), 450);
+  return true;
+}
+
+function activateVoiceContentMode(mode) {
+  const button = contentModeGrid?.querySelector(`[data-content="${mode}"]`);
+  button?.click();
+  setTimeout(() => revealVoiceSection(mode === 'shape' ? shapeContentSection : textContentSection), 40);
+}
+
+function normalizeVoiceCommand(value) {
+  return value.toLowerCase().replace(/[.,!?।]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function executeVoiceCommand(transcript) {
+  const command = normalizeVoiceCommand(transcript);
+  const has = (...terms) => terms.some((term) => command.includes(term));
+  let success = false;
+  const runAnimation = (id) => {
+    animPresetGrid?.querySelector(`[data-anim="${id}"]`)?.click();
+    revealVoiceSection(animPresetGrid);
+  };
+  const runTextTemplate = (id) => {
+    textTemplateGrid?.querySelector(`[data-text-template="${id}"]`)?.click();
+    revealVoiceSection(textContentSection);
+  };
+  const setSafeArea = (value) => {
+    if (!safeAreaSelect) return;
+    safeAreaSelect.value = value;
+    safeAreaSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    revealVoiceSection(safeAreaSelect);
+  };
+  const quickActions = {
+    'টাইপরাইটার': () => runAnimation('typewriter'),
+    'typewriter': () => runAnimation('typewriter'),
+    'ফেড ইন': () => runAnimation('fadeIn'),
+    'fade in': () => runAnimation('fadeIn'),
+    'অ্যানিমেশন বন্ধ': () => runAnimation('none'),
+    'animation off': () => runAnimation('none'),
+    'অফার টেমপ্লেট': () => runTextTemplate('offer'),
+    'offer template': () => runTextTemplate('offer'),
+    'দাম টেমপ্লেট': () => runTextTemplate('price'),
+    'price template': () => runTextTemplate('price'),
+    'নতুন টেমপ্লেট': () => runTextTemplate('new'),
+    'new template': () => runTextTemplate('new'),
+    'শপ নাউ টেমপ্লেট': () => runTextTemplate('cta'),
+    'shop now template': () => runTextTemplate('cta'),
+    'লাল কালার': () => applyColorTemplate('#ff0000', 'Bright Red'),
+    'bright red': () => applyColorTemplate('#ff0000', 'Bright Red'),
+    'হলুদ কালার': () => applyColorTemplate('#ffff00', 'Bright Yellow'),
+    'bright yellow': () => applyColorTemplate('#ffff00', 'Bright Yellow'),
+    'সাদা কালার': () => applyColorTemplate('#ffffff', 'Pure White'),
+    'pure white': () => applyColorTemplate('#ffffff', 'Pure White'),
+    'রিলস ফ্রেম': () => setSafeArea('9:16'),
+    'reels frame': () => setSafeArea('9:16'),
+    'স্কয়ার ফ্রেম': () => setSafeArea('1:1'),
+    'square frame': () => setSafeArea('1:1'),
+    'আনডু': undoStudioEdit,
+    'undo': undoStudioEdit,
+    'রিডু': redoStudioEdit,
+    'redo': redoStudioEdit,
+  };
+  if (quickActions[command]) {
+    quickActions[command]();
+    success = true;
+  } else if (has('কালার টেমপ্লেট') || has('color template')) {
+    colorTemplateBtn?.click();
+    success = !!colorTemplateBtn;
+  } else if ((has('টেক্সট') && has('কালার')) || has('text color') || has('text colour') || has('color')) {
+    success = revealVoiceSection(colorModeSelect);
+  } else if (has('শেপ') || has('shape')) {
+    activateVoiceContentMode('shape');
+    success = true;
+  } else if (has('কিউব') || has('cube')) {
+    activateVoiceContentMode('cube');
+    success = true;
+  } else if (has('ছবি') || has('image') || has('photo')) {
+    activateVoiceContentMode('image');
+    success = true;
+  } else if ((has('অ্যানিমেশন') && (has('প্রিসেট') || has('preset'))) || has('animation')) {
+    success = revealVoiceSection(animPresetGrid);
+  } else if (has('এক্সপোর্ট') || has('export') || has('ডাউনলোড')) {
+    success = revealVoiceSection(exportFormatSelect);
+  } else if (has('ব্যাকগ্রাউন্ড') || has('background')) {
+    success = revealVoiceSection(bgModeSelect);
+  } else if (has('সেফ এরিয়া') || has('safe area') || has('ফ্রেম') || has('frame')) {
+    success = revealVoiceSection(safeAreaSelect);
+  } else if (has('সাইজ') || has('size') || has('গভীরতা') || has('depth')) {
+    success = revealVoiceSection(sizeRange);
+  } else if (has('পজিশন') || has('position') || has('move')) {
+    success = revealVoiceSection(posXRange);
+  } else if (has('রোটেট') || has('rotate') || has('tilt')) {
+    success = revealVoiceSection(rotXRange);
+  } else if (has('ম্যাটেরিয়াল') || has('material')) {
+    success = revealVoiceSection(materialPresetGrid);
+  } else if (has('লাইটিং') || has('lighting') || has('light')) {
+    success = revealVoiceSection(lightingPresetGrid);
+  } else if (has('কোয়ালিটি') || has('quality') || has('performance')) {
+    success = revealVoiceSection(qualityPresetGrid);
+  } else if (has('ক্যামেরা') || has('camera')) {
+    success = revealVoiceSection(resetCameraBtn);
+  } else if (has('টাইমলাইন') || has('timeline') || has('duration')) {
+    success = revealVoiceSection(animDurationRange);
+  } else if (has('স্টিকার') || has('sticker') || has('ব্যাজ') || has('badge')) {
+    activateVoiceContentMode('sticker');
+    success = true;
+  } else if (has('টেক্সট') || has('text') || has('লেখা')) {
+    activateVoiceContentMode('text');
+    success = true;
+  }
+  setVoiceStatus(success ? `✓ “${transcript}”` : `কমান্ডটি বুঝতে পারিনি: “${transcript}”`);
+}
+
+function startVoiceCommand() {
+  if (!SpeechRecognition) {
+    setVoiceStatus('এই browser-এ Voice Recognition নেই—Chrome/Edge ব্যবহার করুন।');
+    return;
+  }
+  if (voiceRecognition) voiceRecognition.abort();
+  voiceRecognition = new SpeechRecognition();
+  voiceRecognition.lang = voiceLanguageSelect?.value || 'bn-BD';
+  voiceRecognition.interimResults = false;
+  voiceRecognition.continuous = false;
+  voiceRecognition.maxAlternatives = 2;
+  voiceRecognition.onstart = () => setVoiceStatus('শুনছি… যেমন: টেক্সট কালার', true);
+  voiceRecognition.onresult = (event) => executeVoiceCommand(event.results[0][0].transcript);
+  voiceRecognition.onerror = (event) => {
+    const message = event.error === 'not-allowed' ? 'মাইক্রোফোনের অনুমতি দিন।' : event.error === 'no-speech' ? 'কোনো কথা শোনা যায়নি—আবার চেষ্টা করুন।' : `Voice error: ${event.error}`;
+    setVoiceStatus(message);
+  };
+  voiceRecognition.onend = () => {
+    if (voiceCommandBtn?.classList.contains('is-listening')) setVoiceStatus('বলুন: “টেক্সট কালার”');
+    voiceRecognition = null;
+  };
+  try { voiceRecognition.start(); } catch (_) { setVoiceStatus('আবার 🎤 বাটন চাপুন।'); }
+}
+
+voiceCommandBtn?.addEventListener('click', startVoiceCommand);
+
+function closeTextCommandMenu() {
+  if (!textCommandMenu || !textCommandBtn) return;
+  textCommandMenu.hidden = true;
+  textCommandBtn.setAttribute('aria-expanded', 'false');
+}
+
+textCommandBtn?.addEventListener('click', (event) => {
+  event.stopPropagation();
+  const opening = textCommandMenu?.hidden;
+  closeTextCommandMenu();
+  if (opening && textCommandMenu) {
+    textCommandMenu.hidden = false;
+    textCommandBtn.setAttribute('aria-expanded', 'true');
+  }
+});
+
+textCommandMenu?.addEventListener('click', (event) => {
+  const command = event.target.closest('[data-text-command]')?.dataset.textCommand;
+  if (!command) return;
+  executeVoiceCommand(command);
+  closeTextCommandMenu();
+});
+
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('.text-command-wrap')) closeTextCommandMenu();
+});
 
 // ---------- Undo / Redo ----------
 // A complete snapshot is captured around edits, including Shape Studio layers.

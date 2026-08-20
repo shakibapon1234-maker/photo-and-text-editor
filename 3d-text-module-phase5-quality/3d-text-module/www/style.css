@@ -300,6 +300,21 @@ body { display: flex; flex-direction: column; }
   background: rgba(255,255,255,.04); color: var(--text); font: 700 11px var(--font-display); cursor: pointer;
 }
 .project-action-btn:hover { border-color: #38bdf8; background: rgba(56,189,248,.12); }
+.voice-command-wrap { display: inline-flex; align-items: center; gap: 5px; margin-left: 8px; }
+.voice-command-btn { padding: 5px 9px; border: 1px solid #f43f5e; border-radius: 6px; background: rgba(244,63,94,.1); color: #fecdd3; font: 700 11px var(--font-display); cursor: pointer; }
+.voice-command-btn:hover, .voice-command-btn.is-listening { background: rgba(244,63,94,.27); border-color: #fb7185; }
+.voice-command-btn.is-listening { animation: voice-pulse 1s ease-in-out infinite; }
+.voice-language-select { max-width: 72px; padding: 4px 3px; border: 1px solid var(--border); border-radius: 5px; color: var(--text); background: var(--surface); font: 11px var(--font-display); }
+.voice-command-status { max-width: 138px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); font: 10px var(--font-mono); }
+@keyframes voice-pulse { 50% { box-shadow: 0 0 0 5px rgba(244,63,94,.16); } }
+.text-command-wrap { position: relative; margin-left: 7px; }
+.text-command-btn { padding: 5px 9px; border: 1px solid #a78bfa; border-radius: 6px; background: rgba(167,139,250,.11); color: #ddd6fe; font: 700 11px var(--font-display); cursor: pointer; }
+.text-command-btn:hover, .text-command-btn[aria-expanded="true"] { background: rgba(167,139,250,.25); }
+.text-command-menu { position: absolute; z-index: 110; top: calc(100% + 7px); right: 0; width: 232px; max-height: min(72vh, 640px); overflow-y: auto; padding: 7px; border: 1px solid var(--border); border-radius: 8px; background: #080c13; box-shadow: 0 12px 30px rgba(0,0,0,.48); }
+.text-command-menu[hidden] { display: none; }
+.text-command-menu p { margin: 2px 6px 6px; color: var(--text-dim); font: 10px var(--font-mono); }
+.text-command-menu button { display: block; width: 100%; padding: 7px 8px; border: 0; border-radius: 5px; background: transparent; color: var(--text); font: 600 12px var(--font-display); text-align: left; cursor: pointer; }
+.text-command-menu button:hover { background: rgba(255,255,255,.09); color: #fff; }
 .text-template-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
 .text-template-grid button { padding: 7px 5px; border: 1px solid rgba(250,204,21,.42); border-radius: 6px; background: rgba(250,204,21,.07); color: #fde68a; font: 700 11px var(--font-display); cursor: pointer; }
 .text-template-grid button:hover { background: rgba(250,204,21,.18); }

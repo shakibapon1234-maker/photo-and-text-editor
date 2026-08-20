@@ -36082,6 +36082,11 @@ var colorTemplateMenu = document.getElementById("colorTemplateMenu");
 var saveProjectBtn = document.getElementById("saveProjectBtn");
 var loadProjectBtn = document.getElementById("loadProjectBtn");
 var projectFileInput = document.getElementById("projectFileInput");
+var voiceCommandBtn = document.getElementById("voiceCommandBtn");
+var voiceLanguageSelect = document.getElementById("voiceLanguageSelect");
+var voiceCommandStatus = document.getElementById("voiceCommandStatus");
+var textCommandBtn = document.getElementById("textCommandBtn");
+var textCommandMenu = document.getElementById("textCommandMenu");
 var canvas = document.getElementById("scene-canvas");
 var viewportEl = document.getElementById("viewport");
 var safeAreaSelect = document.getElementById("safeAreaSelect");
@@ -41430,6 +41435,184 @@ var shapeStudio = initShapeStudio({
   isActive: () => state.contentMode === "shape"
 });
 window.__shapeStudio = shapeStudio;
+var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+var voiceRecognition = null;
+function setVoiceStatus(message, listening = false) {
+  if (voiceCommandStatus) voiceCommandStatus.textContent = message;
+  if (voiceCommandBtn) {
+    voiceCommandBtn.classList.toggle("is-listening", listening);
+    voiceCommandBtn.textContent = listening ? "\u{1F534} \u09B6\u09C1\u09A8\u099B\u09BF\u2026" : "\u{1F3A4} \u09AD\u09DF\u09C7\u09B8 \u0995\u09AE\u09BE\u09A8\u09CD\u09A1";
+  }
+}
+function revealVoiceSection(element) {
+  const section = element?.closest?.(".panel-section") || element;
+  if (!section) return false;
+  section.hidden = false;
+  section.classList.remove("collapsed");
+  const arrow = section.querySelector?.(".accordion-arrow");
+  if (arrow) arrow.textContent = "\u25BC";
+  section.scrollIntoView({ behavior: "smooth", block: "start" });
+  const focusTarget = section.querySelector("textarea, input, select, button");
+  setTimeout(() => focusTarget?.focus({ preventScroll: true }), 450);
+  return true;
+}
+function activateVoiceContentMode(mode) {
+  const button = contentModeGrid?.querySelector(`[data-content="${mode}"]`);
+  button?.click();
+  setTimeout(() => revealVoiceSection(mode === "shape" ? shapeContentSection : textContentSection), 40);
+}
+function normalizeVoiceCommand(value) {
+  return value.toLowerCase().replace(/[.,!?।]/g, " ").replace(/\s+/g, " ").trim();
+}
+function executeVoiceCommand(transcript) {
+  const command = normalizeVoiceCommand(transcript);
+  const has = (...terms) => terms.some((term) => command.includes(term));
+  let success = false;
+  const runAnimation = (id) => {
+    animPresetGrid?.querySelector(`[data-anim="${id}"]`)?.click();
+    revealVoiceSection(animPresetGrid);
+  };
+  const runTextTemplate = (id) => {
+    textTemplateGrid?.querySelector(`[data-text-template="${id}"]`)?.click();
+    revealVoiceSection(textContentSection);
+  };
+  const setSafeArea = (value) => {
+    if (!safeAreaSelect) return;
+    safeAreaSelect.value = value;
+    safeAreaSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    revealVoiceSection(safeAreaSelect);
+  };
+  const quickActions = {
+    "\u099F\u09BE\u0987\u09AA\u09B0\u09BE\u0987\u099F\u09BE\u09B0": () => runAnimation("typewriter"),
+    "typewriter": () => runAnimation("typewriter"),
+    "\u09AB\u09C7\u09A1 \u0987\u09A8": () => runAnimation("fadeIn"),
+    "fade in": () => runAnimation("fadeIn"),
+    "\u0985\u09CD\u09AF\u09BE\u09A8\u09BF\u09AE\u09C7\u09B6\u09A8 \u09AC\u09A8\u09CD\u09A7": () => runAnimation("none"),
+    "animation off": () => runAnimation("none"),
+    "\u0985\u09AB\u09BE\u09B0 \u099F\u09C7\u09AE\u09AA\u09CD\u09B2\u09C7\u099F": () => runTextTemplate("offer"),
+    "offer template": () => runTextTemplate("offer"),
+    "\u09A6\u09BE\u09AE \u099F\u09C7\u09AE\u09AA\u09CD\u09B2\u09C7\u099F": () => runTextTemplate("price"),
+    "price template": () => runTextTemplate("price"),
+    "\u09A8\u09A4\u09C1\u09A8 \u099F\u09C7\u09AE\u09AA\u09CD\u09B2\u09C7\u099F": () => runTextTemplate("new"),
+    "new template": () => runTextTemplate("new"),
+    "\u09B6\u09AA \u09A8\u09BE\u0989 \u099F\u09C7\u09AE\u09AA\u09CD\u09B2\u09C7\u099F": () => runTextTemplate("cta"),
+    "shop now template": () => runTextTemplate("cta"),
+    "\u09B2\u09BE\u09B2 \u0995\u09BE\u09B2\u09BE\u09B0": () => applyColorTemplate("#ff0000", "Bright Red"),
+    "bright red": () => applyColorTemplate("#ff0000", "Bright Red"),
+    "\u09B9\u09B2\u09C1\u09A6 \u0995\u09BE\u09B2\u09BE\u09B0": () => applyColorTemplate("#ffff00", "Bright Yellow"),
+    "bright yellow": () => applyColorTemplate("#ffff00", "Bright Yellow"),
+    "\u09B8\u09BE\u09A6\u09BE \u0995\u09BE\u09B2\u09BE\u09B0": () => applyColorTemplate("#ffffff", "Pure White"),
+    "pure white": () => applyColorTemplate("#ffffff", "Pure White"),
+    "\u09B0\u09BF\u09B2\u09B8 \u09AB\u09CD\u09B0\u09C7\u09AE": () => setSafeArea("9:16"),
+    "reels frame": () => setSafeArea("9:16"),
+    "\u09B8\u09CD\u0995\u09AF\u09BC\u09BE\u09B0 \u09AB\u09CD\u09B0\u09C7\u09AE": () => setSafeArea("1:1"),
+    "square frame": () => setSafeArea("1:1"),
+    "\u0986\u09A8\u09A1\u09C1": undoStudioEdit,
+    "undo": undoStudioEdit,
+    "\u09B0\u09BF\u09A1\u09C1": redoStudioEdit,
+    "redo": redoStudioEdit
+  };
+  if (quickActions[command]) {
+    quickActions[command]();
+    success = true;
+  } else if (has("\u0995\u09BE\u09B2\u09BE\u09B0 \u099F\u09C7\u09AE\u09AA\u09CD\u09B2\u09C7\u099F") || has("color template")) {
+    colorTemplateBtn?.click();
+    success = !!colorTemplateBtn;
+  } else if (has("\u099F\u09C7\u0995\u09CD\u09B8\u099F") && has("\u0995\u09BE\u09B2\u09BE\u09B0") || has("text color") || has("text colour") || has("color")) {
+    success = revealVoiceSection(colorModeSelect);
+  } else if (has("\u09B6\u09C7\u09AA") || has("shape")) {
+    activateVoiceContentMode("shape");
+    success = true;
+  } else if (has("\u0995\u09BF\u0989\u09AC") || has("cube")) {
+    activateVoiceContentMode("cube");
+    success = true;
+  } else if (has("\u099B\u09AC\u09BF") || has("image") || has("photo")) {
+    activateVoiceContentMode("image");
+    success = true;
+  } else if (has("\u0985\u09CD\u09AF\u09BE\u09A8\u09BF\u09AE\u09C7\u09B6\u09A8") && (has("\u09AA\u09CD\u09B0\u09BF\u09B8\u09C7\u099F") || has("preset")) || has("animation")) {
+    success = revealVoiceSection(animPresetGrid);
+  } else if (has("\u098F\u0995\u09CD\u09B8\u09AA\u09CB\u09B0\u09CD\u099F") || has("export") || has("\u09A1\u09BE\u0989\u09A8\u09B2\u09CB\u09A1")) {
+    success = revealVoiceSection(exportFormatSelect);
+  } else if (has("\u09AC\u09CD\u09AF\u09BE\u0995\u0997\u09CD\u09B0\u09BE\u0989\u09A8\u09CD\u09A1") || has("background")) {
+    success = revealVoiceSection(bgModeSelect);
+  } else if (has("\u09B8\u09C7\u09AB \u098F\u09B0\u09BF\u09DF\u09BE") || has("safe area") || has("\u09AB\u09CD\u09B0\u09C7\u09AE") || has("frame")) {
+    success = revealVoiceSection(safeAreaSelect);
+  } else if (has("\u09B8\u09BE\u0987\u099C") || has("size") || has("\u0997\u09AD\u09C0\u09B0\u09A4\u09BE") || has("depth")) {
+    success = revealVoiceSection(sizeRange);
+  } else if (has("\u09AA\u099C\u09BF\u09B6\u09A8") || has("position") || has("move")) {
+    success = revealVoiceSection(posXRange);
+  } else if (has("\u09B0\u09CB\u099F\u09C7\u099F") || has("rotate") || has("tilt")) {
+    success = revealVoiceSection(rotXRange);
+  } else if (has("\u09AE\u09CD\u09AF\u09BE\u099F\u09C7\u09B0\u09BF\u09AF\u09BC\u09BE\u09B2") || has("material")) {
+    success = revealVoiceSection(materialPresetGrid);
+  } else if (has("\u09B2\u09BE\u0987\u099F\u09BF\u0982") || has("lighting") || has("light")) {
+    success = revealVoiceSection(lightingPresetGrid);
+  } else if (has("\u0995\u09CB\u09AF\u09BC\u09BE\u09B2\u09BF\u099F\u09BF") || has("quality") || has("performance")) {
+    success = revealVoiceSection(qualityPresetGrid);
+  } else if (has("\u0995\u09CD\u09AF\u09BE\u09AE\u09C7\u09B0\u09BE") || has("camera")) {
+    success = revealVoiceSection(resetCameraBtn);
+  } else if (has("\u099F\u09BE\u0987\u09AE\u09B2\u09BE\u0987\u09A8") || has("timeline") || has("duration")) {
+    success = revealVoiceSection(animDurationRange);
+  } else if (has("\u09B8\u09CD\u099F\u09BF\u0995\u09BE\u09B0") || has("sticker") || has("\u09AC\u09CD\u09AF\u09BE\u099C") || has("badge")) {
+    activateVoiceContentMode("sticker");
+    success = true;
+  } else if (has("\u099F\u09C7\u0995\u09CD\u09B8\u099F") || has("text") || has("\u09B2\u09C7\u0996\u09BE")) {
+    activateVoiceContentMode("text");
+    success = true;
+  }
+  setVoiceStatus(success ? `\u2713 \u201C${transcript}\u201D` : `\u0995\u09AE\u09BE\u09A8\u09CD\u09A1\u099F\u09BF \u09AC\u09C1\u099D\u09A4\u09C7 \u09AA\u09BE\u09B0\u09BF\u09A8\u09BF: \u201C${transcript}\u201D`);
+}
+function startVoiceCommand() {
+  if (!SpeechRecognition) {
+    setVoiceStatus("\u098F\u0987 browser-\u098F Voice Recognition \u09A8\u09C7\u0987\u2014Chrome/Edge \u09AC\u09CD\u09AF\u09AC\u09B9\u09BE\u09B0 \u0995\u09B0\u09C1\u09A8\u0964");
+    return;
+  }
+  if (voiceRecognition) voiceRecognition.abort();
+  voiceRecognition = new SpeechRecognition();
+  voiceRecognition.lang = voiceLanguageSelect?.value || "bn-BD";
+  voiceRecognition.interimResults = false;
+  voiceRecognition.continuous = false;
+  voiceRecognition.maxAlternatives = 2;
+  voiceRecognition.onstart = () => setVoiceStatus("\u09B6\u09C1\u09A8\u099B\u09BF\u2026 \u09AF\u09C7\u09AE\u09A8: \u099F\u09C7\u0995\u09CD\u09B8\u099F \u0995\u09BE\u09B2\u09BE\u09B0", true);
+  voiceRecognition.onresult = (event) => executeVoiceCommand(event.results[0][0].transcript);
+  voiceRecognition.onerror = (event) => {
+    const message = event.error === "not-allowed" ? "\u09AE\u09BE\u0987\u0995\u09CD\u09B0\u09CB\u09AB\u09CB\u09A8\u09C7\u09B0 \u0985\u09A8\u09C1\u09AE\u09A4\u09BF \u09A6\u09BF\u09A8\u0964" : event.error === "no-speech" ? "\u0995\u09CB\u09A8\u09CB \u0995\u09A5\u09BE \u09B6\u09CB\u09A8\u09BE \u09AF\u09BE\u09DF\u09A8\u09BF\u2014\u0986\u09AC\u09BE\u09B0 \u099A\u09C7\u09B7\u09CD\u099F\u09BE \u0995\u09B0\u09C1\u09A8\u0964" : `Voice error: ${event.error}`;
+    setVoiceStatus(message);
+  };
+  voiceRecognition.onend = () => {
+    if (voiceCommandBtn?.classList.contains("is-listening")) setVoiceStatus("\u09AC\u09B2\u09C1\u09A8: \u201C\u099F\u09C7\u0995\u09CD\u09B8\u099F \u0995\u09BE\u09B2\u09BE\u09B0\u201D");
+    voiceRecognition = null;
+  };
+  try {
+    voiceRecognition.start();
+  } catch (_) {
+    setVoiceStatus("\u0986\u09AC\u09BE\u09B0 \u{1F3A4} \u09AC\u09BE\u099F\u09A8 \u099A\u09BE\u09AA\u09C1\u09A8\u0964");
+  }
+}
+voiceCommandBtn?.addEventListener("click", startVoiceCommand);
+function closeTextCommandMenu() {
+  if (!textCommandMenu || !textCommandBtn) return;
+  textCommandMenu.hidden = true;
+  textCommandBtn.setAttribute("aria-expanded", "false");
+}
+textCommandBtn?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  const opening = textCommandMenu?.hidden;
+  closeTextCommandMenu();
+  if (opening && textCommandMenu) {
+    textCommandMenu.hidden = false;
+    textCommandBtn.setAttribute("aria-expanded", "true");
+  }
+});
+textCommandMenu?.addEventListener("click", (event) => {
+  const command = event.target.closest("[data-text-command]")?.dataset.textCommand;
+  if (!command) return;
+  executeVoiceCommand(command);
+  closeTextCommandMenu();
+});
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".text-command-wrap")) closeTextCommandMenu();
+});
 var editHistory = { undo: [], redo: [], before: null, timer: null, applying: false, max: 50 };
 function getHistorySnapshot() {
   saveStudioState();
