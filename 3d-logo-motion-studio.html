@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Logo + Motion Studio</title>
+  <style>
+    :root {
+      --bg: #070b14;
+      --panel: rgba(15, 23, 42, 0.82);
+      --panel-strong: rgba(15, 23, 42, 0.96);
+      --muted: #94a3b8;
+      --text: #edf2ff;
+      --accent: #67e8f9;
+      --accent-2: #a78bfa;
+      --strip: rgba(103, 232, 249, 0.12);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: radial-gradient(circle at top, #101827 0%, var(--bg) 36%, #030712 100%);
+      color: var(--text);
+    }
+
+    body {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      height: 100vh;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      background: var(--panel);
+      border-right: 1px solid rgba(148, 163, 184, 0.18);
+      backdrop-filter: blur(8px);
+      padding: 22px 18px;
+      overflow-y: auto;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+      padding: 8px 10px 16px; 
+      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    }
+
+    .brand-mark {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #02111e;
+      font-weight: 800;
+      box-shadow: 0 0 16px rgba(103, 232, 249, 0.35);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 1.1rem;
+      letter-spacing: 0.02em;
+    }
+
+    .section {
+      background: rgba(15, 23, 42, 0.66);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .motion-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .preset-btn, .mode-btn, .motion-btn, .action-btn {
+      appearance: none;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      background: rgba(15, 23, 42, 0.6);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .preset-btn:hover, .mode-btn:hover, .motion-btn:hover, .action-btn:hover {
+      transform: translateY(-1px);
+      border-color: rgba(103, 232, 249, 0.55);
+    }
+
+    .preset-btn.active, .mode-btn.active, .motion-btn.active {
+      background: linear-gradient(135deg, rgba(103, 232, 249, 0.2), rgba(167, 139, 250, 0.2));
+      border-color: rgba(103, 232, 249, 0.8);
+      box-shadow: 0 0 20px rgba(103, 232, 249, 0.12);
+    }
+
+    .action-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .action-btn {
+      background: rgba(14, 116, 144, 0.12);
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .field label, .field span {
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    input[type="text"], select, input[type="range"] {
+      width: 100%;
+    }
+
+    input[type="text"], select {
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      background: rgba(2, 6, 23, 0.8);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+    }
+
+    input[type="range"] {
+      accent-color: #67e8f9;
+    }
+
+    .range-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .value-chip {
+      min-width: 64px;
+      text-align: right;
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .viewport {
+      position: relative;
+      overflow: hidden;
+      height: 100vh;
+      min-height: 100vh;
+      background: linear-gradient(180deg, rgba(8, 14, 24, 0.9), rgba(15, 23, 42, 0.95));
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .hud {
+      position: absolute;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      pointer-events: none;
+    }
+
+    .badge {
+      pointer-events: auto;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 0.78rem;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+
+    .badge strong { color: var(--text); }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">3D</span>
+      <h1>Logo + Motion Studio</h1>
+    </div>
+
+    <div class="section">
+      <h2>Studio Mode</h2>
+      <div class="preset-grid">
+        <button class="mode-btn active" data-mode="logo">Logo Studio</button>
+        <button class="mode-btn" data-mode="motion">Motion Studio</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Brand Preset</h2>
+      <div class="preset-grid">
+        <button class="preset-btn active" data-preset="luxury">Luxury</button>
+        <button class="preset-btn" data-preset="neon">Neon</button>
+        <button class="preset-btn" data-preset="sports">Sports</button>
+        <button class="preset-btn" data-preset="premium">Premium</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Text Settings</h2>
+      <div class="field">
+        <label for="logoText">Logo Text</label>
+        <input id="logoText" type="text" value="WARISHA" />
+      </div>
+      <div class="field">
+        <label for="fontSelect">Font Style</label>
+        <select id="fontSelect">
+          <option value="helvetiker_bold">Helvetiker Bold</option>
+          <option value="helvetiker">Helvetiker</option>
+          <option value="optimer_bold">Optimer Bold</option>
+          <option value="gentilis_bold">Gentilis Bold</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="motionType">Motion Type</label>
+        <select id="motionType">
+          <option value="spinY">Spin Y</option>
+          <option value="orbit">Orbit</option>
+          <option value="showroom">Showroom</option>
+          <option value="pulse">Pulse</option>
+          <option value="float">Float</option>
+          <option value="wobble">Wobble</option>
+        </select>
+      </div>
+      <div class="motion-grid" id="motionPresetGrid">
+        <button type="button" class="motion-btn active" data-motion="spinY">Spin Y</button>
+        <button type="button" class="motion-btn" data-motion="orbit">Orbit</button>
+        <button type="button" class="motion-btn" data-motion="showroom">Showroom</button>
+        <button type="button" class="motion-btn" data-motion="pulse">Pulse</button>
+        <button type="button" class="motion-btn" data-motion="float">Float</button>
+        <button type="button" class="motion-btn" data-motion="wobble">Wobble</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Motion Controls</h2>
+      <div class="field">
+        <div class="range-wrap">
+          <span>Speed</span>
+          <span class="value-chip" id="speedValue">1.2x</span>
+        </div>
+        <input id="speedRange" type="range" min="0.2" max="3" step="0.1" value="1.2" />
+      </div>
+      <div class="field">
+        <div class="range-wrap">
+          <span>Depth</span>
+          <span class="value-chip" id="depthValue">18</span>
+        </div>
+        <input id="depthRange" type="range" min="8" max="40" step="1" value="18" />
+      </div>
+      <div class="field">
+        <div class="range-wrap">
+          <span>Glow</span>
+          <span class="value-chip" id="glowValue">0.2</span>
+        </div>
+        <input id="glowRange" type="range" min="0" max="1.5" step="0.05" value="0.2" />
+      </div>
+      <div class="field">
+        <div class="range-wrap">
+          <span>Bevel</span>
+          <span class="value-chip" id="bevelValue">0.12</span>
+        </div>
+        <input id="bevelRange" type="range" min="0.04" max="0.35" step="0.01" value="0.12" />
+      </div>
+      <div class="field">
+        <div class="range-wrap">
+          <span>Scale</span>
+          <span class="value-chip" id="textScaleValue">1.00</span>
+        </div>
+        <input id="textScaleRange" type="range" min="0.6" max="1.8" step="0.05" value="1.0" />
+      </div>
+      <div class="action-row">
+        <button type="button" class="action-btn" id="toggleLoopBtn">Pause</button>
+        <button type="button" class="action-btn" id="exportPngBtn">Export PNG</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="viewport">
+    <canvas id="scene"></canvas>
+    <div class="hud">
+      <div class="badge">Mode: <strong id="modeLabel">Logo Studio</strong></div>
+      <div class="badge">Preset: <strong id="presetLabel">Luxury</strong></div>
+    </div>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+    const state = {
+      mode: 'logo',
+      preset: 'luxury',
+      motionType: 'spinY',
+      speed: 1.2,
+      depth: 18,
+      glow: 0.2,
+      bevel: 0.12,
+      textScale: 1.0,
+      text: 'WARISHA',
+      paused: false,
+      rotation: 0
+    };
+
+    const presetMap = {
+      luxury: { bg: '#050b12', fill: '#f8dca8', shadow: '#9d5f17', accent: '#f59e0b', accent2: '#f97316' },
+      neon: { bg: '#070b14', fill: '#67e8f9', shadow: '#a78bfa', accent: '#22d3ee', accent2: '#a855f7' },
+      sports: { bg: '#08131b', fill: '#facc15', shadow: '#f97316', accent: '#f8fafc', accent2: '#fbbf24' },
+      premium: { bg: '#0b1020', fill: '#e5e7eb', shadow: '#9ca3af', accent: '#d1d5db', accent2: '#f8fafc' }
+    };
+
+    function setMode(mode) {
+      state.mode = mode;
+      document.getElementById('modeLabel').textContent = mode === 'logo' ? 'Logo Studio' : 'Motion Studio';
+      document.querySelectorAll('.mode-btn').forEach((btn) => btn.classList.toggle('active', btn.dataset.mode === mode));
+    }
+
+    function setPreset(key) {
+      state.preset = key;
+      const preset = presetMap[key];
+      document.getElementById('presetLabel').textContent = key.charAt(0).toUpperCase() + key.slice(1);
+      document.querySelectorAll('.preset-btn').forEach((btn) => btn.classList.toggle('active', btn.dataset.preset === key));
+      document.body.style.background = `radial-gradient(circle at top, ${preset.bg} 0%, #020812 42%, #010409 100%)`;
+    }
+
+    function setMotionType(type) {
+      state.motionType = type;
+      document.getElementById('motionType').value = type;
+      document.querySelectorAll('.motion-btn').forEach((btn) => btn.classList.toggle('active', btn.dataset.motion === type));
+    }
+
+    function renderText(time) {
+      const preset = presetMap[state.preset];
+      const w = canvas.width;
+      const h = canvas.height;
+      const text = (state.text || 'WARISHA').toUpperCase();
+      const baseSize = Math.max(80, Math.min(180, w * 0.16 * state.textScale));
+
+      const bg = ctx.createLinearGradient(0, 0, w, h);
+      bg.addColorStop(0, preset.bg);
+      bg.addColorStop(1, '#020812');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, w, h);
+
+      const halo = ctx.createRadialGradient(w * 0.5, h * 0.5, 20, w * 0.5, h * 0.5, w * 0.75);
+      halo.addColorStop(0, 'rgba(103,232,249,0.25)');
+      halo.addColorStop(0.35, 'rgba(167,139,250,0.12)');
+      halo.addColorStop(1, 'rgba(2,8,18,0)');
+      ctx.fillStyle = halo;
+      ctx.fillRect(0, 0, w, h);
+
+      const offsetX = state.mode === 'motion' ? Math.sin(time * 1.5) * 18 : 0;
+      const offsetY = state.mode === 'motion' ? Math.cos(time * 1.2) * 16 : 0;
+      const rot = state.mode === 'motion' ? Math.sin(time * 0.8) * 0.25 : 0;
+
+      ctx.save();
+      ctx.translate(w * 0.5 + offsetX, h * 0.52 + offsetY);
+      ctx.rotate(rot);
+
+      const depth = Math.max(6, Math.round(state.depth / 2.5));
+      for (let i = depth; i >= 1; i--) {
+        ctx.fillStyle = i % 2 === 0 ? preset.shadow : 'rgba(0,0,0,0.38)';
+        ctx.font = `900 ${baseSize + i * 0.9}px Segoe UI, Arial Black, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, i * 0.8, i * 0.8);
+      }
+
+      const grad = ctx.createLinearGradient(-w * 0.38, -h * 0.25, w * 0.38, h * 0.25);
+      grad.addColorStop(0, preset.fill);
+      grad.addColorStop(0.55, '#ffffff');
+      grad.addColorStop(1, preset.accent2 || preset.fill);
+
+      ctx.font = `900 ${baseSize}px Segoe UI, Arial Black, sans-serif`;
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+      ctx.lineWidth = Math.max(4, state.glow * 24);
+      ctx.strokeText(text, 0, 0);
+      ctx.shadowColor = preset.accent;
+      ctx.shadowBlur = Math.max(12, state.glow * 40);
+      ctx.fillStyle = grad;
+      ctx.fillText(text, 0, 0);
+      ctx.shadowBlur = 0;
+
+      ctx.fillStyle = 'rgba(255,255,255,0.22)';
+      ctx.fillRect(-baseSize * 0.7, -baseSize * 0.58, baseSize * 1.4, baseSize * 0.16);
+      ctx.restore();
+    }
+
+    function animate(now) {
+      const t = now * 0.001 * state.speed;
+
+      if (!state.paused) {
+        if (state.motionType === 'spinY') {
+          state.rotation = t * 1.8;
+        } else if (state.motionType === 'orbit') {
+          state.rotation = t * 1.2;
+        } else if (state.motionType === 'showroom') {
+          state.rotation = t * 2.4;
+        } else if (state.motionType === 'pulse') {
+          state.rotation = t * 0.9;
+        } else if (state.motionType === 'float') {
+          state.rotation = Math.sin(t * 0.9) * 1.2;
+        } else if (state.motionType === 'wobble') {
+          state.rotation = t * 1.5;
+        }
+      }
+
+      const w = canvas.width;
+      const h = canvas.height;
+      const preset = presetMap[state.preset];
+      const bg = ctx.createLinearGradient(0, 0, w, h);
+      bg.addColorStop(0, preset.bg);
+      bg.addColorStop(1, '#020812');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.save();
+      ctx.translate(w * 0.5, h * 0.52);
+      ctx.rotate(state.rotation);
+      ctx.translate(-w * 0.5, -h * 0.52);
+      renderText(t);
+      ctx.restore();
+
+      requestAnimationFrame(animate);
+    }
+
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = Math.max(300, Math.floor(rect.width * ratio));
+      canvas.height = Math.max(150, Math.floor(rect.height * ratio));
+    }
+
+    document.getElementById('logoText').addEventListener('input', () => {
+      state.text = document.getElementById('logoText').value.trim() || 'WARISHA';
+    });
+
+    document.getElementById('motionType').addEventListener('change', (e) => setMotionType(e.target.value));
+    document.getElementById('speedRange').addEventListener('input', (e) => {
+      state.speed = Number(e.target.value);
+      document.getElementById('speedValue').textContent = `${state.speed.toFixed(1)}x`;
+    });
+    document.getElementById('depthRange').addEventListener('input', (e) => {
+      state.depth = Number(e.target.value);
+      document.getElementById('depthValue').textContent = String(state.depth);
+    });
+    document.getElementById('glowRange').addEventListener('input', (e) => {
+      state.glow = Number(e.target.value);
+      document.getElementById('glowValue').textContent = state.glow.toFixed(2);
+    });
+    document.getElementById('bevelRange').addEventListener('input', (e) => {
+      state.bevel = Number(e.target.value);
+      document.getElementById('bevelValue').textContent = state.bevel.toFixed(2);
+    });
+    document.getElementById('textScaleRange').addEventListener('input', (e) => {
+      state.textScale = Number(e.target.value);
+      document.getElementById('textScaleValue').textContent = state.textScale.toFixed(2);
+    });
+    document.getElementById('toggleLoopBtn').addEventListener('click', () => {
+      state.paused = !state.paused;
+      document.getElementById('toggleLoopBtn').textContent = state.paused ? 'Play' : 'Pause';
+    });
+    document.getElementById('exportPngBtn').addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = `${(state.text || 'logo').replace(/\s+/g, '_').toLowerCase()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+
+    document.querySelectorAll('.preset-btn').forEach((btn) => {
+      btn.addEventListener('click', () => setPreset(btn.dataset.preset));
+    });
+    document.querySelectorAll('.mode-btn').forEach((btn) => {
+      btn.addEventListener('click', () => setMode(btn.dataset.mode));
+    });
+    document.querySelectorAll('.motion-btn').forEach((btn) => {
+      btn.addEventListener('click', () => setMotionType(btn.dataset.motion));
+    });
+
+    setPreset('luxury');
+    setMode('logo');
+    setMotionType('spinY');
+    resize();
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
