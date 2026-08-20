@@ -15,9 +15,16 @@
     <div class="brand">
       <span class="brand-mark">◆</span>
       <span class="brand-name">3D Text Module</span>
-      <span class="phase-badge">PLAN_3 — কার্ভড টেক্সট (Phase B1-B3)</span>
+      <div class="color-template-wrap">
+        <button type="button" id="colorTemplateBtn" class="color-template-trigger" aria-expanded="false" aria-controls="colorTemplateMenu">🎨 কালার টেমপ্লেট <span aria-hidden="true">▾</span></button>
+        <div id="colorTemplateMenu" class="color-template-menu" hidden role="menu" aria-label="টেক্সট কালার টেমপ্লেট">
+          <button type="button" role="menuitem" data-template-color="#ff0000" data-template-label="Bright Red"><i style="--template-color:#ff0000"></i><span>Bright Red <small>#FF0000 · 255, 0, 0</small></span></button>
+          <button type="button" role="menuitem" data-template-color="#ffff00" data-template-label="Bright Yellow"><i style="--template-color:#ffff00"></i><span>Bright Yellow <small>#FFFF00 · 255, 255, 0</small></span></button>
+          <button type="button" role="menuitem" data-template-color="#ffffff" data-template-label="Pure White"><i style="--template-color:#ffffff"></i><span>Pure White <small>#FFFFFF · 255, 255, 255</small></span></button>
+        </div>
+      </div>
     </div>
-    <div class="topbar-note" id="statusNote">মডেল/ফন্ট লোড হচ্ছে…</div>
+    <div class="topbar-note" id="statusNote" hidden>মডেল/ফন্ট লোড হচ্ছে…</div>
     <button type="button" id="topbarResetBtn" title="সব এডিট মুছে স্টুডিও রিসেট করুন" style="margin-left:auto; background:rgba(245,158,11,0.15); border:1px solid #f59e0b; color:#fbbf24; padding:5px 14px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">🧹 রিসেট / ক্লিয়ার অল</button>
   </div>
 

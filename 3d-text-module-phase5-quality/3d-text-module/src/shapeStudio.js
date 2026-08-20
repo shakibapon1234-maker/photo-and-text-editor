@@ -758,6 +758,30 @@ export function initShapeStudio({
     try { localStorage.removeItem(STORAGE_KEY); } catch (_) { /* ignore */ }
   }
 
+  function getSnapshot() {
+    return JSON.parse(JSON.stringify({
+      order,
+      selectedId,
+      layers: order.map((id) => layers.get(id)?.layer).filter(Boolean),
+    }));
+  }
+
+  function restoreSnapshot(snapshot) {
+    clearAll();
+    if (!snapshot || !Array.isArray(snapshot.layers)) return;
+    for (const savedLayer of snapshot.layers) {
+      if (!savedLayer || !savedLayer.id) continue;
+      const layer = JSON.parse(JSON.stringify(savedLayer));
+      layers.set(layer.id, { layer, group: null });
+      order.push(layer.id);
+      rebuildLayer(layer.id);
+    }
+    const wantedId = snapshot.selectedId;
+    selectLayer(wantedId && layers.has(wantedId) ? wantedId : (order[order.length - 1] || null));
+    renderLayerList();
+    persist();
+  }
+
   // ---------------------------------------------------------------------
   // Selection + outline
   // ---------------------------------------------------------------------
@@ -1156,9 +1180,16 @@ export function initShapeStudio({
     hasSelection: () => !!selectedId,
     getSelectedGroup: () => (selectedId ? layers.get(selectedId)?.group || null : null),
     applySharedAppearance,
+    applySelectedTextColor(color) {
+      if (!selectedId || !layers.has(selectedId)) return false;
+      updateLayer(selectedId, { textFillMode: 'solid', textColor: color });
+      return true;
+    },
     applyAnimation,
     resetAnimation,
     getSelectedTextUnitCount,
+    getSnapshot,
+    restoreSnapshot,
     clearAll,
   };
 }

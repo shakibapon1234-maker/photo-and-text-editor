@@ -35679,6 +35679,28 @@ function initShapeStudio({
     } catch (_) {
     }
   }
+  function getSnapshot() {
+    return JSON.parse(JSON.stringify({
+      order,
+      selectedId,
+      layers: order.map((id) => layers.get(id)?.layer).filter(Boolean)
+    }));
+  }
+  function restoreSnapshot(snapshot) {
+    clearAll();
+    if (!snapshot || !Array.isArray(snapshot.layers)) return;
+    for (const savedLayer of snapshot.layers) {
+      if (!savedLayer || !savedLayer.id) continue;
+      const layer = JSON.parse(JSON.stringify(savedLayer));
+      layers.set(layer.id, { layer, group: null });
+      order.push(layer.id);
+      rebuildLayer(layer.id);
+    }
+    const wantedId = snapshot.selectedId;
+    selectLayer(wantedId && layers.has(wantedId) ? wantedId : order[order.length - 1] || null);
+    renderLayerList();
+    persist();
+  }
   let selectionHelper = null;
   function selectLayer(id) {
     selectedId = id;
@@ -36039,15 +36061,24 @@ function initShapeStudio({
     hasSelection: () => !!selectedId,
     getSelectedGroup: () => selectedId ? layers.get(selectedId)?.group || null : null,
     applySharedAppearance,
+    applySelectedTextColor(color) {
+      if (!selectedId || !layers.has(selectedId)) return false;
+      updateLayer(selectedId, { textFillMode: "solid", textColor: color });
+      return true;
+    },
     applyAnimation,
     resetAnimation,
     getSelectedTextUnitCount,
+    getSnapshot,
+    restoreSnapshot,
     clearAll
   };
 }
 
 // src/main.js
 var statusNote = document.getElementById("statusNote");
+var colorTemplateBtn = document.getElementById("colorTemplateBtn");
+var colorTemplateMenu = document.getElementById("colorTemplateMenu");
 var canvas = document.getElementById("scene-canvas");
 var viewportEl = document.getElementById("viewport");
 var contentModeGrid = document.getElementById("contentModeGrid");
@@ -41314,6 +41345,165 @@ var shapeStudio = initShapeStudio({
   isActive: () => state.contentMode === "shape"
 });
 window.__shapeStudio = shapeStudio;
+var editHistory = { undo: [], redo: [], before: null, timer: null, applying: false, max: 50 };
+function getHistorySnapshot() {
+  saveStudioState();
+  let studio = null;
+  try {
+    studio = JSON.parse(localStorage.getItem("3d_studio_saved_state") || "null");
+  } catch (_) {
+  }
+  return { studio, shapes: shapeStudio.getSnapshot() };
+}
+function historyChanged(before, after) {
+  return JSON.stringify(before) !== JSON.stringify(after);
+}
+function beginHistoryEdit() {
+  if (editHistory.applying || editHistory.before) return;
+  editHistory.before = getHistorySnapshot();
+}
+function finishHistoryEdit() {
+  if (editHistory.applying || !editHistory.before) return;
+  clearTimeout(editHistory.timer);
+  editHistory.timer = setTimeout(commitHistoryEdit, 260);
+}
+function commitHistoryEdit() {
+  clearTimeout(editHistory.timer);
+  editHistory.timer = null;
+  if (editHistory.applying || !editHistory.before) return;
+  const before = editHistory.before;
+  editHistory.before = null;
+  const after = getHistorySnapshot();
+  if (!historyChanged(before, after)) return;
+  editHistory.undo.push(before);
+  if (editHistory.undo.length > editHistory.max) editHistory.undo.shift();
+  editHistory.redo = [];
+}
+function restoreHistorySnapshot(snapshot) {
+  if (!snapshot?.studio) return;
+  editHistory.applying = true;
+  clearTimeout(saveTimeout);
+  try {
+    state.imageElement = null;
+    state.bgImageElement = null;
+    if (imagePreviewThumb) {
+      imagePreviewThumb.removeAttribute("src");
+      imagePreviewThumb.hidden = true;
+    }
+    if (bgPreviewThumb) {
+      bgPreviewThumb.removeAttribute("src");
+      bgPreviewThumb.hidden = true;
+    }
+    localStorage.setItem("3d_studio_saved_state", JSON.stringify(snapshot.studio));
+    loadStudioState();
+    shapeStudio.restoreSnapshot(snapshot.shapes);
+    shapeStudio.setActive(state.contentMode === "shape");
+    updateSceneBackground();
+    rebuildTextMesh();
+  } finally {
+    editHistory.applying = false;
+  }
+  saveStudioState();
+}
+function undoStudioEdit() {
+  clearTimeout(editHistory.timer);
+  if (editHistory.before) commitHistoryEdit();
+  const snapshot = editHistory.undo.pop();
+  if (!snapshot) return;
+  editHistory.redo.push(getHistorySnapshot());
+  restoreHistorySnapshot(snapshot);
+}
+function redoStudioEdit() {
+  clearTimeout(editHistory.timer);
+  if (editHistory.before) commitHistoryEdit();
+  const snapshot = editHistory.redo.pop();
+  if (!snapshot) return;
+  editHistory.undo.push(getHistorySnapshot());
+  restoreHistorySnapshot(snapshot);
+}
+function isHistoryTarget(target) {
+  return target instanceof Element && !target.closest("#exportSection, #colorTemplateMenu");
+}
+document.addEventListener("input", (event) => {
+  if (!isHistoryTarget(event.target)) return;
+  beginHistoryEdit();
+  finishHistoryEdit();
+}, true);
+document.addEventListener("change", (event) => {
+  if (!isHistoryTarget(event.target)) return;
+  beginHistoryEdit();
+  finishHistoryEdit();
+}, true);
+document.addEventListener("click", (event) => {
+  if (!isHistoryTarget(event.target)) return;
+  beginHistoryEdit();
+  finishHistoryEdit();
+}, true);
+viewportEl.addEventListener("pointerdown", beginHistoryEdit, true);
+window.addEventListener("pointerup", finishHistoryEdit, true);
+window.addEventListener("keydown", (event) => {
+  const mod = event.ctrlKey || event.metaKey;
+  if (!mod || event.altKey) return;
+  const key = event.key.toLowerCase();
+  if (key === "z") {
+    event.preventDefault();
+    if (event.shiftKey) redoStudioEdit();
+    else undoStudioEdit();
+  } else if (key === "y") {
+    event.preventDefault();
+    redoStudioEdit();
+  }
+}, true);
+function applyColorTemplate(color, label) {
+  if (state.contentMode === "shape") {
+    if (!shapeStudio.applySelectedTextColor(color)) return;
+  } else if (state.contentMode === "sticker") {
+    state.stickerTextColor = color;
+    if (stickerTextColorPicker) stickerTextColorPicker.value = color;
+    scheduleRebuild();
+  } else if (state.contentMode === "cube") {
+    state.cubeTextColor = color;
+    if (cubeTextColorPicker) cubeTextColorPicker.value = color;
+    scheduleRebuild();
+  } else if (state.contentMode === "text") {
+    state.colorMode = "solid";
+    state.color = color;
+    if (colorModeSelect) colorModeSelect.value = "solid";
+    if (colorPicker) colorPicker.value = color;
+    if (solidColorGroup) solidColorGroup.hidden = false;
+    if (gradientColorGroup) gradientColorGroup.hidden = true;
+    scheduleRebuild();
+  } else {
+    return;
+  }
+  if (colorTemplateBtn) colorTemplateBtn.innerHTML = `\u{1F3A8} ${label} <span aria-hidden="true">\u25BE</span>`;
+}
+function closeColorTemplateMenu() {
+  if (!colorTemplateMenu || !colorTemplateBtn) return;
+  colorTemplateMenu.hidden = true;
+  colorTemplateBtn.setAttribute("aria-expanded", "false");
+}
+colorTemplateBtn?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  const isOpening = colorTemplateMenu?.hidden;
+  closeColorTemplateMenu();
+  if (isOpening && colorTemplateMenu) {
+    colorTemplateMenu.hidden = false;
+    colorTemplateBtn.setAttribute("aria-expanded", "true");
+  }
+});
+colorTemplateMenu?.addEventListener("click", (event) => {
+  const choice = event.target.closest("[data-template-color]");
+  if (!choice) return;
+  applyColorTemplate(choice.dataset.templateColor, choice.dataset.templateLabel);
+  closeColorTemplateMenu();
+});
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".color-template-wrap")) closeColorTemplateMenu();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeColorTemplateMenu();
+});
 if (canvas) {
   canvas.addEventListener("wheel", (e) => {
     if (e.ctrlKey || e.metaKey) return;
@@ -41341,6 +41531,9 @@ function animate(now2) {
 }
 animate();
 function reset3DStudio() {
+  stopAnimation();
+  clearTimeout(saveTimeout);
+  saveTimeout = null;
   state.contentMode = "text";
   state.text = "Warisha Fashion";
   state.stickerText = "Warisha Fashion";
@@ -41371,6 +41564,24 @@ function reset3DStudio() {
   state.rotZ = 0;
   state.posX = 0;
   state.posY = 0;
+  state.posZ = 0;
+  state.curveDirection = "up";
+  state.bgMode = "darkBlue";
+  state.bgColor = "#0a192f";
+  state.bgImageElement = null;
+  state.imageElement = null;
+  state.pictureStyle = "none";
+  state.cubeFace1 = "3";
+  state.cubeFace2 = "D";
+  state.cubeFace3 = "3D";
+  state.cubeColor = "#1d4ed8";
+  state.cubeTextColor = "#ffffff";
+  state.cubeTextBorder = "#0f172a";
+  animState.presetId = "none";
+  animState.durationMs = 1800;
+  animState.delayMs = 0;
+  animState.easing = "easeOut";
+  animState.loop = false;
   if (textInput) textInput.value = state.text;
   if (stickerTextInput) stickerTextInput.value = state.stickerText;
   if (sizeRange) sizeRange.value = 70;
@@ -41380,16 +41591,49 @@ function reset3DStudio() {
   if (rotZRange) rotZRange.value = 0;
   if (posXRange) posXRange.value = 0;
   if (posYRange) posYRange.value = 0;
+  if (colorModeSelect) colorModeSelect.value = "gradient";
+  if (gradientPresetSelect) gradientPresetSelect.value = "gold";
+  if (colorPicker) colorPicker.value = "#ffd700";
+  if (solidColorGroup) solidColorGroup.hidden = true;
+  if (gradientColorGroup) gradientColorGroup.hidden = false;
+  if (multicolorGroup) multicolorGroup.hidden = true;
+  if (patternGroup) patternGroup.hidden = true;
+  if (bgModeSelect) bgModeSelect.value = "darkBlue";
+  if (bgColorPicker) bgColorPicker.value = "#0a192f";
+  if (bgFileInput) bgFileInput.value = "";
+  if (imageFileInput) imageFileInput.value = "";
+  if (bgPreviewThumb) {
+    bgPreviewThumb.removeAttribute("src");
+    bgPreviewThumb.hidden = true;
+  }
+  if (imagePreviewThumb) {
+    imagePreviewThumb.removeAttribute("src");
+    imagePreviewThumb.hidden = true;
+  }
+  if (bgImageNote) bgImageNote.textContent = "";
+  if (imageNote) imageNote.textContent = "";
+  if (cubeFace1Input) cubeFace1Input.value = state.cubeFace1;
+  if (cubeFace2Input) cubeFace2Input.value = state.cubeFace2;
+  if (cubeFace3Input) cubeFace3Input.value = state.cubeFace3;
+  if (cubeColorPicker) cubeColorPicker.value = state.cubeColor;
+  if (cubeTextColorPicker) cubeTextColorPicker.value = state.cubeTextColor;
+  if (cubeTextBorderPicker) cubeTextBorderPicker.value = state.cubeTextBorder;
+  if (animPresetGrid) setActivePreset(animPresetGrid, "anim", "none");
+  if (animPlayBtn) animPlayBtn.disabled = true;
   if (contentModeGrid) setActivePreset(contentModeGrid, "content", "text");
   if (textContentSection) textContentSection.hidden = false;
   if (imageContentSection) imageContentSection.hidden = true;
   if (stickerContentSection) stickerContentSection.hidden = true;
   if (cubeContentSection) cubeContentSection.hidden = true;
   if (shapeContentSection) shapeContentSection.hidden = true;
+  if (curveSection) curveSection.hidden = false;
+  shapeStudio.clearAll();
   try {
+    localStorage.removeItem("3d_studio_saved_state");
     localStorage.removeItem("studio_state_plan3");
   } catch (_) {
   }
+  updateSceneBackground();
   rebuildTextMesh();
 }
 var reset3DStudioBtn = document.getElementById("reset3DStudioBtn");

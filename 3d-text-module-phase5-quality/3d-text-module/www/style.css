@@ -275,6 +275,28 @@ body { display: flex; flex-direction: column; }
   font-size: 13px;
 }
 
+.color-template-wrap { position: relative; margin-left: 10px; }
+.color-template-trigger {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px;
+  border: 1px solid #f59e0b; border-radius: 6px; background: rgba(245,158,11,.12);
+  color: #fbbf24; font: 700 12px var(--font-display); cursor: pointer;
+}
+.color-template-trigger:hover, .color-template-trigger[aria-expanded="true"] { background: rgba(245,158,11,.24); }
+.color-template-menu {
+  position: absolute; z-index: 100; top: calc(100% + 7px); left: 0; width: 228px;
+  padding: 6px; border: 1px solid var(--border); border-radius: 8px;
+  background: #080c13; box-shadow: 0 12px 30px rgba(0,0,0,.45);
+}
+.color-template-menu[hidden] { display: none; }
+.color-template-menu button {
+  display: flex; align-items: center; width: 100%; gap: 8px; padding: 7px 8px;
+  border: 0; border-radius: 5px; color: var(--text); background: transparent;
+  font: 600 12px var(--font-display); text-align: left; cursor: pointer;
+}
+.color-template-menu button:hover { background: rgba(255,255,255,.09); }
+.color-template-menu i { width: 12px; height: 12px; flex: 0 0 12px; border-radius: 50%; background: var(--template-color); box-shadow: 0 0 0 1px rgba(255,255,255,.32); }
+.color-template-menu small { margin-left: 5px; color: var(--text-dim); font: 10px var(--font-mono); }
+
 .field textarea {
   min-height: 66px;
   resize: vertical;
