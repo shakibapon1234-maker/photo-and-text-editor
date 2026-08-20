@@ -35207,6 +35207,85 @@ function initShapeStudio({
     }
     return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
   }
+  const SHAPE_TEXT_FONT = '"Noto Sans Bengali", "Nirmala UI", "Vrinda", Arial, sans-serif';
+  const splitGraphemes2 = (value) => {
+    if (typeof Intl !== "undefined" && Intl.Segmenter) return [...new Intl.Segmenter(void 0, { granularity: "grapheme" }).segment(value)].map((part) => part.segment);
+    return Array.from(value);
+  };
+  function wrapShapeText(ctx, text, maxWidth) {
+    const lines = [];
+    for (const paragraph of text.replace(/\r/g, "").split("\n")) {
+      if (!paragraph) {
+        lines.push("");
+        continue;
+      }
+      let line = "";
+      for (const word of paragraph.trim().split(/\s+/)) {
+        const candidate = line ? `${line} ${word}` : word;
+        if (ctx.measureText(candidate).width <= maxWidth) {
+          line = candidate;
+          continue;
+        }
+        if (line) lines.push(line);
+        line = "";
+        for (const grapheme of splitGraphemes2(word)) {
+          const next = line + grapheme;
+          if (line && ctx.measureText(next).width > maxWidth) {
+            lines.push(line);
+            line = grapheme;
+          } else line = next;
+        }
+      }
+      lines.push(line);
+    }
+    return lines.length ? lines : [""];
+  }
+  function buildShapeTextMesh(layer, box, depth) {
+    const safeW = Math.max(24, box.w * 0.78);
+    const safeH = Math.max(20, box.h * 0.66);
+    const canvas2 = document.createElement("canvas");
+    canvas2.width = 1536;
+    canvas2.height = Math.max(512, Math.round(canvas2.width * safeH / safeW));
+    const ctx = canvas2.getContext("2d");
+    const padX = canvas2.width * 0.06;
+    const padY = canvas2.height * 0.08;
+    const maxWidth = canvas2.width - padX * 2;
+    const maxHeight = canvas2.height - padY * 2;
+    const requested = Math.max(18, Math.round(canvas2.height * (layer.textSize / 100) * 0.9));
+    let fontSize = requested;
+    let lines = [];
+    for (; fontSize >= 12; fontSize -= 2) {
+      ctx.font = `600 ${fontSize}px ${SHAPE_TEXT_FONT}`;
+      lines = wrapShapeText(ctx, layer.text.trim(), maxWidth);
+      if (lines.length * fontSize * 1.24 <= maxHeight) break;
+    }
+    fontSize = Math.max(8, fontSize);
+    ctx.clearRect(0, 0, canvas2.width, canvas2.height);
+    ctx.font = `600 ${fontSize}px ${SHAPE_TEXT_FONT}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = layer.textColor;
+    ctx.strokeStyle = "rgba(0,0,0,0.28)";
+    ctx.lineWidth = Math.max(1, fontSize * 0.028);
+    ctx.lineJoin = "round";
+    const lineHeight = fontSize * 1.24;
+    const startY = (canvas2.height - lines.length * lineHeight) / 2 + fontSize * 0.88;
+    lines.forEach((line, index) => {
+      const y = startY + index * lineHeight;
+      ctx.strokeText(line, canvas2.width / 2, y);
+      ctx.fillText(line, canvas2.width / 2, y);
+    });
+    const texture = new THREE.CanvasTexture(canvas2);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = renderer2.capabilities.getMaxAnisotropy();
+    texture.needsUpdate = true;
+    const material = new THREE.MeshBasicMaterial({ map: texture, color: 16777215, transparent: true, alphaTest: 0.01, depthTest: false, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(safeW, safeH), material);
+    mesh.position.z = depth / 2 + 2;
+    mesh.renderOrder = 100;
+    mesh.userData.layerId = layer.id;
+    return mesh;
+  }
   function buildRainbowTexture(colors) {
     const canvas2 = document.createElement("canvas");
     canvas2.width = canvas2.height = 512;
@@ -35301,38 +35380,7 @@ function initShapeStudio({
       group.add(reflMesh);
     }
     group.add(mainMesh);
-    if (layer.text && layer.text.trim()) {
-      const font2 = fontCache2[layer.fontFamily] || fontCache2.helvetiker;
-      if (font2) {
-        try {
-          const fontSize = Math.max(4, box.h * (layer.textSize / 100));
-          const textDepth = layer.is3D ? Math.max(0.8, depth * 0.35) : 0.8;
-          const tGeo = new TextGeometry2(layer.text, {
-            font: font2,
-            size: fontSize,
-            height: textDepth,
-            curveSegments: 6,
-            bevelEnabled: false
-          });
-          tGeo.computeBoundingBox();
-          const tb = tGeo.boundingBox;
-          const tw = tb.max.x - tb.min.x;
-          const th = tb.max.y - tb.min.y;
-          const maxW = box.w * 0.82;
-          const fit = tw > maxW ? maxW / tw : 1;
-          tGeo.translate(-(tb.min.x + tw / 2), -(tb.min.y + th / 2), -textDepth / 2);
-          const tMat = new THREE.MeshStandardMaterial({ color: layer.textColor, roughness: 0.4, metalness: 0.1 });
-          const tMesh = new THREE.Mesh(tGeo, tMat);
-          tMesh.scale.setScalar(fit);
-          tMesh.position.z = depth / 2 + 0.4;
-          tMesh.userData.layerId = layer.id;
-          tMesh.castShadow = true;
-          group.add(tMesh);
-        } catch (err) {
-          console.warn("shape text build failed", err);
-        }
-      }
-    }
+    if (layer.text && layer.text.trim()) group.add(buildShapeTextMesh(layer, box, depth));
     group.userData.layerId = layer.id;
     group.position.set(layer.posX, layer.posY, layer.posZ);
     group.rotation.z = layer.rotationZ * Math.PI / 180;

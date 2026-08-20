@@ -251,6 +251,90 @@ export function initShapeStudio({
     return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
   }
 
+  // Canvas text is deliberately used inside shapes instead of TextGeometry.
+  // It supports Bengali/Unicode shaping and lets a long message wrap and
+  // shrink to fit, rather than disappearing once its 3D geometry crosses the
+  // shape bounds.
+  const SHAPE_TEXT_FONT = '"Noto Sans Bengali", "Nirmala UI", "Vrinda", Arial, sans-serif';
+  const splitGraphemes = (value) => {
+    if (typeof Intl !== 'undefined' && Intl.Segmenter) return [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(value)].map((part) => part.segment);
+    return Array.from(value);
+  };
+  function wrapShapeText(ctx, text, maxWidth) {
+    const lines = [];
+    for (const paragraph of text.replace(/\r/g, '').split('\n')) {
+      if (!paragraph) { lines.push(''); continue; }
+      let line = '';
+      for (const word of paragraph.trim().split(/\s+/)) {
+        const candidate = line ? `${line} ${word}` : word;
+        if (ctx.measureText(candidate).width <= maxWidth) { line = candidate; continue; }
+        if (line) lines.push(line);
+        line = '';
+        // A very long unbroken word is split at grapheme boundaries, which
+        // preserves Bangla vowel marks/ligatures as far as the browser can.
+        for (const grapheme of splitGraphemes(word)) {
+          const next = line + grapheme;
+          if (line && ctx.measureText(next).width > maxWidth) { lines.push(line); line = grapheme; }
+          else line = next;
+        }
+      }
+      lines.push(line);
+    }
+    return lines.length ? lines : [''];
+  }
+
+  function buildShapeTextMesh(layer, box, depth) {
+    const safeW = Math.max(24, box.w * 0.78);
+    const safeH = Math.max(20, box.h * 0.66);
+    const canvas = document.createElement('canvas');
+    canvas.width = 1536;
+    canvas.height = Math.max(512, Math.round(canvas.width * safeH / safeW));
+    const ctx = canvas.getContext('2d');
+    const padX = canvas.width * 0.06;
+    const padY = canvas.height * 0.08;
+    const maxWidth = canvas.width - padX * 2;
+    const maxHeight = canvas.height - padY * 2;
+    const requested = Math.max(18, Math.round(canvas.height * (layer.textSize / 100) * 0.9));
+    let fontSize = requested;
+    let lines = [];
+    for (; fontSize >= 12; fontSize -= 2) {
+      ctx.font = `600 ${fontSize}px ${SHAPE_TEXT_FONT}`;
+      lines = wrapShapeText(ctx, layer.text.trim(), maxWidth);
+      if (lines.length * fontSize * 1.24 <= maxHeight) break;
+    }
+    // The input has a generous limit, but keep an absolute final fallback so
+    // no message becomes invisible even when it contains many short lines.
+    fontSize = Math.max(8, fontSize);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.font = `600 ${fontSize}px ${SHAPE_TEXT_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = layer.textColor;
+    ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+    ctx.lineWidth = Math.max(1, fontSize * 0.028);
+    ctx.lineJoin = 'round';
+    const lineHeight = fontSize * 1.24;
+    const startY = (canvas.height - lines.length * lineHeight) / 2 + fontSize * 0.88;
+    lines.forEach((line, index) => {
+      const y = startY + index * lineHeight;
+      ctx.strokeText(line, canvas.width / 2, y);
+      ctx.fillText(line, canvas.width / 2, y);
+    });
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    texture.needsUpdate = true;
+    // Text is an overlay: disable depth testing as well as depth writing so
+    // it cannot disappear behind the front cap of an extruded shape at a
+    // slightly rotated camera angle.
+    const material = new THREE.MeshBasicMaterial({ map: texture, color: 0xffffff, transparent: true, alphaTest: 0.01, depthTest: false, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(safeW, safeH), material);
+    mesh.position.z = depth / 2 + 2;
+    mesh.renderOrder = 100;
+    mesh.userData.layerId = layer.id;
+    return mesh;
+  }
+
   function buildRainbowTexture(colors) {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = 512;
@@ -372,44 +456,8 @@ export function initShapeStudio({
 
     group.add(mainMesh);
 
-    // ---- embedded text ----
-    if (layer.text && layer.text.trim()) {
-      const font = fontCache[layer.fontFamily] || fontCache.helvetiker;
-      if (font) {
-        try {
-          const fontSize = Math.max(4, box.h * (layer.textSize / 100));
-          const textDepth = layer.is3D ? Math.max(0.8, depth * 0.35) : 0.8;
-          // NOTE: THREE.TextGeometry's extrusion-thickness parameter is
-          // called `height`, not `depth` (it internally maps height ->
-          // ExtrudeGeometry's `depth`, defaulting to 50 whenever `height`
-          // is missing). Passing `depth` here was silently ignored, so
-          // every embedded shape text was extruded 50 units deep — wildly
-          // out of proportion to the shape (and often out of camera range)
-          // which made it look like text never appeared at all.
-          const tGeo = new TextGeometry(layer.text, {
-            font, size: fontSize, height: textDepth, curveSegments: 6, bevelEnabled: false,
-          });
-          tGeo.computeBoundingBox();
-          const tb = tGeo.boundingBox;
-          const tw = tb.max.x - tb.min.x;
-          const th = tb.max.y - tb.min.y;
-          const maxW = box.w * 0.82;
-          const fit = tw > maxW ? maxW / tw : 1;
-          // Also center the extrusion on Z (TextGeometry only extrudes
-          // 0..height, it doesn't center like the main shape mesh does).
-          tGeo.translate(-(tb.min.x + tw / 2), -(tb.min.y + th / 2), -textDepth / 2);
-          const tMat = new THREE.MeshStandardMaterial({ color: layer.textColor, roughness: 0.4, metalness: 0.1 });
-          const tMesh = new THREE.Mesh(tGeo, tMat);
-          tMesh.scale.setScalar(fit);
-          tMesh.position.z = depth / 2 + 0.4;
-          tMesh.userData.layerId = layer.id;
-          tMesh.castShadow = true;
-          group.add(tMesh);
-        } catch (err) {
-          console.warn('shape text build failed', err);
-        }
-      }
-    }
+    // ---- embedded, auto-fitting Unicode text ----
+    if (layer.text && layer.text.trim()) group.add(buildShapeTextMesh(layer, box, depth));
 
     group.userData.layerId = layer.id;
     group.position.set(layer.posX, layer.posY, layer.posZ);
