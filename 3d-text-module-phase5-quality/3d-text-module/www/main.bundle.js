@@ -26276,6 +26276,20 @@ function buildLightingPreset(preset) {
 }
 var font = null;
 var textMesh = null;
+function getActiveStudioText() {
+  if (state.text && state.text.trim().length > 0) return state.text;
+  if (state.stickerText && state.stickerText.trim().length > 0) return state.stickerText;
+  if (typeof textInput !== "undefined" && textInput && textInput.value && textInput.value.trim().length > 0) return textInput.value;
+  if (typeof stickerTextInput !== "undefined" && stickerTextInput && stickerTextInput.value && stickerTextInput.value.trim().length > 0) return stickerTextInput.value;
+  return "Warisha Fashion";
+}
+function syncStudioText(newText) {
+  const val = newText !== void 0 ? newText : getActiveStudioText();
+  state.text = val;
+  state.stickerText = val;
+  if (typeof textInput !== "undefined" && textInput && textInput.value !== val) textInput.value = val;
+  if (typeof stickerTextInput !== "undefined" && stickerTextInput && stickerTextInput.value !== val) stickerTextInput.value = val;
+}
 var state = {
   contentMode: "text",
   // PLAN_3 §1: 'text' | 'image' | 'sticker' — mutually exclusive, one active object at a time
@@ -27597,6 +27611,15 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
     ctx.textBaseline = "middle";
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
+    if (borderWidth > 0) {
+      ctx.save();
+      ctx.strokeStyle = borderColor || "#ffd700";
+      ctx.lineWidth = fs * 0.68 + borderWidth * 3.5;
+      perLine.forEach(({ clusters, layout }, i) => {
+        drawCurvedLineStroke(ctx, clusters, layout, textCenterX, startY + lineHeightPx * i);
+      });
+      ctx.restore();
+    }
     ctx.save();
     ctx.shadowColor = "rgba(0, 0, 0, 0.48)";
     ctx.shadowBlur = 24;
@@ -28851,7 +28874,7 @@ function drawStickerShape(ctx, shape, w, bodyH, tailPx, color, borderWidth = 0, 
 }
 function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, borderOpts) {
   const group = new Group();
-  const textStr = text && text.trim().length > 0 ? text : state.stickerText || "Warisha Fashion";
+  const textStr = text && text.trim().length > 0 ? text : getActiveStudioText();
   const textDepth = Math.max(3, state.depth);
   const usesIndividualLetterTiles = shape === "woodenBlocks" || shape === "redTiles";
   const is3D = state.stickerMode === "standing" || state.stickerMode === "wall" || state.stickerWith3DText;
@@ -29526,6 +29549,7 @@ contentModeGrid.addEventListener("click", (e) => {
   const btn = e.target.closest(".preset-btn");
   if (!btn) return;
   state.contentMode = btn.dataset.content;
+  syncStudioText(getActiveStudioText());
   setActivePreset(contentModeGrid, "content", state.contentMode);
   textContentSection.hidden = state.contentMode !== "text";
   imageContentSection.hidden = state.contentMode !== "image";
@@ -30003,12 +30027,6 @@ function loadStudioState() {
     if (saved.autoRotate !== void 0 && autoRotateToggle) {
       state.autoRotate = saved.autoRotate;
       autoRotateToggle.checked = saved.autoRotate;
-    }
-    if (saved.stickerText !== void 0) {
-      state.stickerText = saved.stickerText;
-      state.text = saved.stickerText;
-      if (stickerTextInput) stickerTextInput.value = saved.stickerText;
-      if (textInput) textInput.value = saved.stickerText;
     }
     if (saved.stickerShape && stickerShapeGrid) {
       state.stickerShape = saved.stickerShape;
