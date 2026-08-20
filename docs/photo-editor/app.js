@@ -1198,31 +1198,17 @@
     // Download
     // ============================================
 
-    downloadBtn.addEventListener('click', async () => {
+    downloadBtn.addEventListener('click', () => {
         if (!processedBlob) {
             showToast('আগে একটি টুল অ্যাপ্লাই করুন', 'error');
             return;
         }
 
-        // Shape overlay is intentionally kept editable above the preview until
-        // download; bake it into this exported copy without flattening the
-        // working image or destroying the editable shape list.
-        let exportBlob = processedBlob;
-        if (window.shapeEditor && window.shapeEditor.hasShapes()) {
-            const shapeSource = await createImageBitmap(processedBlob);
-            const shapeCanvas = document.createElement('canvas');
-            shapeCanvas.width = shapeSource.width; shapeCanvas.height = shapeSource.height;
-            const shapeCtx = shapeCanvas.getContext('2d');
-            shapeCtx.drawImage(shapeSource, 0, 0);
-            window.shapeEditor.drawTo(shapeCtx, shapeCanvas.width, shapeCanvas.height);
-            exportBlob = await new Promise(resolve => shapeCanvas.toBlob(resolve, processedBlob.type || 'image/png'));
-            shapeSource.close();
-        }
-        const ext = exportBlob.type.split('/')[1] === 'jpeg' ? 'jpg' : exportBlob.type.split('/')[1];
+        const ext = processedBlob.type.split('/')[1] === 'jpeg' ? 'jpg' : processedBlob.type.split('/')[1];
         const baseName = originalFile.name.replace(/\.[^/.]+$/, '');
         const fileName = `${baseName}_edited.${ext}`;
 
-        const url = URL.createObjectURL(exportBlob);
+        const url = URL.createObjectURL(processedBlob);
         const a = document.createElement('a');
         a.href = url;
         a.download = fileName;

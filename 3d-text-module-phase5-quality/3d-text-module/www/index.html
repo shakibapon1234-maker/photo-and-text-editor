@@ -44,6 +44,7 @@
           <button type="button" class="preset-btn" data-content="image">ছবি</button>
           <button type="button" class="preset-btn" data-content="sticker">স্টিকার/ব্যাজ</button>
           <button type="button" class="preset-btn" data-content="cube">🧊 ৩D কিউব বক্স</button>
+          <button type="button" class="preset-btn" data-content="shape">🔷 শেপ</button>
         </div>
         <p class="field-note">টেক্সট, ছবি, স্টিকার/ব্যাজ বা ৩D কিউব — যেকোনো একটা একবারে অ্যাক্টিভ থাকে।</p>
       </section>
@@ -75,6 +76,138 @@
           <input type="color" id="cubeTextBorderPicker" value="#0f172a" />
         </label>
         <p class="field-note">মাউস দিয়ে ক্যানভাসে ড্র্যাগ করে ৩D কিউবটি ৩৬০° ঘুরিয়ে প্রতিটি পাশের ৩D লেখা দেখতে পারবেন।</p>
+      </section>
+
+      <section class="panel-section" id="shapeContentSection" hidden>
+        <h3>🔷 শেপ যোগ করুন</h3>
+        <div class="preset-grid shape-preset-grid" id="shapePresetGrid"></div>
+        <button type="button" class="btn-secondary shape-freehand-btn" id="shapeFreehandBtn">✏️ ফ্রিহ্যান্ড আঁকুন</button>
+        <p class="field-note" id="shapeFreehandHint" style="display:none;">ক্যানভাসে মাউস চেপে ধরে যেকোনো আকার আঁকুন, ছেড়ে দিলে শেপ তৈরি হয়ে যাবে।</p>
+        <p class="field-note">প্রতিটা শেপ আলাদা লেয়ার — ক্লিক করে সিলেক্ট, ড্র্যাগ করে সরানো, আর <span class="badge-key">Ctrl+C</span> / <span class="badge-key">Ctrl+V</span> দিয়ে কপি-পেস্ট করা যাবে।</p>
+
+        <h4 style="margin:14px 0 6px;font-size:13px;color:var(--text-secondary);">লেয়ার তালিকা</h4>
+        <p class="field-note" id="shapeEmptyNote">এখনো কোনো শেপ যোগ করা হয়নি।</p>
+        <div id="shapeLayerList" class="shape-layer-list"></div>
+
+        <p class="field-note" id="shapeNoSelectionNote">একটা শেপ সিলেক্ট করুন এডিট করতে।</p>
+
+        <div id="shapePropsPanel" style="display:none;">
+          <h4 style="margin:14px 0 6px;font-size:13px;color:var(--text-secondary);">ফিল</h4>
+          <div class="preset-grid" id="shapeFillModeGrid">
+            <button type="button" class="preset-btn active" data-fill-mode="solid">সলিড কালার</button>
+            <button type="button" class="preset-btn" data-fill-mode="gradient">গ্রেডিয়েন্ট</button>
+          </div>
+          <label class="field" id="shapeSolidGroup">
+            <span>কালার</span>
+            <input type="color" id="shapeSolidColor" value="#3b82f6" />
+          </label>
+          <div id="shapeGradientGroup" hidden>
+            <label class="field">
+              <span>কালার ১</span>
+              <input type="color" id="shapeGradientColor1" value="#f59e0b" />
+            </label>
+            <label class="field">
+              <span>কালার ২</span>
+              <input type="color" id="shapeGradientColor2" value="#ef4444" />
+            </label>
+            <label class="field">
+              <span>অ্যাঙ্গেল: <strong id="shapeGradientAngleValue">45°</strong></span>
+              <input type="range" id="shapeGradientAngle" min="0" max="180" value="45" class="range-slider" />
+            </label>
+          </div>
+
+          <h4 style="margin:14px 0 6px;font-size:13px;color:var(--text-secondary);">বর্ডার</h4>
+          <label class="field-inline">
+            <input type="checkbox" id="shapeBorderToggle" />
+            <span>বর্ডার চালু করুন</span>
+          </label>
+          <div id="shapeBorderFields" hidden>
+            <label class="field">
+              <span>বর্ডার কালার</span>
+              <input type="color" id="shapeBorderColor" value="#ffffff" />
+            </label>
+            <label class="field">
+              <span>বর্ডার সাইজ: <strong id="shapeBorderWidthValue">4px</strong></span>
+              <input type="range" id="shapeBorderWidth" min="0" max="20" value="4" class="range-slider" />
+            </label>
+          </div>
+
+          <h4 style="margin:14px 0 6px;font-size:13px;color:var(--text-secondary);">রিফ্লেক্স</h4>
+          <label class="field-inline">
+            <input type="checkbox" id="shapeReflectionToggle" />
+            <span>রিফ্লেক্স চালু করুন</span>
+          </label>
+          <div id="shapeReflectionFields" hidden>
+            <label class="field">
+              <span>ইনটেনসিটি: <strong id="shapeReflectionIntensityValue">50%</strong></span>
+              <input type="range" id="shapeReflectionIntensity" min="0" max="100" value="50" class="range-slider" />
+            </label>
+          </div>
+
+          <h4 style="margin:14px 0 6px;font-size:13px;color:var(--text-secondary);">৩D মোড</h4>
+          <label class="field-inline">
+            <input type="checkbox" id="shape3DToggle" checked />
+            <span>৩D এক্সট্রুশন চালু করুন</span>
+          </label>
+          <div id="shape3DFields">
+            <label class="field">
+              <span>গভীরতা: <strong id="shapeDepthValue">14</strong></span>
+              <input type="range" id="shapeDepth" min="1" max="60" value="14" class="range-slider" />
+            </label>
+          </div>
+
+          <h4 style="margin:14px 0 6px;font-size:13px;color:var(--text-secondary);">ভিতরে টেক্সট</h4>
+          <label class="field">
+            <span>টেক্সট</span>
+            <input type="text" id="shapeTextInput" placeholder="শেপের ভিতরে লেখা লিখুন" maxlength="40" />
+          </label>
+          <label class="field">
+            <span>টেক্সট কালার</span>
+            <input type="color" id="shapeTextColor" value="#ffffff" />
+          </label>
+          <label class="field">
+            <span>টেক্সট সাইজ: <strong id="shapeTextSizeValue">32%</strong></span>
+            <input type="range" id="shapeTextSize" min="10" max="90" value="32" class="range-slider" />
+          </label>
+          <label class="field">
+            <span>ফন্ট</span>
+            <select id="shapeFontSelect">
+              <option value="helvetiker">Helvetiker</option>
+              <option value="helvetiker_bold">Helvetiker Bold</option>
+              <option value="Grand Hotel">Grand Hotel</option>
+              <option value="Pacifico">Pacifico</option>
+              <option value="Lobster">Lobster</option>
+              <option value="Satisfy">Satisfy</option>
+              <option value="Yellowtail">Yellowtail</option>
+              <option value="Montserrat">Montserrat</option>
+              <option value="Playfair Display">Playfair Display</option>
+              <option value="Bungee">Bungee</option>
+            </select>
+          </label>
+
+          <h4 style="margin:14px 0 6px;font-size:13px;color:var(--text-secondary);">ট্রান্সফর্ম</h4>
+          <label class="field">
+            <span>সাইজ: <strong id="shapeSizeValue">100%</strong></span>
+            <input type="range" id="shapeSizeRange" min="20" max="300" value="100" class="range-slider" />
+          </label>
+          <label class="field">
+            <span>রোটেশন: <strong id="shapeRotationValue">0°</strong></span>
+            <input type="range" id="shapeRotationRange" min="-180" max="180" value="0" class="range-slider" />
+          </label>
+          <label class="field">
+            <span>অপাসিটি: <strong id="shapeOpacityValue">100%</strong></span>
+            <input type="range" id="shapeOpacityRange" min="10" max="100" value="100" class="range-slider" />
+          </label>
+
+          <div class="shape-action-row">
+            <button type="button" class="btn-secondary" id="shapeDuplicateBtn">⧉ কপি</button>
+            <button type="button" class="btn-secondary" id="shapeBringFrontBtn">⬆ সামনে আনুন</button>
+            <button type="button" class="btn-secondary" id="shapeSendBackBtn">⬇ পিছনে পাঠান</button>
+            <button type="button" class="btn-danger" id="shapeDeleteBtn">🗑 মুছুন</button>
+          </div>
+        </div>
+
+        <button type="button" class="btn-danger" id="shapeClearAllBtn" style="margin-top:14px;width:100%;">🧹 সব শেপ মুছুন</button>
       </section>
 
       <section class="panel-section" id="textContentSection">

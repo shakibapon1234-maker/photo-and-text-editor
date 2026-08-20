@@ -29,6 +29,7 @@ import {
   estimateGifSizeBytes,
 } from './export.js';
 import { computeArcLayout, splitGraphemes } from './curve.js';
+import { initShapeStudio } from './shapeStudio.js';
 
 const statusNote = document.getElementById('statusNote');
 
@@ -171,6 +172,7 @@ const patternGroup = document.getElementById('patternGroup');
 const patternPresetSelect = document.getElementById('patternPresetSelect');
 const festiveDecorToggle = document.getElementById('festiveDecorToggle');
 
+const shapeContentSection = document.getElementById('shapeContentSection');
 const cubeContentSection = document.getElementById('cubeContentSection');
 const cubeFace1Input = document.getElementById('cubeFace1Input');
 const cubeFace2Input = document.getElementById('cubeFace2Input');
@@ -4099,6 +4101,15 @@ function rebuildTextMesh() {
     return;
   }
 
+  if (state.contentMode === 'shape') {
+    // Shape layers are managed entirely by shapeStudio.js (its own group,
+    // persisted independently) — nothing to build here.
+    disposeTextMesh();
+    updateQualityNote();
+    updateTextModeNote(false);
+    return;
+  }
+
   if (state.contentMode === 'image') {
     disposeTextMesh();
     if (!state.imageElement) {
@@ -4195,6 +4206,10 @@ function applyRotation() {
 }
 
 function applyMaterial() {
+  if (state.contentMode === 'shape' && shapeStudio) {
+    shapeStudio.applySharedAppearance();
+    return;
+  }
   if (!textMesh) return;
 
   if (renderMode === 'canvas') {
@@ -4288,6 +4303,10 @@ function applyTypewriterReveal(progress) {
 }
 
 function applyPresetOffset(preset, t) {
+  if (state.contentMode === 'shape' && shapeStudio) {
+    shapeStudio.applyAnimation(preset, t);
+    return;
+  }
   if (!textMesh) return;
   const { pos, rot, scaleMul, opacityMul, emissiveMul, reveal } = preset.apply(t);
 
@@ -4331,6 +4350,10 @@ function applyPresetOffset(preset, t) {
 }
 
 function resetMeshToBaseTransform() {
+  if (state.contentMode === 'shape' && shapeStudio) {
+    shapeStudio.resetAnimation();
+    return;
+  }
   if (!textMesh) return;
   textMesh.visible = true;
   applyPosition();
@@ -4363,7 +4386,7 @@ function updateProgressUI(t, label) {
 }
 
 function playAnimation() {
-  if (!textMesh || animState.presetId === 'none') return;
+  if ((state.contentMode === 'shape' ? !shapeStudio?.hasSelection() : !textMesh) || animState.presetId === 'none') return;
   animState.playing = true;
   animState.startTime = performance.now();
   animPlayBtn.textContent = 'রিস্টার্ট';
@@ -4380,7 +4403,7 @@ function stopAnimation() {
 // Called once per rendered frame (from the main render loop below) with the
 // same high-res timestamp requestAnimationFrame hands to that loop.
 function tickAnimation(now) {
-  if (!animState.playing || !textMesh) return;
+  if (!animState.playing || (state.contentMode === 'shape' ? !shapeStudio?.hasSelection() : !textMesh)) return;
   const preset = ANIMATION_PRESETS[animState.presetId] || ANIMATION_PRESETS.none;
   const elapsed = now - animState.startTime - animState.delayMs;
 
@@ -4503,6 +4526,11 @@ let rebuildTimer = null;
 function scheduleRebuild() {
   clearTimeout(rebuildTimer);
   rebuildTimer = setTimeout(() => {
+    if (state.contentMode === 'shape' && shapeStudio) {
+      shapeStudio.applySharedAppearance();
+      saveStudioStateDebounced();
+      return;
+    }
     rebuildTextMesh();
     saveStudioStateDebounced();
   }, 120); // debounce so typing stays smooth
@@ -4525,18 +4553,21 @@ contentModeGrid.addEventListener('click', (e) => {
   imageContentSection.hidden = state.contentMode !== 'image';
   stickerContentSection.hidden = state.contentMode !== 'sticker';
   if (cubeContentSection) cubeContentSection.hidden = state.contentMode !== 'cube';
+  if (shapeContentSection) shapeContentSection.hidden = state.contentMode !== 'shape';
+  if (window.__shapeStudio) window.__shapeStudio.setActive(state.contentMode === 'shape');
   // Auto-expand the active content section
   const activeSec = state.contentMode === 'text' ? textContentSection
     : state.contentMode === 'image' ? imageContentSection
     : state.contentMode === 'sticker' ? stickerContentSection
-    : state.contentMode === 'cube' ? cubeContentSection : null;
+    : state.contentMode === 'cube' ? cubeContentSection
+    : state.contentMode === 'shape' ? shapeContentSection : null;
   if (activeSec) {
     activeSec.classList.remove('collapsed');
     const arrow = activeSec.querySelector('.accordion-arrow');
     if (arrow) arrow.textContent = '▼';
   }
   // PLAN_3 §3.2: curve control is shared by Text and Sticker, hidden for Image and Cube.
-  curveSection.hidden = state.contentMode === 'image' || state.contentMode === 'cube';
+  curveSection.hidden = state.contentMode === 'image' || state.contentMode === 'cube' || state.contentMode === 'shape';
   stopAnimation(); // switching the active object mid-playback would animate a stale mesh
   rebuildTextMesh();
   saveStudioStateDebounced();
@@ -4870,6 +4901,7 @@ function loadStudioState() {
       if (imageContentSection) imageContentSection.hidden = saved.contentMode !== 'image';
       if (stickerContentSection) stickerContentSection.hidden = saved.contentMode !== 'sticker';
       if (cubeContentSection) cubeContentSection.hidden = saved.contentMode !== 'cube';
+      if (shapeContentSection) shapeContentSection.hidden = saved.contentMode !== 'shape';
       if (curveSection) curveSection.hidden = saved.contentMode === 'image' || saved.contentMode === 'cube';
     }
     if (saved.color && colorPicker) {
@@ -5206,6 +5238,7 @@ viewportEl.addEventListener('contextmenu', (e) => {
 
 viewportEl.addEventListener('pointerdown', (e) => {
   if (!state.dragEnabled) return;
+  if (state.contentMode === 'shape') return; // shapeStudio.js owns pointer handling in Shape mode
 
   // Determine action:
   // 1. Right Click (button 2) or Middle Click (button 1) -> ALWAYS Drag to Move/Pan
@@ -5508,13 +5541,14 @@ reflectionIntensityRange.addEventListener('input', () => {
 });
 
 resetCameraBtn.addEventListener('click', () => {
-  if (!textMesh) {
+  const activeObject = state.contentMode === 'shape' ? shapeStudio?.getSelectedGroup() : textMesh;
+  if (!activeObject) {
     camera.position.copy(DEFAULT_CAMERA_POS);
     controls.target.set(0, 0, 0);
     controls.update();
     return;
   }
-  const box = new THREE.Box3().setFromObject(textMesh);
+  const box = new THREE.Box3().setFromObject(activeObject);
   const size = box.getSize(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z, 10);
   const fovRad = camera.fov * (Math.PI / 180);
@@ -6070,6 +6104,23 @@ updateWebmSupportNote();
 updateExportSourceNote();
 rebuildTextMesh();
 
+// ---------- Shape Studio (multi-layer 2D/3D shapes) ----------
+const shapeStudio = initShapeStudio({
+  THREE,
+  TextGeometry,
+  scene,
+  camera,
+  renderer,
+  controls,
+  viewportEl,
+  fontCache,
+  FONT_MAP,
+  fontLoader,
+  getSharedAppearance: () => state,
+  isActive: () => state.contentMode === 'shape',
+});
+window.__shapeStudio = shapeStudio;
+
 // ---------- Mouse-wheel zoom: scale text mesh ----------
 // Scrolling up/down shrinks or grows the active textMesh without touching camera FOV.
 // Works regardless of drag mode. Ctrl+Wheel keeps the default browser zoom.
@@ -6093,10 +6144,12 @@ function animate(now) {
   requestAnimationFrame(animate);
   if (animState.playing) {
     tickAnimation(now);
-  } else if (state.autoRotate && textMesh) {
-    textMesh.rotation.y += 0.008;
+  } else if (state.autoRotate) {
+    const activeObject = state.contentMode === 'shape' ? shapeStudio?.getSelectedGroup() : textMesh;
+    if (activeObject) activeObject.rotation.y += 0.008;
   }
   controls.update();
+  if (shapeStudio) shapeStudio.update();
   renderer.render(scene, camera);
 }
 animate();
@@ -6149,6 +6202,7 @@ function reset3DStudio() {
   if (imageContentSection) imageContentSection.hidden = true;
   if (stickerContentSection) stickerContentSection.hidden = true;
   if (cubeContentSection) cubeContentSection.hidden = true;
+  if (shapeContentSection) shapeContentSection.hidden = true;
 
   try { localStorage.removeItem('studio_state_plan3'); } catch(_) {}
   rebuildTextMesh();
