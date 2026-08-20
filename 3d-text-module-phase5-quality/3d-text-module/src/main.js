@@ -1738,7 +1738,13 @@ function buildVectorTextMesh(validLines) {
   const palette = getMulticolorPalette();
   const totalLinesHeight = (validLines.length - 1) * lineHeight;
   const hasCurvedOrSpacing = (state.curveIntensity && Math.abs(state.curveIntensity) > 0) || (state.curveSpacing && Math.abs(state.curveSpacing - 1) > 0.01);
-  const isPerCharMode = hasCurvedOrSpacing || state.colorMode === 'multicolor';
+  // Typewriter needs independent glyph meshes so it can reveal the text one
+  // character at a time. Other modes keep the original single-geometry path
+  // unless curve, spacing, or multicolour already requires per-character text.
+  const isTypewriterMode = animState.presetId === 'typewriter';
+  const isPerCharMode = hasCurvedOrSpacing || state.colorMode === 'multicolor' || isTypewriterMode;
+  const isStraightTypewriter = isTypewriterMode && !hasCurvedOrSpacing;
+  const typewriterChars = [];
 
   let globalCharIdx = 0;
 
@@ -1751,6 +1757,15 @@ function buildVectorTextMesh(validLines) {
       // Per-character 3D TextGeometry: maintains 100% thick, heavy 3D vector geometry with bevel & depth
       const chars = splitGraphemes(content);
       const charWidths = chars.map((ch) => {
+        // For ordinary straight typewriter text, use Three.js font advance
+        // widths rather than visual bounding boxes. This preserves the same
+        // line width as a normal TextGeometry and prevents long text from
+        // being pushed outside the camera frame.
+        if (isStraightTypewriter) {
+          const glyph = font && font.data && font.data.glyphs && font.data.glyphs[ch];
+          const resolution = (font && font.data && font.data.resolution) || 1000;
+          return glyph ? glyph.ha * state.size / resolution : state.size * 0.5;
+        }
         if (ch === ' ') return state.size * 0.45;
         const g = new TextGeometry(ch, {
           font,
@@ -1767,6 +1782,33 @@ function buildVectorTextMesh(validLines) {
         g.dispose();
         return w;
       });
+
+      // Keep straight typewriter glyphs on the exact baseline and horizontal
+      // centre used by the ordinary, single TextGeometry line. Centreing each
+      // glyph independently made lower-case letters drift vertically and
+      // caused long multi-line text to look broken.
+      let straightLineLayout = null;
+      if (isStraightTypewriter) {
+        const referenceGeo = new TextGeometry(content, {
+          font,
+          size: state.size,
+          depth: state.depth,
+          curveSegments: q.curveSegments,
+          bevelEnabled: true,
+          bevelThickness: Math.max(1, state.depth * 0.06),
+          bevelSize: Math.max(0.5, state.depth * 0.03),
+          bevelSegments: q.bevelSegments,
+        });
+        referenceGeo.computeBoundingBox();
+        const bb = referenceGeo.boundingBox;
+        straightLineLayout = {
+          advance: charWidths.reduce((sum, width) => sum + width, 0),
+          centerX: bb ? (bb.max.x + bb.min.x) / 2 : 0,
+          centerY: bb ? (bb.max.y + bb.min.y) / 2 : 0,
+          centerZ: bb ? (bb.max.z + bb.min.z) / 2 : 0,
+        };
+        referenceGeo.dispose();
+      }
 
       const arcLayout = computeArcLayout(charWidths, {
         curveIntensity: state.curveIntensity || 0,
@@ -1795,7 +1837,14 @@ function buildVectorTextMesh(validLines) {
 
         charGeo.computeBoundingBox();
         if (charGeo.boundingBox && !isNaN(charGeo.boundingBox.min.x)) {
-          charGeo.center();
+          if (isStraightTypewriter) {
+            // Keep X at the glyph's natural pen origin (for exact advance
+            // layout), and use the whole line's centre for Y/Z so all glyphs
+            // share their real font baseline.
+            charGeo.translate(0, -straightLineLayout.centerY, -straightLineLayout.centerZ);
+          } else {
+            charGeo.center();
+          }
         }
         assignGeometryUVs(charGeo);
 
@@ -1807,8 +1856,15 @@ function buildVectorTextMesh(validLines) {
         const charMesh = new THREE.Mesh(charGeo, charMat);
         charMesh.castShadow = state.shadowsOn;
         charMesh.receiveShadow = state.shadowsOn;
-        charMesh.position.set(cPos.x, lineY + cPos.y, 0);
-        charMesh.rotation.z = -cPos.rotation;
+        charMesh.position.set(
+          isStraightTypewriter
+            ? cPos.x + straightLineLayout.advance / 2 - charWidths[ci] / 2 - straightLineLayout.centerX
+            : cPos.x,
+          lineY + cPos.y,
+          0
+        );
+        charMesh.rotation.z = isStraightTypewriter ? 0 : -cPos.rotation;
+        if (isTypewriterMode) typewriterChars.push(charMesh);
         group.add(charMesh);
       });
     } else {
@@ -1839,6 +1895,7 @@ function buildVectorTextMesh(validLines) {
   });
 
   renderMode = 'vector';
+  if (isTypewriterMode) group.userData.typewriterChars = typewriterChars;
   textMesh = group;
   textMesh.material = defaultMaterial;
 }
@@ -4221,9 +4278,18 @@ function applyReflectionToggle() {
 // `applyPresetOffset` is the single place that turns a preset's {pos, rot,
 // scaleMul, opacityMul} into an actual mesh transform. It always layers the
 // offset on TOP of the current slider-configured base position and rotation,
+function applyTypewriterReveal(progress) {
+  if (!textMesh || !textMesh.userData.typewriterChars) return;
+  const chars = textMesh.userData.typewriterChars;
+  const revealCount = Math.floor(Math.min(1, Math.max(0, progress)) * chars.length + 1e-8);
+  chars.forEach((charMesh, index) => {
+    charMesh.visible = index < revealCount;
+  });
+}
+
 function applyPresetOffset(preset, t) {
   if (!textMesh) return;
-  const { pos, rot, scaleMul, opacityMul, emissiveMul } = preset.apply(t);
+  const { pos, rot, scaleMul, opacityMul, emissiveMul, reveal } = preset.apply(t);
 
   textMesh.position.set(
     (state.posX || 0) + (pos ? pos[0] : 0),
@@ -4260,6 +4326,8 @@ function applyPresetOffset(preset, t) {
       });
     }
   });
+
+  if (reveal !== undefined) applyTypewriterReveal(reveal);
 }
 
 function resetMeshToBaseTransform() {
@@ -4282,6 +4350,11 @@ function resetMeshToBaseTransform() {
       });
     }
   });
+  // Stopping or finishing a typewriter animation always leaves the complete
+  // text visible, just like every other entrance preset.
+  if (textMesh.userData.typewriterChars) {
+    textMesh.userData.typewriterChars.forEach((charMesh) => { charMesh.visible = true; });
+  }
 }
 
 function updateProgressUI(t, label) {
@@ -5475,6 +5548,13 @@ animPresetGrid.addEventListener('click', (e) => {
     updateExportSourceNote();
     saveStudioStateDebounced();
     return;
+  }
+
+  // Switch the normal vector text builder to independent glyph meshes before
+  // playback. Canvas/script text and non-text content retain their existing
+  // animation behavior, while Latin 3D text gets the true character reveal.
+  if (animState.presetId === 'typewriter' && state.contentMode === 'text' && !isBanglaText(state.text || '')) {
+    rebuildTextMesh();
   }
 
   // Continuous presets (pulse, float, glowPulse, etc.) work best with loop

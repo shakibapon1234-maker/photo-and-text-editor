@@ -25420,6 +25420,13 @@ var ANIMATION_PRESETS = {
     label: "Pop In",
     apply: (t) => ({ pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: t, opacityMul: 1 })
   },
+  typewriter: {
+    // The mesh layer uses `reveal` to show its pre-built glyph meshes one by
+    // one. Keeping the transform neutral means the typed text lands exactly
+    // on the user's configured position, rotation, and scale.
+    label: "Typewriter (\u098F\u0995 \u0985\u0995\u09CD\u09B7\u09B0 \u0995\u09B0\u09C7)",
+    apply: (t) => ({ pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: 1, reveal: t })
+  },
   rotateIn: {
     label: "Rotate In",
     apply: (t) => ({ pos: [0, 0, 0], rot: [0, TAU * (1 - t), 0], scaleMul: 1, opacityMul: 1 })
@@ -27319,7 +27326,10 @@ function buildVectorTextMesh(validLines) {
   const palette = getMulticolorPalette();
   const totalLinesHeight = (validLines.length - 1) * lineHeight;
   const hasCurvedOrSpacing = state.curveIntensity && Math.abs(state.curveIntensity) > 0 || state.curveSpacing && Math.abs(state.curveSpacing - 1) > 0.01;
-  const isPerCharMode = hasCurvedOrSpacing || state.colorMode === "multicolor";
+  const isTypewriterMode = animState.presetId === "typewriter";
+  const isPerCharMode = hasCurvedOrSpacing || state.colorMode === "multicolor" || isTypewriterMode;
+  const isStraightTypewriter = isTypewriterMode && !hasCurvedOrSpacing;
+  const typewriterChars = [];
   let globalCharIdx = 0;
   validLines.forEach((lineStr, idx) => {
     const hasText = lineStr.trim().length > 0;
@@ -27328,6 +27338,11 @@ function buildVectorTextMesh(validLines) {
     if (isPerCharMode && hasText) {
       const chars = splitGraphemes(content);
       const charWidths = chars.map((ch) => {
+        if (isStraightTypewriter) {
+          const glyph = font && font.data && font.data.glyphs && font.data.glyphs[ch];
+          const resolution = font && font.data && font.data.resolution || 1e3;
+          return glyph ? glyph.ha * state.size / resolution : state.size * 0.5;
+        }
         if (ch === " ") return state.size * 0.45;
         const g = new TextGeometry(ch, {
           font,
@@ -27344,6 +27359,28 @@ function buildVectorTextMesh(validLines) {
         g.dispose();
         return w;
       });
+      let straightLineLayout = null;
+      if (isStraightTypewriter) {
+        const referenceGeo = new TextGeometry(content, {
+          font,
+          size: state.size,
+          depth: state.depth,
+          curveSegments: q.curveSegments,
+          bevelEnabled: true,
+          bevelThickness: Math.max(1, state.depth * 0.06),
+          bevelSize: Math.max(0.5, state.depth * 0.03),
+          bevelSegments: q.bevelSegments
+        });
+        referenceGeo.computeBoundingBox();
+        const bb = referenceGeo.boundingBox;
+        straightLineLayout = {
+          advance: charWidths.reduce((sum, width) => sum + width, 0),
+          centerX: bb ? (bb.max.x + bb.min.x) / 2 : 0,
+          centerY: bb ? (bb.max.y + bb.min.y) / 2 : 0,
+          centerZ: bb ? (bb.max.z + bb.min.z) / 2 : 0
+        };
+        referenceGeo.dispose();
+      }
       const arcLayout = computeArcLayout(charWidths, {
         curveIntensity: state.curveIntensity || 0,
         direction: state.curveDirection || "up",
@@ -27368,7 +27405,11 @@ function buildVectorTextMesh(validLines) {
         });
         charGeo.computeBoundingBox();
         if (charGeo.boundingBox && !isNaN(charGeo.boundingBox.min.x)) {
-          charGeo.center();
+          if (isStraightTypewriter) {
+            charGeo.translate(0, -straightLineLayout.centerY, -straightLineLayout.centerZ);
+          } else {
+            charGeo.center();
+          }
         }
         assignGeometryUVs(charGeo);
         const charMat = state.colorMode === "multicolor" ? buildMaterial(state.materialType, palette[globalCharIdx % palette.length]) : defaultMaterial;
@@ -27376,8 +27417,13 @@ function buildVectorTextMesh(validLines) {
         const charMesh = new Mesh(charGeo, charMat);
         charMesh.castShadow = state.shadowsOn;
         charMesh.receiveShadow = state.shadowsOn;
-        charMesh.position.set(cPos.x, lineY + cPos.y, 0);
-        charMesh.rotation.z = -cPos.rotation;
+        charMesh.position.set(
+          isStraightTypewriter ? cPos.x + straightLineLayout.advance / 2 - charWidths[ci] / 2 - straightLineLayout.centerX : cPos.x,
+          lineY + cPos.y,
+          0
+        );
+        charMesh.rotation.z = isStraightTypewriter ? 0 : -cPos.rotation;
+        if (isTypewriterMode) typewriterChars.push(charMesh);
         group.add(charMesh);
       });
     } else {
@@ -27405,6 +27451,7 @@ function buildVectorTextMesh(validLines) {
     }
   });
   renderMode = "vector";
+  if (isTypewriterMode) group.userData.typewriterChars = typewriterChars;
   textMesh = group;
   textMesh.material = defaultMaterial;
 }
@@ -29368,9 +29415,17 @@ function applyReflectionToggle() {
   scene.environment = state.reflectionsOn ? envTexture : null;
   applyMaterial();
 }
+function applyTypewriterReveal(progress) {
+  if (!textMesh || !textMesh.userData.typewriterChars) return;
+  const chars = textMesh.userData.typewriterChars;
+  const revealCount = Math.floor(Math.min(1, Math.max(0, progress)) * chars.length + 1e-8);
+  chars.forEach((charMesh, index) => {
+    charMesh.visible = index < revealCount;
+  });
+}
 function applyPresetOffset(preset, t) {
   if (!textMesh) return;
-  const { pos, rot, scaleMul, opacityMul, emissiveMul } = preset.apply(t);
+  const { pos, rot, scaleMul, opacityMul, emissiveMul, reveal } = preset.apply(t);
   textMesh.position.set(
     (state.posX || 0) + (pos ? pos[0] : 0),
     (state.posY || 0) + (pos ? pos[1] : 0),
@@ -29400,6 +29455,7 @@ function applyPresetOffset(preset, t) {
       });
     }
   });
+  if (reveal !== void 0) applyTypewriterReveal(reveal);
 }
 function resetMeshToBaseTransform() {
   if (!textMesh) return;
@@ -29421,6 +29477,11 @@ function resetMeshToBaseTransform() {
       });
     }
   });
+  if (textMesh.userData.typewriterChars) {
+    textMesh.userData.typewriterChars.forEach((charMesh) => {
+      charMesh.visible = true;
+    });
+  }
 }
 function updateProgressUI(t, label) {
   animProgressFill.style.width = `${Math.round(Math.min(1, Math.max(0, t)) * 100)}%`;
@@ -30507,6 +30568,9 @@ animPresetGrid.addEventListener("click", (e) => {
     updateExportSourceNote();
     saveStudioStateDebounced();
     return;
+  }
+  if (animState.presetId === "typewriter" && state.contentMode === "text" && !isBanglaText(state.text || "")) {
+    rebuildTextMesh();
   }
   const selectedPreset = ANIMATION_PRESETS[animState.presetId];
   if (selectedPreset && selectedPreset.continuous) {

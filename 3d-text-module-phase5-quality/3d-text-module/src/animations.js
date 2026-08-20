@@ -82,6 +82,13 @@ export const ANIMATION_PRESETS = {
     label: 'Pop In',
     apply: (t) => ({ pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: t, opacityMul: 1 }),
   },
+  typewriter: {
+    // The mesh layer uses `reveal` to show its pre-built glyph meshes one by
+    // one. Keeping the transform neutral means the typed text lands exactly
+    // on the user's configured position, rotation, and scale.
+    label: 'Typewriter (এক অক্ষর করে)',
+    apply: (t) => ({ pos: [0, 0, 0], rot: [0, 0, 0], scaleMul: 1, opacityMul: 1, reveal: t }),
+  },
   rotateIn: {
     label: 'Rotate In',
     apply: (t) => ({ pos: [0, 0, 0], rot: [0, TAU * (1 - t), 0], scaleMul: 1, opacityMul: 1 }),
