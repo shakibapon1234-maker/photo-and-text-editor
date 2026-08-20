@@ -1960,7 +1960,8 @@ function buildCanvasCardTextMesh(validLines) {
     revealCanvas.width = sourceCanvas.width;
     revealCanvas.height = sourceCanvas.height;
     const revealCtx = revealCanvas.getContext('2d');
-    const graphemeCount = Math.max(1, splitGraphemes(validLines.join('\n')).filter((char) => char.trim()).length);
+    const lineCounts = validLines.map((line) => Math.max(0, splitGraphemes(line).filter((char) => char.trim()).length));
+    const graphemeCount = Math.max(1, lineCounts.reduce((total, count) => total + count, 0));
     let lastVisibleChars = -1;
     const paintReveal = (progress) => {
       const visibleChars = Math.floor(Math.min(1, Math.max(0, progress)) * graphemeCount + 1e-8);
@@ -1968,9 +1969,20 @@ function buildCanvasCardTextMesh(validLines) {
       // only when the next character appears, not 60 times a second.
       if (visibleChars === lastVisibleChars) return;
       lastVisibleChars = visibleChars;
-      const visibleWidth = Math.round(sourceCanvas.width * (visibleChars / graphemeCount));
       revealCtx.clearRect(0, 0, revealCanvas.width, revealCanvas.height);
-      if (visibleWidth > 0) revealCtx.drawImage(sourceCanvas, 0, 0, visibleWidth, sourceCanvas.height, 0, 0, visibleWidth, revealCanvas.height);
+      // Reveal line by line: a second line remains completely hidden until
+      // every visible grapheme in the previous line has been revealed.
+      let remaining = visibleChars;
+      lineCounts.forEach((lineCount, index) => {
+        if (!lineCount || remaining <= 0) return;
+        const shown = Math.min(lineCount, remaining);
+        const top = Math.floor(index * sourceCanvas.height / lineCounts.length);
+        const bottom = Math.ceil((index + 1) * sourceCanvas.height / lineCounts.length);
+        const h = Math.max(1, bottom - top);
+        const w = Math.round(sourceCanvas.width * shown / lineCount);
+        if (w > 0) revealCtx.drawImage(sourceCanvas, 0, top, w, h, 0, top, w, h);
+        remaining -= lineCount;
+      });
       frontTex.image = revealCanvas;
       backTex.image = revealCanvas;
       frontTex.needsUpdate = true;
@@ -2334,7 +2346,8 @@ function drawStickerCanvasTexture(
 // left-to-right crop of the whole badge).
 function createFlatStickerTypewriterReveal(text, shape, bgColor, textColor, curveOpts, borderOpts, target) {
   const lines = (text || ' ').split(/\r?\n/).map((line) => (line.length ? line : ' '));
-  const count = Math.max(1, splitGraphemes(lines.join('\n')).filter((char) => char.trim()).length);
+  const lineCounts = lines.map((line) => Math.max(0, splitGraphemes(line).filter((char) => char.trim()).length));
+  const count = Math.max(1, lineCounts.reduce((total, lineCount) => total + lineCount, 0));
   const { canvas: baseCanvas } = drawStickerCanvasTexture('', shape, bgColor, textColor, curveOpts, borderOpts);
   const { canvas: fullCanvas } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts, borderOpts);
   const revealCanvas = document.createElement('canvas');
@@ -2347,19 +2360,19 @@ function createFlatStickerTypewriterReveal(text, shape, bgColor, textColor, curv
     const visible = Math.floor(Math.min(1, Math.max(0, progress)) * count + 1e-8);
     if (visible === lastVisibleChars) return;
     lastVisibleChars = visible;
-    const revealWidth = Math.round(fullCanvas.width * visible / count);
     ctx.clearRect(0, 0, revealCanvas.width, revealCanvas.height);
     ctx.drawImage(baseCanvas, 0, 0);
-    if (revealWidth > 0) {
-      // The full badge includes the same shape background, so clipping and
-      // overlaying it only exposes the label pixels that have been typed.
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, 0, revealWidth, revealCanvas.height);
-      ctx.clip();
-      ctx.drawImage(fullCanvas, 0, 0);
-      ctx.restore();
-    }
+    let remaining = visible;
+    lineCounts.forEach((lineCount, index) => {
+      if (!lineCount || remaining <= 0) return;
+      const shown = Math.min(lineCount, remaining);
+      const top = Math.floor(index * fullCanvas.height / lineCounts.length);
+      const bottom = Math.ceil((index + 1) * fullCanvas.height / lineCounts.length);
+      const h = Math.max(1, bottom - top);
+      const w = Math.round(fullCanvas.width * shown / lineCount);
+      if (w > 0) ctx.drawImage(fullCanvas, 0, top, w, h, 0, top, w, h);
+      remaining -= lineCount;
+    });
     target.image = revealCanvas;
     target.needsUpdate = true;
   };
