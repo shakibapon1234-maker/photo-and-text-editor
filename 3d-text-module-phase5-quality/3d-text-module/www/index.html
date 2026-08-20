@@ -155,7 +155,31 @@
           <span>টেক্সট ৩D বর্ডার</span>
           <input type="color" id="cubeTextBorderPicker" value="#0f172a" />
         </label>
-        <p class="field-note">মাউস দিয়ে ক্যানভাসে ড্র্যাগ করে ৩D কিউবটি ৩৬০° ঘুরিয়ে প্রতিটি পাশের ৩D লেখা দেখতে পারবেন।</p>
+        <label class="field">
+          <span>কিউব সাইজ: <strong id="cubeBoxSizeValue">120</strong></span>
+          <input type="range" id="cubeBoxSizeRange" min="50" max="260" step="5" value="120" class="range-slider" />
+        </label>
+        <label class="field">
+          <span>টেক্সট স্কেল: <strong id="cubeTextScaleValue">100%</strong></span>
+          <input type="range" id="cubeTextScaleRange" min="40" max="200" step="5" value="100" class="range-slider" />
+        </label>
+        <label class="field">
+          <span>অ্যানিমেশন</span>
+          <select id="cubeAnimationSelect">
+            <option value="none" selected>বন্ধ</option>
+            <option value="spinY">Y-অক্ষে ঘূর্ণন</option>
+            <option value="spinXY">X+Y  দুদিকেই ঘূর্ণন</option>
+            <option value="orbit">অরবিট মোশন</option>
+            <option value="flip">ফ্লিপ</option>
+            <option value="wobble">ওব্বল</option>
+            <option value="bounce">বাউন্স</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>গতি: <strong id="cubeAnimationSpeedValue">1.0x</strong></span>
+          <input type="range" id="cubeAnimationSpeedRange" min="0.2" max="3" step="0.1" value="1" class="range-slider" />
+        </label>
+        <p class="field-note">এখানে কিউবের আকার আর লেখা ইউনিকভাবে কন্ট্রোল করা যাবে—কিউব বড় করলে টেক্সট ছোট হবে না, বরং আলাদা স্কেলে লেখা থাকবে।</p>
       </section>
 
       <section class="panel-section" id="shapeContentSection" hidden>

@@ -36223,6 +36223,13 @@ var cubeFace3Input = document.getElementById("cubeFace3Input");
 var cubeColorPicker = document.getElementById("cubeColorPicker");
 var cubeTextColorPicker = document.getElementById("cubeTextColorPicker");
 var cubeTextBorderPicker = document.getElementById("cubeTextBorderPicker");
+var cubeBoxSizeRange = document.getElementById("cubeBoxSizeRange");
+var cubeBoxSizeValue = document.getElementById("cubeBoxSizeValue");
+var cubeTextScaleRange = document.getElementById("cubeTextScaleRange");
+var cubeTextScaleValue = document.getElementById("cubeTextScaleValue");
+var cubeAnimationSelect = document.getElementById("cubeAnimationSelect");
+var cubeAnimationSpeedRange = document.getElementById("cubeAnimationSpeedRange");
+var cubeAnimationSpeedValue = document.getElementById("cubeAnimationSpeedValue");
 var bgModeSelect = document.getElementById("bgModeSelect");
 var bgColorGroup = document.getElementById("bgColorGroup");
 var bgColorPicker = document.getElementById("bgColorPicker");
@@ -36530,6 +36537,10 @@ var state = {
   cubeColor: cubeColorPicker?.value || "#1d4ed8",
   cubeTextColor: cubeTextColorPicker?.value || "#ffffff",
   cubeTextBorder: cubeTextBorderPicker?.value || "#0f172a",
+  cubeBoxSize: Number(cubeBoxSizeRange?.value || 120),
+  cubeTextScale: Number(cubeTextScaleRange?.value || 100),
+  cubeAnimation: cubeAnimationSelect?.value || "none",
+  cubeAnimationSpeed: Number(cubeAnimationSpeedRange?.value || 1),
   bgMode: bgModeSelect?.value || "darkBlue",
   bgColor: bgColorPicker?.value || "#0a192f",
   bgImageElement: null,
@@ -39444,12 +39455,13 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
   textMesh = group;
   textMesh.material = materials;
 }
-function drawCubeFaceCanvas(faceText, cubeColor, textColor, borderColor) {
+function drawCubeFaceCanvas(faceText, cubeColor, textColor, borderColor, textScale = 1) {
   const size = 512;
   const canvas2 = document.createElement("canvas");
   canvas2.width = size;
   canvas2.height = size;
   const ctx = canvas2.getContext("2d");
+  ctx.clearRect(0, 0, size, size);
   ctx.fillStyle = cubeColor;
   ctx.fillRect(0, 0, size, size);
   const vgrd = ctx.createRadialGradient(size / 2, size / 2, size * 0.08, size / 2, size / 2, size * 0.72);
@@ -39472,8 +39484,16 @@ function drawCubeFaceCanvas(faceText, cubeColor, textColor, borderColor) {
   }
   if (!faceText || !faceText.trim()) return { canvas: canvas2 };
   const len = faceText.length;
-  const fontSize = len <= 1 ? size * 0.62 : len <= 3 ? size * 0.42 : size * 0.28;
-  const fontFamily = `"Grand Hotel", "Pacifico", sans-serif`;
+  const baseFontSize = len <= 1 ? size * 0.62 : len <= 3 ? size * 0.42 : size * 0.28;
+  const fontSize = baseFontSize * (Number(textScale) || 1);
+  const fontFamily = '"Grand Hotel", "Pacifico", sans-serif';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+  ctx.miterLimit = 2;
+  ctx.lineWidth = Math.max(10, fontSize * 0.12);
+  ctx.font = `900 ${fontSize}px ${fontFamily}`;
+  ctx.strokeStyle = borderColor || "#0f172a";
   ctx.strokeText(faceText, size / 2, size / 2);
   const tGrad = ctx.createLinearGradient(0, size / 2 - fontSize * 0.6, 0, size / 2 + fontSize * 0.6);
   const tc = textColor || "#ffffff";
@@ -39485,19 +39505,20 @@ function drawCubeFaceCanvas(faceText, cubeColor, textColor, borderColor) {
   return { canvas: canvas2 };
 }
 function buildCubeBoxMesh() {
-  const cubeSize = state.size * 1.4;
+  const cubeSize = Number(state.cubeBoxSize || 120);
   const cubeColor = state.cubeColor || "#1d4ed8";
   const textColor = state.cubeTextColor || "#ffffff";
   const borderColor = state.cubeTextBorder || "#0f172a";
+  const textScale = Math.max(0.4, Number(state.cubeTextScale || 100) / 100);
   const face1 = state.cubeFace1 || "3";
   const face2 = state.cubeFace2 || "D";
   const face3 = state.cubeFace3 || "";
-  const { canvas: cFront } = drawCubeFaceCanvas(face1, cubeColor, textColor, borderColor);
-  const { canvas: cRight } = drawCubeFaceCanvas(face2, cubeColor, textColor, borderColor);
-  const { canvas: cTop } = drawCubeFaceCanvas(face3, cubeColor, textColor, borderColor);
-  const { canvas: cBack } = drawCubeFaceCanvas(face1, cubeColor, textColor, borderColor);
-  const { canvas: cLeft } = drawCubeFaceCanvas(face2, cubeColor, textColor, borderColor);
-  const { canvas: cBottom } = drawCubeFaceCanvas("", cubeColor, textColor, borderColor);
+  const { canvas: cFront } = drawCubeFaceCanvas(face1, cubeColor, textColor, borderColor, textScale);
+  const { canvas: cRight } = drawCubeFaceCanvas(face2, cubeColor, textColor, borderColor, textScale);
+  const { canvas: cTop } = drawCubeFaceCanvas(face3, cubeColor, textColor, borderColor, textScale);
+  const { canvas: cBack } = drawCubeFaceCanvas(face1, cubeColor, textColor, borderColor, textScale);
+  const { canvas: cLeft } = drawCubeFaceCanvas(face2, cubeColor, textColor, borderColor, textScale);
+  const { canvas: cBottom } = drawCubeFaceCanvas("", cubeColor, textColor, borderColor, textScale);
   function makeCubeTex(cnv, mirrorH) {
     const t = new CanvasTexture(cnv);
     t.colorSpace = SRGBColorSpace;
@@ -40071,6 +40092,24 @@ if (cubeTextColorPicker) cubeTextColorPicker.addEventListener("input", () => {
 if (cubeTextBorderPicker) cubeTextBorderPicker.addEventListener("input", () => {
   state.cubeTextBorder = cubeTextBorderPicker.value;
   if (state.contentMode === "cube") scheduleRebuild();
+});
+if (cubeBoxSizeRange) cubeBoxSizeRange.addEventListener("input", () => {
+  state.cubeBoxSize = Number(cubeBoxSizeRange.value);
+  if (cubeBoxSizeValue) cubeBoxSizeValue.textContent = `${state.cubeBoxSize}`;
+  if (state.contentMode === "cube") scheduleRebuild();
+});
+if (cubeTextScaleRange) cubeTextScaleRange.addEventListener("input", () => {
+  state.cubeTextScale = Number(cubeTextScaleRange.value);
+  if (cubeTextScaleValue) cubeTextScaleValue.textContent = `${Math.round(state.cubeTextScale)}%`;
+  if (state.contentMode === "cube") scheduleRebuild();
+});
+if (cubeAnimationSelect) cubeAnimationSelect.addEventListener("change", () => {
+  state.cubeAnimation = cubeAnimationSelect.value;
+  if (state.contentMode === "cube") applyRotation();
+});
+if (cubeAnimationSpeedRange) cubeAnimationSpeedRange.addEventListener("input", () => {
+  state.cubeAnimationSpeed = Number(cubeAnimationSpeedRange.value);
+  if (cubeAnimationSpeedValue) cubeAnimationSpeedValue.textContent = `${Number(state.cubeAnimationSpeed).toFixed(1)}x`;
 });
 stickerTextInput.addEventListener("input", () => {
   state.stickerText = stickerTextInput.value;
@@ -41823,6 +41862,53 @@ if (canvas) {
     saveStudioStateDebounced();
   }, { passive: false });
 }
+function applyCubeAnimation(now2) {
+  if (state.contentMode !== "cube" || !textMesh || animState.playing) return false;
+  if (state.cubeAnimation === "none") {
+    applyRotation();
+    return true;
+  }
+  const t = now2 * 1e-3 * (state.cubeAnimationSpeed || 1);
+  const baseX = MathUtils.degToRad(state.rotX);
+  const baseY = MathUtils.degToRad(state.rotY);
+  const baseZ = MathUtils.degToRad(state.rotZ);
+  let x = baseX;
+  let y = baseY;
+  let z = baseZ;
+  switch (state.cubeAnimation) {
+    case "spinY":
+      y += t * 1.8;
+      break;
+    case "spinXY":
+      x += Math.sin(t * 1.4) * 0.8;
+      y += t * 2.2;
+      z += Math.cos(t * 1.2) * 0.7;
+      break;
+    case "orbit":
+      x += Math.sin(t * 1.1) * 0.8;
+      y += t * 1.5;
+      z += Math.cos(t * 1.3) * 0.6;
+      break;
+    case "flip":
+      x += Math.sin(t * 2.2) * 1.1;
+      y += Math.cos(t * 2.2) * 1.1;
+      break;
+    case "wobble":
+      x += Math.sin(t * 2.4) * 0.9;
+      z += Math.sin(t * 2.8) * 0.9;
+      y += Math.sin(t * 1.5) * 0.5;
+      break;
+    case "bounce":
+      y += Math.sin(t * 3) * 0.55;
+      z += Math.sin(t * 2.5) * 0.7;
+      break;
+    default:
+      break;
+  }
+  textMesh.rotation.set(x, y, z);
+  textMesh.position.set(state.posX || 0, state.posY || 0, state.posZ || 0);
+  return true;
+}
 function animate(now2) {
   requestAnimationFrame(animate);
   if (animState.playing) {
@@ -41830,6 +41916,9 @@ function animate(now2) {
   } else if (state.autoRotate) {
     const activeObject = state.contentMode === "shape" ? shapeStudio?.getSelectedGroup() : textMesh;
     if (activeObject) activeObject.rotation.y += 8e-3;
+  }
+  if (state.contentMode === "cube" && !animState.playing) {
+    applyCubeAnimation(now2);
   }
   controls.update();
   if (shapeStudio) shapeStudio.update();
@@ -41926,6 +42015,13 @@ function reset3DStudio() {
   if (cubeColorPicker) cubeColorPicker.value = state.cubeColor;
   if (cubeTextColorPicker) cubeTextColorPicker.value = state.cubeTextColor;
   if (cubeTextBorderPicker) cubeTextBorderPicker.value = state.cubeTextBorder;
+  if (cubeBoxSizeRange) cubeBoxSizeRange.value = state.cubeBoxSize;
+  if (cubeTextScaleRange) cubeTextScaleRange.value = state.cubeTextScale;
+  if (cubeAnimationSelect) cubeAnimationSelect.value = state.cubeAnimation;
+  if (cubeAnimationSpeedRange) cubeAnimationSpeedRange.value = state.cubeAnimationSpeed;
+  if (cubeBoxSizeValue) cubeBoxSizeValue.textContent = `${state.cubeBoxSize}`;
+  if (cubeTextScaleValue) cubeTextScaleValue.textContent = `${Math.round(state.cubeTextScale)}%`;
+  if (cubeAnimationSpeedValue) cubeAnimationSpeedValue.textContent = `${Number(state.cubeAnimationSpeed).toFixed(1)}x`;
   if (animPresetGrid) setActivePreset(animPresetGrid, "anim", "none");
   if (animPlayBtn) animPlayBtn.disabled = true;
   if (contentModeGrid) setActivePreset(contentModeGrid, "content", "text");

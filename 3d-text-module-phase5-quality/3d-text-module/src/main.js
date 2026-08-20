@@ -194,6 +194,13 @@ const cubeFace3Input = document.getElementById('cubeFace3Input');
 const cubeColorPicker = document.getElementById('cubeColorPicker');
 const cubeTextColorPicker = document.getElementById('cubeTextColorPicker');
 const cubeTextBorderPicker = document.getElementById('cubeTextBorderPicker');
+const cubeBoxSizeRange = document.getElementById('cubeBoxSizeRange');
+const cubeBoxSizeValue = document.getElementById('cubeBoxSizeValue');
+const cubeTextScaleRange = document.getElementById('cubeTextScaleRange');
+const cubeTextScaleValue = document.getElementById('cubeTextScaleValue');
+const cubeAnimationSelect = document.getElementById('cubeAnimationSelect');
+const cubeAnimationSpeedRange = document.getElementById('cubeAnimationSpeedRange');
+const cubeAnimationSpeedValue = document.getElementById('cubeAnimationSpeedValue');
 
 const bgModeSelect = document.getElementById('bgModeSelect');
 const bgColorGroup = document.getElementById('bgColorGroup');
@@ -565,6 +572,10 @@ const state = {
   cubeColor: cubeColorPicker?.value || '#1d4ed8',
   cubeTextColor: cubeTextColorPicker?.value || '#ffffff',
   cubeTextBorder: cubeTextBorderPicker?.value || '#0f172a',
+  cubeBoxSize: Number(cubeBoxSizeRange?.value || 120),
+  cubeTextScale: Number(cubeTextScaleRange?.value || 100),
+  cubeAnimation: cubeAnimationSelect?.value || 'none',
+  cubeAnimationSpeed: Number(cubeAnimationSpeedRange?.value || 1),
   bgMode: bgModeSelect?.value || 'darkBlue',
   bgColor: bgColorPicker?.value || '#0a192f',
   bgImageElement: null,
@@ -4108,13 +4119,13 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
 //   Face 0 (front), Face 1 (back), Face 2 (top), Face 3 (bottom),
 //   Face 4 (right), Face 5 (left)  — Three.js BoxGeometry face order.
 // We put Face1 text on front+back, Face2 text on right+left, Face3 text on top.
-function drawCubeFaceCanvas(faceText, cubeColor, textColor, borderColor) {
+function drawCubeFaceCanvas(faceText, cubeColor, textColor, borderColor, textScale = 1) {
   const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
 
-  // Background: rich solid cube body color with subtle radial vignette
+  ctx.clearRect(0, 0, size, size);
   ctx.fillStyle = cubeColor;
   ctx.fillRect(0, 0, size, size);
   const vgrd = ctx.createRadialGradient(size/2, size/2, size*0.08, size/2, size/2, size*0.72);
@@ -4123,7 +4134,6 @@ function drawCubeFaceCanvas(faceText, cubeColor, textColor, borderColor) {
   ctx.fillStyle = vgrd;
   ctx.fillRect(0, 0, size, size);
 
-  // Subtle grid lines for 3D feel
   ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.lineWidth = 1;
   for (let g = 0; g <= 4; g++) {
@@ -4134,13 +4144,19 @@ function drawCubeFaceCanvas(faceText, cubeColor, textColor, borderColor) {
 
   if (!faceText || !faceText.trim()) return { canvas };
 
-  // Choose font size based on text length
   const len = faceText.length;
-  const fontSize = len <= 1 ? size * 0.62 : len <= 3 ? size * 0.42 : size * 0.28;
-  const fontFamily = `"Grand Hotel", "Pacifico", sans-serif`;
+  const baseFontSize = len <= 1 ? size * 0.62 : len <= 3 ? size * 0.42 : size * 0.28;
+  const fontSize = baseFontSize * (Number(textScale) || 1);
+  const fontFamily = '"Grand Hotel", "Pacifico", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.miterLimit = 2;
+  ctx.lineWidth = Math.max(10, fontSize * 0.12);
+  ctx.font = `900 ${fontSize}px ${fontFamily}`;
+  ctx.strokeStyle = borderColor || '#0f172a';
   ctx.strokeText(faceText, size/2, size/2);
 
-  // Main text fill: vertical highlight gradient
   const tGrad = ctx.createLinearGradient(0, size/2 - fontSize*0.6, 0, size/2 + fontSize*0.6);
   const tc = textColor || '#ffffff';
   tGrad.addColorStop(0, lightenHex(tc, 0.5));
@@ -4153,21 +4169,22 @@ function drawCubeFaceCanvas(faceText, cubeColor, textColor, borderColor) {
 }
 
 function buildCubeBoxMesh() {
-  const cubeSize = state.size * 1.4;
+  const cubeSize = Number(state.cubeBoxSize || 120);
   const cubeColor = state.cubeColor || '#1d4ed8';
   const textColor = state.cubeTextColor || '#ffffff';
   const borderColor = state.cubeTextBorder || '#0f172a';
+  const textScale = Math.max(0.4, Number(state.cubeTextScale || 100) / 100);
 
   const face1 = state.cubeFace1 || '3';
   const face2 = state.cubeFace2 || 'D';
   const face3 = state.cubeFace3 || '';
 
-  const { canvas: cFront } = drawCubeFaceCanvas(face1, cubeColor, textColor, borderColor);
-  const { canvas: cRight } = drawCubeFaceCanvas(face2, cubeColor, textColor, borderColor);
-  const { canvas: cTop } = drawCubeFaceCanvas(face3, cubeColor, textColor, borderColor);
-  const { canvas: cBack } = drawCubeFaceCanvas(face1, cubeColor, textColor, borderColor);
-  const { canvas: cLeft } = drawCubeFaceCanvas(face2, cubeColor, textColor, borderColor);
-  const { canvas: cBottom } = drawCubeFaceCanvas('', cubeColor, textColor, borderColor);
+  const { canvas: cFront } = drawCubeFaceCanvas(face1, cubeColor, textColor, borderColor, textScale);
+  const { canvas: cRight } = drawCubeFaceCanvas(face2, cubeColor, textColor, borderColor, textScale);
+  const { canvas: cTop } = drawCubeFaceCanvas(face3, cubeColor, textColor, borderColor, textScale);
+  const { canvas: cBack } = drawCubeFaceCanvas(face1, cubeColor, textColor, borderColor, textScale);
+  const { canvas: cLeft } = drawCubeFaceCanvas(face2, cubeColor, textColor, borderColor, textScale);
+  const { canvas: cBottom } = drawCubeFaceCanvas('', cubeColor, textColor, borderColor, textScale);
 
   function makeCubeTex(cnv, mirrorH) {
     const t = new THREE.CanvasTexture(cnv);
@@ -4816,6 +4833,24 @@ if (cubeFace3Input) cubeFace3Input.addEventListener('input', () => { state.cubeF
 if (cubeColorPicker) cubeColorPicker.addEventListener('input', () => { state.cubeColor = cubeColorPicker.value; if (state.contentMode === 'cube') scheduleRebuild(); });
 if (cubeTextColorPicker) cubeTextColorPicker.addEventListener('input', () => { state.cubeTextColor = cubeTextColorPicker.value; if (state.contentMode === 'cube') scheduleRebuild(); });
 if (cubeTextBorderPicker) cubeTextBorderPicker.addEventListener('input', () => { state.cubeTextBorder = cubeTextBorderPicker.value; if (state.contentMode === 'cube') scheduleRebuild(); });
+if (cubeBoxSizeRange) cubeBoxSizeRange.addEventListener('input', () => {
+  state.cubeBoxSize = Number(cubeBoxSizeRange.value);
+  if (cubeBoxSizeValue) cubeBoxSizeValue.textContent = `${state.cubeBoxSize}`;
+  if (state.contentMode === 'cube') scheduleRebuild();
+});
+if (cubeTextScaleRange) cubeTextScaleRange.addEventListener('input', () => {
+  state.cubeTextScale = Number(cubeTextScaleRange.value);
+  if (cubeTextScaleValue) cubeTextScaleValue.textContent = `${Math.round(state.cubeTextScale)}%`;
+  if (state.contentMode === 'cube') scheduleRebuild();
+});
+if (cubeAnimationSelect) cubeAnimationSelect.addEventListener('change', () => {
+  state.cubeAnimation = cubeAnimationSelect.value;
+  if (state.contentMode === 'cube') applyRotation();
+});
+if (cubeAnimationSpeedRange) cubeAnimationSpeedRange.addEventListener('input', () => {
+  state.cubeAnimationSpeed = Number(cubeAnimationSpeedRange.value);
+  if (cubeAnimationSpeedValue) cubeAnimationSpeedValue.textContent = `${Number(state.cubeAnimationSpeed).toFixed(1)}x`;
+});
 
 // ---------- PLAN_3 §2: sticker/badge text wiring ----------
 stickerTextInput.addEventListener('input', () => {
@@ -6789,6 +6824,58 @@ if (canvas) {
 }
 
 // ---------- render loop ----------
+function applyCubeAnimation(now) {
+  if (state.contentMode !== 'cube' || !textMesh || animState.playing) return false;
+  if (state.cubeAnimation === 'none') {
+    applyRotation();
+    return true;
+  }
+
+  const t = now * 0.001 * (state.cubeAnimationSpeed || 1);
+  const baseX = THREE.MathUtils.degToRad(state.rotX);
+  const baseY = THREE.MathUtils.degToRad(state.rotY);
+  const baseZ = THREE.MathUtils.degToRad(state.rotZ);
+
+  let x = baseX;
+  let y = baseY;
+  let z = baseZ;
+
+  switch (state.cubeAnimation) {
+    case 'spinY':
+      y += t * 1.8;
+      break;
+    case 'spinXY':
+      x += Math.sin(t * 1.4) * 0.8;
+      y += t * 2.2;
+      z += Math.cos(t * 1.2) * 0.7;
+      break;
+    case 'orbit':
+      x += Math.sin(t * 1.1) * 0.8;
+      y += t * 1.5;
+      z += Math.cos(t * 1.3) * 0.6;
+      break;
+    case 'flip':
+      x += Math.sin(t * 2.2) * 1.1;
+      y += Math.cos(t * 2.2) * 1.1;
+      break;
+    case 'wobble':
+      x += Math.sin(t * 2.4) * 0.9;
+      z += Math.sin(t * 2.8) * 0.9;
+      y += Math.sin(t * 1.5) * 0.5;
+      break;
+    case 'bounce':
+      y += Math.sin(t * 3) * 0.55;
+      z += Math.sin(t * 2.5) * 0.7;
+      break;
+    default:
+      break;
+  }
+
+  textMesh.rotation.set(x, y, z);
+  textMesh.position.set(state.posX || 0, state.posY || 0, state.posZ || 0);
+  return true;
+}
+
 function animate(now) {
   requestAnimationFrame(animate);
   if (animState.playing) {
@@ -6797,6 +6884,11 @@ function animate(now) {
     const activeObject = state.contentMode === 'shape' ? shapeStudio?.getSelectedGroup() : textMesh;
     if (activeObject) activeObject.rotation.y += 0.008;
   }
+
+  if (state.contentMode === 'cube' && !animState.playing) {
+    applyCubeAnimation(now);
+  }
+
   controls.update();
   if (shapeStudio) shapeStudio.update();
   renderer.render(scene, camera);
@@ -6889,6 +6981,13 @@ function reset3DStudio() {
   if (cubeColorPicker) cubeColorPicker.value = state.cubeColor;
   if (cubeTextColorPicker) cubeTextColorPicker.value = state.cubeTextColor;
   if (cubeTextBorderPicker) cubeTextBorderPicker.value = state.cubeTextBorder;
+  if (cubeBoxSizeRange) cubeBoxSizeRange.value = state.cubeBoxSize;
+  if (cubeTextScaleRange) cubeTextScaleRange.value = state.cubeTextScale;
+  if (cubeAnimationSelect) cubeAnimationSelect.value = state.cubeAnimation;
+  if (cubeAnimationSpeedRange) cubeAnimationSpeedRange.value = state.cubeAnimationSpeed;
+  if (cubeBoxSizeValue) cubeBoxSizeValue.textContent = `${state.cubeBoxSize}`;
+  if (cubeTextScaleValue) cubeTextScaleValue.textContent = `${Math.round(state.cubeTextScale)}%`;
+  if (cubeAnimationSpeedValue) cubeAnimationSpeedValue.textContent = `${Number(state.cubeAnimationSpeed).toFixed(1)}x`;
   if (animPresetGrid) setActivePreset(animPresetGrid, 'anim', 'none');
   if (animPlayBtn) animPlayBtn.disabled = true;
 
