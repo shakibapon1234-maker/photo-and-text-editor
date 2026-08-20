@@ -1037,7 +1037,7 @@
                     <div class="tool-card shape-tool-card">
                         <h3>✦ শেপ এডিটর</h3>
                         <p class="tool-desc">একাধিক শেপ যোগ করুন, ছবির উপর টেনে সরান এবং Ctrl+C / Ctrl+V দিয়ে কপি করুন।</p>
-                        <div class="shape-preset-grid" id="shapePresetGrid"><button type="button" data-shape="rect">▭ রেক্ট</button><button type="button" data-shape="roundRect">▢ রাউন্ড</button><button type="button" data-shape="circle">● সার্কেল</button><button type="button" data-shape="triangle">▲ ট্রায়াঙ্গেল</button><button type="button" data-shape="star">★ স্টার</button><button type="button" data-shape="arrow">➜ অ্যারো</button><button type="button" data-shape="freehand">✎ ফ্রিহ্যান্ড</button></div>
+                        <div class="shape-preset-grid" id="shapePresetGrid"><button type="button" data-shape="rect">▭ রেক্ট</button><button type="button" data-shape="circle">● সার্কেল</button><button type="button" data-shape="triangle">▲ ট্রায়াঙ্গেল</button><button type="button" data-shape="star">★ স্টার</button><button type="button" data-shape="arrow">➜ অ্যারো</button><button type="button" data-shape="freehand">✎ ফ্রিহ্যান্ড</button></div>
                         <div class="form-row-2col"><div class="form-group"><label>ফিল</label><input type="color" id="shapeFill" value="#ff6b35"></div><div class="form-group"><label>বর্ডার</label><input type="color" id="shapeStroke" value="#ffffff"></div></div>
                         <div class="form-group"><label>কালার মোড</label><select id="shapeFillMode"><option value="solid">Solid</option><option value="gradient">Gradient</option></select></div>
                         <div class="form-group"><label>বর্ডার: <strong id="shapeStrokeWidthValue">3</strong>px</label><input type="range" id="shapeStrokeWidth" min="0" max="20" value="3" class="range-slider"></div>
@@ -1046,8 +1046,8 @@
                         <div class="form-row-2col"><div class="form-group"><label>শেপের ভিতরের লেখা</label><input type="text" id="shapeText" placeholder="লেখা লিখুন"></div><div class="form-group"><label>টেক্সট রং</label><input type="color" id="shapeTextColor" value="#ffffff"></div></div>
                         <div class="form-group"><label>বক্স সাইজ: <strong id="shapeSizeValue">100</strong>%</label><input type="range" id="shapeSize" min="25" max="250" value="100" class="range-slider"></div>
                         <div class="form-group"><label>বক্স রোটেট: <strong id="shapeRotateValue">0</strong>°</label><input type="range" id="shapeRotate" min="-180" max="180" value="0" class="range-slider"></div>
-                        <div class="shape-actions"><button type="button" class="btn btn-primary" id="shapeAddBtn">＋ শেপ যোগ করুন</button><button type="button" class="btn btn-secondary" id="shapeDuplicateBtn">কপি</button><button type="button" class="btn btn-ghost" id="shapeDeleteBtn">ডিলিট</button></div>
-                        <p class="wm-hint">টিপ: শেপ নির্বাচন করে ড্র্যাগ করুন। Ctrl+C / Ctrl+V কপি-পেস্ট, Delete মুছুন।</p>
+                        <div class="shape-actions"><button type="button" class="btn btn-primary" id="shapeAddBtn">＋ শেপ যোগ করুন</button><button type="button" class="btn btn-secondary" id="shapeDuplicateBtn">কপি</button><button type="button" class="btn btn-secondary" id="shapeFrontBtn">সামনে আনুন</button><button type="button" class="btn btn-secondary" id="shapeBackBtn">পিছনে পাঠান</button><button type="button" class="btn btn-ghost" id="shapeDeleteBtn">ডিলিট</button></div>
+                        <p class="wm-hint">টিপ: শেপ টেনে আঁকুন। নির্বাচিত শেপের কোণ ধরে resize ও উপরের গোল হ্যান্ডেল ধরে rotate করুন। Ctrl+C / Ctrl+V কপি-পেস্ট, Delete মুছুন।</p>
                     </div>
                 </div>
 

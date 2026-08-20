@@ -171,7 +171,7 @@
       c.fillStyle = '#00d4c8';
       c.fillRect((s.x + s.w) * w - 5, (s.y + s.h) * h - 5, 10, 10);
       c.beginPath();
-      c.arc((s.x + s.w / 2) * w, s.y * h - 22, 7, 0, Math.PI * 2);
+      c.arc((s.x + s.w / 2) * w, s.y * h - 22, 7, 0, Math.PI*2);
       c.fill();
     }
     c.restore();

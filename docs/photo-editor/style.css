@@ -2334,6 +2334,14 @@ kbd {
     pointer-events: none;
 }
 
+.shape-overlay { position:absolute; z-index:15; pointer-events:none; touch-action:none; }
+.shape-overlay.active { display:block; pointer-events:auto; cursor:crosshair; }
+.shape-preset-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; margin:10px 0; }
+.shape-preset-grid button,.shape-actions .btn { font-size:12px; padding:8px 7px; }
+.shape-preset-grid button { border:1px solid var(--border-color); background:var(--bg-input); color:var(--text-primary); border-radius:7px; cursor:pointer; }
+.shape-preset-grid button.active { border-color:var(--accent); color:var(--accent); }
+.shape-actions { display:flex; gap:7px; flex-wrap:wrap; margin:12px 0 5px; }
+
 .wm-handle {
     position: absolute;
     transform: translate(-50%, -50%);
