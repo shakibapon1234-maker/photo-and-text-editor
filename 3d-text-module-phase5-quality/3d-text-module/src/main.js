@@ -201,6 +201,7 @@ const cubeTextScaleValue = document.getElementById('cubeTextScaleValue');
 const cubeAnimationSelect = document.getElementById('cubeAnimationSelect');
 const cubeAnimationSpeedRange = document.getElementById('cubeAnimationSpeedRange');
 const cubeAnimationSpeedValue = document.getElementById('cubeAnimationSpeedValue');
+const cubeThemeGrid = document.getElementById('cubeThemeGrid');
 
 const bgModeSelect = document.getElementById('bgModeSelect');
 const bgColorGroup = document.getElementById('bgColorGroup');
@@ -576,6 +577,7 @@ const state = {
   cubeTextScale: Number(cubeTextScaleRange?.value || 100),
   cubeAnimation: cubeAnimationSelect?.value || 'none',
   cubeAnimationSpeed: Number(cubeAnimationSpeedRange?.value || 1),
+  cubeTheme: 'classic',
   bgMode: bgModeSelect?.value || 'darkBlue',
   bgColor: bgColorPicker?.value || '#0a192f',
   bgImageElement: null,
@@ -632,6 +634,14 @@ const animState = {
   loop: false,
   playing: false,
   startTime: 0,
+};
+
+const CUBE_THEME_PRESETS = {
+  classic: { color: '#1d4ed8', text: '#ffffff', border: '#0f172a', animation: 'spinXY', speed: 1.2, boxSize: 120, textScale: 100 },
+  luxury: { color: '#7c2d12', text: '#f8e7b5', border: '#4c1d16', animation: 'luxury', speed: 0.9, boxSize: 140, textScale: 118 },
+  neon: { color: '#111827', text: '#22d3ee', border: '#a855f7', animation: 'orbit', speed: 1.8, boxSize: 130, textScale: 110 },
+  sports: { color: '#0f172a', text: '#facc15', border: '#f97316', animation: 'showroom', speed: 1.5, boxSize: 150, textScale: 120 },
+  premium: { color: '#f5f5f4', text: '#111827', border: '#d6d3d1', animation: 'spinY', speed: 1, boxSize: 140, textScale: 105 },
 };
 
 function getBaseOpacity() {
@@ -4830,9 +4840,9 @@ contentModeGrid.addEventListener('click', (e) => {
 if (cubeFace1Input) cubeFace1Input.addEventListener('input', () => { state.cubeFace1 = cubeFace1Input.value; if (state.contentMode === 'cube') scheduleRebuild(); });
 if (cubeFace2Input) cubeFace2Input.addEventListener('input', () => { state.cubeFace2 = cubeFace2Input.value; if (state.contentMode === 'cube') scheduleRebuild(); });
 if (cubeFace3Input) cubeFace3Input.addEventListener('input', () => { state.cubeFace3 = cubeFace3Input.value; if (state.contentMode === 'cube') scheduleRebuild(); });
-if (cubeColorPicker) cubeColorPicker.addEventListener('input', () => { state.cubeColor = cubeColorPicker.value; if (state.contentMode === 'cube') scheduleRebuild(); });
-if (cubeTextColorPicker) cubeTextColorPicker.addEventListener('input', () => { state.cubeTextColor = cubeTextColorPicker.value; if (state.contentMode === 'cube') scheduleRebuild(); });
-if (cubeTextBorderPicker) cubeTextBorderPicker.addEventListener('input', () => { state.cubeTextBorder = cubeTextBorderPicker.value; if (state.contentMode === 'cube') scheduleRebuild(); });
+if (cubeColorPicker) cubeColorPicker.addEventListener('input', () => { state.cubeColor = cubeColorPicker.value; state.cubeTheme = 'classic'; if (cubeThemeGrid) setActivePreset(cubeThemeGrid, 'cubeTheme', state.cubeTheme); if (state.contentMode === 'cube') scheduleRebuild(); });
+if (cubeTextColorPicker) cubeTextColorPicker.addEventListener('input', () => { state.cubeTextColor = cubeTextColorPicker.value; state.cubeTheme = 'classic'; if (cubeThemeGrid) setActivePreset(cubeThemeGrid, 'cubeTheme', state.cubeTheme); if (state.contentMode === 'cube') scheduleRebuild(); });
+if (cubeTextBorderPicker) cubeTextBorderPicker.addEventListener('input', () => { state.cubeTextBorder = cubeTextBorderPicker.value; state.cubeTheme = 'classic'; if (cubeThemeGrid) setActivePreset(cubeThemeGrid, 'cubeTheme', state.cubeTheme); if (state.contentMode === 'cube') scheduleRebuild(); });
 if (cubeBoxSizeRange) cubeBoxSizeRange.addEventListener('input', () => {
   state.cubeBoxSize = Number(cubeBoxSizeRange.value);
   if (cubeBoxSizeValue) cubeBoxSizeValue.textContent = `${state.cubeBoxSize}`;
@@ -4850,6 +4860,36 @@ if (cubeAnimationSelect) cubeAnimationSelect.addEventListener('change', () => {
 if (cubeAnimationSpeedRange) cubeAnimationSpeedRange.addEventListener('input', () => {
   state.cubeAnimationSpeed = Number(cubeAnimationSpeedRange.value);
   if (cubeAnimationSpeedValue) cubeAnimationSpeedValue.textContent = `${Number(state.cubeAnimationSpeed).toFixed(1)}x`;
+});
+if (cubeThemeGrid) cubeThemeGrid.addEventListener('click', (event) => {
+  const btn = event.target.closest('.preset-btn');
+  if (!btn) return;
+  const themeKey = btn.dataset.cubeTheme;
+  if (!themeKey || !CUBE_THEME_PRESETS[themeKey]) return;
+  const preset = CUBE_THEME_PRESETS[themeKey];
+  state.cubeTheme = themeKey;
+  state.cubeColor = preset.color;
+  state.cubeTextColor = preset.text;
+  state.cubeTextBorder = preset.border;
+  state.cubeAnimation = preset.animation;
+  state.cubeAnimationSpeed = preset.speed;
+  state.cubeBoxSize = preset.boxSize;
+  state.cubeTextScale = preset.textScale;
+  if (cubeColorPicker) cubeColorPicker.value = preset.color;
+  if (cubeTextColorPicker) cubeTextColorPicker.value = preset.text;
+  if (cubeTextBorderPicker) cubeTextBorderPicker.value = preset.border;
+  if (cubeAnimationSelect) cubeAnimationSelect.value = preset.animation;
+  if (cubeAnimationSpeedRange) cubeAnimationSpeedRange.value = String(preset.speed);
+  if (cubeBoxSizeRange) cubeBoxSizeRange.value = String(preset.boxSize);
+  if (cubeTextScaleRange) cubeTextScaleRange.value = String(preset.textScale);
+  if (cubeBoxSizeValue) cubeBoxSizeValue.textContent = `${preset.boxSize}`;
+  if (cubeTextScaleValue) cubeTextScaleValue.textContent = `${Math.round(preset.textScale)}%`;
+  if (cubeAnimationSpeedValue) cubeAnimationSpeedValue.textContent = `${Number(preset.speed).toFixed(1)}x`;
+  setActivePreset(cubeThemeGrid, 'cubeTheme', themeKey);
+  if (state.contentMode === 'cube') {
+    scheduleRebuild();
+    applyRotation();
+  }
 });
 
 // ---------- PLAN_3 §2: sticker/badge text wiring ----------
@@ -5117,6 +5157,11 @@ function saveStudioState() {
       cubeColor: state.cubeColor,
       cubeTextColor: state.cubeTextColor,
       cubeTextBorder: state.cubeTextBorder,
+      cubeBoxSize: state.cubeBoxSize,
+      cubeTextScale: state.cubeTextScale,
+      cubeAnimation: state.cubeAnimation,
+      cubeAnimationSpeed: state.cubeAnimationSpeed,
+      cubeTheme: state.cubeTheme,
       pictureStyle: state.pictureStyle,
     };
     try {
@@ -5426,6 +5471,29 @@ function loadStudioState() {
     if (saved.cubeTextBorder !== undefined && cubeTextBorderPicker) {
       state.cubeTextBorder = saved.cubeTextBorder;
       cubeTextBorderPicker.value = saved.cubeTextBorder;
+    }
+    if (saved.cubeBoxSize !== undefined && cubeBoxSizeRange) {
+      state.cubeBoxSize = Number(saved.cubeBoxSize);
+      cubeBoxSizeRange.value = String(state.cubeBoxSize);
+      if (cubeBoxSizeValue) cubeBoxSizeValue.textContent = `${state.cubeBoxSize}`;
+    }
+    if (saved.cubeTextScale !== undefined && cubeTextScaleRange) {
+      state.cubeTextScale = Number(saved.cubeTextScale);
+      cubeTextScaleRange.value = String(state.cubeTextScale);
+      if (cubeTextScaleValue) cubeTextScaleValue.textContent = `${Math.round(state.cubeTextScale)}%`;
+    }
+    if (saved.cubeAnimation !== undefined && cubeAnimationSelect) {
+      state.cubeAnimation = saved.cubeAnimation;
+      cubeAnimationSelect.value = saved.cubeAnimation;
+    }
+    if (saved.cubeAnimationSpeed !== undefined && cubeAnimationSpeedRange) {
+      state.cubeAnimationSpeed = Number(saved.cubeAnimationSpeed);
+      cubeAnimationSpeedRange.value = String(state.cubeAnimationSpeed);
+      if (cubeAnimationSpeedValue) cubeAnimationSpeedValue.textContent = `${Number(state.cubeAnimationSpeed).toFixed(1)}x`;
+    }
+    if (saved.cubeTheme && cubeThemeGrid) {
+      state.cubeTheme = saved.cubeTheme;
+      setActivePreset(cubeThemeGrid, 'cubeTheme', saved.cubeTheme);
     }
     if (saved.multicolorPalette && multicolorPaletteSelect) {
       state.multicolorPalette = saved.multicolorPalette;
@@ -6867,6 +6935,16 @@ function applyCubeAnimation(now) {
       y += Math.sin(t * 3) * 0.55;
       z += Math.sin(t * 2.5) * 0.7;
       break;
+    case 'showroom':
+      x += Math.cos(t * 0.9) * 0.75;
+      y += t * 2.0;
+      z += Math.sin(t * 1.4) * 0.75;
+      break;
+    case 'luxury':
+      x += Math.sin(t * 1.5) * 0.9;
+      y += Math.cos(t * 1.2) * 0.8;
+      z += Math.sin(t * 2.0) * 0.5;
+      break;
     default:
       break;
   }
@@ -6944,6 +7022,11 @@ function reset3DStudio() {
   state.cubeColor = '#1d4ed8';
   state.cubeTextColor = '#ffffff';
   state.cubeTextBorder = '#0f172a';
+  state.cubeBoxSize = 120;
+  state.cubeTextScale = 100;
+  state.cubeAnimation = 'spinXY';
+  state.cubeAnimationSpeed = 1.2;
+  state.cubeTheme = 'classic';
   animState.presetId = 'none';
   animState.durationMs = 1800;
   animState.delayMs = 0;
@@ -6988,6 +7071,7 @@ function reset3DStudio() {
   if (cubeBoxSizeValue) cubeBoxSizeValue.textContent = `${state.cubeBoxSize}`;
   if (cubeTextScaleValue) cubeTextScaleValue.textContent = `${Math.round(state.cubeTextScale)}%`;
   if (cubeAnimationSpeedValue) cubeAnimationSpeedValue.textContent = `${Number(state.cubeAnimationSpeed).toFixed(1)}x`;
+  if (cubeThemeGrid) setActivePreset(cubeThemeGrid, 'cubeTheme', state.cubeTheme);
   if (animPresetGrid) setActivePreset(animPresetGrid, 'anim', 'none');
   if (animPlayBtn) animPlayBtn.disabled = true;
 

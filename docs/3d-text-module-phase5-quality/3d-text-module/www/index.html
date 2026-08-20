@@ -173,12 +173,23 @@
             <option value="flip">ফ্লিপ</option>
             <option value="wobble">ওব্বল</option>
             <option value="bounce">বাউন্স</option>
+            <option value="showroom">Showroom Spin</option>
+            <option value="luxury">Luxury Tilt</option>
           </select>
         </label>
         <label class="field">
           <span>গতি: <strong id="cubeAnimationSpeedValue">1.0x</strong></span>
           <input type="range" id="cubeAnimationSpeedRange" min="0.2" max="3" step="0.1" value="1" class="range-slider" />
         </label>
+        <div style="margin-top:10px;">
+          <div class="preset-grid preset-grid-3" id="cubeThemeGrid">
+            <button type="button" class="preset-btn active" data-cube-theme="classic">Classic</button>
+            <button type="button" class="preset-btn" data-cube-theme="luxury">Luxury</button>
+            <button type="button" class="preset-btn" data-cube-theme="neon">Neon</button>
+            <button type="button" class="preset-btn" data-cube-theme="sports">Sports</button>
+            <button type="button" class="preset-btn" data-cube-theme="premium">Premium White</button>
+          </div>
+        </div>
         <p class="field-note">এখানে কিউবের আকার আর লেখা ইউনিকভাবে কন্ট্রোল করা যাবে—কিউব বড় করলে টেক্সট ছোট হবে না, বরং আলাদা স্কেলে লেখা থাকবে।</p>
       </section>
 
