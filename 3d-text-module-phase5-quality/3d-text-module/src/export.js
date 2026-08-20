@@ -85,6 +85,26 @@ function endExportResolution(deps) {
   deps.handleResize();
 }
 
+// The studio preview intentionally has its own backdrop (the default is the
+// dark-blue studio).  An export advertised as "transparent" must never inherit
+// that preview-only backdrop, otherwise a valid PNG/WebM/GIF is produced but
+// every transparent pixel has already been painted opaque.  Keep this concern
+// inside the export pipeline so users do not have to change their preview
+// background before every download.
+function beginTransparentExport(deps) {
+  const previousBackground = deps.scene.background;
+  const previousClearColor = deps.renderer.getClearColor(new deps.THREE.Color()).clone();
+  const previousClearAlpha = deps.renderer.getClearAlpha();
+
+  deps.scene.background = null;
+  deps.renderer.setClearColor(0x000000, 0);
+
+  return () => {
+    deps.scene.background = previousBackground;
+    deps.renderer.setClearColor(previousClearColor, previousClearAlpha);
+  };
+}
+
 // ---------- WebM (real-time, live scene) ----------
 // deps: { renderer, camera, canvas, scene, animState, state,
 //         handleResize, resetMeshToBaseTransform }
@@ -99,6 +119,7 @@ export async function exportWebM(deps, opts, callbacks = {}) {
     );
   }
 
+  const restoreTransparentSurface = beginTransparentExport(deps);
   beginExportResolution(deps, opts.width, opts.height);
 
   const stream = deps.canvas.captureStream(opts.fps);
@@ -156,6 +177,7 @@ export async function exportWebM(deps, opts, callbacks = {}) {
 
   deps.resetMeshToBaseTransform();
   endExportResolution(deps);
+  restoreTransparentSurface();
 
   const blob = new Blob(chunks, { type: mimeType.split(';')[0] });
   return { blob, mimeType, width: opts.width, height: opts.height, durationMs: totalMs };
@@ -171,6 +193,7 @@ export async function exportPngSequence(deps, opts, callbacks = {}) {
   const { onProgress, onStatus } = callbacks;
   const { renderer, camera, scene, canvas } = deps;
 
+  const restoreTransparentSurface = beginTransparentExport(deps);
   beginExportResolution(deps, opts.width, opts.height);
 
   const isAnimated = opts.presetId !== 'none';
@@ -219,6 +242,7 @@ export async function exportPngSequence(deps, opts, callbacks = {}) {
 
   deps.resetMeshToBaseTransform();
   endExportResolution(deps);
+  restoreTransparentSurface();
 
   onStatus?.('ZIP প্যাক করা হচ্ছে…');
   const zipBlob = await zip.generateAsync({
@@ -260,6 +284,9 @@ export async function exportGif(deps, opts, callbacks = {}) {
   const { onProgress, onStatus } = callbacks;
   const { renderer, camera, scene, canvas } = deps;
 
+  // GIF can optionally use a visible background.  Only hide the studio
+  // backdrop when the user chose GIF transparency; otherwise preserve it.
+  const restoreTransparentSurface = opts.transparentBg ? beginTransparentExport(deps) : null;
   beginExportResolution(deps, opts.width, opts.height);
 
   const isAnimated = opts.presetId !== 'none';
@@ -339,6 +366,7 @@ export async function exportGif(deps, opts, callbacks = {}) {
 
   deps.resetMeshToBaseTransform();
   endExportResolution(deps);
+  restoreTransparentSurface?.();
 
   onStatus?.('GIF এনকোড হচ্ছে (এতে কিছুটা সময় লাগতে পারে)…');
   const blob = await new Promise((resolve, reject) => {

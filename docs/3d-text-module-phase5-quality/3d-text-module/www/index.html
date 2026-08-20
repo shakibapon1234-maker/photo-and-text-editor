@@ -768,14 +768,17 @@
         <label class="field">
           <span>ফরম্যাট</span>
           <select id="exportFormatSelect">
-            <option value="webm">Transparent WebM (ভিডিও)</option>
-            <option value="png">PNG Sequence (ZIP)</option>
+            <option value="webm">Transparent WebM (ভিডিও এডিটরে আপলোড করুন)</option>
+            <option value="png">Transparent PNG Sequence (ZIP — ভিডিও ফাইল নয়)</option>
             <option value="gif">GIF (অ্যানিমেটেড ছবি)</option>
           </select>
         </label>
         <p class="field-note" id="webmSupportNote" hidden>
           ⚠️ এই ব্রাউজার/ডিভাইসে transparent WebM রেকর্ডিং সাপোর্টেড না মনে হচ্ছে
           (Chrome/Edge-এ ভালো কাজ করে)। এর বদলে PNG Sequence ব্যবহার করুন।
+        </p>
+        <p class="field-note">
+          ভিডিও এডিটরে শুধু <strong>Transparent WebM</strong> আপলোড করুন। PNG Sequence হলো ZIP-এর ভেতরে আলাদা আলাদা ছবি, তাই সেটি ভিডিও-আপলোড বক্সে দিলে গ্রহণ হবে না।
         </p>
 
         <div id="gifOptionsGroup" hidden>

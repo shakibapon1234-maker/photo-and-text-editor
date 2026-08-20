@@ -5794,6 +5794,7 @@ exportBtn.addEventListener('click', async () => {
   };
 
   const deps = {
+    THREE,
     renderer,
     camera,
     canvas,

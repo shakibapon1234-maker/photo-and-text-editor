@@ -34761,6 +34761,17 @@ function endExportResolution(deps) {
   deps.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   deps.handleResize();
 }
+function beginTransparentExport(deps) {
+  const previousBackground = deps.scene.background;
+  const previousClearColor = deps.renderer.getClearColor(new deps.THREE.Color()).clone();
+  const previousClearAlpha = deps.renderer.getClearAlpha();
+  deps.scene.background = null;
+  deps.renderer.setClearColor(0, 0);
+  return () => {
+    deps.scene.background = previousBackground;
+    deps.renderer.setClearColor(previousClearColor, previousClearAlpha);
+  };
+}
 async function exportWebM(deps, opts, callbacks = {}) {
   const { onProgress, onStatus } = callbacks;
   const mimeType = supportedWebmMimeType();
@@ -34769,6 +34780,7 @@ async function exportWebM(deps, opts, callbacks = {}) {
       "\u098F\u0987 \u09AC\u09CD\u09B0\u09BE\u0989\u099C\u09BE\u09B0\u09C7 transparent WebM \u09B0\u09C7\u0995\u09B0\u09CD\u09A1\u09BF\u0982 \u09B8\u09BE\u09AA\u09CB\u09B0\u09CD\u099F\u09C7\u09A1 \u09A8\u09BE \u2014 PNG Sequence \u09AC\u09CD\u09AF\u09AC\u09B9\u09BE\u09B0 \u0995\u09B0\u09C1\u09A8\u0964"
     );
   }
+  const restoreTransparentSurface = beginTransparentExport(deps);
   beginExportResolution(deps, opts.width, opts.height);
   const stream = deps.canvas.captureStream(opts.fps);
   const videoBitsPerSecond = Math.round(opts.width * opts.height * opts.fps * 0.12);
@@ -34811,12 +34823,14 @@ async function exportWebM(deps, opts, callbacks = {}) {
   await stopped;
   deps.resetMeshToBaseTransform();
   endExportResolution(deps);
+  restoreTransparentSurface();
   const blob = new Blob(chunks, { type: mimeType.split(";")[0] });
   return { blob, mimeType, width: opts.width, height: opts.height, durationMs: totalMs };
 }
 async function exportPngSequence(deps, opts, callbacks = {}) {
   const { onProgress, onStatus } = callbacks;
   const { renderer: renderer2, camera: camera2, scene: scene2, canvas: canvas2 } = deps;
+  const restoreTransparentSurface = beginTransparentExport(deps);
   beginExportResolution(deps, opts.width, opts.height);
   const isAnimated = opts.presetId !== "none";
   const isTurntable = !isAnimated && opts.autoRotate;
@@ -34848,6 +34862,7 @@ async function exportPngSequence(deps, opts, callbacks = {}) {
   }
   deps.resetMeshToBaseTransform();
   endExportResolution(deps);
+  restoreTransparentSurface();
   onStatus?.("ZIP \u09AA\u09CD\u09AF\u09BE\u0995 \u0995\u09B0\u09BE \u09B9\u099A\u09CD\u099B\u09C7\u2026");
   const zipBlob = await zip.generateAsync({
     type: "blob",
@@ -34865,6 +34880,7 @@ function estimateGifSizeBytes(width, height, frameCount) {
 async function exportGif(deps, opts, callbacks = {}) {
   const { onProgress, onStatus } = callbacks;
   const { renderer: renderer2, camera: camera2, scene: scene2, canvas: canvas2 } = deps;
+  const restoreTransparentSurface = opts.transparentBg ? beginTransparentExport(deps) : null;
   beginExportResolution(deps, opts.width, opts.height);
   const isAnimated = opts.presetId !== "none";
   const isTurntable = !isAnimated && opts.autoRotate;
@@ -34916,6 +34932,7 @@ async function exportGif(deps, opts, callbacks = {}) {
   }
   deps.resetMeshToBaseTransform();
   endExportResolution(deps);
+  restoreTransparentSurface?.();
   onStatus?.("GIF \u098F\u09A8\u0995\u09CB\u09A1 \u09B9\u099A\u09CD\u099B\u09C7 (\u098F\u09A4\u09C7 \u0995\u09BF\u099B\u09C1\u099F\u09BE \u09B8\u09AE\u09AF\u09BC \u09B2\u09BE\u0997\u09A4\u09C7 \u09AA\u09BE\u09B0\u09C7)\u2026");
   const blob = await new Promise((resolve, reject) => {
     gif.on("progress", (p) => {
@@ -40798,6 +40815,7 @@ exportBtn.addEventListener("click", async () => {
     backgroundColor: gifBackgroundColorPicker.value
   };
   const deps = {
+    THREE: three_module_exports,
     renderer,
     camera,
     canvas,
