@@ -23,6 +23,11 @@
           <button type="button" role="menuitem" data-template-color="#ffffff" data-template-label="Pure White"><i style="--template-color:#ffffff"></i><span>Pure White <small>#FFFFFF · 255, 255, 255</small></span></button>
         </div>
       </div>
+      <div class="project-actions" aria-label="প্রজেক্ট ফাইল">
+        <button type="button" id="saveProjectBtn" class="project-action-btn" title="বর্তমান কাজ Project file হিসেবে সেভ করুন">💾 প্রজেক্ট সেভ</button>
+        <button type="button" id="loadProjectBtn" class="project-action-btn" title="আগে সেভ করা Project file খুলুন">📂 প্রজেক্ট লোড</button>
+        <input id="projectFileInput" type="file" accept=".warisha3d.json,application/json" hidden>
+      </div>
     </div>
     <div class="topbar-note" id="statusNote" hidden>মডেল/ফন্ট লোড হচ্ছে…</div>
     <button type="button" id="topbarResetBtn" title="সব এডিট মুছে স্টুডিও রিসেট করুন" style="margin-left:auto; background:rgba(245,158,11,0.15); border:1px solid #f59e0b; color:#fbbf24; padding:5px 14px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;">🧹 রিসেট / ক্লিয়ার অল</button>
@@ -31,6 +36,11 @@
   <div class="workspace">
     <div class="viewport" id="viewport">
       <canvas id="scene-canvas"></canvas>
+      <div id="safeAreaGuide" class="safe-area-guide" hidden aria-hidden="true">
+        <span class="safe-area-label" id="safeAreaLabel"></span>
+        <span class="safe-area-title-zone">TITLE SAFE</span>
+        <span class="safe-area-cta-zone">CTA SAFE</span>
+      </div>
       <div class="viewport-shortcuts-hint">
         <span><span class="badge-key">Ctrl</span> + Drag মুভ</span>
         <span class="divider">•</span>
@@ -54,6 +64,21 @@
           <button type="button" class="preset-btn" data-content="shape">🔷 শেপ</button>
         </div>
         <p class="field-note">টেক্সট, ছবি, স্টিকার/ব্যাজ বা ৩D কিউব — যেকোনো একটা একবারে অ্যাক্টিভ থাকে।</p>
+      </section>
+
+      <section class="panel-section">
+        <h3>ফ্রেম ও সেফ এরিয়া</h3>
+        <label class="field">
+          <span>গাইড</span>
+          <select id="safeAreaSelect">
+            <option value="none" selected>বন্ধ</option>
+            <option value="9:16">Shorts / Reels (9:16)</option>
+            <option value="1:1">Instagram Post (1:1)</option>
+            <option value="4:5">Feed Portrait (4:5)</option>
+            <option value="16:9">YouTube / Landscape (16:9)</option>
+          </select>
+        </label>
+        <p class="field-note">এটি শুধু প্রিভিউ গাইড—এক্সপোর্টে দেখা যাবে না। লেখা Title ও CTA safe zone-এর মধ্যে রাখুন।</p>
       </section>
 
       <section class="panel-section" id="cubeContentSection" hidden>
@@ -258,6 +283,12 @@
           </select>
         </label>
         <p class="field-note" id="textModeNote" hidden>—</p>
+        <div class="text-template-grid" id="textTemplateGrid" aria-label="দ্রুত টেক্সট টেমপ্লেট">
+          <button type="button" data-text-template="offer">🔥 অফার</button>
+          <button type="button" data-text-template="price">🏷️ দাম</button>
+          <button type="button" data-text-template="new">✨ নতুন কালেকশন</button>
+          <button type="button" data-text-template="cta">🛍️ Shop Now</button>
+        </div>
       </section>
 
       <section class="panel-section" id="imageContentSection" hidden>
@@ -844,6 +875,8 @@
           <select id="exportResolutionSelect">
             <option value="1280x720">1280×720 (720p)</option>
             <option value="1920x1080" selected>1920×1080 (1080p)</option>
+            <option value="1080x1920">1080×1920 (Shorts / Reels)</option>
+            <option value="1080x1350">1080×1350 (Feed Portrait)</option>
             <option value="1080x1080">1080×1080 (স্কয়ার)</option>
             <option value="800x800">800×800 (দ্রুত টেস্ট)</option>
           </select>

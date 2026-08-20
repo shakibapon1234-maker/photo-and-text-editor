@@ -34,10 +34,17 @@ import { initShapeStudio } from './shapeStudio.js';
 const statusNote = document.getElementById('statusNote');
 const colorTemplateBtn = document.getElementById('colorTemplateBtn');
 const colorTemplateMenu = document.getElementById('colorTemplateMenu');
+const saveProjectBtn = document.getElementById('saveProjectBtn');
+const loadProjectBtn = document.getElementById('loadProjectBtn');
+const projectFileInput = document.getElementById('projectFileInput');
 
 // ---------- DOM refs ----------
 const canvas = document.getElementById('scene-canvas');
 const viewportEl = document.getElementById('viewport');
+const safeAreaSelect = document.getElementById('safeAreaSelect');
+const safeAreaGuide = document.getElementById('safeAreaGuide');
+const safeAreaLabel = document.getElementById('safeAreaLabel');
+const textTemplateGrid = document.getElementById('textTemplateGrid');
 
 const contentModeGrid = document.getElementById('contentModeGrid');
 const textContentSection = document.getElementById('textContentSection');
@@ -533,6 +540,7 @@ function syncStudioText(newText) {
 
 const state = {
   contentMode: 'text', // PLAN_3 §1: 'text' | 'image' | 'sticker' — mutually exclusive, one active object at a time
+  safeArea: safeAreaSelect?.value || 'none',
   fontFamily: fontSelect?.value || 'helvetiker',
   colorMode: colorModeSelect?.value || 'gradient',
   gradientPreset: gradientPresetSelect?.value || 'gold',
@@ -4669,6 +4677,29 @@ function handleResize() {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h, false);
+  renderSafeAreaGuide();
+}
+
+function renderSafeAreaGuide() {
+  if (!safeAreaGuide || !safeAreaSelect || state.safeArea === 'none') {
+    if (safeAreaGuide) safeAreaGuide.hidden = true;
+    return;
+  }
+  const [frameW, frameH] = state.safeArea.split(':').map(Number);
+  const hostW = viewportEl.clientWidth;
+  const hostH = viewportEl.clientHeight;
+  if (!frameW || !frameH || !hostW || !hostH) return;
+  const frameRatio = frameW / frameH;
+  const hostRatio = hostW / hostH;
+  let width, height;
+  if (frameRatio > hostRatio) { width = hostW * .92; height = width / frameRatio; }
+  else { height = hostH * .88; width = height * frameRatio; }
+  safeAreaGuide.style.width = `${Math.round(width)}px`;
+  safeAreaGuide.style.height = `${Math.round(height)}px`;
+  safeAreaGuide.style.left = `${Math.round((hostW - width) / 2)}px`;
+  safeAreaGuide.style.top = `${Math.round((hostH - height) / 2)}px`;
+  safeAreaGuide.hidden = false;
+  if (safeAreaLabel) safeAreaLabel.textContent = `${state.safeArea} SAFE FRAME`;
 }
 window.addEventListener('resize', handleResize);
 handleResize();
@@ -4691,6 +4722,53 @@ function scheduleRebuild() {
 textInput.addEventListener('input', () => {
   state.text = textInput.value;
   scheduleRebuild();
+});
+
+safeAreaSelect?.addEventListener('change', () => {
+  state.safeArea = safeAreaSelect.value;
+  renderSafeAreaGuide();
+  saveStudioStateDebounced();
+});
+
+const TEXT_TEMPLATES = {
+  offer: { text: '🔥 আজকের অফার!', colorStart: '#ffff00', colorEnd: '#ff0000', size: 82, depth: 22 },
+  price: { text: 'মাত্র ৳ ৯৯৯', colorStart: '#ffffff', colorEnd: '#ffff00', size: 80, depth: 20 },
+  new: { text: '✨ নতুন কালেকশন', colorStart: '#ffffff', colorEnd: '#ff0000', size: 72, depth: 18 },
+  cta: { text: '🛍️ Shop Now', colorStart: '#ffff00', colorEnd: '#ffffff', size: 74, depth: 20 },
+};
+
+textTemplateGrid?.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-text-template]');
+  const preset = TEXT_TEMPLATES[button?.dataset.textTemplate];
+  if (!preset) return;
+  state.contentMode = 'text';
+  syncStudioText(preset.text);
+  state.colorMode = 'gradient';
+  state.gradientPreset = 'custom';
+  state.colorStart = preset.colorStart;
+  state.colorEnd = preset.colorEnd;
+  state.size = preset.size;
+  state.depth = preset.depth;
+  if (textInput) textInput.value = preset.text;
+  if (contentModeGrid) setActivePreset(contentModeGrid, 'content', 'text');
+  if (textContentSection) textContentSection.hidden = false;
+  if (imageContentSection) imageContentSection.hidden = true;
+  if (stickerContentSection) stickerContentSection.hidden = true;
+  if (cubeContentSection) cubeContentSection.hidden = true;
+  if (shapeContentSection) shapeContentSection.hidden = true;
+  if (colorModeSelect) colorModeSelect.value = 'gradient';
+  if (gradientPresetSelect) gradientPresetSelect.value = 'custom';
+  if (colorStartPicker) colorStartPicker.value = preset.colorStart;
+  if (colorEndPicker) colorEndPicker.value = preset.colorEnd;
+  if (solidColorGroup) solidColorGroup.hidden = true;
+  if (gradientColorGroup) gradientColorGroup.hidden = false;
+  if (sizeRange) sizeRange.value = preset.size;
+  if (sizeValue) sizeValue.textContent = preset.size;
+  if (depthRange) depthRange.value = preset.depth;
+  if (depthValue) depthValue.textContent = preset.depth;
+  if (window.__shapeStudio) window.__shapeStudio.setActive(false);
+  rebuildTextMesh();
+  saveStudioStateDebounced();
 });
 
 // ---------- §8.2: content-type toggle (text vs image) ----------
@@ -4938,6 +5016,7 @@ function saveStudioState() {
       text: state.text,
       fontFamily: state.fontFamily,
       contentMode: state.contentMode,
+      safeArea: state.safeArea,
       colorMode: state.colorMode,
       color: state.color,
       colorStart: state.colorStart,
@@ -5055,6 +5134,11 @@ function loadStudioState() {
       if (cubeContentSection) cubeContentSection.hidden = saved.contentMode !== 'cube';
       if (shapeContentSection) shapeContentSection.hidden = saved.contentMode !== 'shape';
       if (curveSection) curveSection.hidden = saved.contentMode === 'image' || saved.contentMode === 'cube';
+    }
+    if (saved.safeArea && safeAreaSelect) {
+      state.safeArea = saved.safeArea;
+      safeAreaSelect.value = saved.safeArea;
+      renderSafeAreaGuide();
     }
     if (saved.color && colorPicker) {
       state.color = saved.color;
@@ -6360,6 +6444,48 @@ function redoStudioEdit() {
   restoreHistorySnapshot(snapshot);
 }
 
+function projectFileName() {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  return `warisha-3d-text-${stamp}.warisha3d.json`;
+}
+
+function saveProjectFile() {
+  const snapshot = getHistorySnapshot();
+  const project = {
+    format: 'warisha-3d-text-project',
+    version: 1,
+    createdAt: new Date().toISOString(),
+    studio: snapshot.studio,
+    shapes: snapshot.shapes,
+  };
+  const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = projectFileName();
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function loadProjectFile(file) {
+  if (!file) return;
+  try {
+    const project = JSON.parse(await file.text());
+    if (project?.format !== 'warisha-3d-text-project' || project.version !== 1 || !project.studio) {
+      throw new Error('invalid-project');
+    }
+    restoreHistorySnapshot({ studio: project.studio, shapes: project.shapes || { order: [], layers: [] } });
+  } catch (_) {
+    alert('এই Project file টি খোলা যায়নি। অনুগ্রহ করে একটি সঠিক .warisha3d.json file নির্বাচন করুন।');
+  } finally {
+    if (projectFileInput) projectFileInput.value = '';
+  }
+}
+
+saveProjectBtn?.addEventListener('click', saveProjectFile);
+loadProjectBtn?.addEventListener('click', () => projectFileInput?.click());
+projectFileInput?.addEventListener('change', () => loadProjectFile(projectFileInput.files?.[0]));
+
 function isHistoryTarget(target) {
   return target instanceof Element && !target.closest('#exportSection, #colorTemplateMenu');
 }
@@ -6491,6 +6617,7 @@ function reset3DStudio() {
   clearTimeout(saveTimeout); // prevent an older debounced save restoring cleared work
   saveTimeout = null;
   state.contentMode = 'text';
+  state.safeArea = 'none';
   state.text = 'Warisha Fashion';
   state.stickerText = 'Warisha Fashion';
   state.fontFamily = 'helvetiker';
@@ -6540,6 +6667,7 @@ function reset3DStudio() {
   animState.loop = false;
 
   if (textInput) textInput.value = state.text;
+  if (safeAreaSelect) safeAreaSelect.value = 'none';
   if (stickerTextInput) stickerTextInput.value = state.stickerText;
   if (sizeRange) sizeRange.value = 70;
   if (depthRange) depthRange.value = 18;
@@ -6586,6 +6714,7 @@ function reset3DStudio() {
     localStorage.removeItem('studio_state_plan3'); // legacy key, safe to remove
   } catch(_) {}
   updateSceneBackground();
+  renderSafeAreaGuide();
   rebuildTextMesh();
 }
 
