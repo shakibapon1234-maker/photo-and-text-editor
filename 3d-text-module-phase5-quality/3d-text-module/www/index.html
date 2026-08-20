@@ -165,6 +165,24 @@
             <span>টেক্সট কালার</span>
             <input type="color" id="shapeTextColor" value="#ffffff" />
           </label>
+          <div class="preset-grid" id="shapeTextFillModeGrid">
+            <button type="button" class="preset-btn active" data-text-fill-mode="solid">সলিড টেক্সট</button>
+            <button type="button" class="preset-btn" data-text-fill-mode="gradient">গ্রেডিয়েন্ট টেক্সট</button>
+          </div>
+          <div id="shapeTextGradientGroup" hidden>
+            <label class="field">
+              <span>টেক্সট গ্রেডিয়েন্ট কালার ১</span>
+              <input type="color" id="shapeTextGradientColor1" value="#fef08a" />
+            </label>
+            <label class="field">
+              <span>টেক্সট গ্রেডিয়েন্ট কালার ২</span>
+              <input type="color" id="shapeTextGradientColor2" value="#f43f5e" />
+            </label>
+            <label class="field">
+              <span>গ্রেডিয়েন্ট এঙ্গেল: <strong id="shapeTextGradientAngleValue">90°</strong></span>
+              <input type="range" id="shapeTextGradientAngle" min="0" max="360" value="90" class="range-slider" />
+            </label>
+          </div>
           <label class="field">
             <span>টেক্সট সাইজ: <strong id="shapeTextSizeValue">32%</strong></span>
             <input type="range" id="shapeTextSize" min="10" max="90" value="32" class="range-slider" />

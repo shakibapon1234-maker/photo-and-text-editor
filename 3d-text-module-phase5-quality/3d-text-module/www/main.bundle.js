@@ -35056,6 +35056,12 @@ function initShapeStudio({
     depthValue: $("shapeDepthValue"),
     textInput: $("shapeTextInput"),
     textColor: $("shapeTextColor"),
+    textFillModeGrid: $("shapeTextFillModeGrid"),
+    textGradientGroup: $("shapeTextGradientGroup"),
+    textGradientColor1: $("shapeTextGradientColor1"),
+    textGradientColor2: $("shapeTextGradientColor2"),
+    textGradientAngle: $("shapeTextGradientAngle"),
+    textGradientAngleValue: $("shapeTextGradientAngleValue"),
     textSize: $("shapeTextSize"),
     textSizeValue: $("shapeTextSizeValue"),
     fontSelect: $("shapeFontSelect"),
@@ -35098,6 +35104,7 @@ function initShapeStudio({
     return pts;
   }
   const PRESETS = {
+    textBox: { label: "\u099F\u09C7\u0995\u09CD\u09B8\u099F \u09AC\u0995\u09CD\u09B8", icon: "\u25B0", points: () => roundedRectPoints(S * 3.2, S * 0.82, 12) },
     rect: { label: "\u0986\u09AF\u09BC\u09A4\u0995\u09CD\u09B7\u09C7\u09A4\u09CD\u09B0", icon: "\u25AD", points: () => [[-S, -S * 0.68], [S, -S * 0.68], [S, S * 0.68], [-S, S * 0.68]] },
     roundedRect: { label: "\u09B0\u09BE\u0989\u09A8\u09CD\u09A1 \u09B0\u09C7\u0995\u09CD\u099F", icon: "\u25A2", points: () => roundedRectPoints(S * 2, S * 1.36, 14) },
     circle: { label: "\u09AC\u09C3\u09A4\u09CD\u09A4", icon: "\u25CF", points: () => regularPolygon(48, S) },
@@ -35159,7 +35166,7 @@ function initShapeStudio({
       }
     }
   };
-  const PRESET_ORDER = ["rect", "roundedRect", "circle", "ellipse", "triangle", "pentagon", "hexagon", "star", "heart", "arrow", "speech"];
+  const PRESET_ORDER = ["textBox", "rect", "roundedRect", "circle", "ellipse", "triangle", "pentagon", "hexagon", "star", "heart", "arrow", "speech"];
   function buildGradientTexture(c1, c2, angleDeg) {
     const size = 256;
     const cnv = document.createElement("canvas");
@@ -35211,6 +35218,13 @@ function initShapeStudio({
   }
   function getLayerPoints(layer) {
     if (layer.presetType === "freehand") return layer.freehandPoints;
+    if (layer.presetType === "textBox") {
+      const lines = String(layer.text || "\u099F\u09C7\u0995\u09CD\u09B8\u099F \u09AC\u0995\u09CD\u09B8").split(/\r?\n/);
+      const longest = Math.max(1, ...lines.map((line) => splitGraphemes2(line).filter((char) => char.trim()).length));
+      const textScale = Math.max(0.55, (layer.textSize || 32) / 32);
+      const width = Math.max(S * 2.4, Math.min(S * 9, S * (1.35 + longest * 0.42 * textScale)));
+      return roundedRectPoints(width, S * 0.82, 12);
+    }
     const preset = PRESETS[layer.presetType] || PRESETS.rect;
     return preset.points();
   }
@@ -35289,7 +35303,21 @@ function initShapeStudio({
     ctx.font = `${textStyle.weight} ${fontSize}px ${textStyle.stack}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
-    ctx.fillStyle = layer.textColor;
+    const textFill = () => {
+      if (layer.textFillMode !== "gradient") return layer.textColor;
+      const rad = (layer.textGradientAngle || 90) * Math.PI / 180;
+      const dx = Math.cos(rad), dy = Math.sin(rad);
+      const gradient = ctx.createLinearGradient(
+        canvas2.width / 2 - dx * canvas2.width / 2,
+        canvas2.height / 2 - dy * canvas2.height / 2,
+        canvas2.width / 2 + dx * canvas2.width / 2,
+        canvas2.height / 2 + dy * canvas2.height / 2
+      );
+      gradient.addColorStop(0, layer.textGradientColor1 || "#fef08a");
+      gradient.addColorStop(1, layer.textGradientColor2 || "#f43f5e");
+      return gradient;
+    };
+    ctx.fillStyle = textFill();
     ctx.strokeStyle = "rgba(0,0,0,0.28)";
     ctx.lineWidth = Math.max(1, fontSize * 0.028);
     ctx.lineJoin = "round";
@@ -35304,6 +35332,7 @@ function initShapeStudio({
       lastVisibleGraphemes = visibleTotal;
       let remaining = visibleTotal;
       ctx.clearRect(0, 0, canvas2.width, canvas2.height);
+      ctx.fillStyle = textFill();
       lines.forEach((line, index) => {
         const y = startY + index * lineHeight;
         const parts = lineParts[index];
@@ -35433,6 +35462,16 @@ function initShapeStudio({
       group.add(reflMesh);
     }
     group.add(mainMesh);
+    if (layer.presetType === "textBox") {
+      const borderThickness = Math.max(1.5, Math.min(5, box.h * 0.065));
+      const topBorder = new THREE.Mesh(
+        new THREE.BoxGeometry(box.w, borderThickness, Math.max(1, depth * 0.22)),
+        new THREE.MeshStandardMaterial({ color: layer.borderColor || "#ffffff", roughness: 0.42, metalness: 0.15 })
+      );
+      topBorder.position.set(0, box.h / 2 - borderThickness / 2, depth / 2 + 0.35);
+      topBorder.userData.layerId = layer.id;
+      group.add(topBorder);
+    }
     if (layer.text && layer.text.trim()) group.add(buildShapeTextMesh(layer, box, depth));
     group.userData.layerId = layer.id;
     group.position.set(layer.posX, layer.posY, layer.posZ);
@@ -35491,6 +35530,10 @@ function initShapeStudio({
       depth: 14,
       text: "",
       textColor: "#ffffff",
+      textFillMode: "solid",
+      textGradientColor1: "#fef08a",
+      textGradientColor2: "#f43f5e",
+      textGradientAngle: 90,
       textSize: 32,
       fontFamily: "helvetiker",
       materialType: "glossy",
@@ -35510,6 +35553,11 @@ function initShapeStudio({
   }
   function addPreset(presetType) {
     const layer = defaultLayer(presetType);
+    if (presetType === "textBox") {
+      layer.text = "\u0986\u09AA\u09A8\u09BE\u09B0 \u099F\u09C7\u0995\u09CD\u09B8\u099F";
+      layer.fillColor = "#172554";
+      layer.borderColor = "#fbbf24";
+    }
     const n = order.length;
     layer.posX = n % 5 * 8 - 16;
     layer.posY = -(n % 5 * 4);
@@ -35868,6 +35916,12 @@ function initShapeStudio({
     if (el.depthValue) el.depthValue.textContent = L.depth;
     if (el.textInput) el.textInput.value = L.text;
     if (el.textColor) el.textColor.value = L.textColor;
+    if (el.textFillModeGrid) el.textFillModeGrid.querySelectorAll(".preset-btn").forEach((b) => b.classList.toggle("active", b.dataset.textFillMode === L.textFillMode));
+    if (el.textGradientGroup) el.textGradientGroup.hidden = L.textFillMode !== "gradient";
+    if (el.textGradientColor1) el.textGradientColor1.value = L.textGradientColor1 || "#fef08a";
+    if (el.textGradientColor2) el.textGradientColor2.value = L.textGradientColor2 || "#f43f5e";
+    if (el.textGradientAngle) el.textGradientAngle.value = L.textGradientAngle || 90;
+    if (el.textGradientAngleValue) el.textGradientAngleValue.textContent = `${L.textGradientAngle || 90}\xB0`;
     if (el.textSize) el.textSize.value = L.textSize;
     if (el.textSizeValue) el.textSizeValue.textContent = `${L.textSize}%`;
     if (el.fontSelect) el.fontSelect.value = L.fontFamily;
@@ -35903,6 +35957,15 @@ function initShapeStudio({
   wireProp(el.depth, () => selectedId && updateLayer(selectedId, { depth: Number(el.depth.value) }));
   wireProp(el.textInput, () => selectedId && updateLayer(selectedId, { text: el.textInput.value }));
   wireProp(el.textColor, () => selectedId && updateLayer(selectedId, { textColor: el.textColor.value }));
+  if (el.textFillModeGrid) {
+    el.textFillModeGrid.addEventListener("click", (e) => {
+      const btn = e.target.closest(".preset-btn");
+      if (btn && selectedId) updateLayer(selectedId, { textFillMode: btn.dataset.textFillMode });
+    });
+  }
+  wireProp(el.textGradientColor1, () => selectedId && updateLayer(selectedId, { textGradientColor1: el.textGradientColor1.value }));
+  wireProp(el.textGradientColor2, () => selectedId && updateLayer(selectedId, { textGradientColor2: el.textGradientColor2.value }));
+  wireProp(el.textGradientAngle, () => selectedId && updateLayer(selectedId, { textGradientAngle: Number(el.textGradientAngle.value) }));
   wireProp(el.textSize, () => selectedId && updateLayer(selectedId, { textSize: Number(el.textSize.value) }));
   wireProp(el.fontSelect, async () => {
     if (!selectedId) return;
