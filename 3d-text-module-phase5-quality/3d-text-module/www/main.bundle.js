@@ -35208,6 +35208,13 @@ function initShapeStudio({
     return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
   }
   const SHAPE_TEXT_FONT = '"Noto Sans Bengali", "Nirmala UI", "Vrinda", Arial, sans-serif';
+  function getShapeTextStyle(layer) {
+    const family = layer.fontFamily;
+    if (!family || family === "helvetiker" || family === "helvetiker_bold" || family === "Noto Sans Bengali") {
+      return { weight: family === "Noto Sans Bengali" ? 900 : 600, stack: SHAPE_TEXT_FONT };
+    }
+    return { weight: 600, stack: `"${family}", ${SHAPE_TEXT_FONT}` };
+  }
   const splitGraphemes2 = (value) => {
     if (typeof Intl !== "undefined" && Intl.Segmenter) return [...new Intl.Segmenter(void 0, { granularity: "grapheme" }).segment(value)].map((part) => part.segment);
     return Array.from(value);
@@ -35251,17 +35258,18 @@ function initShapeStudio({
     const padY = canvas2.height * 0.08;
     const maxWidth = canvas2.width - padX * 2;
     const maxHeight = canvas2.height - padY * 2;
+    const textStyle = getShapeTextStyle(layer);
     const requested = Math.max(18, Math.round(canvas2.height * (layer.textSize / 100) * 0.9));
     let fontSize = requested;
     let lines = [];
     for (; fontSize >= 12; fontSize -= 2) {
-      ctx.font = `600 ${fontSize}px ${SHAPE_TEXT_FONT}`;
+      ctx.font = `${textStyle.weight} ${fontSize}px ${textStyle.stack}`;
       lines = wrapShapeText(ctx, layer.text.trim(), maxWidth);
       if (lines.length * fontSize * 1.24 <= maxHeight) break;
     }
     fontSize = Math.max(8, fontSize);
     ctx.clearRect(0, 0, canvas2.width, canvas2.height);
-    ctx.font = `600 ${fontSize}px ${SHAPE_TEXT_FONT}`;
+    ctx.font = `${textStyle.weight} ${fontSize}px ${textStyle.stack}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
     ctx.fillStyle = layer.textColor;
@@ -36868,8 +36876,9 @@ function darkenHex(hex, amount) {
 }
 function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
   const fontStack = getFontStack(state.fontFamily);
+  const fontWeight = state.fontFamily === "Noto Sans Bengali" ? 900 : 600;
   const measureCtx = document.createElement("canvas").getContext("2d");
-  measureCtx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${fontStack}`;
+  measureCtx.font = `${fontWeight} ${CANVAS_TEXT_FONT_PX}px ${fontStack}`;
   const arcOpts = {
     curveIntensity: curveOpts.curveIntensity,
     direction: curveOpts.curveDirection,
@@ -36884,7 +36893,7 @@ function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
   canvas2.width = canvasW;
   canvas2.height = canvasH;
   const ctx = canvas2.getContext("2d");
-  ctx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${fontStack}`;
+  ctx.font = `${fontWeight} ${CANVAS_TEXT_FONT_PX}px ${fontStack}`;
   if (state.colorMode === "multicolor") {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";

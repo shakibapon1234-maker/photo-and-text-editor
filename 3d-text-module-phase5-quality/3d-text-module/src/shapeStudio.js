@@ -256,6 +256,13 @@ export function initShapeStudio({
   // shrink to fit, rather than disappearing once its 3D geometry crosses the
   // shape bounds.
   const SHAPE_TEXT_FONT = '"Noto Sans Bengali", "Nirmala UI", "Vrinda", Arial, sans-serif';
+  function getShapeTextStyle(layer) {
+    const family = layer.fontFamily;
+    if (!family || family === 'helvetiker' || family === 'helvetiker_bold' || family === 'Noto Sans Bengali') {
+      return { weight: family === 'Noto Sans Bengali' ? 900 : 600, stack: SHAPE_TEXT_FONT };
+    }
+    return { weight: 600, stack: `"${family}", ${SHAPE_TEXT_FONT}` };
+  }
   const splitGraphemes = (value) => {
     if (typeof Intl !== 'undefined' && Intl.Segmenter) return [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(value)].map((part) => part.segment);
     return Array.from(value);
@@ -294,11 +301,12 @@ export function initShapeStudio({
     const padY = canvas.height * 0.08;
     const maxWidth = canvas.width - padX * 2;
     const maxHeight = canvas.height - padY * 2;
+    const textStyle = getShapeTextStyle(layer);
     const requested = Math.max(18, Math.round(canvas.height * (layer.textSize / 100) * 0.9));
     let fontSize = requested;
     let lines = [];
     for (; fontSize >= 12; fontSize -= 2) {
-      ctx.font = `600 ${fontSize}px ${SHAPE_TEXT_FONT}`;
+      ctx.font = `${textStyle.weight} ${fontSize}px ${textStyle.stack}`;
       lines = wrapShapeText(ctx, layer.text.trim(), maxWidth);
       if (lines.length * fontSize * 1.24 <= maxHeight) break;
     }
@@ -306,7 +314,7 @@ export function initShapeStudio({
     // no message becomes invisible even when it contains many short lines.
     fontSize = Math.max(8, fontSize);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.font = `600 ${fontSize}px ${SHAPE_TEXT_FONT}`;
+    ctx.font = `${textStyle.weight} ${fontSize}px ${textStyle.stack}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = layer.textColor;

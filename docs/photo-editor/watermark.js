@@ -67,7 +67,8 @@
             ctx.save();
             ctx.globalAlpha = (settings.textOpacity != null ? settings.textOpacity : 100) / 100;
             ctx.fillStyle = settings.color || '#ffffff';
-            ctx.font = `bold ${layout.text.fontPx}px ${settings.fontFamily || "'Inter', sans-serif"}`;
+            const weight = (settings.fontFamily || '').includes('Noto Sans Bengali') ? 900 : 'bold';
+            ctx.font = `${weight} ${layout.text.fontPx}px ${settings.fontFamily || "'Inter', sans-serif"}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             // A soft shadow keeps the text legible over busy/light photo areas.

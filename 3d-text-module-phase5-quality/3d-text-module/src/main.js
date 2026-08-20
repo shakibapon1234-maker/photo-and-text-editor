@@ -1066,8 +1066,9 @@ function darkenHex(hex, amount) {
 // Draws all lines onto one offscreen canvas (white/gradient glyphs on a transparent background)
 function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
   const fontStack = getFontStack(state.fontFamily);
+  const fontWeight = state.fontFamily === 'Noto Sans Bengali' ? 900 : 600;
   const measureCtx = document.createElement('canvas').getContext('2d');
-  measureCtx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${fontStack}`;
+  measureCtx.font = `${fontWeight} ${CANVAS_TEXT_FONT_PX}px ${fontStack}`;
   const arcOpts = {
     curveIntensity: curveOpts.curveIntensity,
     direction: curveOpts.curveDirection,
@@ -1084,7 +1085,7 @@ function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
   canvas.width = canvasW;
   canvas.height = canvasH;
   const ctx = canvas.getContext('2d');
-  ctx.font = `600 ${CANVAS_TEXT_FONT_PX}px ${fontStack}`;
+  ctx.font = `${fontWeight} ${CANVAS_TEXT_FONT_PX}px ${fontStack}`;
 
   // ---- MULTICOLOR MODE (Design 1: per-letter rainbow cartoon) ----
   if (state.colorMode === 'multicolor') {

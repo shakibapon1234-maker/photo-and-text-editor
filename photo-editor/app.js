@@ -4176,6 +4176,7 @@
             wmTextHandle.style.top = (wmTextPos.fy * 100) + '%';
             wmTextHandle.style.fontSize = fontPx + 'px';
             wmTextHandle.style.fontFamily = wmFontFamily.value;
+            wmTextHandle.style.fontWeight = wmFontFamily.value.includes('Noto Sans Bengali') ? '900' : '700';
             wmTextHandle.style.color = wmTextColor.value;
             wmTextHandle.style.opacity = parseFloat(wmTextOpacity.value) / 100;
             wmTextHandle.style.display = 'block';
