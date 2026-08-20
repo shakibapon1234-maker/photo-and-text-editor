@@ -323,11 +323,35 @@ export function initShapeStudio({
     ctx.lineJoin = 'round';
     const lineHeight = fontSize * 1.24;
     const startY = (canvas.height - lines.length * lineHeight) / 2 + fontSize * 0.88;
-    lines.forEach((line, index) => {
-      const y = startY + index * lineHeight;
-      ctx.strokeText(line, canvas.width / 2, y);
-      ctx.fillText(line, canvas.width / 2, y);
-    });
+    const lineParts = lines.map((line) => splitGraphemes(line));
+    const totalGraphemes = Math.max(1, lineParts.reduce((sum, parts) => sum + parts.filter((part) => part.trim()).length, 0));
+    let lastVisibleGraphemes = -1;
+    const paintTextReveal = (progress = 1) => {
+      const visibleTotal = Math.floor(Math.min(1, Math.max(0, progress)) * totalGraphemes + 1e-8);
+      if (visibleTotal === lastVisibleGraphemes) return;
+      lastVisibleGraphemes = visibleTotal;
+      let remaining = visibleTotal;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      lines.forEach((line, index) => {
+        const y = startY + index * lineHeight;
+        const parts = lineParts[index];
+        const visibleParts = Math.min(parts.length, Math.max(0, remaining));
+        const fullWidth = ctx.measureText(line).width;
+        const visibleText = parts.slice(0, visibleParts).join('');
+        const visibleWidth = ctx.measureText(visibleText).width;
+        if (visibleParts > 0) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(canvas.width / 2 - fullWidth / 2 - ctx.lineWidth, y - lineHeight, visibleWidth + ctx.lineWidth * 2, lineHeight * 1.35);
+          ctx.clip();
+          ctx.strokeText(line, canvas.width / 2, y);
+          ctx.fillText(line, canvas.width / 2, y);
+          ctx.restore();
+        }
+        remaining -= parts.filter((part) => part.trim()).length;
+      });
+    };
+    paintTextReveal(1);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
@@ -340,6 +364,10 @@ export function initShapeStudio({
     mesh.position.z = depth / 2 + 2;
     mesh.renderOrder = 100;
     mesh.userData.layerId = layer.id;
+    mesh.userData.typewriterReveal = (progress) => {
+      paintTextReveal(progress);
+      texture.needsUpdate = true;
+    };
     return mesh;
   }
 
@@ -619,13 +647,14 @@ export function initShapeStudio({
   function applyAnimation(preset, t) {
     const entry = selectedId && layers.get(selectedId);
     if (!entry) return false;
-    const { pos, rot, scaleMul, opacityMul, emissiveMul } = preset.apply(t);
+    const { pos, rot, scaleMul, opacityMul, emissiveMul, reveal } = preset.apply(t);
     const { group, layer } = entry;
     group.position.set(layer.posX + (pos ? pos[0] : 0), layer.posY + (pos ? pos[1] : 0), layer.posZ + (pos ? pos[2] : 0));
     group.rotation.set(0, 0, THREE.MathUtils.degToRad(layer.rotationZ) + (rot ? rot[2] : 0));
     group.scale.setScalar(layer.scaleMul * Math.max(0, scaleMul === undefined ? 1 : scaleMul));
     group.visible = opacityMul === undefined || opacityMul > 0.005;
     group.traverse((child) => {
+      child.userData?.typewriterReveal?.(reveal === undefined ? 1 : reveal);
       if (!child.isMesh || !child.material) return;
       (Array.isArray(child.material) ? child.material : [child.material]).forEach((material) => {
         material.transparent = true;
@@ -639,6 +668,11 @@ export function initShapeStudio({
   function resetAnimation() {
     const entry = selectedId && layers.get(selectedId);
     if (entry) rebuildLayer(entry.layer.id);
+  }
+
+  function getSelectedTextUnitCount() {
+    const text = selectedId ? layers.get(selectedId)?.layer?.text : '';
+    return Math.max(1, splitGraphemes(text || '').filter((part) => part.trim()).length);
   }
 
   function bringToFront(id) {
@@ -1054,6 +1088,7 @@ export function initShapeStudio({
     applySharedAppearance,
     applyAnimation,
     resetAnimation,
+    getSelectedTextUnitCount,
     clearAll,
   };
 }

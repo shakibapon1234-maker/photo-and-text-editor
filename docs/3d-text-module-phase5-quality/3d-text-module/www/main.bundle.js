@@ -35295,11 +35295,35 @@ function initShapeStudio({
     ctx.lineJoin = "round";
     const lineHeight = fontSize * 1.24;
     const startY = (canvas2.height - lines.length * lineHeight) / 2 + fontSize * 0.88;
-    lines.forEach((line, index) => {
-      const y = startY + index * lineHeight;
-      ctx.strokeText(line, canvas2.width / 2, y);
-      ctx.fillText(line, canvas2.width / 2, y);
-    });
+    const lineParts = lines.map((line) => splitGraphemes2(line));
+    const totalGraphemes = Math.max(1, lineParts.reduce((sum, parts) => sum + parts.filter((part) => part.trim()).length, 0));
+    let lastVisibleGraphemes = -1;
+    const paintTextReveal = (progress = 1) => {
+      const visibleTotal = Math.floor(Math.min(1, Math.max(0, progress)) * totalGraphemes + 1e-8);
+      if (visibleTotal === lastVisibleGraphemes) return;
+      lastVisibleGraphemes = visibleTotal;
+      let remaining = visibleTotal;
+      ctx.clearRect(0, 0, canvas2.width, canvas2.height);
+      lines.forEach((line, index) => {
+        const y = startY + index * lineHeight;
+        const parts = lineParts[index];
+        const visibleParts = Math.min(parts.length, Math.max(0, remaining));
+        const fullWidth = ctx.measureText(line).width;
+        const visibleText = parts.slice(0, visibleParts).join("");
+        const visibleWidth = ctx.measureText(visibleText).width;
+        if (visibleParts > 0) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(canvas2.width / 2 - fullWidth / 2 - ctx.lineWidth, y - lineHeight, visibleWidth + ctx.lineWidth * 2, lineHeight * 1.35);
+          ctx.clip();
+          ctx.strokeText(line, canvas2.width / 2, y);
+          ctx.fillText(line, canvas2.width / 2, y);
+          ctx.restore();
+        }
+        remaining -= parts.filter((part) => part.trim()).length;
+      });
+    };
+    paintTextReveal(1);
     const texture = new THREE.CanvasTexture(canvas2);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = renderer2.capabilities.getMaxAnisotropy();
@@ -35309,6 +35333,10 @@ function initShapeStudio({
     mesh.position.z = depth / 2 + 2;
     mesh.renderOrder = 100;
     mesh.userData.layerId = layer.id;
+    mesh.userData.typewriterReveal = (progress) => {
+      paintTextReveal(progress);
+      texture.needsUpdate = true;
+    };
     return mesh;
   }
   function buildRainbowTexture(colors) {
@@ -35549,13 +35577,14 @@ function initShapeStudio({
   function applyAnimation(preset, t) {
     const entry = selectedId && layers.get(selectedId);
     if (!entry) return false;
-    const { pos, rot, scaleMul, opacityMul, emissiveMul } = preset.apply(t);
+    const { pos, rot, scaleMul, opacityMul, emissiveMul, reveal } = preset.apply(t);
     const { group, layer } = entry;
     group.position.set(layer.posX + (pos ? pos[0] : 0), layer.posY + (pos ? pos[1] : 0), layer.posZ + (pos ? pos[2] : 0));
     group.rotation.set(0, 0, THREE.MathUtils.degToRad(layer.rotationZ) + (rot ? rot[2] : 0));
     group.scale.setScalar(layer.scaleMul * Math.max(0, scaleMul === void 0 ? 1 : scaleMul));
     group.visible = opacityMul === void 0 || opacityMul > 5e-3;
     group.traverse((child) => {
+      child.userData?.typewriterReveal?.(reveal === void 0 ? 1 : reveal);
       if (!child.isMesh || !child.material) return;
       (Array.isArray(child.material) ? child.material : [child.material]).forEach((material) => {
         material.transparent = true;
@@ -35568,6 +35597,10 @@ function initShapeStudio({
   function resetAnimation() {
     const entry = selectedId && layers.get(selectedId);
     if (entry) rebuildLayer(entry.layer.id);
+  }
+  function getSelectedTextUnitCount() {
+    const text = selectedId ? layers.get(selectedId)?.layer?.text : "";
+    return Math.max(1, splitGraphemes2(text || "").filter((part) => part.trim()).length);
   }
   function bringToFront(id) {
     order = order.filter((x) => x !== id);
@@ -35945,6 +35978,7 @@ function initShapeStudio({
     applySharedAppearance,
     applyAnimation,
     resetAnimation,
+    getSelectedTextUnitCount,
     clearAll
   };
 }
@@ -37397,7 +37431,7 @@ function buildVectorTextMesh(validLines) {
   const palette = getMulticolorPalette();
   const totalLinesHeight = (validLines.length - 1) * lineHeight;
   const hasCurvedOrSpacing = state.curveIntensity && Math.abs(state.curveIntensity) > 0 || state.curveSpacing && Math.abs(state.curveSpacing - 1) > 0.01;
-  const isTypewriterMode = animState.presetId === "typewriter";
+  const isTypewriterMode = animState.presetId === "typewriter" && animState.playing;
   const isPerCharMode = hasCurvedOrSpacing || state.colorMode === "multicolor" || isTypewriterMode;
   const isStraightTypewriter = isTypewriterMode && !hasCurvedOrSpacing;
   const typewriterChars = [];
@@ -37547,6 +37581,28 @@ function buildCanvasCardTextMesh(validLines) {
   group.add(mesh);
   group.userData.frontTex = frontTex;
   group.userData.backTex = backTex;
+  if (animState.presetId === "typewriter" && animState.playing) {
+    const sourceCanvas = canvas2;
+    const revealCanvas = document.createElement("canvas");
+    revealCanvas.width = sourceCanvas.width;
+    revealCanvas.height = sourceCanvas.height;
+    const revealCtx = revealCanvas.getContext("2d");
+    const graphemeCount = Math.max(1, splitGraphemes(validLines.join("\n")).filter((char) => char.trim()).length);
+    let lastVisibleChars = -1;
+    const paintReveal = (progress) => {
+      const visibleChars = Math.floor(Math.min(1, Math.max(0, progress)) * graphemeCount + 1e-8);
+      if (visibleChars === lastVisibleChars) return;
+      lastVisibleChars = visibleChars;
+      const visibleWidth = Math.round(sourceCanvas.width * (visibleChars / graphemeCount));
+      revealCtx.clearRect(0, 0, revealCanvas.width, revealCanvas.height);
+      if (visibleWidth > 0) revealCtx.drawImage(sourceCanvas, 0, 0, visibleWidth, sourceCanvas.height, 0, 0, visibleWidth, revealCanvas.height);
+      frontTex.image = revealCanvas;
+      backTex.image = revealCanvas;
+      frontTex.needsUpdate = true;
+      backTex.needsUpdate = true;
+    };
+    group.userData.typewriterReveal = paintReveal;
+  }
   renderMode = "canvas";
   textMesh = group;
   textMesh.material = materials;
@@ -37646,7 +37702,7 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
   ctx.save();
   drawStickerShape(ctx, shape, canvasW, bodyH, tailPx, bgColor, borderWidth, borderColor, shadow);
   ctx.restore();
-  if (state.stickerWith3DText) {
+  if (state.stickerWith3DText && !borderOpts.renderTextOnCanvas) {
     return { canvas: canvas2, aspect: canvasW / canvasH };
   }
   ctx.save();
@@ -37812,6 +37868,35 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
   });
   ctx.restore();
   return { canvas: canvas2, aspect: canvasW / canvasH };
+}
+function createFlatStickerTypewriterReveal(text, shape, bgColor, textColor, curveOpts, borderOpts, target) {
+  const lines = (text || " ").split(/\r?\n/).map((line) => line.length ? line : " ");
+  const count = Math.max(1, splitGraphemes(lines.join("\n")).filter((char) => char.trim()).length);
+  const { canvas: baseCanvas } = drawStickerCanvasTexture("", shape, bgColor, textColor, curveOpts, borderOpts);
+  const { canvas: fullCanvas } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts, borderOpts);
+  const revealCanvas = document.createElement("canvas");
+  revealCanvas.width = fullCanvas.width;
+  revealCanvas.height = fullCanvas.height;
+  const ctx = revealCanvas.getContext("2d");
+  let lastVisibleChars = -1;
+  return (progress) => {
+    const visible = Math.floor(Math.min(1, Math.max(0, progress)) * count + 1e-8);
+    if (visible === lastVisibleChars) return;
+    lastVisibleChars = visible;
+    const revealWidth = Math.round(fullCanvas.width * visible / count);
+    ctx.clearRect(0, 0, revealCanvas.width, revealCanvas.height);
+    ctx.drawImage(baseCanvas, 0, 0);
+    if (revealWidth > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, revealWidth, revealCanvas.height);
+      ctx.clip();
+      ctx.drawImage(fullCanvas, 0, 0);
+      ctx.restore();
+    }
+    target.image = revealCanvas;
+    target.needsUpdate = true;
+  };
 }
 function drawStarPolygonPath(ctx, cx, cy, outerR, innerR, spikes) {
   ctx.beginPath();
@@ -38995,7 +39080,10 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
   const textStr = text && text.trim().length > 0 ? text : getActiveStudioText();
   const textDepth = Math.max(3, state.depth);
   const usesIndividualLetterTiles = shape === "woodenBlocks" || shape === "redTiles";
-  const is3D = state.stickerMode === "standing" || state.stickerMode === "wall" || state.stickerWith3DText;
+  const wants3D = state.stickerMode === "standing" || state.stickerMode === "wall" || state.stickerWith3DText;
+  const needsUnicodeCanvasText = isBanglaText(textStr);
+  const is3D = wants3D && !needsUnicodeCanvasText;
+  const isTypewriterMode = animState.presetId === "typewriter" && animState.playing;
   if (is3D) {
     if (!font) {
       loadAndSetFont(state.fontFamily || "helvetiker");
@@ -39025,7 +39113,8 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
         mat3D = buildMaterial(state.materialType, activeTextColor);
       }
       const text3DGroup = new Group();
-      const hasCurvedOrSpacing = usesIndividualLetterTiles || state.colorMode === "multicolor" || state.curveIntensity && Math.abs(state.curveIntensity) > 2 || state.curveSpacing && Math.abs(state.curveSpacing - 1) > 0.05;
+      const typewriterChars = [];
+      const hasCurvedOrSpacing = usesIndividualLetterTiles || isTypewriterMode || state.colorMode === "multicolor" || state.curveIntensity && Math.abs(state.curveIntensity) > 2 || state.curveSpacing && Math.abs(state.curveSpacing - 1) > 0.05;
       let letterColorIndex = 0;
       lines3D.forEach((lineStr, idx) => {
         const hasText = lineStr.trim().length > 0;
@@ -39084,6 +39173,7 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
             charMesh.receiveShadow = state.shadowsOn;
             charMesh.position.set(cPos.x, lineY3D + cPos.y, 0);
             charMesh.rotation.z = cPos.rotation;
+            if (isTypewriterMode) typewriterChars.push(charMesh);
             text3DGroup.add(charMesh);
           });
         } else {
@@ -39188,13 +39278,15 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
       group.add(text3DGroup);
       group.userData.frontTex = frontTex2;
       group.userData.backTex = backTex2;
+      if (isTypewriterMode) group.userData.typewriterChars = typewriterChars;
       renderMode = "canvas";
       textMesh = group;
       textMesh.material = badgeMaterials;
       return;
     }
   }
-  const { canvas: canvas2, aspect: aspect2 } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts, borderOpts);
+  const canvasTextOpts = needsUnicodeCanvasText ? { ...borderOpts, renderTextOnCanvas: true } : borderOpts;
+  const { canvas: canvas2, aspect: aspect2 } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts, canvasTextOpts);
   const frontTex = makeCardTexture(canvas2, false);
   const backTex = makeCardTexture(canvas2, true);
   const worldHeight = state.size * 1.6;
@@ -39208,6 +39300,14 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
   group.add(mesh);
   group.userData.frontTex = frontTex;
   group.userData.backTex = backTex;
+  if (isTypewriterMode) {
+    const paintReveal = createFlatStickerTypewriterReveal(textStr, shape, bgColor, textColor, curveOpts, canvasTextOpts, frontTex);
+    const paintBackReveal = createFlatStickerTypewriterReveal(textStr, shape, bgColor, textColor, curveOpts, canvasTextOpts, backTex);
+    group.userData.typewriterReveal = (progress) => {
+      paintReveal(progress);
+      paintBackReveal(progress);
+    };
+  }
   renderMode = "canvas";
   textMesh = group;
   textMesh.material = materials;
@@ -39497,12 +39597,17 @@ function applyReflectionToggle() {
   applyMaterial();
 }
 function applyTypewriterReveal(progress) {
-  if (!textMesh || !textMesh.userData.typewriterChars) return;
+  if (!textMesh) return;
   const chars = textMesh.userData.typewriterChars;
-  const revealCount = Math.floor(Math.min(1, Math.max(0, progress)) * chars.length + 1e-8);
-  chars.forEach((charMesh, index) => {
-    charMesh.visible = index < revealCount;
-  });
+  if (chars) {
+    const revealCount = Math.floor(Math.min(1, Math.max(0, progress)) * chars.length + 1e-8);
+    if (textMesh.userData.typewriterVisibleCount === revealCount) return;
+    textMesh.userData.typewriterVisibleCount = revealCount;
+    chars.forEach((charMesh, index) => {
+      charMesh.visible = index < revealCount;
+    });
+  }
+  textMesh.userData.typewriterReveal?.(progress);
 }
 function applyPresetOffset(preset, t) {
   if (state.contentMode === "shape" && shapeStudio) {
@@ -39571,6 +39676,18 @@ function resetMeshToBaseTransform() {
       charMesh.visible = true;
     });
   }
+  textMesh.userData.typewriterReveal?.(1);
+}
+function getTypewriterUnitCount() {
+  if (state.contentMode === "shape") return shapeStudio?.getSelectedTextUnitCount?.() || 1;
+  const text = state.contentMode === "sticker" ? state.stickerText : state.text;
+  return Math.max(1, splitGraphemes(text || "").filter((char) => char.trim()).length);
+}
+function setRecommendedTypewriterDuration() {
+  const recommended = Math.min(6500, Math.max(1200, Math.ceil(getTypewriterUnitCount() * 55 / 100) * 100));
+  animState.durationMs = recommended;
+  animDurationRange.value = recommended;
+  animDurationValue.textContent = `${(recommended / 1e3).toFixed(1)}s`;
 }
 function updateProgressUI(t, label) {
   animProgressFill.style.width = `${Math.round(Math.min(1, Math.max(0, t)) * 100)}%`;
@@ -39579,6 +39696,10 @@ function updateProgressUI(t, label) {
 function playAnimation() {
   if ((state.contentMode === "shape" ? !shapeStudio?.hasSelection() : !textMesh) || animState.presetId === "none") return;
   animState.playing = true;
+  if (animState.presetId === "typewriter" && state.contentMode !== "shape") {
+    rebuildTextMesh();
+    applyPresetOffset(ANIMATION_PRESETS.typewriter, 0);
+  }
   animState.startTime = performance.now();
   animPlayBtn.textContent = "\u09B0\u09BF\u09B8\u09CD\u099F\u09BE\u09B0\u09CD\u099F";
   updateProgressUI(0, "\u09AA\u09CD\u09B2\u09C7 \u09B9\u099A\u09CD\u099B\u09C7\u2026");
@@ -40668,9 +40789,7 @@ animPresetGrid.addEventListener("click", (e) => {
     saveStudioStateDebounced();
     return;
   }
-  if (animState.presetId === "typewriter" && state.contentMode === "text" && !isBanglaText(state.text || "")) {
-    rebuildTextMesh();
-  }
+  if (animState.presetId === "typewriter") setRecommendedTypewriterDuration();
   const selectedPreset = ANIMATION_PRESETS[animState.presetId];
   if (selectedPreset && selectedPreset.continuous) {
     animState.loop = true;
@@ -40786,6 +40905,11 @@ exportBtn.addEventListener("click", async () => {
     return;
   }
   stopAnimation();
+  if (animState.presetId === "typewriter" && state.contentMode !== "shape") {
+    animState.playing = true;
+    rebuildTextMesh();
+    animState.playing = false;
+  }
   if (lastExportUrl) {
     URL.revokeObjectURL(lastExportUrl);
     lastExportUrl = null;

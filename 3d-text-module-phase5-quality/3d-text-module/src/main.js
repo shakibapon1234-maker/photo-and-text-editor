@@ -1744,7 +1744,10 @@ function buildVectorTextMesh(validLines) {
   // Typewriter needs independent glyph meshes so it can reveal the text one
   // character at a time. Other modes keep the original single-geometry path
   // unless curve, spacing, or multicolour already requires per-character text.
-  const isTypewriterMode = animState.presetId === 'typewriter';
+  // Only build individual glyphs while the animation is actually playing.
+  // Keeping a selected Typewriter preset lightweight is essential while a
+  // user is entering a long caption.
+  const isTypewriterMode = animState.presetId === 'typewriter' && animState.playing;
   const isPerCharMode = hasCurvedOrSpacing || state.colorMode === 'multicolor' || isTypewriterMode;
   const isStraightTypewriter = isTypewriterMode && !hasCurvedOrSpacing;
   const typewriterChars = [];
@@ -1928,6 +1931,34 @@ function buildCanvasCardTextMesh(validLines) {
   group.userData.frontTex = frontTex;
   group.userData.backTex = backTex;
 
+  // Bengali/Unicode text is rendered into a canvas so its ligatures remain
+  // correct. Keep an untouched source canvas and reveal it in grapheme-sized
+  // steps during Typewriter instead of falling back to a non-working preset.
+  if (animState.presetId === 'typewriter' && animState.playing) {
+    const sourceCanvas = canvas;
+    const revealCanvas = document.createElement('canvas');
+    revealCanvas.width = sourceCanvas.width;
+    revealCanvas.height = sourceCanvas.height;
+    const revealCtx = revealCanvas.getContext('2d');
+    const graphemeCount = Math.max(1, splitGraphemes(validLines.join('\n')).filter((char) => char.trim()).length);
+    let lastVisibleChars = -1;
+    const paintReveal = (progress) => {
+      const visibleChars = Math.floor(Math.min(1, Math.max(0, progress)) * graphemeCount + 1e-8);
+      // Updating a CanvasTexture uploads a full image to the GPU. Do that
+      // only when the next character appears, not 60 times a second.
+      if (visibleChars === lastVisibleChars) return;
+      lastVisibleChars = visibleChars;
+      const visibleWidth = Math.round(sourceCanvas.width * (visibleChars / graphemeCount));
+      revealCtx.clearRect(0, 0, revealCanvas.width, revealCanvas.height);
+      if (visibleWidth > 0) revealCtx.drawImage(sourceCanvas, 0, 0, visibleWidth, sourceCanvas.height, 0, 0, visibleWidth, revealCanvas.height);
+      frontTex.image = revealCanvas;
+      backTex.image = revealCanvas;
+      frontTex.needsUpdate = true;
+      backTex.needsUpdate = true;
+    };
+    group.userData.typewriterReveal = paintReveal;
+  }
+
   renderMode = 'canvas';
   textMesh = group;
   textMesh.material = materials;
@@ -2080,8 +2111,11 @@ function drawStickerCanvasTexture(
   drawStickerShape(ctx, shape, canvasW, bodyH, tailPx, bgColor, borderWidth, borderColor, shadow);
   ctx.restore();
 
-  // If 3D text on badge is enabled, skip 2D canvas text so the real 3D extruded text is clean and sharp
-  if (state.stickerWith3DText) {
+  // If 3D text on badge is enabled, normally skip 2D canvas text so the real
+  // extruded text is clean and sharp. Bengali/Unicode is the exception: the
+  // bundled Three.js typefaces do not contain those glyphs and render `?`, so
+  // callers can explicitly keep the correctly-shaped canvas text instead.
+  if (state.stickerWith3DText && !borderOpts.renderTextOnCanvas) {
     return { canvas, aspect: canvasW / canvasH };
   }
 
@@ -2275,6 +2309,43 @@ function drawStickerCanvasTexture(
   ctx.restore();
 
   return { canvas, aspect: canvasW / canvasH };
+}
+
+// Repaint a flat badge on a transparent canvas while revealing only its
+// label. The shape itself remains visible from frame zero, which is the
+// natural typewriter behaviour for text inside a sticker (and avoids a
+// left-to-right crop of the whole badge).
+function createFlatStickerTypewriterReveal(text, shape, bgColor, textColor, curveOpts, borderOpts, target) {
+  const lines = (text || ' ').split(/\r?\n/).map((line) => (line.length ? line : ' '));
+  const count = Math.max(1, splitGraphemes(lines.join('\n')).filter((char) => char.trim()).length);
+  const { canvas: baseCanvas } = drawStickerCanvasTexture('', shape, bgColor, textColor, curveOpts, borderOpts);
+  const { canvas: fullCanvas } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts, borderOpts);
+  const revealCanvas = document.createElement('canvas');
+  revealCanvas.width = fullCanvas.width;
+  revealCanvas.height = fullCanvas.height;
+  const ctx = revealCanvas.getContext('2d');
+  let lastVisibleChars = -1;
+
+  return (progress) => {
+    const visible = Math.floor(Math.min(1, Math.max(0, progress)) * count + 1e-8);
+    if (visible === lastVisibleChars) return;
+    lastVisibleChars = visible;
+    const revealWidth = Math.round(fullCanvas.width * visible / count);
+    ctx.clearRect(0, 0, revealCanvas.width, revealCanvas.height);
+    ctx.drawImage(baseCanvas, 0, 0);
+    if (revealWidth > 0) {
+      // The full badge includes the same shape background, so clipping and
+      // overlaying it only exposes the label pixels that have been typed.
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, revealWidth, revealCanvas.height);
+      ctx.clip();
+      ctx.drawImage(fullCanvas, 0, 0);
+      ctx.restore();
+    }
+    target.image = revealCanvas;
+    target.needsUpdate = true;
+  };
 }
 
 // ---------- PLAN_3 §2.1 (Phase A2): background-shape template functions ----------
@@ -3699,7 +3770,10 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
   const textDepth = Math.max(3, state.depth);
 
   const usesIndividualLetterTiles = shape === 'woodenBlocks' || shape === 'redTiles';
-  const is3D = state.stickerMode === 'standing' || state.stickerMode === 'wall' || state.stickerWith3DText;
+  const wants3D = state.stickerMode === 'standing' || state.stickerMode === 'wall' || state.stickerWith3DText;
+  const needsUnicodeCanvasText = isBanglaText(textStr);
+  const is3D = wants3D && !needsUnicodeCanvasText;
+  const isTypewriterMode = animState.presetId === 'typewriter' && animState.playing;
 
   if (is3D) {
     if (!font) {
@@ -3735,10 +3809,11 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
       }
 
       const text3DGroup = new THREE.Group();
+      const typewriterChars = [];
       // Tile templates need one real 3D letter per tile even with straight,
       // normally-spaced text. Other badges only split into letters for curve
       // or character-spacing layouts.
-      const hasCurvedOrSpacing = usesIndividualLetterTiles || state.colorMode === 'multicolor' ||
+      const hasCurvedOrSpacing = usesIndividualLetterTiles || isTypewriterMode || state.colorMode === 'multicolor' ||
         (state.curveIntensity && Math.abs(state.curveIntensity) > 2) ||
         (state.curveSpacing && Math.abs(state.curveSpacing - 1) > 0.05);
       let letterColorIndex = 0;
@@ -3807,6 +3882,7 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
             charMesh.receiveShadow = state.shadowsOn;
             charMesh.position.set(cPos.x, lineY3D + cPos.y, 0);
             charMesh.rotation.z = cPos.rotation;
+            if (isTypewriterMode) typewriterChars.push(charMesh);
             text3DGroup.add(charMesh);
           });
         } else {
@@ -3935,6 +4011,7 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
       group.add(text3DGroup);
       group.userData.frontTex = frontTex;
       group.userData.backTex = backTex;
+      if (isTypewriterMode) group.userData.typewriterChars = typewriterChars;
 
       renderMode = 'canvas';
       textMesh = group;
@@ -3944,7 +4021,10 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
   }
 
   // ── FLAT 2D BADGE FALLBACK ───────────────────────────────────────────────────
-  const { canvas, aspect } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts, borderOpts);
+  const canvasTextOpts = needsUnicodeCanvasText
+    ? { ...borderOpts, renderTextOnCanvas: true }
+    : borderOpts;
+  const { canvas, aspect } = drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts, canvasTextOpts);
   const frontTex = makeCardTexture(canvas, false);
   const backTex = makeCardTexture(canvas, true);
 
@@ -3961,6 +4041,16 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
   group.add(mesh);
   group.userData.frontTex = frontTex;
   group.userData.backTex = backTex;
+  if (isTypewriterMode) {
+    const paintReveal = createFlatStickerTypewriterReveal(textStr, shape, bgColor, textColor, curveOpts, canvasTextOpts, frontTex);
+    // Back texture is normally only visible when the card is rotated; keep it
+    // in sync so the animation does not pop when the badge has a tilt.
+    const paintBackReveal = createFlatStickerTypewriterReveal(textStr, shape, bgColor, textColor, curveOpts, canvasTextOpts, backTex);
+    group.userData.typewriterReveal = (progress) => {
+      paintReveal(progress);
+      paintBackReveal(progress);
+    };
+  }
 
   renderMode = 'canvas';
   textMesh = group;
@@ -4295,12 +4385,17 @@ function applyReflectionToggle() {
 // scaleMul, opacityMul} into an actual mesh transform. It always layers the
 // offset on TOP of the current slider-configured base position and rotation,
 function applyTypewriterReveal(progress) {
-  if (!textMesh || !textMesh.userData.typewriterChars) return;
+  if (!textMesh) return;
   const chars = textMesh.userData.typewriterChars;
-  const revealCount = Math.floor(Math.min(1, Math.max(0, progress)) * chars.length + 1e-8);
-  chars.forEach((charMesh, index) => {
-    charMesh.visible = index < revealCount;
-  });
+  if (chars) {
+    const revealCount = Math.floor(Math.min(1, Math.max(0, progress)) * chars.length + 1e-8);
+    if (textMesh.userData.typewriterVisibleCount === revealCount) return;
+    textMesh.userData.typewriterVisibleCount = revealCount;
+    chars.forEach((charMesh, index) => {
+      charMesh.visible = index < revealCount;
+    });
+  }
+  textMesh.userData.typewriterReveal?.(progress);
 }
 
 function applyPresetOffset(preset, t) {
@@ -4379,6 +4474,22 @@ function resetMeshToBaseTransform() {
   if (textMesh.userData.typewriterChars) {
     textMesh.userData.typewriterChars.forEach((charMesh) => { charMesh.visible = true; });
   }
+  textMesh.userData.typewriterReveal?.(1);
+}
+
+function getTypewriterUnitCount() {
+  if (state.contentMode === 'shape') return shapeStudio?.getSelectedTextUnitCount?.() || 1;
+  const text = state.contentMode === 'sticker' ? state.stickerText : state.text;
+  return Math.max(1, splitGraphemes(text || '').filter((char) => char.trim()).length);
+}
+
+function setRecommendedTypewriterDuration() {
+  // A brisk 55 ms per visible grapheme feels like actual typing while still
+  // leaving enough frames to see long Bangla/English captions in exports.
+  const recommended = Math.min(6500, Math.max(1200, Math.ceil(getTypewriterUnitCount() * 55 / 100) * 100));
+  animState.durationMs = recommended;
+  animDurationRange.value = recommended;
+  animDurationValue.textContent = `${(recommended / 1000).toFixed(1)}s`;
 }
 
 function updateProgressUI(t, label) {
@@ -4389,6 +4500,13 @@ function updateProgressUI(t, label) {
 function playAnimation() {
   if ((state.contentMode === 'shape' ? !shapeStudio?.hasSelection() : !textMesh) || animState.presetId === 'none') return;
   animState.playing = true;
+  // Rebuild only at playback time so editing remains instant even if the
+  // Typewriter preset is selected. This creates the temporary glyph/canvas
+  // reveal data exactly once per playback, not once per keystroke.
+  if (animState.presetId === 'typewriter' && state.contentMode !== 'shape') {
+    rebuildTextMesh();
+    applyPresetOffset(ANIMATION_PRESETS.typewriter, 0);
+  }
   animState.startTime = performance.now();
   animPlayBtn.textContent = 'রিস্টার্ট';
   updateProgressUI(0, 'প্লে হচ্ছে…');
@@ -5585,12 +5703,7 @@ animPresetGrid.addEventListener('click', (e) => {
     return;
   }
 
-  // Switch the normal vector text builder to independent glyph meshes before
-  // playback. Canvas/script text and non-text content retain their existing
-  // animation behavior, while Latin 3D text gets the true character reveal.
-  if (animState.presetId === 'typewriter' && state.contentMode === 'text' && !isBanglaText(state.text || '')) {
-    rebuildTextMesh();
-  }
+  if (animState.presetId === 'typewriter') setRecommendedTypewriterDuration();
 
   // Continuous presets (pulse, float, glowPulse, etc.) work best with loop
   // enabled and a steady cycle duration — auto-configure them on selection
@@ -5756,6 +5869,16 @@ exportBtn.addEventListener('click', async () => {
   // path), and either would race against the main render loop's own
   // tickAnimation() call if a preview loop were still playing.
   stopAnimation();
+
+  // Preview editing deliberately keeps Typewriter lightweight. Build its
+  // temporary reveal data here as well, so exports remain character-by-
+  // character even when the user typed new content and exported immediately
+  // without previewing it first.
+  if (animState.presetId === 'typewriter' && state.contentMode !== 'shape') {
+    animState.playing = true;
+    rebuildTextMesh();
+    animState.playing = false;
+  }
 
   if (lastExportUrl) {
     URL.revokeObjectURL(lastExportUrl);
