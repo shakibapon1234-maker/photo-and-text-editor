@@ -36614,6 +36614,22 @@ var CANVAS_TEXT_FONT_STACK = '"Noto Sans Bengali","Nirmala UI","Vrinda UI","Vrin
 var CANVAS_TEXT_FONT_PX = 220;
 var CANVAS_TEXT_LINE_HEIGHT_PX = CANVAS_TEXT_FONT_PX * 1.35;
 var CANVAS_TEXT_PAD_PX = CANVAS_TEXT_FONT_PX * 0.35;
+var MAX_TEXT_TEXTURE_DIM = 2048;
+var MAX_TEXT_TEXTURE_PIXELS = 25e5;
+function createBoundedTextCanvas(logicalWidth, logicalHeight) {
+  const scale = Math.min(
+    1,
+    MAX_TEXT_TEXTURE_DIM / logicalWidth,
+    MAX_TEXT_TEXTURE_DIM / logicalHeight,
+    Math.sqrt(MAX_TEXT_TEXTURE_PIXELS / (logicalWidth * logicalHeight))
+  );
+  const canvas2 = document.createElement("canvas");
+  canvas2.width = Math.max(1, Math.round(logicalWidth * scale));
+  canvas2.height = Math.max(1, Math.round(logicalHeight * scale));
+  const ctx = canvas2.getContext("2d");
+  if (scale !== 1) ctx.scale(scale, scale);
+  return { canvas: canvas2, ctx };
+}
 function layoutCurvedLines(ctx, lines, curveOpts) {
   const perLine = lines.map((line) => {
     const clusters = splitGraphemes(line);
@@ -36940,10 +36956,7 @@ function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
   const canvasH = Math.ceil(
     CANVAS_TEXT_LINE_HEIGHT_PX * lines.length + CANVAS_TEXT_PAD_PX * 2 + maxBulge * 2
   );
-  const canvas2 = document.createElement("canvas");
-  canvas2.width = canvasW;
-  canvas2.height = canvasH;
-  const ctx = canvas2.getContext("2d");
+  const { canvas: canvas2, ctx } = createBoundedTextCanvas(canvasW, canvasH);
   ctx.font = `${fontWeight} ${CANVAS_TEXT_FONT_PX}px ${fontStack}`;
   if (state.colorMode === "multicolor") {
     ctx.textAlign = "center";
@@ -37413,7 +37426,8 @@ function assignGeometryUVs(geometry) {
   geometry.setAttribute("uv", new BufferAttribute(uvs, 2));
 }
 function buildVectorTextMesh(validLines) {
-  const q = QUALITY_PRESETS[state.quality];
+  const totalGlyphs = splitGraphemes(validLines.join("\n")).filter((char) => char.trim()).length;
+  const q = totalGlyphs > 80 ? QUALITY_PRESETS.low : QUALITY_PRESETS[state.quality];
   const lineHeight = state.size * 1.35;
   const group = new Group();
   let defaultMaterial;
@@ -37694,10 +37708,7 @@ function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = {
   }
   const tailPx = sizing.tailRatio ? Math.round(bodyH * sizing.tailRatio) : 0;
   const canvasH = bodyH + tailPx;
-  const canvas2 = document.createElement("canvas");
-  canvas2.width = canvasW;
-  canvas2.height = canvasH;
-  const ctx = canvas2.getContext("2d");
+  const { canvas: canvas2, ctx } = createBoundedTextCanvas(canvasW, canvasH);
   ctx.clearRect(0, 0, canvasW, canvasH);
   ctx.save();
   drawStickerShape(ctx, shape, canvasW, bodyH, tailPx, bgColor, borderWidth, borderColor, shadow);
@@ -39089,7 +39100,8 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
       loadAndSetFont(state.fontFamily || "helvetiker");
     }
     if (font) {
-      const q = QUALITY_PRESETS[state.quality];
+      const stickerGlyphs = splitGraphemes(textStr).filter((char) => char.trim()).length;
+      const q = stickerGlyphs > 80 ? QUALITY_PRESETS.low : QUALITY_PRESETS[state.quality];
       const lines3D = textStr.split(/\r?\n/).map((l) => l.length > 0 ? l : " ");
       const tScale = (state.stickerTextScale || 100) / 100;
       const bScale = (state.stickerBoxScale || 100) / 100;

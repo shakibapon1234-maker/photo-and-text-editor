@@ -753,6 +753,25 @@ const CANVAS_TEXT_FONT_STACK =
 const CANVAS_TEXT_FONT_PX = 220;
 const CANVAS_TEXT_LINE_HEIGHT_PX = CANVAS_TEXT_FONT_PX * 1.35;
 const CANVAS_TEXT_PAD_PX = CANVAS_TEXT_FONT_PX * 0.35;
+// A long caption must not allocate an unbounded GPU texture. Keep its logical
+// layout intact, then rasterize it at a bounded resolution.
+const MAX_TEXT_TEXTURE_DIM = 2048;
+const MAX_TEXT_TEXTURE_PIXELS = 2_500_000;
+
+function createBoundedTextCanvas(logicalWidth, logicalHeight) {
+  const scale = Math.min(
+    1,
+    MAX_TEXT_TEXTURE_DIM / logicalWidth,
+    MAX_TEXT_TEXTURE_DIM / logicalHeight,
+    Math.sqrt(MAX_TEXT_TEXTURE_PIXELS / (logicalWidth * logicalHeight))
+  );
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(logicalWidth * scale));
+  canvas.height = Math.max(1, Math.round(logicalHeight * scale));
+  const ctx = canvas.getContext('2d');
+  if (scale !== 1) ctx.scale(scale, scale);
+  return { canvas, ctx };
+}
 // for curve inside badge text too, and both already go through this same
 // canvas-card pipeline, so one helper covers both call sites.
 //
@@ -1081,10 +1100,7 @@ function drawCanvasTextTexture(lines, curveOpts = { curveIntensity: 0 }) {
     CANVAS_TEXT_LINE_HEIGHT_PX * lines.length + CANVAS_TEXT_PAD_PX * 2 + maxBulge * 2
   );
 
-  const canvas = document.createElement('canvas');
-  canvas.width = canvasW;
-  canvas.height = canvasH;
-  const ctx = canvas.getContext('2d');
+  const { canvas, ctx } = createBoundedTextCanvas(canvasW, canvasH);
   ctx.font = `${fontWeight} ${CANVAS_TEXT_FONT_PX}px ${fontStack}`;
 
   // ---- MULTICOLOR MODE (Design 1: per-letter rainbow cartoon) ----
@@ -1721,7 +1737,11 @@ function assignGeometryUVs(geometry) {
 }
 
 function buildVectorTextMesh(validLines) {
-  const q = QUALITY_PRESETS[state.quality];
+  const totalGlyphs = splitGraphemes(validLines.join('\n')).filter((char) => char.trim()).length;
+  // Bevelled 3D geometry grows very quickly for long sentences. Use the
+  // existing Low profile automatically for long captions; short headings
+  // still use the user's selected quality.
+  const q = totalGlyphs > 80 ? QUALITY_PRESETS.low : QUALITY_PRESETS[state.quality];
   const lineHeight = state.size * 1.35;
 
   const group = new THREE.Group();
@@ -2100,10 +2120,7 @@ function drawStickerCanvasTexture(
   const tailPx = sizing.tailRatio ? Math.round(bodyH * sizing.tailRatio) : 0;
   const canvasH = bodyH + tailPx;
 
-  const canvas = document.createElement('canvas');
-  canvas.width = canvasW;
-  canvas.height = canvasH;
-  const ctx = canvas.getContext('2d');
+  const { canvas, ctx } = createBoundedTextCanvas(canvasW, canvasH);
   ctx.clearRect(0, 0, canvasW, canvasH);
 
   // 1) background shape
@@ -3780,7 +3797,8 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
       loadAndSetFont(state.fontFamily || 'helvetiker');
     }
     if (font) {
-      const q = QUALITY_PRESETS[state.quality];
+      const stickerGlyphs = splitGraphemes(textStr).filter((char) => char.trim()).length;
+      const q = stickerGlyphs > 80 ? QUALITY_PRESETS.low : QUALITY_PRESETS[state.quality];
       const lines3D = textStr.split(/\r?\n/).map(l => (l.length > 0 ? l : ' '));
       const tScale = (state.stickerTextScale || 100) / 100;
       const bScale = (state.stickerBoxScale || 100) / 100;
