@@ -36,16 +36,37 @@
     color: #f3f4f6;
   }
   .suite-brand-mark {
-    background: linear-gradient(135deg, #f59e0b, #ec4899);
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    background: radial-gradient(circle at 35% 30%, #ffdb9a, #ef4444 48%, #710d17 100%);
     color: #fff;
     width: 28px;
     height: 28px;
-    border-radius: 6px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: -.5px;
+    box-shadow: 0 0 12px rgba(239, 68, 68, .55);
   }
+  .suite-brand-mark::before {
+    content: '✦ PHOTO ✦ 3D ✦';
+    position: absolute;
+    inset: 2px;
+    display: grid;
+    place-items: center;
+    border: 2px solid rgba(255,255,255,.88);
+    border-radius: 50%;
+    font-size: 4px;
+    letter-spacing: 1.2px;
+    color: #fff;
+    animation: suite-logo-spin 7s linear infinite;
+  }
+  .suite-brand-mark span { position: relative; z-index: 1; }
+  @keyframes suite-logo-spin { to { transform: rotate(360deg); } }
   .suite-tabs {
     display: flex;
     align-items: center;
@@ -102,7 +123,7 @@
 
   <header class="suite-header">
     <div class="suite-brand">
-      <div class="suite-brand-mark">◆</div>
+      <div class="suite-brand-mark" aria-label="Photo and 3D Text Studio animated logo"><span>PS</span></div>
       <span>Photo & 3D Text Studio</span>
     </div>
 

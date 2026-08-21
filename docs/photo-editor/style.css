@@ -100,6 +100,42 @@ body {
     color: var(--accent-primary);
 }
 
+/* The app identity mirrors the animated circular-logo studio: only the outer
+   ring spins, while the centre initials remain upright and readable. */
+.logo-spinner {
+    position: relative;
+    overflow: hidden;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffc778, #e69521 52%, #6f3b00 100%);
+    color: #17120a;
+    font-weight: 900;
+    font-size: 10px;
+    letter-spacing: -0.5px;
+    isolation: isolate;
+}
+
+.logo-spinner::before {
+    content: '✦  PHOTO  ✦  EDITOR  ✦';
+    position: absolute;
+    inset: 2px;
+    display: grid;
+    place-items: center;
+    border: 2px solid rgba(25, 18, 4, .9);
+    border-radius: inherit;
+    color: rgba(25, 18, 4, .95);
+    font-size: 5px;
+    letter-spacing: 1.3px;
+    animation: photo-editor-logo-spin 8s linear infinite;
+}
+
+.logo-spinner span { position: relative; z-index: 1; }
+
+@keyframes photo-editor-logo-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .logo-spinner::before { animation-duration: 28s; }
+}
+
 .logo h1 {
     font-size: 16px;
     font-weight: 700;
@@ -2336,7 +2372,6 @@ kbd {
 
 .wm-handle {
     position: absolute;
-    transform: translate(-50%, -50%);
     cursor: move;
     pointer-events: auto;
     user-select: none;
@@ -2349,10 +2384,48 @@ kbd {
     text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
+.wm-handle-text > #wmTextHandleLabel {
+    display: inline-block;
+}
+
 .wm-handle-logo img {
     display: block;
     pointer-events: none;
 }
+
+.wm-control {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    color: #06121f;
+    font-weight: 800;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    touch-action: none;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
+}
+
+.wm-resize-control {
+    left: calc(100% - 3px);
+    top: calc(100% - 3px);
+    cursor: nwse-resize;
+}
+
+.wm-rotate-control {
+    left: 50%;
+    top: -32px;
+    transform: translateX(-50%);
+    cursor: grab;
+}
+
+.wm-control:active { cursor: grabbing; }
 
 .wm-handle.dragging {
     outline: 2px dashed var(--accent-primary);

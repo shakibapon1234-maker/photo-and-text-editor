@@ -309,4 +309,11 @@ export const ANIMATION_PRESETS = {
       return { pos: [posX, 0, 0], rot: [rotX, rotY, 0], scaleMul: scale, opacityMul: 1, emissiveMul };
     },
   },
+  logoSpin: {
+    // The same steady full-circle motion as the Photo Editor logo maker.
+    // It is continuous so the preview and exported GIF/WebM both loop cleanly.
+    label: '🔄 Logo Spin (লোগোর মতো ঘূর্ণন)',
+    continuous: true,
+    apply: (t) => ({ pos: [0, 0, 0], rot: [0, 0, t * TAU], scaleMul: 1, opacityMul: 1 }),
+  },
 };

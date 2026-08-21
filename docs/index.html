@@ -36,16 +36,37 @@
     color: #f3f4f6;
   }
   .suite-brand-mark {
-    background: linear-gradient(135deg, #f59e0b, #ec4899);
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    background: radial-gradient(circle at 35% 30%, #ffdb9a, #ef4444 48%, #710d17 100%);
     color: #fff;
     width: 28px;
     height: 28px;
-    border-radius: 6px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: -.5px;
+    box-shadow: 0 0 12px rgba(239, 68, 68, .55);
   }
+  .suite-brand-mark::before {
+    content: '✦ PHOTO ✦ 3D ✦';
+    position: absolute;
+    inset: 2px;
+    display: grid;
+    place-items: center;
+    border: 2px solid rgba(255,255,255,.88);
+    border-radius: 50%;
+    font-size: 4px;
+    letter-spacing: 1.2px;
+    color: #fff;
+    animation: suite-logo-spin 7s linear infinite;
+  }
+  .suite-brand-mark span { position: relative; z-index: 1; }
+  @keyframes suite-logo-spin { to { transform: rotate(360deg); } }
   .suite-tabs {
     display: flex;
     align-items: center;
@@ -102,7 +123,7 @@
 
   <header class="suite-header">
     <div class="suite-brand">
-      <div class="suite-brand-mark">◆</div>
+      <div class="suite-brand-mark" aria-label="Photo and 3D Text Studio animated logo"><span>PS</span></div>
       <span>Photo & 3D Text Studio</span>
     </div>
 
@@ -126,6 +147,7 @@
         <span>📊 প্রেজেন্টেশন (Presentation)</span>
       </button>
     </div>
+    <button class="tab-btn" id="sendActiveToPresentationBtn" onclick="sendActiveToPresentation()" title="বর্তমান tab-এর preview Presentation Asset Library-তে পাঠান" style="color:#67e8f9;border:1px solid #24516a;">📤 Presentation-এ পাঠান</button>
   </header>
 
   <main class="suite-body">
@@ -134,7 +156,7 @@
     <iframe id="frameLogo" class="app-frame" src="spinning-circle-animation.html"></iframe>
     <iframe id="framePromo" class="app-frame" src="promo-motion-studio.html"></iframe>
     <iframe id="frameDesign" class="app-frame" src="design-tools.html"></iframe>
-    <iframe id="framePresentation" class="app-frame" data-src="../presentation-studio.html"></iframe>
+    <iframe id="framePresentation" class="app-frame" data-src="presentation-studio.html"></iframe>
   </main>
 
   <script>
@@ -297,6 +319,44 @@
         } catch(e) {
           console.warn('Clear design tools error', e);
         }
+      }
+    }
+
+    // A suite-wide handoff: all visual tools expose a canvas or preview image.
+    // Capture it in one place so every tab can send an asset to Presentation.
+    async function sendActiveToPresentation() {
+      const pairs = [
+        ['framePhoto', 'Photo Editor output', '#previewImage'],
+        ['frame3d', '3D Studio output', '#scene-canvas'],
+        ['frameLogo', 'Logo Motion output', '#spinCanvas'],
+        ['framePromo', 'Promo Motion output', '#c'],
+        ['frameDesign', 'Design Tools output', '#canvas']
+      ];
+      const active = pairs.find(([frameId]) => document.getElementById(frameId).classList.contains('active'));
+      if (!active) { alert('প্রথমে একটি visual tool খুলুন।'); return; }
+      const [frameId, name, selector] = active;
+      const frame = document.getElementById(frameId);
+      try {
+        const doc = frame.contentDocument || frame.contentWindow.document;
+        const source = doc.querySelector(selector);
+        if (!source) throw new Error('Preview পাওয়া যায়নি');
+        let dataUrl;
+        if (source.tagName === 'CANVAS') dataUrl = source.toDataURL('image/png');
+        else {
+          const temp = document.createElement('canvas');
+          temp.width = source.naturalWidth || source.width;
+          temp.height = source.naturalHeight || source.height;
+          temp.getContext('2d').drawImage(source, 0, 0);
+          dataUrl = temp.toDataURL('image/png');
+        }
+        const key = 'presentation-studio-assets-v1';
+        const items = JSON.parse(localStorage.getItem(key) || '[]');
+        items.push({ src: dataUrl, added: Date.now(), name });
+        localStorage.setItem(key, JSON.stringify(items.slice(-30)));
+        alert(`✅ ${name} Presentation Asset Library-তে পাঠানো হয়েছে।`);
+      } catch (err) {
+        console.error(err);
+        alert('বর্তমান preview পাঠানো যায়নি। আগে content তৈরি করুন, তারপর আবার চেষ্টা করুন।');
       }
     }
 

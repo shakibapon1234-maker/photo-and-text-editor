@@ -34731,6 +34731,13 @@ var ANIMATION_PRESETS = {
       const emissiveMul = 0.8 + 1.2 * Math.pow(Math.sin(t * Math.PI), 2);
       return { pos: [posX, 0, 0], rot: [rotX, rotY, 0], scaleMul: scale, opacityMul: 1, emissiveMul };
     }
+  },
+  logoSpin: {
+    // The same steady full-circle motion as the Photo Editor logo maker.
+    // It is continuous so the preview and exported GIF/WebM both loop cleanly.
+    label: "\u{1F504} Logo Spin (\u09B2\u09CB\u0997\u09CB\u09B0 \u09AE\u09A4\u09CB \u0998\u09C2\u09B0\u09CD\u09A3\u09A8)",
+    continuous: true,
+    apply: (t) => ({ pos: [0, 0, 0], rot: [0, 0, t * TAU], scaleMul: 1, opacityMul: 1 })
   }
 };
 

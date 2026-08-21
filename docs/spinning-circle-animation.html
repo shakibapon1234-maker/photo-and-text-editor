@@ -650,6 +650,12 @@
                         <button class="dir-btn" id="dirCCW" onclick="setDirection('ccw')">↺ উল্টো দিক</button>
                     </div>
                 </div>
+                <div class="form-row">
+                    <label class="form-label" style="display:flex;align-items:center;gap:9px;cursor:pointer;">
+                        <input type="checkbox" id="loopSpinToggle" checked>
+                        সবসময় ঘুরতে থাকবে (Loop)
+                    </label>
+                </div>
             </div>
 
             <!-- ACTION BUTTONS -->
@@ -667,6 +673,17 @@
             <button class="btn btn-ghost" style="width:100%" onclick="resetAll()">
                 🔄 রিসেট করুন
             </button>
+
+            <div class="control-card" style="margin-top:16px;">
+                <div class="card-title"><div class="card-title-icon">⬇️</div>ডাউনলোড</div>
+                <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px;line-height:1.55;">বর্তমান লোগো PNG হিসেবে, অথবা একটি পূর্ণ ঘূর্ণন GIF/ভিডিও হিসেবে সেভ করুন।</p>
+                <div class="btn-group">
+                    <button class="btn btn-primary" type="button" onclick="downloadPng()">PNG ডাউনলোড</button>
+                    <button class="btn btn-primary" type="button" onclick="downloadGif()">GIF ডাউনলোড</button>
+                    <button class="btn btn-primary" type="button" onclick="downloadVideo()">ভিডিও (WebM)</button>
+                </div>
+                <div id="exportStatus" style="font-size:12px;color:var(--text-muted);margin-top:10px;min-height:18px;"></div>
+            </div>
 
         </div>
     </div>
@@ -700,6 +717,7 @@
     let direction = 1;           // 1 = CW, -1 = CCW
     let speedRPM = 1.0;
     let lastTimestamp = null;
+    let isExporting = false;
 
     // === STYLE PRESETS ===
     const stylePresets = {
@@ -999,10 +1017,12 @@
 
         drawFrame();
 
-        if (remaining <= 0) {
+        if (remaining <= 0 && !document.getElementById('loopSpinToggle').checked) {
             finishSpin();
             return;
         }
+
+        if (remaining <= 0) startTime = timestamp;
 
         animFrame = requestAnimationFrame(animationLoop);
     }
@@ -1101,6 +1121,101 @@
         drawFrame();
     }
 
+    function setExportStatus(message) {
+        document.getElementById('exportStatus').textContent = message;
+    }
+
+    function saveBlob(blob, filename) {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    }
+
+    function downloadPng() {
+        canvas.toBlob((blob) => {
+            if (!blob) return setExportStatus('PNG তৈরি করা যায়নি। আবার চেষ্টা করুন।');
+            saveBlob(blob, 'photo-editor-spinning-logo.png');
+            setExportStatus('✓ PNG ডাউনলোড শুরু হয়েছে।');
+        }, 'image/png');
+    }
+
+    function getExportCanvas(size = 720) {
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = exportCanvas.height = size;
+        const oldWidth = canvas.width, oldHeight = canvas.height, oldAngle = spinAngle;
+        canvas.width = canvas.height = size;
+        drawFrame();
+        exportCanvas.getContext('2d').drawImage(canvas, 0, 0);
+        canvas.width = oldWidth; canvas.height = oldHeight; spinAngle = oldAngle;
+        drawFrame();
+        return exportCanvas;
+    }
+
+    async function downloadGif() {
+        if (!window.GIF) {
+            setExportStatus('GIF লাইব্রেরি লোড হয়নি। ইন্টারনেট সংযোগ দিয়ে আবার চেষ্টা করুন।');
+            return;
+        }
+        if (isExporting) return;
+        isExporting = true;
+        const oldAngle = spinAngle;
+        const gif = new GIF({ workers: 2, quality: 10, width: 720, height: 720, workerScript: 'gif.worker.js' });
+        const frames = 48;
+        const frameDelay = 50;
+        setExportStatus('GIF তৈরি হচ্ছে… 0%');
+        for (let frame = 0; frame < frames; frame++) {
+            spinAngle = oldAngle + direction * (Math.PI * 2 * frame / frames);
+            gif.addFrame(getExportCanvas(720), { copy: true, delay: frameDelay });
+            setExportStatus(`GIF তৈরি হচ্ছে… ${Math.round((frame + 1) / frames * 100)}%`);
+            await new Promise(requestAnimationFrame);
+        }
+        spinAngle = oldAngle; drawFrame();
+        gif.on('finished', (blob) => {
+            saveBlob(blob, 'photo-editor-spinning-logo.gif');
+            setExportStatus('✓ GIF ডাউনলোড শুরু হয়েছে।');
+            isExporting = false;
+        });
+        gif.render();
+    }
+
+    async function downloadVideo() {
+        if (!window.MediaRecorder || !canvas.captureStream) {
+            setExportStatus('এই ব্রাউজারে ভিডিও এক্সপোর্ট সাপোর্ট নেই। Chrome বা Edge ব্যবহার করুন।');
+            return;
+        }
+        if (isExporting) return;
+        isExporting = true;
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = exportCanvas.height = 720;
+        const exportCtx = exportCanvas.getContext('2d');
+        const stream = exportCanvas.captureStream(30);
+        const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+        const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 5000000 });
+        const chunks = [];
+        const oldAngle = spinAngle;
+        recorder.ondataavailable = (event) => event.data.size && chunks.push(event.data);
+        recorder.onstop = () => {
+            saveBlob(new Blob(chunks, { type: mimeType }), 'photo-editor-spinning-logo.webm');
+            spinAngle = oldAngle; drawFrame(); isExporting = false;
+            setExportStatus('✓ ভিডিও ডাউনলোড শুরু হয়েছে।');
+        };
+        recorder.start();
+        const start = performance.now();
+        const duration = 2400;
+        setExportStatus('ভিডিও তৈরি হচ্ছে…');
+        const render = (now) => {
+            const progress = Math.min(1, (now - start) / duration);
+            spinAngle = oldAngle + direction * Math.PI * 2 * progress;
+            const frame = getExportCanvas(720);
+            exportCtx.clearRect(0, 0, 720, 720);
+            exportCtx.drawImage(frame, 0, 0);
+            if (progress < 1) requestAnimationFrame(render); else recorder.stop();
+        };
+        requestAnimationFrame(render);
+    }
+
     // === DIRECTION ===
     function setDirection(dir) {
         direction = dir === 'cw' ? 1 : -1;
@@ -1139,7 +1254,11 @@
 
     // === INITIAL DRAW ===
     drawFrame();
+    // The logo acts as a live application mark: it starts rotating and keeps
+    // looping until the user explicitly presses Stop.
+    setTimeout(startSpin, 150);
 
     </script>
+    <script src="gif.js" defer></script>
 </body>
 </html>

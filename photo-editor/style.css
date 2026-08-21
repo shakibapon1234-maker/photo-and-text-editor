@@ -100,6 +100,42 @@ body {
     color: var(--accent-primary);
 }
 
+/* The app identity mirrors the animated circular-logo studio: only the outer
+   ring spins, while the centre initials remain upright and readable. */
+.logo-spinner {
+    position: relative;
+    overflow: hidden;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffc778, #e69521 52%, #6f3b00 100%);
+    color: #17120a;
+    font-weight: 900;
+    font-size: 10px;
+    letter-spacing: -0.5px;
+    isolation: isolate;
+}
+
+.logo-spinner::before {
+    content: '✦  PHOTO  ✦  EDITOR  ✦';
+    position: absolute;
+    inset: 2px;
+    display: grid;
+    place-items: center;
+    border: 2px solid rgba(25, 18, 4, .9);
+    border-radius: inherit;
+    color: rgba(25, 18, 4, .95);
+    font-size: 5px;
+    letter-spacing: 1.3px;
+    animation: photo-editor-logo-spin 8s linear infinite;
+}
+
+.logo-spinner span { position: relative; z-index: 1; }
+
+@keyframes photo-editor-logo-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .logo-spinner::before { animation-duration: 28s; }
+}
+
 .logo h1 {
     font-size: 16px;
     font-weight: 700;

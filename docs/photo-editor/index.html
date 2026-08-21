@@ -30,14 +30,7 @@
         <!-- Header -->
         <header class="app-header">
             <div class="logo">
-                <div class="logo-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                        <circle cx="8.5" cy="8.5" r="1.5" />
-                        <polyline points="21 15 16 10 5 21" />
-                    </svg>
-                </div>
+                <div class="logo-icon logo-spinner" aria-label="Photo Editor rotating logo"><span>PE</span></div>
                 <h1>Photo Editor by Shakib</h1>
             </div>
             <p class="tagline">ফটো সাইজ, পিক্সেল, ব্রাইটনেস এবং ক্রপ সহজেই এডিট করুন</p>
@@ -412,6 +405,36 @@
                             </div>
                         </div>
 
+                        <div class="form-group">
+                            <label>হিউ / রঙ ঘোরানো: <strong id="hueValue">0</strong>°</label>
+                            <input type="range" id="hueSlider" min="-180" max="180" value="0" class="range-slider">
+                            <div class="range-labels"><span>কুল</span><span>ওয়ার্ম</span></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>ব্লার: <strong id="blurValue">0</strong>px</label>
+                            <input type="range" id="blurSlider" min="0" max="20" value="0" step="0.5" class="range-slider">
+                            <div class="range-labels"><span>শার্প</span><span>সফট ব্লার</span></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>ভিনিয়েট: <strong id="vignetteValue">0</strong>%</label>
+                            <input type="range" id="vignetteSlider" min="0" max="100" value="0" class="range-slider">
+                            <div class="range-labels"><span>বন্ধ</span><span>সিনেমাটিক</span></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>এক্সপোজার: <strong id="exposureValue">0</strong></label>
+                            <input type="range" id="exposureSlider" min="-100" max="100" value="0" class="range-slider">
+                            <div class="range-labels"><span>ডার্ক</span><span>লাইট</span></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>ওয়ার্মথ / টেম্পারেচার: <strong id="temperatureValue">0</strong></label>
+                            <input type="range" id="temperatureSlider" min="-100" max="100" value="0" class="range-slider">
+                            <div class="range-labels"><span>কুল ব্লু</span><span>ওয়ার্ম গোল্ড</span></div>
+                        </div>
+
                         <div class="brightness-presets">
                             <label>প্রিসেট:</label>
                             <div class="preset-grid">
@@ -430,6 +453,10 @@
                                 <button class="preset-btn-bright" data-b="105" data-c="105" data-s="110" data-h="15">গরম
                                     টোন</button>
                                 <button class="preset-btn-bright" data-b="100" data-c="100" data-s="100">রিসেট</button>
+                                <button class="preset-btn-bright" data-b="96" data-c="118" data-s="84" data-h="-8" data-v="22">সিনেমাটিক</button>
+                                <button class="preset-btn-bright" data-b="108" data-c="108" data-s="115" data-h="8">গোল্ডেন আওয়ার</button>
+                                <button class="preset-btn-bright" data-b="105" data-c="90" data-s="85" data-bl="1">পোর্ট্রেট সফট</button>
+                                <button class="preset-btn-bright" data-b="112" data-c="122" data-s="130">প্রোডাক্ট পপ</button>
                             </div>
                         </div>
 
@@ -967,7 +994,7 @@
                                         <button type="button" class="active" data-fx="0.88" data-fy="0.88" title="নিচে-ডানে"></button>
                                     </div>
                                 </div>
-                                <p class="wm-hint">টিপ: প্রিভিউতে টেক্সট ধরে টেনে ইচ্ছেমতো জায়গায় বসাতে পারবেন</p>
+                                <p class="wm-hint">টিপ: প্রিভিউতে টেক্সট ধরে টেনে সরান; ডান-নিচের handle টেনে সাইজ এবং উপরের handle টেনে ঘুরান</p>
                             </div>
                         </div>
 
@@ -1016,7 +1043,7 @@
                                         <button type="button" class="active" data-fx="0.88" data-fy="0.88" title="নিচে-ডানে"></button>
                                     </div>
                                 </div>
-                                <p class="wm-hint">টিপ: প্রিভিউতে লোগো ধরে টেনে ইচ্ছেমতো জায়গায় বসাতে পারবেন</p>
+                                <p class="wm-hint">টিপ: প্রিভিউতে লোগো ধরে টেনে সরান; ডান-নিচের handle টেনে সাইজ এবং উপরের handle টেনে ঘুরান</p>
                             </div>
                         </div>
 
@@ -1101,43 +1128,6 @@
                             <div class="spinner"></div>
                             <span>AI প্রসেস করছে... (কিছুটা সময় লাগতে পারে)</span>
                         </div>
-                        </div>
-                    </div>
-
-                    <!-- METHOD 2: Local canvas-based upscale -->
-                    <div class="tool-card bg-method-card" id="upcard-local">
-                        <button type="button" class="bg-method-header" aria-expanded="false">
-                            <div class="bg-method-icon">🖼️</div>
-                            <div class="bg-method-title">
-                                <h3>লোকাল আপস্কেল</h3>
-                                <p class="tool-desc">কোনো API key বা ইন্টারনেট লাগে না — সম্পূর্ণ অফলাইনে, তাৎক্ষণিক কাজ করে।</p>
-                            </div>
-                            <svg class="bg-method-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                        </button>
-                        <div class="bg-method-body">
-                        <div class="form-row-2col">
-                            <div class="form-group">
-                                <label>কতটুকু বড় করবেন</label>
-                                <select id="upFactor">
-                                    <option value="1.5">1.5x</option>
-                                    <option value="2" selected>2x</option>
-                                    <option value="3">3x</option>
-                                    <option value="4">4x</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>শার্পনেস: <strong id="upSharpenValue">20</strong></label>
-                                <input type="range" id="upSharpen" min="0" max="100" value="20" class="range-slider">
-                                <div class="range-labels"><span>নরম</span><span>তীক্ষ্ণ</span></div>
-                            </div>
-                        </div>
-                        <p class="tool-desc" style="margin-top:0;">বড় ছবিতে (৪x পর্যন্ত) কিছুটা সময় লাগতে পারে, ব্রাউজার রেসপন্স করবে কিছুক্ষণের জন্য ধীর।</p>
-                        <button class="btn btn-primary btn-action" id="upLocalBtn">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                            লোকাল আপস্কেল করুন
-                        </button>
                         </div>
                     </div>
 
@@ -1305,6 +1295,12 @@
                                 </svg>
                                 পরিবর্তন
                             </button>
+                            <button class="btn btn-ghost" id="sendToPresentationBtn" title="Presentation Asset Library-তে পাঠান (Ctrl+Shift+P)" style="color:#67e8f9; font-weight:600;">
+                                📊 প্রেজেন্টেশনে পাঠান
+                            </button>
+                            <button class="btn btn-ghost" id="sendTo3dBtn" title="3D Studio-তে ছবি হিসেবে খুলুন (Ctrl+Shift+3)" style="color:#c4b5fd; font-weight:600;">
+                                🧊 3D-তে পাঠান
+                            </button>
                             <button class="btn btn-ghost" id="resetSessionBtn" title="সংরক্ষিত সেশন মুছে নতুন ছবি শুরু করুন" style="color:#ef4444;">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                                                 নতুন ছবি
@@ -1353,9 +1349,11 @@
                         </div>
                         <!-- Watermark live-position overlay (Phase 9) -->
                         <div class="wm-overlay" id="wmOverlay" style="display:none;">
-                            <div class="wm-handle wm-handle-text" id="wmTextHandle" style="display:none;"></div>
+                            <div class="wm-handle wm-handle-text" id="wmTextHandle" style="display:none;"><span id="wmTextHandleLabel"></span><button type="button" class="wm-control wm-rotate-control" data-wm-action="rotate" aria-label="টেক্সট ঘুরান">↻</button><button type="button" class="wm-control wm-resize-control" data-wm-action="resize" aria-label="টেক্সটের সাইজ বদলান">↘</button></div>
                             <div class="wm-handle wm-handle-logo" id="wmLogoHandle" style="display:none;">
                                 <img id="wmLogoHandleImg" alt="Logo" draggable="false">
+                                <button type="button" class="wm-control wm-rotate-control" data-wm-action="rotate" aria-label="লোগো ঘুরান">↻</button>
+                                <button type="button" class="wm-control wm-resize-control" data-wm-action="resize" aria-label="লোগোর সাইজ বদলান">↘</button>
                             </div>
                         </div>
                     </div>

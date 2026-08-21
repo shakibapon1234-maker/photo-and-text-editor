@@ -85,6 +85,14 @@ esbuild
       const logoToolSource = path.join(__dirname, '..', '..', 'spinning-circle-animation.html');
       if (fs.existsSync(logoToolSource)) {
         fs.copyFileSync(logoToolSource, path.join(docsRootDir, 'spinning-circle-animation.html'));
+        // The standalone Logo Motion exporter uses gif.js directly, so keep
+        // its encoder and worker next to both deployable HTML files.
+        if (fs.existsSync(gifWorkerSrc)) {
+          fs.copyFileSync(path.join(__dirname, 'node_modules', 'gif.js', 'dist', 'gif.js'), path.join(__dirname, '..', '..', 'gif.js'));
+          fs.copyFileSync(gifWorkerSrc, path.join(__dirname, '..', '..', 'gif.worker.js'));
+          fs.copyFileSync(path.join(__dirname, '..', '..', 'gif.js'), path.join(docsRootDir, 'gif.js'));
+          fs.copyFileSync(path.join(__dirname, '..', '..', 'gif.worker.js'), path.join(docsRootDir, 'gif.worker.js'));
+        }
       }
       const promoToolSource = path.join(__dirname, '..', '..', 'promo-motion-studio.html');
       if (fs.existsSync(promoToolSource)) {
