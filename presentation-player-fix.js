@@ -66,5 +66,151 @@
     // used while this string is embedded in JavaScript).
     popup.document.open(); popup.document.write(html.replace('<\\/script>', '</script>')); popup.document.close();
   };
+
+  // Text should be written where it is seen.  Older code required a
+  // double-click and then moved focus to the sidebar textarea; this layer
+  // makes every text box directly editable and keeps its model in sync.
+  const textField = $('textValue');
+  if (textField) {
+    const textFieldLabel = textField.closest('label');
+    if (textFieldLabel) textFieldLabel.style.display = 'none';
+  }
+  document.head.insertAdjacentHTML('beforeend', '<style>.text-el[contenteditable="true"]{cursor:text;user-select:text;outline:1px dashed transparent}.text-el[contenteditable="true"]:focus{outline-color:#ffb11b;background:#ffb11b12}</style>');
+  const renderWithDirectText = render;
+  render = function () {
+    renderWithDirectText();
+    active().elements.filter(e => e.type === 'text').forEach(e => {
+      const node = $('slide').querySelector('.text-el[data-id="' + e.id + '"]');
+      if (!node || node.dataset.directTextReady) return;
+      node.dataset.directTextReady = '1';
+      node.contentEditable = 'true';
+      node.spellcheck = false;
+      node.addEventListener('pointerdown', event => {
+        if (event.altKey) return; // Alt + drag keeps object-moving available.
+        event.stopImmediatePropagation();
+        selected = e.id;
+        renderInspector();
+      }, true);
+      node.addEventListener('input', () => {
+        e.text = node.innerText.replace(/\r/g, '');
+        if (textField) textField.value = e.text;
+        if (typeof fitSelectedTextBox === 'function') {
+          fitSelectedTextBox();
+          node.style.height = e.h + '%';
+        }
+        try { localStorage.setItem('presentation-studio-autosave-v1', JSON.stringify({slides, current})); } catch (_) {}
+      });
+      node.addEventListener('focus', () => { selected = e.id; renderInspector(); });
+    });
+  };
+
+  // Keep the top bar compact.  These are the existing controls (not cloned
+  // buttons), so their original listeners and keyboard behaviour stay intact.
+  const top = document.querySelector('.top');
+  if (top && !document.getElementById('toolbarGroups')) {
+    const groups = document.createElement('div');
+    groups.id = 'toolbarGroups';
+    const definitions = [
+      ['slide', 'Slide', ['newSlide', 'duplicateSlide']],
+      ['insert', 'Insert', ['addText', 'imageInput', 'assetBtn', 'addShape', 'addTable']],
+      ['design', 'Design', ['textTools']],
+      ['export', 'Export', ['saveProject', 'loadProject', 'downloadSlideshow', 'exportVideo']],
+      ['present', 'Present', ['previewSlideBtn', 'presentBtn']]
+    ];
+    definitions.forEach(([key, title, ids]) => {
+      const wrap = document.createElement('div'); wrap.className = 'toolbar-group';
+      const trigger = document.createElement('button'); trigger.className = 'toolbar-trigger'; trigger.type = 'button'; trigger.textContent = title + ' ▾';
+      const menu = document.createElement('div'); menu.className = 'toolbar-menu'; menu.dataset.menu = key;
+      trigger.onclick = event => { event.stopPropagation(); const opening = !wrap.classList.contains('open'); groups.querySelectorAll('.toolbar-group').forEach(x => x.classList.remove('open')); wrap.classList.toggle('open', opening); };
+      ids.forEach(id => { const control = id === 'imageInput' ? $('imageInput')?.closest('label') : $(id); if (control) menu.appendChild(control); });
+      wrap.append(trigger, menu); groups.appendChild(wrap);
+    });
+    // Any later-added top-bar control has a safe home instead of forcing the
+    // bar to become horizontally scrollable again.
+    const more = document.createElement('div'); more.className = 'toolbar-group';
+    const moreTrigger = document.createElement('button'); moreTrigger.className = 'toolbar-trigger'; moreTrigger.type = 'button'; moreTrigger.textContent = 'More ▾';
+    const moreMenu = document.createElement('div'); moreMenu.className = 'toolbar-menu';
+    moreTrigger.onclick = event => { event.stopPropagation(); const opening = !more.classList.contains('open'); groups.querySelectorAll('.toolbar-group').forEach(x => x.classList.remove('open')); more.classList.toggle('open', opening); };
+    more.append(moreTrigger, moreMenu); groups.appendChild(more);
+    top.querySelectorAll(':scope > button, :scope > label.file-label').forEach(control => { if (control !== moreTrigger && !control.closest('#toolbarGroups') && !control.classList.contains('brand')) moreMenu.appendChild(control); });
+    top.querySelector('.brand')?.after(groups);
+    if (!moreMenu.children.length) more.remove();
+    document.addEventListener('pointerdown', event => { if (!groups.contains(event.target)) groups.querySelectorAll('.toolbar-group').forEach(x => x.classList.remove('open')); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') groups.querySelectorAll('.toolbar-group').forEach(x => x.classList.remove('open')); });
+    document.head.insertAdjacentHTML('beforeend', '<style>.top{overflow:visible!important;gap:9px}.top .brand{margin-right:8px!important}.toolbar-groups,#toolbarGroups{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.toolbar-group{position:relative}.toolbar-trigger{white-space:nowrap;background:#18253a}.toolbar-menu{display:none;position:absolute;z-index:150;top:calc(100% + 7px);left:0;width:min(720px,calc(100vw - 32px));min-width:260px;padding:8px;background:#111b2c;border:1px solid #50617d;border-radius:9px;box-shadow:0 18px 48px #000c}.toolbar-group.open>.toolbar-menu{display:flex;flex-flow:row wrap;align-items:center;gap:6px}.toolbar-menu button,.toolbar-menu .file-label{width:auto;flex:0 1 auto;text-align:left;white-space:nowrap}.toolbar-menu #presentBtn{background:#1769e8;border-color:#79abff}.toolbar-menu #saveProject,.toolbar-menu #downloadSlideshow{background:#0f766e;border-color:#50c7b5}.toolbar-menu #exportVideo{background:#7c3aed;border-color:#b9a0ff}@media(max-width:900px){#toolbarGroups{flex-wrap:nowrap}.top{overflow-x:auto!important}.toolbar-menu{width:min(520px,calc(100vw - 24px))}}</style>');
+  }
+  // Reliable presentation-wide history.  This intentionally replaces the
+  // earlier history listener which skipped edits made inside text boxes.
+  const undoButton = $('undoAction');
+  const redoButton = $('redoAction');
+  let undoStates = [structuredClone({slides, current})];
+  let undoIndex = 0;
+  let restoringHistory = false;
+  let undoStamp = JSON.stringify(undoStates[0]);
+  const refreshUndoButtons = () => {
+    if (undoButton) undoButton.disabled = undoIndex === 0;
+    if (redoButton) redoButton.disabled = undoIndex >= undoStates.length - 1;
+  };
+  const recordHistory = () => {
+    if (restoringHistory) return;
+    const snapshot = structuredClone({slides, current});
+    const stamp = JSON.stringify(snapshot);
+    if (stamp === undoStamp) return;
+    undoStates = undoStates.slice(0, undoIndex + 1);
+    undoStates.push(snapshot);
+    if (undoStates.length > 100) undoStates.shift();
+    undoIndex = undoStates.length - 1;
+    undoStamp = stamp;
+    refreshUndoButtons();
+  };
+  const restoreHistory = target => {
+    if (target < 0 || target >= undoStates.length) return;
+    restoringHistory = true;
+    const snapshot = structuredClone(undoStates[target]);
+    slides = snapshot.slides;
+    current = Math.max(0, Math.min(snapshot.current || 0, slides.length - 1));
+    selected = null;
+    undoIndex = target;
+    render();
+    undoStamp = JSON.stringify({slides, current});
+    restoringHistory = false;
+    refreshUndoButtons();
+  };
+  if (undoButton) undoButton.onclick = () => restoreHistory(undoIndex - 1);
+  if (redoButton) redoButton.onclick = () => restoreHistory(undoIndex + 1);
+  const renderWithHistory = render;
+  // Render is also called internally while other legacy undo code restores a
+  // snapshot.  Recording only after user actions avoids that stale history
+  // from polluting this reliable stack.
+  render = function () { renderWithHistory(); };
+  window.addEventListener('input', () => setTimeout(recordHistory, 0), true);
+  window.addEventListener('change', () => setTimeout(recordHistory, 0), true);
+  window.addEventListener('pointerup', () => setTimeout(recordHistory, 0), true);
+  window.addEventListener('click', () => setTimeout(recordHistory, 0), true);
+  window.addEventListener('keydown', event => {
+    const key = event.key.toLowerCase();
+    if ((event.ctrlKey || event.metaKey) && key === 's') {
+      event.preventDefault();
+      $('saveProject')?.click();
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && key === 'z') {
+      event.preventDefault();
+      restoreHistory(event.shiftKey ? undoIndex + 1 : undoIndex - 1);
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && key === 'y') {
+      event.preventDefault();
+      restoreHistory(undoIndex + 1);
+      return;
+    }
+    if (event.key !== 'Escape') return;
+    document.querySelectorAll('.toolbar-group.open').forEach(x => x.classList.remove('open'));
+    ['textToolsMenu','colorPop','shapeGallery','tablePicker','assetDrawer','smartDesigner','soundtrackPanel','textGradientAppearance'].forEach(id => $(id)?.classList.add('hidden'));
+    document.getAnimations().forEach(animation => animation.cancel());
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    window.getSelection()?.removeAllRanges();
+  }, true);
+  refreshUndoButtons();
   render();
 })();
