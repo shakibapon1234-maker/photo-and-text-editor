@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, session } = require('electron');
 
 try {
     app.setAppUserModelId('com.shakib.photostudio');
@@ -109,6 +109,12 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+    // Voice-controlled presentations require microphone access. Only the
+    // media permission is granted; all other permission types stay denied.
+    session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+        callback(permission === 'media');
+    });
+
     startInternalServer(() => {
         createWindow();
     });
