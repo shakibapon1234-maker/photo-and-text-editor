@@ -37297,11 +37297,19 @@ function buildCanvasCardMaterials(frontTex, backTex, isImage = false) {
   const faceColor = isTexturePreserved ? "#ffffff" : state.color;
   const frontMat = buildMaterial(state.materialType, faceColor);
   frontMat.map = frontTex;
+  if (state.materialType === "neon") {
+    frontMat.emissive.set(16777215);
+    frontMat.emissiveMap = frontTex;
+  }
   frontMat.transparent = true;
   frontMat.alphaTest = isImage ? 0.05 : 0.4;
   frontMat.needsUpdate = true;
   const backMat = buildMaterial(state.materialType, faceColor);
   backMat.map = backTex;
+  if (state.materialType === "neon") {
+    backMat.emissive.set(16777215);
+    backMat.emissiveMap = backTex;
+  }
   backMat.transparent = true;
   backMat.alphaTest = isImage ? 0.05 : 0.4;
   backMat.needsUpdate = true;
@@ -41019,6 +41027,7 @@ autoRotateToggle.addEventListener("change", () => {
 colorPicker.addEventListener("input", () => {
   state.color = colorPicker.value;
   if (state.contentMode === "sticker" && state.stickerWith3DText) scheduleRebuild();
+  else if (state.contentMode === "text" && renderMode === "canvas") scheduleRebuild();
   else applyMaterial();
   saveStudioStateDebounced();
 });

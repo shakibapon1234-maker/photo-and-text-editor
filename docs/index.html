@@ -119,8 +119,8 @@
       <button class="tab-btn" id="tabPromoBtn" onclick="switchTab('promo')">
         <span>📱 প্রোমো মোশন (Promo Motion)</span>
       </button>
-      <button class="tab-btn" id="tab3dLogoMotionBtn" onclick="switchTab('3dLogoMotion')">
-        <span>✨ ৩D লোগো মোশন (3D Logo Motion)</span>
+      <button class="tab-btn" id="tabDesignBtn" onclick="switchTab('design')">
+        <span>✨ ডিজাইন টুলস (Design Tools)</span>
       </button>
     </div>
   </header>
@@ -130,7 +130,7 @@
     <iframe id="frame3d" class="app-frame" src="3d-text-module-phase5-quality/3d-text-module/www/index.html?v=1.2.0"></iframe>
     <iframe id="frameLogo" class="app-frame" src="spinning-circle-animation.html"></iframe>
     <iframe id="framePromo" class="app-frame" src="promo-motion-studio.html"></iframe>
-    <iframe id="frame3dLogoMotion" class="app-frame" src="3d-logo-motion-studio.html"></iframe>
+    <iframe id="frameDesign" class="app-frame" src="design-tools.html"></iframe>
   </main>
 
   <script>
@@ -139,73 +139,73 @@
       const frame3d = document.getElementById('frame3d');
       const frameLogo = document.getElementById('frameLogo');
       const framePromo = document.getElementById('framePromo');
-      const frame3dLogoMotion = document.getElementById('frame3dLogoMotion');
+      const frameDesign = document.getElementById('frameDesign');
       const tabPhotoBtn = document.getElementById('tabPhotoBtn');
       const tab3dBtn = document.getElementById('tab3dBtn');
       const tabLogoBtn = document.getElementById('tabLogoBtn');
       const tabPromoBtn = document.getElementById('tabPromoBtn');
-      const tab3dLogoMotionBtn = document.getElementById('tab3dLogoMotionBtn');
+      const tabDesignBtn = document.getElementById('tabDesignBtn');
 
       if (tab === 'photo') {
         framePhoto.classList.add('active');
         frame3d.classList.remove('active');
         frameLogo.classList.remove('active');
         framePromo.classList.remove('active');
-        frame3dLogoMotion.classList.remove('active');
+        frameDesign.classList.remove('active');
         tabPhotoBtn.classList.add('active');
         tab3dBtn.classList.remove('active');
         tabLogoBtn.classList.remove('active');
         tabPromoBtn.classList.remove('active');
-        tab3dLogoMotionBtn.classList.remove('active');
+        tabDesignBtn.classList.remove('active');
         try { localStorage.setItem('active_studio_tab', 'photo'); } catch (_) {}
       } else if (tab === '3d') {
         frame3d.classList.add('active');
         framePhoto.classList.remove('active');
         frameLogo.classList.remove('active');
         framePromo.classList.remove('active');
-        frame3dLogoMotion.classList.remove('active');
+        frameDesign.classList.remove('active');
         tab3dBtn.classList.add('active');
         tabPhotoBtn.classList.remove('active');
         tabLogoBtn.classList.remove('active');
         tabPromoBtn.classList.remove('active');
-        tab3dLogoMotionBtn.classList.remove('active');
+        tabDesignBtn.classList.remove('active');
         try { localStorage.setItem('active_studio_tab', '3d'); } catch (_) {}
       } else if (tab === 'logo') {
         frameLogo.classList.add('active');
         framePhoto.classList.remove('active');
         frame3d.classList.remove('active');
         framePromo.classList.remove('active');
-        frame3dLogoMotion.classList.remove('active');
+        frameDesign.classList.remove('active');
         tabLogoBtn.classList.add('active');
         tabPhotoBtn.classList.remove('active');
         tab3dBtn.classList.remove('active');
         tabPromoBtn.classList.remove('active');
-        tab3dLogoMotionBtn.classList.remove('active');
+        tabDesignBtn.classList.remove('active');
         try { localStorage.setItem('active_studio_tab', 'logo'); } catch (_) {}
       } else if (tab === 'promo') {
         framePromo.classList.add('active');
         framePhoto.classList.remove('active');
         frame3d.classList.remove('active');
         frameLogo.classList.remove('active');
-        frame3dLogoMotion.classList.remove('active');
+        frameDesign.classList.remove('active');
         tabPromoBtn.classList.add('active');
         tabPhotoBtn.classList.remove('active');
         tab3dBtn.classList.remove('active');
         tabLogoBtn.classList.remove('active');
-        tab3dLogoMotionBtn.classList.remove('active');
+        tabDesignBtn.classList.remove('active');
         try { localStorage.setItem('active_studio_tab', 'promo'); } catch (_) {}
-      } else if (tab === '3dLogoMotion') {
-        frame3dLogoMotion.classList.add('active');
+      } else if (tab === 'design') {
+        frameDesign.classList.add('active');
         framePhoto.classList.remove('active');
         frame3d.classList.remove('active');
         frameLogo.classList.remove('active');
         framePromo.classList.remove('active');
-        tab3dLogoMotionBtn.classList.add('active');
+        tabDesignBtn.classList.add('active');
         tabPhotoBtn.classList.remove('active');
         tab3dBtn.classList.remove('active');
         tabLogoBtn.classList.remove('active');
         tabPromoBtn.classList.remove('active');
-        try { localStorage.setItem('active_studio_tab', '3dLogoMotion'); } catch (_) {}
+        try { localStorage.setItem('active_studio_tab', 'design'); } catch (_) {}
       }
     }
 
@@ -259,12 +259,12 @@
         }
       } else {
         try {
-          const frame = document.getElementById('frame3dLogoMotion');
+          const frame = document.getElementById('frameDesign');
           const win = frame.contentWindow;
-          if (win && typeof win.resetStudio === 'function') win.resetStudio();
+          if (win && typeof win.resetDesignTools === 'function') win.resetDesignTools();
           else win.location.reload();
         } catch(e) {
-          console.warn('Clear 3D logo motion error', e);
+          console.warn('Clear design tools error', e);
         }
       }
     }
@@ -275,7 +275,7 @@
       try {
         savedTab = localStorage.getItem('active_studio_tab') || 'photo';
       } catch (_) {}
-      if (savedTab === '3d' || savedTab === 'logo' || savedTab === 'promo' || savedTab === '3dLogoMotion') switchTab(savedTab);
+      if (savedTab === '3d' || savedTab === 'logo' || savedTab === 'promo' || savedTab === 'design') switchTab(savedTab);
     });
   </script>
 </body>

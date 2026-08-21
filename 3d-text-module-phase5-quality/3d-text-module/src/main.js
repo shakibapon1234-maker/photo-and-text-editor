@@ -1428,12 +1428,23 @@ function buildCanvasCardMaterials(frontTex, backTex, isImage = false) {
 
   const frontMat = buildMaterial(state.materialType, faceColor);
   frontMat.map = frontTex;
+  // Canvas text keeps its glyph colours in the texture. Give Neon that same
+  // texture as an emission map so it visibly glows without turning every
+  // gradient into a flat white light.
+  if (state.materialType === 'neon') {
+    frontMat.emissive.set(0xffffff);
+    frontMat.emissiveMap = frontTex;
+  }
   frontMat.transparent = true;
   frontMat.alphaTest = isImage ? 0.05 : 0.4;
   frontMat.needsUpdate = true;
 
   const backMat = buildMaterial(state.materialType, faceColor);
   backMat.map = backTex;
+  if (state.materialType === 'neon') {
+    backMat.emissive.set(0xffffff);
+    backMat.emissiveMap = backTex;
+  }
   backMat.transparent = true;
   backMat.alphaTest = isImage ? 0.05 : 0.4;
   backMat.needsUpdate = true;
@@ -5824,6 +5835,10 @@ colorPicker.addEventListener('input', () => {
   // extruded letters. Rebuild that group so Solid Color updates the letters,
   // not only the background card material.
   if (state.contentMode === 'sticker' && state.stickerWith3DText) scheduleRebuild();
+  // Bengali/Unicode text is painted into a canvas texture. Rebuilding makes
+  // a solid-colour edit repaint the glyph texture itself; merely replacing
+  // its Three.js material left the old colour visible.
+  else if (state.contentMode === 'text' && renderMode === 'canvas') scheduleRebuild();
   else applyMaterial();
   saveStudioStateDebounced();
 });
