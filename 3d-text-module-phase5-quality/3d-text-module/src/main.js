@@ -7115,3 +7115,27 @@ const topbarResetBtn = document.getElementById('topbarResetBtn');
 if (topbarResetBtn) topbarResetBtn.addEventListener('click', reset3DStudio);
 
 window.reset3DStudio = reset3DStudio;
+
+// Desktop-suite handoff: capture the current rendered 3D composition as a
+// PNG and place it in Presentation Studio's shared local Asset Library.
+const send3dToPresentationBtn = document.getElementById('send3dToPresentationBtn');
+function send3DToPresentation() {
+  if (!textMesh) { alert('আগে একটি 3D টেক্সট, ছবি বা শেপ তৈরি করুন।'); return; }
+  try {
+    renderer.render(scene, camera);
+    const src = renderer.domElement.toDataURL('image/png');
+    const key = 'presentation-studio-assets-v1';
+    const assets = JSON.parse(localStorage.getItem(key) || '[]');
+    if (!assets.some((asset) => asset.src === src)) {
+      assets.push({ src, added: Date.now(), name: '3D Text Studio output' });
+      localStorage.setItem(key, JSON.stringify(assets.slice(-30)));
+    }
+    alert('3D output Presentation Asset Library-তে পাঠানো হয়েছে।');
+  } catch (err) { console.error(err); alert('Presentation-এ পাঠানো যায়নি।'); }
+}
+if (send3dToPresentationBtn) send3dToPresentationBtn.addEventListener('click', send3DToPresentation);
+window.addEventListener('keydown', (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'p') {
+    event.preventDefault(); send3DToPresentation();
+  }
+});

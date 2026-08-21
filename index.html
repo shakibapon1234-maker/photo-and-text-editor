@@ -122,6 +122,9 @@
       <button class="tab-btn" id="tabDesignBtn" onclick="switchTab('design')">
         <span>✨ ডিজাইন টুলস (Design Tools)</span>
       </button>
+      <button class="tab-btn" id="tabPresentationBtn" onclick="switchTab('presentation')">
+        <span>📊 প্রেজেন্টেশন (Presentation)</span>
+      </button>
     </div>
   </header>
 
@@ -131,6 +134,7 @@
     <iframe id="frameLogo" class="app-frame" src="spinning-circle-animation.html"></iframe>
     <iframe id="framePromo" class="app-frame" src="promo-motion-studio.html"></iframe>
     <iframe id="frameDesign" class="app-frame" src="design-tools.html"></iframe>
+    <iframe id="framePresentation" class="app-frame" data-src="presentation-studio.html"></iframe>
   </main>
 
   <script>
@@ -140,11 +144,13 @@
       const frameLogo = document.getElementById('frameLogo');
       const framePromo = document.getElementById('framePromo');
       const frameDesign = document.getElementById('frameDesign');
+      const framePresentation = document.getElementById('framePresentation');
       const tabPhotoBtn = document.getElementById('tabPhotoBtn');
       const tab3dBtn = document.getElementById('tab3dBtn');
       const tabLogoBtn = document.getElementById('tabLogoBtn');
       const tabPromoBtn = document.getElementById('tabPromoBtn');
       const tabDesignBtn = document.getElementById('tabDesignBtn');
+      const tabPresentationBtn = document.getElementById('tabPresentationBtn');
 
       if (tab === 'photo') {
         framePhoto.classList.add('active');
@@ -152,11 +158,13 @@
         frameLogo.classList.remove('active');
         framePromo.classList.remove('active');
         frameDesign.classList.remove('active');
+        framePresentation.classList.remove('active');
         tabPhotoBtn.classList.add('active');
         tab3dBtn.classList.remove('active');
         tabLogoBtn.classList.remove('active');
         tabPromoBtn.classList.remove('active');
         tabDesignBtn.classList.remove('active');
+        tabPresentationBtn.classList.remove('active');
         try { localStorage.setItem('active_studio_tab', 'photo'); } catch (_) {}
       } else if (tab === '3d') {
         frame3d.classList.add('active');
@@ -164,11 +172,13 @@
         frameLogo.classList.remove('active');
         framePromo.classList.remove('active');
         frameDesign.classList.remove('active');
+        framePresentation.classList.remove('active');
         tab3dBtn.classList.add('active');
         tabPhotoBtn.classList.remove('active');
         tabLogoBtn.classList.remove('active');
         tabPromoBtn.classList.remove('active');
         tabDesignBtn.classList.remove('active');
+        tabPresentationBtn.classList.remove('active');
         try { localStorage.setItem('active_studio_tab', '3d'); } catch (_) {}
       } else if (tab === 'logo') {
         frameLogo.classList.add('active');
@@ -176,11 +186,13 @@
         frame3d.classList.remove('active');
         framePromo.classList.remove('active');
         frameDesign.classList.remove('active');
+        framePresentation.classList.remove('active');
         tabLogoBtn.classList.add('active');
         tabPhotoBtn.classList.remove('active');
         tab3dBtn.classList.remove('active');
         tabPromoBtn.classList.remove('active');
         tabDesignBtn.classList.remove('active');
+        tabPresentationBtn.classList.remove('active');
         try { localStorage.setItem('active_studio_tab', 'logo'); } catch (_) {}
       } else if (tab === 'promo') {
         framePromo.classList.add('active');
@@ -188,11 +200,13 @@
         frame3d.classList.remove('active');
         frameLogo.classList.remove('active');
         frameDesign.classList.remove('active');
+        framePresentation.classList.remove('active');
         tabPromoBtn.classList.add('active');
         tabPhotoBtn.classList.remove('active');
         tab3dBtn.classList.remove('active');
         tabLogoBtn.classList.remove('active');
         tabDesignBtn.classList.remove('active');
+        tabPresentationBtn.classList.remove('active');
         try { localStorage.setItem('active_studio_tab', 'promo'); } catch (_) {}
       } else if (tab === 'design') {
         frameDesign.classList.add('active');
@@ -200,12 +214,29 @@
         frame3d.classList.remove('active');
         frameLogo.classList.remove('active');
         framePromo.classList.remove('active');
+        framePresentation.classList.remove('active');
         tabDesignBtn.classList.add('active');
         tabPhotoBtn.classList.remove('active');
         tab3dBtn.classList.remove('active');
         tabLogoBtn.classList.remove('active');
         tabPromoBtn.classList.remove('active');
+        tabPresentationBtn.classList.remove('active');
         try { localStorage.setItem('active_studio_tab', 'design'); } catch (_) {}
+      } else if (tab === 'presentation') {
+        if (!framePresentation.src) framePresentation.src = framePresentation.dataset.src;
+        framePresentation.classList.add('active');
+        framePhoto.classList.remove('active');
+        frame3d.classList.remove('active');
+        frameLogo.classList.remove('active');
+        framePromo.classList.remove('active');
+        frameDesign.classList.remove('active');
+        tabPresentationBtn.classList.add('active');
+        tabPhotoBtn.classList.remove('active');
+        tab3dBtn.classList.remove('active');
+        tabLogoBtn.classList.remove('active');
+        tabPromoBtn.classList.remove('active');
+        tabDesignBtn.classList.remove('active');
+        try { localStorage.setItem('active_studio_tab', 'presentation'); } catch (_) {}
       }
     }
 
@@ -275,7 +306,7 @@
       try {
         savedTab = localStorage.getItem('active_studio_tab') || 'photo';
       } catch (_) {}
-      if (savedTab === '3d' || savedTab === 'logo' || savedTab === 'promo' || savedTab === 'design') switchTab(savedTab);
+      if (savedTab === '3d' || savedTab === 'logo' || savedTab === 'promo' || savedTab === 'design' || savedTab === 'presentation') switchTab(savedTab);
     });
   </script>
 </body>

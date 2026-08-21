@@ -412,6 +412,36 @@
                             </div>
                         </div>
 
+                        <div class="form-group">
+                            <label>হিউ / রঙ ঘোরানো: <strong id="hueValue">0</strong>°</label>
+                            <input type="range" id="hueSlider" min="-180" max="180" value="0" class="range-slider">
+                            <div class="range-labels"><span>কুল</span><span>ওয়ার্ম</span></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>ব্লার: <strong id="blurValue">0</strong>px</label>
+                            <input type="range" id="blurSlider" min="0" max="20" value="0" step="0.5" class="range-slider">
+                            <div class="range-labels"><span>শার্প</span><span>সফট ব্লার</span></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>ভিনিয়েট: <strong id="vignetteValue">0</strong>%</label>
+                            <input type="range" id="vignetteSlider" min="0" max="100" value="0" class="range-slider">
+                            <div class="range-labels"><span>বন্ধ</span><span>সিনেমাটিক</span></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>এক্সপোজার: <strong id="exposureValue">0</strong></label>
+                            <input type="range" id="exposureSlider" min="-100" max="100" value="0" class="range-slider">
+                            <div class="range-labels"><span>ডার্ক</span><span>লাইট</span></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>ওয়ার্মথ / টেম্পারেচার: <strong id="temperatureValue">0</strong></label>
+                            <input type="range" id="temperatureSlider" min="-100" max="100" value="0" class="range-slider">
+                            <div class="range-labels"><span>কুল ব্লু</span><span>ওয়ার্ম গোল্ড</span></div>
+                        </div>
+
                         <div class="brightness-presets">
                             <label>প্রিসেট:</label>
                             <div class="preset-grid">
@@ -430,6 +460,10 @@
                                 <button class="preset-btn-bright" data-b="105" data-c="105" data-s="110" data-h="15">গরম
                                     টোন</button>
                                 <button class="preset-btn-bright" data-b="100" data-c="100" data-s="100">রিসেট</button>
+                                <button class="preset-btn-bright" data-b="96" data-c="118" data-s="84" data-h="-8" data-v="22">সিনেমাটিক</button>
+                                <button class="preset-btn-bright" data-b="108" data-c="108" data-s="115" data-h="8">গোল্ডেন আওয়ার</button>
+                                <button class="preset-btn-bright" data-b="105" data-c="90" data-s="85" data-bl="1">পোর্ট্রেট সফট</button>
+                                <button class="preset-btn-bright" data-b="112" data-c="122" data-s="130">প্রোডাক্ট পপ</button>
                             </div>
                         </div>
 
@@ -1267,6 +1301,9 @@
                                     <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
                                 </svg>
                                 পরিবর্তন
+                            </button>
+                            <button class="btn btn-ghost" id="sendToPresentationBtn" title="Presentation Asset Library-তে পাঠান (Ctrl+Shift+P)" style="color:#67e8f9; font-weight:600;">
+                                📊 প্রেজেন্টেশনে পাঠান
                             </button>
                             <button class="btn btn-ghost" id="resetSessionBtn" title="সংরক্ষিত সেশন মুছে নতুন ছবি শুরু করুন" style="color:#ef4444;">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>

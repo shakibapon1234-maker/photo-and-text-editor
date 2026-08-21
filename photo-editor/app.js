@@ -68,6 +68,16 @@
     const contrastValue = document.getElementById('contrastValue');
     const saturationSlider = document.getElementById('saturationSlider');
     const saturationValue = document.getElementById('saturationValue');
+    const hueSlider = document.getElementById('hueSlider');
+    const hueValue = document.getElementById('hueValue');
+    const blurSlider = document.getElementById('blurSlider');
+    const blurValue = document.getElementById('blurValue');
+    const vignetteSlider = document.getElementById('vignetteSlider');
+    const vignetteValue = document.getElementById('vignetteValue');
+    const exposureSlider = document.getElementById('exposureSlider');
+    const exposureValue = document.getElementById('exposureValue');
+    const temperatureSlider = document.getElementById('temperatureSlider');
+    const temperatureValue = document.getElementById('temperatureValue');
     const applyBrightness = document.getElementById('applyBrightness');
     const brightnessResult = document.getElementById('brightnessResult');
     const newBrightness = document.getElementById('newBrightness');
@@ -81,6 +91,7 @@
     let presetGrayscale = 0; // 0–1
     let presetSepia = 0;     // 0–1
     let presetHueRotate = 0; // degrees
+    let filterVignette = 0;  // 0–100
 
     // Crop Tool
     const cropX = document.getElementById('cropX');
@@ -97,6 +108,7 @@
     // Download
     const downloadSection = document.getElementById('downloadSection');
     const downloadBtn = document.getElementById('downloadBtn');
+    const sendToPresentationBtn = document.getElementById('sendToPresentationBtn');
 
     // Toast
     const toast = document.getElementById('toast');
@@ -344,6 +356,22 @@
         saturationSlider.value = 100;
         saturationValue.textContent = '100';
         saturationSlider.style.setProperty('--slider-percent', '33.3%');
+        hueSlider.value = 0;
+        hueValue.textContent = '0';
+        hueSlider.style.setProperty('--slider-percent', '50%');
+        blurSlider.value = 0;
+        blurValue.textContent = '0';
+        blurSlider.style.setProperty('--slider-percent', '0%');
+        vignetteSlider.value = 0;
+        vignetteValue.textContent = '0';
+        vignetteSlider.style.setProperty('--slider-percent', '0%');
+        filterVignette = 0;
+        exposureSlider.value = 0;
+        exposureValue.textContent = '0';
+        exposureSlider.style.setProperty('--slider-percent', '50%');
+        temperatureSlider.value = 0;
+        temperatureValue.textContent = '0';
+        temperatureSlider.style.setProperty('--slider-percent', '50%');
         previewImage.style.filter = 'none';
 
         // Phase 8: clear any active filter preset (grayscale/sepia/hue-rotate)
@@ -662,7 +690,9 @@
     // ============================================
 
     function updateSliderPercent(slider) {
-        const percent = (slider.value / slider.max) * 100;
+        const min = Number(slider.min || 0);
+        const max = Number(slider.max || 100);
+        const percent = ((Number(slider.value) - min) / (max - min)) * 100;
         slider.style.setProperty('--slider-percent', percent + '%');
     }
 
@@ -676,12 +706,22 @@
         brightnessValue.textContent = brightnessSlider.value;
         contrastValue.textContent = contrastSlider.value;
         saturationValue.textContent = saturationSlider.value;
+        hueValue.textContent = hueSlider.value;
+        blurValue.textContent = blurSlider.value;
+        vignetteValue.textContent = vignetteSlider.value;
+        exposureValue.textContent = exposureSlider.value;
+        temperatureValue.textContent = temperatureSlider.value;
         updateSliderPercent(brightnessSlider);
         updateSliderPercent(contrastSlider);
         updateSliderPercent(saturationSlider);
+        updateSliderPercent(hueSlider);
+        updateSliderPercent(blurSlider);
+        updateSliderPercent(vignetteSlider);
+        updateSliderPercent(exposureSlider);
+        updateSliderPercent(temperatureSlider);
         previewImage.style.filter = buildFilterString(
             brightness, contrast, saturation,
-            presetGrayscale, presetSepia, presetHueRotate
+            presetGrayscale, presetSepia, presetHueRotate + Number(hueSlider.value), Number(blurSlider.value)
         );
     }
 
@@ -693,11 +733,12 @@
     // as a no-op grayscale(0)/sepia(0)/hue-rotate(0deg), keeping the
     // filter string identical to the pre-Phase-8 output when no filter
     // preset is active.
-    function buildFilterString(brightness, contrast, saturation, grayscale, sepia, hueRotate) {
+    function buildFilterString(brightness, contrast, saturation, grayscale, sepia, hueRotate, blur) {
         let filter = `brightness(${brightness}) contrast(${contrast}) saturate(${saturation})`;
         if (grayscale) filter += ` grayscale(${grayscale})`;
         if (sepia) filter += ` sepia(${sepia})`;
         if (hueRotate) filter += ` hue-rotate(${hueRotate}deg)`;
+        if (blur) filter += ` blur(${blur}px)`;
         return filter;
     }
 
@@ -764,11 +805,15 @@
             presetGrayscale = parseFloat(btn.dataset.g || 0);
             presetSepia = parseFloat(btn.dataset.sp || 0);
             presetHueRotate = parseFloat(btn.dataset.h || 0);
+            hueSlider.value = 0;
+            blurSlider.value = btn.dataset.bl || 0;
+            vignetteSlider.value = btn.dataset.v || 0;
+            filterVignette = Number(vignetteSlider.value);
             updateBrightnessLivePreview();
         });
     });
 
-    [brightnessSlider, contrastSlider, saturationSlider].forEach(slider => {
+    [brightnessSlider, contrastSlider, saturationSlider, hueSlider, blurSlider, vignetteSlider, exposureSlider, temperatureSlider].forEach(slider => {
         slider.addEventListener('input', updateBrightnessLivePreview);
     });
 
@@ -808,6 +853,12 @@
             presetGrayscale = 0;
             presetSepia = 0;
             presetHueRotate = 0;
+            hueSlider.value = 0;
+            blurSlider.value = 0;
+            vignetteSlider.value = 0;
+            filterVignette = 0;
+            exposureSlider.value = 0;
+            temperatureSlider.value = 0;
             document.querySelectorAll('.preset-btn-bright').forEach(b => b.classList.remove('active'));
 
             showToast(`✨ অটো ফিক্স: Brightness ${settings.brightness}%, Contrast ${settings.contrast}%, Saturation ${settings.saturation}% — "অ্যাপ্লাই করুন" চাপুন`);
@@ -826,15 +877,39 @@
         setTimeout(() => {
             canvas.width = originalWidth;
             canvas.height = originalHeight;
-            ctx.filter = buildFilterString(brightness, contrast, saturation, presetGrayscale, presetSepia, presetHueRotate);
+            ctx.filter = buildFilterString(brightness, contrast, saturation, presetGrayscale, presetSepia, presetHueRotate + Number(hueSlider.value), Number(blurSlider.value));
             ctx.drawImage(originalImage, 0, 0);
             ctx.filter = 'none';
+
+            const exposure = Number(exposureSlider.value);
+            const temperature = Number(temperatureSlider.value);
+            if (exposure || temperature) {
+                const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const gain = Math.pow(2, exposure / 100);
+                const temp = temperature * 0.7;
+                for (let i = 0; i < pixels.data.length; i += 4) {
+                    pixels.data[i] = Math.max(0, Math.min(255, pixels.data[i] * gain + temp));
+                    pixels.data[i + 1] = Math.max(0, Math.min(255, pixels.data[i + 1] * gain));
+                    pixels.data[i + 2] = Math.max(0, Math.min(255, pixels.data[i + 2] * gain - temp));
+                }
+                ctx.putImageData(pixels, 0, 0);
+            }
+
+            filterVignette = Number(vignetteSlider.value);
+            if (filterVignette > 0) {
+                const strength = filterVignette / 100;
+                const gradient = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, Math.min(canvas.width, canvas.height) * 0.15, canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.72);
+                gradient.addColorStop(0, 'rgba(0,0,0,0)');
+                gradient.addColorStop(1, `rgba(0,0,0,${(strength * 0.75).toFixed(3)})`);
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
 
             canvas.toBlob(blob => {
                 previewImage.style.filter = 'none';
                 processedBlob = blob;
                 brightnessResult.style.display = 'block';
-                newBrightness.textContent = `B:${brightnessSlider.value}% C:${contrastSlider.value}% S:${saturationSlider.value}%`;
+                newBrightness.textContent = `B:${brightnessSlider.value}% C:${contrastSlider.value}% S:${saturationSlider.value}% H:${hueSlider.value}°`;
                 downloadSection.style.display = 'block';
                 updatePreview(blob);
                 pushHistory(blob, `ব্রাইটনেস/কন্ট্রাস্ট/স্যাচুরেশন পরিবর্তন`);
@@ -1246,6 +1321,33 @@
         showToast('📁 ফাইল ডাউনলোড হচ্ছে!', 'success');
     });
 
+    // Shared local Asset Library for the desktop suite. This avoids a
+    // download/upload round trip: the current edited image becomes available
+    // in Presentation Studio immediately (same Electron origin/localStorage).
+    const PRESENTATION_ASSET_KEY = 'presentation-studio-assets-v1';
+    function sendCurrentImageToPresentation() {
+        const source = processedBlob || originalFile;
+        if (!source) {
+            showToast('আগে একটি ছবি আপলোড বা এডিট করুন', 'error');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const assets = JSON.parse(localStorage.getItem(PRESENTATION_ASSET_KEY) || '[]');
+                if (!assets.some(asset => asset.src === reader.result)) {
+                    assets.push({ src: reader.result, added: Date.now(), name: originalFile?.name || 'Photo Editor image' });
+                    localStorage.setItem(PRESENTATION_ASSET_KEY, JSON.stringify(assets.slice(-30)));
+                }
+                showToast('📊 ছবিটি Presentation Asset Library-তে পাঠানো হয়েছে', 'success');
+            } catch (_) {
+                showToast('❌ Presentation asset save করা যায়নি', 'error');
+            }
+        };
+        reader.readAsDataURL(source);
+    }
+    if (sendToPresentationBtn) sendToPresentationBtn.addEventListener('click', sendCurrentImageToPresentation);
+
     // ============================================
     // Utilities
     // ============================================
@@ -1609,7 +1711,8 @@
         if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
         if (!(e.ctrlKey || e.metaKey)) return;
         const key = e.key.toLowerCase();
-        if (key === 'z' && !e.shiftKey) { e.preventDefault(); undoEdit(); }
+        if (key === 'p' && e.shiftKey) { e.preventDefault(); sendCurrentImageToPresentation(); }
+        else if (key === 'z' && !e.shiftKey) { e.preventDefault(); undoEdit(); }
         else if (key === 'y' || (key === 'z' && e.shiftKey)) { e.preventDefault(); redoEdit(); }
     });
 

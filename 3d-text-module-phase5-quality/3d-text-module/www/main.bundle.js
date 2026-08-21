@@ -42144,6 +42144,34 @@ if (reset3DStudioBtn) reset3DStudioBtn.addEventListener("click", reset3DStudio);
 var topbarResetBtn = document.getElementById("topbarResetBtn");
 if (topbarResetBtn) topbarResetBtn.addEventListener("click", reset3DStudio);
 window.reset3DStudio = reset3DStudio;
+var send3dToPresentationBtn = document.getElementById("send3dToPresentationBtn");
+function send3DToPresentation() {
+  if (!textMesh) {
+    alert("\u0986\u0997\u09C7 \u098F\u0995\u099F\u09BF 3D \u099F\u09C7\u0995\u09CD\u09B8\u099F, \u099B\u09AC\u09BF \u09AC\u09BE \u09B6\u09C7\u09AA \u09A4\u09C8\u09B0\u09BF \u0995\u09B0\u09C1\u09A8\u0964");
+    return;
+  }
+  try {
+    renderer.render(scene, camera);
+    const src = renderer.domElement.toDataURL("image/png");
+    const key = "presentation-studio-assets-v1";
+    const assets = JSON.parse(localStorage.getItem(key) || "[]");
+    if (!assets.some((asset) => asset.src === src)) {
+      assets.push({ src, added: Date.now(), name: "3D Text Studio output" });
+      localStorage.setItem(key, JSON.stringify(assets.slice(-30)));
+    }
+    alert("3D output Presentation Asset Library-\u09A4\u09C7 \u09AA\u09BE\u09A0\u09BE\u09A8\u09CB \u09B9\u09DF\u09C7\u099B\u09C7\u0964");
+  } catch (err) {
+    console.error(err);
+    alert("Presentation-\u098F \u09AA\u09BE\u09A0\u09BE\u09A8\u09CB \u09AF\u09BE\u09DF\u09A8\u09BF\u0964");
+  }
+}
+if (send3dToPresentationBtn) send3dToPresentationBtn.addEventListener("click", send3DToPresentation);
+window.addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "p") {
+    event.preventDefault();
+    send3DToPresentation();
+  }
+});
 /*! Bundled license information:
 
 jszip/dist/jszip.min.js:
