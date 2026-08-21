@@ -109,6 +109,7 @@
     const downloadSection = document.getElementById('downloadSection');
     const downloadBtn = document.getElementById('downloadBtn');
     const sendToPresentationBtn = document.getElementById('sendToPresentationBtn');
+    const sendTo3dBtn = document.getElementById('sendTo3dBtn');
 
     // Toast
     const toast = document.getElementById('toast');
@@ -1348,6 +1349,20 @@
     }
     if (sendToPresentationBtn) sendToPresentationBtn.addEventListener('click', sendCurrentImageToPresentation);
 
+    function sendCurrentImageTo3D() {
+        const source = processedBlob || originalFile;
+        if (!source) { showToast('আগে একটি ছবি আপলোড বা এডিট করুন', 'error'); return; }
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                localStorage.setItem('3d-studio-pending-image-v1', reader.result);
+                showToast('🧊 ছবিটি 3D Studio-তে পাঠানো হয়েছে — 3D tab খুলুন', 'success');
+            } catch (_) { showToast('❌ 3D Studio-তে পাঠানো যায়নি', 'error'); }
+        };
+        reader.readAsDataURL(source);
+    }
+    if (sendTo3dBtn) sendTo3dBtn.addEventListener('click', sendCurrentImageTo3D);
+
     // ============================================
     // Utilities
     // ============================================
@@ -1712,6 +1727,7 @@
         if (!(e.ctrlKey || e.metaKey)) return;
         const key = e.key.toLowerCase();
         if (key === 'p' && e.shiftKey) { e.preventDefault(); sendCurrentImageToPresentation(); }
+        else if (key === '3' && e.shiftKey) { e.preventDefault(); sendCurrentImageTo3D(); }
         else if (key === 'z' && !e.shiftKey) { e.preventDefault(); undoEdit(); }
         else if (key === 'y' || (key === 'z' && e.shiftKey)) { e.preventDefault(); redoEdit(); }
     });

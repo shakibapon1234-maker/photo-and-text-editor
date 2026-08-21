@@ -126,6 +126,7 @@
         <span>📊 প্রেজেন্টেশন (Presentation)</span>
       </button>
     </div>
+    <button class="tab-btn" id="sendActiveToPresentationBtn" onclick="sendActiveToPresentation()" title="বর্তমান tab-এর preview Presentation Asset Library-তে পাঠান" style="color:#67e8f9;border:1px solid #24516a;">📤 Presentation-এ পাঠান</button>
   </header>
 
   <main class="suite-body">
@@ -297,6 +298,44 @@
         } catch(e) {
           console.warn('Clear design tools error', e);
         }
+      }
+    }
+
+    // A suite-wide handoff: all visual tools expose a canvas or preview image.
+    // Capture it in one place so every tab can send an asset to Presentation.
+    async function sendActiveToPresentation() {
+      const pairs = [
+        ['framePhoto', 'Photo Editor output', '#previewImage'],
+        ['frame3d', '3D Studio output', '#scene-canvas'],
+        ['frameLogo', 'Logo Motion output', '#spinCanvas'],
+        ['framePromo', 'Promo Motion output', '#c'],
+        ['frameDesign', 'Design Tools output', '#canvas']
+      ];
+      const active = pairs.find(([frameId]) => document.getElementById(frameId).classList.contains('active'));
+      if (!active) { alert('প্রথমে একটি visual tool খুলুন।'); return; }
+      const [frameId, name, selector] = active;
+      const frame = document.getElementById(frameId);
+      try {
+        const doc = frame.contentDocument || frame.contentWindow.document;
+        const source = doc.querySelector(selector);
+        if (!source) throw new Error('Preview পাওয়া যায়নি');
+        let dataUrl;
+        if (source.tagName === 'CANVAS') dataUrl = source.toDataURL('image/png');
+        else {
+          const temp = document.createElement('canvas');
+          temp.width = source.naturalWidth || source.width;
+          temp.height = source.naturalHeight || source.height;
+          temp.getContext('2d').drawImage(source, 0, 0);
+          dataUrl = temp.toDataURL('image/png');
+        }
+        const key = 'presentation-studio-assets-v1';
+        const items = JSON.parse(localStorage.getItem(key) || '[]');
+        items.push({ src: dataUrl, added: Date.now(), name });
+        localStorage.setItem(key, JSON.stringify(items.slice(-30)));
+        alert(`✅ ${name} Presentation Asset Library-তে পাঠানো হয়েছে।`);
+      } catch (err) {
+        console.error(err);
+        alert('বর্তমান preview পাঠানো যায়নি। আগে content তৈরি করুন, তারপর আবার চেষ্টা করুন।');
       }
     }
 

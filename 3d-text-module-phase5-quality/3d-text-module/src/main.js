@@ -7139,3 +7139,31 @@ window.addEventListener('keydown', (event) => {
     event.preventDefault(); send3DToPresentation();
   }
 });
+
+// Receives Photo Editor's current output without a disk download/upload.
+// The payload is consumed once so reopening 3D Studio never resurrects a
+// stale image unexpectedly.
+function importPendingPhotoEditorImage() {
+  let src = null;
+  try { src = localStorage.getItem('3d-studio-pending-image-v1'); localStorage.removeItem('3d-studio-pending-image-v1'); } catch (_) {}
+  if (!src) return;
+  const img = new Image();
+  img.onload = () => {
+    state.imageElement = img;
+    state.contentMode = 'image';
+    setActivePreset(contentModeGrid, 'content', 'image');
+    textContentSection.hidden = true;
+    imageContentSection.hidden = false;
+    stickerContentSection.hidden = true;
+    if (cubeContentSection) cubeContentSection.hidden = true;
+    if (shapeContentSection) shapeContentSection.hidden = true;
+    curveSection.hidden = true;
+    imagePreviewThumb.src = src;
+    imagePreviewThumb.hidden = false;
+    imageNote.textContent = 'Photo Editor থেকে পাঠানো ছবি — 3D image object হিসেবে প্রস্তুত।';
+    rebuildTextMesh();
+    saveStudioStateDebounced();
+  };
+  img.src = src;
+}
+importPendingPhotoEditorImage();

@@ -42172,6 +42172,34 @@ window.addEventListener("keydown", (event) => {
     send3DToPresentation();
   }
 });
+function importPendingPhotoEditorImage() {
+  let src = null;
+  try {
+    src = localStorage.getItem("3d-studio-pending-image-v1");
+    localStorage.removeItem("3d-studio-pending-image-v1");
+  } catch (_) {
+  }
+  if (!src) return;
+  const img = new Image();
+  img.onload = () => {
+    state.imageElement = img;
+    state.contentMode = "image";
+    setActivePreset(contentModeGrid, "content", "image");
+    textContentSection.hidden = true;
+    imageContentSection.hidden = false;
+    stickerContentSection.hidden = true;
+    if (cubeContentSection) cubeContentSection.hidden = true;
+    if (shapeContentSection) shapeContentSection.hidden = true;
+    curveSection.hidden = true;
+    imagePreviewThumb.src = src;
+    imagePreviewThumb.hidden = false;
+    imageNote.textContent = "Photo Editor \u09A5\u09C7\u0995\u09C7 \u09AA\u09BE\u09A0\u09BE\u09A8\u09CB \u099B\u09AC\u09BF \u2014 3D image object \u09B9\u09BF\u09B8\u09C7\u09AC\u09C7 \u09AA\u09CD\u09B0\u09B8\u09CD\u09A4\u09C1\u09A4\u0964";
+    rebuildTextMesh();
+    saveStudioStateDebounced();
+  };
+  img.src = src;
+}
+importPendingPhotoEditorImage();
 /*! Bundled license information:
 
 jszip/dist/jszip.min.js:
