@@ -967,7 +967,7 @@
                                         <button type="button" class="active" data-fx="0.88" data-fy="0.88" title="নিচে-ডানে"></button>
                                     </div>
                                 </div>
-                                <p class="wm-hint">টিপ: প্রিভিউতে টেক্সট ধরে টেনে ইচ্ছেমতো জায়গায় বসাতে পারবেন</p>
+                                <p class="wm-hint">টিপ: প্রিভিউতে টেক্সট ধরে টেনে সরান; ডান-নিচের handle টেনে সাইজ এবং উপরের handle টেনে ঘুরান</p>
                             </div>
                         </div>
 
@@ -1016,7 +1016,7 @@
                                         <button type="button" class="active" data-fx="0.88" data-fy="0.88" title="নিচে-ডানে"></button>
                                     </div>
                                 </div>
-                                <p class="wm-hint">টিপ: প্রিভিউতে লোগো ধরে টেনে ইচ্ছেমতো জায়গায় বসাতে পারবেন</p>
+                                <p class="wm-hint">টিপ: প্রিভিউতে লোগো ধরে টেনে সরান; ডান-নিচের handle টেনে সাইজ এবং উপরের handle টেনে ঘুরান</p>
                             </div>
                         </div>
 
@@ -1353,9 +1353,11 @@
                         </div>
                         <!-- Watermark live-position overlay (Phase 9) -->
                         <div class="wm-overlay" id="wmOverlay" style="display:none;">
-                            <div class="wm-handle wm-handle-text" id="wmTextHandle" style="display:none;"></div>
+                            <div class="wm-handle wm-handle-text" id="wmTextHandle" style="display:none;"><span id="wmTextHandleLabel"></span><button type="button" class="wm-control wm-rotate-control" data-wm-action="rotate" aria-label="টেক্সট ঘুরান">↻</button><button type="button" class="wm-control wm-resize-control" data-wm-action="resize" aria-label="টেক্সটের সাইজ বদলান">↘</button></div>
                             <div class="wm-handle wm-handle-logo" id="wmLogoHandle" style="display:none;">
                                 <img id="wmLogoHandleImg" alt="Logo" draggable="false">
+                                <button type="button" class="wm-control wm-rotate-control" data-wm-action="rotate" aria-label="লোগো ঘুরান">↻</button>
+                                <button type="button" class="wm-control wm-resize-control" data-wm-action="resize" aria-label="লোগোর সাইজ বদলান">↘</button>
                             </div>
                         </div>
                     </div>

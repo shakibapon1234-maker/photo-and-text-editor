@@ -4110,6 +4110,7 @@
         const applyWatermarkBtn = document.getElementById('applyWatermark');
         const wmOverlay = document.getElementById('wmOverlay');
         const wmTextHandle = document.getElementById('wmTextHandle');
+        const wmTextHandleLabel = document.getElementById('wmTextHandleLabel');
         const wmLogoHandle = document.getElementById('wmLogoHandle');
         const wmLogoHandleImg = document.getElementById('wmLogoHandleImg');
         const wmTemplateGrid = document.getElementById('wmTemplateGrid');
@@ -4123,6 +4124,8 @@
 
         let wmTextPos = { fx: 0.88, fy: 0.88 };
         let wmLogoPos = { fx: 0.88, fy: 0.88 };
+        let wmTextRotation = 0;
+        let wmLogoRotation = 0;
         let wmLogoImage = null;   // loaded HTMLImageElement for the uploaded logo
         let wmLogoAspect = 1;     // naturalHeight / naturalWidth, for preserving logo proportions
 
@@ -4171,9 +4174,10 @@
             const rect = getImageDisplayRect();
             const refDim = Math.min(rect.width, rect.height);
             const fontPx = Math.max(8, Math.round(refDim * (parseFloat(wmFontSize.value) / 100)));
-            wmTextHandle.textContent = wmText.value || 'নমুনা টেক্সট';
+            wmTextHandleLabel.textContent = wmText.value || 'নমুনা টেক্সট';
             wmTextHandle.style.left = (wmTextPos.fx * 100) + '%';
             wmTextHandle.style.top = (wmTextPos.fy * 100) + '%';
+            wmTextHandle.style.transform = `translate(-50%, -50%) rotate(${wmTextRotation}deg)`;
             wmTextHandle.style.fontSize = fontPx + 'px';
             wmTextHandle.style.fontFamily = wmFontFamily.value;
             wmTextHandle.style.fontWeight = wmFontFamily.value.includes('Noto Sans Bengali') ? '900' : '700';
@@ -4195,6 +4199,7 @@
             wmLogoHandleImg.style.height = height + 'px';
             wmLogoHandle.style.left = (wmLogoPos.fx * 100) + '%';
             wmLogoHandle.style.top = (wmLogoPos.fy * 100) + '%';
+            wmLogoHandle.style.transform = `translate(-50%, -50%) rotate(${wmLogoRotation}deg)`;
             wmLogoHandle.style.opacity = parseFloat(wmLogoOpacity.value) / 100;
             wmLogoHandle.style.display = 'block';
         }
@@ -4292,12 +4297,9 @@
         wirePositionGrid(wmTextPositionGrid, wmTextPos, updateTextHandle);
         wirePositionGrid(wmLogoPositionGrid, wmLogoPos, updateLogoHandle);
 
-        // ---------- Free-drag positioning ----------
-        // Same "fixed element + JS-computed left/top from the pointer"
-        // approach as the eyedropper loupe, adapted to set a persistent
-        // fx/fy anchor (0–1) instead of a one-off cursor-follow position.
-        function wireDrag(handle, posState, grid, onMove) {
-            let dragging = false;
+        // ---------- Direct mouse transform: move, corner-resize, rotate ----------
+        function wireTransform(handle, posState, grid, onMove, sizeInput, minSize, maxSize, getRotation, setRotation) {
+            let interaction = null;
 
             function clientToFraction(clientX, clientY) {
                 const rect = getImageDisplayRect();
@@ -4310,36 +4312,61 @@
                 return { fx, fy };
             }
 
+            function getCenter() {
+                const rect = handle.getBoundingClientRect();
+                return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            }
+
             function onPointerMove(e) {
-                if (!dragging) return;
-                const pt = clientToFraction(e.clientX, e.clientY);
-                if (!pt) return;
-                posState.fx = pt.fx;
-                posState.fy = pt.fy;
+                if (!interaction) return;
+                if (interaction.kind === 'move') {
+                    const pt = clientToFraction(e.clientX, e.clientY);
+                    if (!pt) return;
+                    posState.fx = pt.fx;
+                    posState.fy = pt.fy;
+                } else if (interaction.kind === 'resize') {
+                    const distance = Math.max(1, Math.hypot(e.clientX - interaction.center.x, e.clientY - interaction.center.y));
+                    sizeInput.value = String(Math.max(minSize, Math.min(maxSize, interaction.size * distance / interaction.distance)));
+                    refreshSliderLabels();
+                } else if (interaction.kind === 'rotate') {
+                    const angle = Math.atan2(e.clientY - interaction.center.y, e.clientX - interaction.center.x) * 180 / Math.PI + 90;
+                    setRotation(Math.round(angle));
+                }
                 onMove();
             }
 
             function onPointerUp() {
-                if (!dragging) return;
-                dragging = false;
+                if (!interaction) return;
+                const moved = interaction.kind === 'move';
+                interaction = null;
                 handle.classList.remove('dragging');
-                // A manual drag no longer matches any 9-grid preset exactly —
-                // clear the active highlight so the grid doesn't lie about it.
-                if (grid) grid.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                if (moved && grid) grid.querySelectorAll('button').forEach(b => b.classList.remove('active'));
                 document.removeEventListener('pointermove', onPointerMove);
                 document.removeEventListener('pointerup', onPointerUp);
             }
 
             handle.addEventListener('pointerdown', (e) => {
+                if (e.button !== undefined && e.button !== 0) return;
                 e.preventDefault();
-                dragging = true;
+                const actionControl = e.target.closest('[data-wm-action]');
+                const kind = actionControl ? actionControl.dataset.wmAction : 'move';
+                const center = getCenter();
+                interaction = {
+                    kind,
+                    center,
+                    size: Number(sizeInput.value),
+                    distance: Math.max(1, Math.hypot(e.clientX - center.x, e.clientY - center.y)),
+                    rotation: getRotation()
+                };
                 handle.classList.add('dragging');
                 document.addEventListener('pointermove', onPointerMove);
                 document.addEventListener('pointerup', onPointerUp);
             });
         }
-        wireDrag(wmTextHandle, wmTextPos, wmTextPositionGrid, updateTextHandle);
-        wireDrag(wmLogoHandle, wmLogoPos, wmLogoPositionGrid, updateLogoHandle);
+        wireTransform(wmTextHandle, wmTextPos, wmTextPositionGrid, updateTextHandle, wmFontSize, 2, 20,
+            () => wmTextRotation, (value) => { wmTextRotation = value; });
+        wireTransform(wmLogoHandle, wmLogoPos, wmLogoPositionGrid, updateLogoHandle, wmLogoScale, 5, 60,
+            () => wmLogoRotation, (value) => { wmLogoRotation = value; });
 
         // ---------- Tab / image lifecycle ----------
         document.addEventListener('app:tabchange', syncOverlayVisibility);
@@ -4358,11 +4385,13 @@
                 color: wmTextColor.value,
                 textOpacity: parseFloat(wmTextOpacity.value),
                 textPos: { fx: wmTextPos.fx, fy: wmTextPos.fy },
+                textRotation: wmTextRotation,
                 logoEnabled: wmLogoEnabled.checked,
                 logoScaleRatio: parseFloat(wmLogoScale.value) / 100,
                 logoAspect: wmLogoAspect,
                 logoOpacity: parseFloat(wmLogoOpacity.value),
-                logoPos: { fx: wmLogoPos.fx, fy: wmLogoPos.fy }
+                logoPos: { fx: wmLogoPos.fx, fy: wmLogoPos.fy },
+                logoRotation: wmLogoRotation
             };
         }
 
