@@ -344,6 +344,7 @@
         saturationSlider.value = 100;
         saturationValue.textContent = '100';
         saturationSlider.style.setProperty('--slider-percent', '33.3%');
+        previewImage.style.filter = 'none';
 
         // Phase 8: clear any active filter preset (grayscale/sepia/hue-rotate)
         // and its highlighted button so a fresh upload always starts neutral.
@@ -665,6 +666,25 @@
         slider.style.setProperty('--slider-percent', percent + '%');
     }
 
+    // Show adjustment changes immediately while the sliders move. The Apply
+    // button below still commits the same values into the exported image.
+    function updateBrightnessLivePreview() {
+        if (!originalImage) return;
+        const brightness = parseInt(brightnessSlider.value, 10) / 100;
+        const contrast = parseInt(contrastSlider.value, 10) / 100;
+        const saturation = parseInt(saturationSlider.value, 10) / 100;
+        brightnessValue.textContent = brightnessSlider.value;
+        contrastValue.textContent = contrastSlider.value;
+        saturationValue.textContent = saturationSlider.value;
+        updateSliderPercent(brightnessSlider);
+        updateSliderPercent(contrastSlider);
+        updateSliderPercent(saturationSlider);
+        previewImage.style.filter = buildFilterString(
+            brightness, contrast, saturation,
+            presetGrayscale, presetSepia, presetHueRotate
+        );
+    }
+
     // Phase 8: PURE function — builds the ctx.filter CSS string from plain
     // numbers, no canvas/DOM involved, so it's unit-testable standalone in
     // plain Node. brightness/contrast/saturation are ratios (1 = 100%),
@@ -744,7 +764,12 @@
             presetGrayscale = parseFloat(btn.dataset.g || 0);
             presetSepia = parseFloat(btn.dataset.sp || 0);
             presetHueRotate = parseFloat(btn.dataset.h || 0);
+            updateBrightnessLivePreview();
         });
+    });
+
+    [brightnessSlider, contrastSlider, saturationSlider].forEach(slider => {
+        slider.addEventListener('input', updateBrightnessLivePreview);
     });
 
     // Phase 18: auto-enhance button
@@ -806,6 +831,7 @@
             ctx.filter = 'none';
 
             canvas.toBlob(blob => {
+                previewImage.style.filter = 'none';
                 processedBlob = blob;
                 brightnessResult.style.display = 'block';
                 newBrightness.textContent = `B:${brightnessSlider.value}% C:${contrastSlider.value}% S:${saturationSlider.value}%`;
