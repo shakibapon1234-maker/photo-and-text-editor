@@ -206,11 +206,54 @@
     }
     if (event.key !== 'Escape') return;
     document.querySelectorAll('.toolbar-group.open').forEach(x => x.classList.remove('open'));
-    ['textToolsMenu','colorPop','shapeGallery','tablePicker','assetDrawer','smartDesigner','soundtrackPanel','textGradientAppearance'].forEach(id => $(id)?.classList.add('hidden'));
+    ['textToolsMenu','colorPop','shapeGallery','tablePicker','assetDrawer','smartDesigner','soundtrackPanel','textGradientAppearance','iconLibrary'].forEach(id => $(id)?.classList.add('hidden'));
     document.getAnimations().forEach(animation => animation.cancel());
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     window.getSelection()?.removeAllRanges();
   }, true);
+
+  // Built-in SVG icons stay sharp at every size and behave exactly like an
+  // inserted image, so they can be placed beside any text box.
+  const iconButton = document.createElement('button');
+  iconButton.id = 'iconLibraryBtn';
+  iconButton.type = 'button';
+  iconButton.textContent = '◈ Icons';
+  const insertMenu = document.querySelector('.toolbar-menu[data-menu="insert"]');
+  (insertMenu || document.querySelector('.top')).appendChild(iconButton);
+  const iconPanel = document.createElement('div');
+  iconPanel.id = 'iconLibrary';
+  iconPanel.className = 'icon-library hidden';
+  iconPanel.innerHTML = '<div class="icon-library-head"><strong>ICON LIBRARY</strong><button type="button" id="closeIconLibrary">×</button></div><p class="hint">Icon click করলেই slide-এ যোগ হবে। তারপর text box পাশে বসান।</p><div id="iconGrid" class="icon-grid"></div>';
+  document.body.appendChild(iconPanel);
+  const iconDefinitions = [
+    ['Facebook','#1877f2','f','Facebook'], ['WhatsApp','#25d366','☎','WhatsApp'], ['Instagram','#e4405f','◎','Instagram'], ['YouTube','#ff0000','▶','YouTube'], ['Messenger','#0084ff','✦','Messenger'], ['Telegram','#229ed9','➤','Telegram'], ['LinkedIn','#0a66c2','in','LinkedIn'], ['TikTok','#111827','♪','TikTok'],
+    ['Email','#e85d4a','✉','Email'], ['Phone','#16a34a','☎','Phone'], ['Location','#dc2626','●','Location'], ['Website','#2563eb','◎','Website'], ['Home','#f59e0b','⌂','Home'], ['User','#7c3aed','●','User'], ['Calendar','#0f766e','▣','Calendar'], ['Clock','#475569','◷','Clock'],
+    ['Cart','#b45309','🛒','Shopping cart'], ['Bag','#a855f7','▢','Shopping bag'], ['Star','#eab308','★','Star'], ['Check','#16a34a','✓','Check'], ['Info','#0284c7','i','Info'], ['Arrow','#334155','→','Arrow']
+  ];
+  const svgIcon = (color, glyph, label) => {
+    const textSize = glyph.length > 1 ? 42 : 58;
+    const whatsapp = label === 'WhatsApp'
+      ? '<path fill="#fff" d="M80 35C55.1 35 35 55.1 35 80c0 8 2.1 15.4 5.8 21.9L35 125l23.7-6.2A44.8 44.8 0 0 0 80 125c24.9 0 45-20.1 45-45S104.9 35 80 35zm0 80.9c-6.8 0-13.1-2-18.5-5.4l-13.8 3.6 3.7-13.4A35.6 35.6 0 1 1 80 115.9z"/><path fill="'+color+'" d="M66.1 56.7c-2.1 0-3.7 1.1-4.5 3.1-1.5 3.7-2.2 7.1-2.2 10.5 0 16.2 13.1 29.3 29.3 29.3 3.4 0 6.8-.7 10.5-2.2 2-.8 3.1-2.4 3.1-4.5l-1-7.5c-.2-1.8-2-3-3.8-2.5l-6.3 1.7c-1.2.3-2.4 0-3.3-.8a43.7 43.7 0 0 1-11.7-11.7c-.8-.9-1.1-2.1-.8-3.3l1.7-6.3c.5-1.8-.7-3.6-2.5-3.8z"/>'
+      : '<text x="80" y="101" text-anchor="middle" font-family="Arial, sans-serif" font-size="'+textSize+'" font-weight="700" fill="#fff">'+glyph+'</text>';
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-label="'+label+'"><circle cx="80" cy="80" r="72" fill="'+color+'"/>'+whatsapp+'</svg>';
+    return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  };
+  const iconGrid = $('iconGrid');
+  iconDefinitions.forEach(([name, color, glyph, label]) => {
+    const item = document.createElement('button'); item.type = 'button'; item.className = 'icon-choice'; item.title = label;
+    item.innerHTML = '<img alt="" src="'+svgIcon(color, glyph, label)+'"><span>'+name+'</span>';
+    item.onclick = () => {
+      addImage(svgIcon(color, glyph, label));
+      const icon = selectedEl();
+      if (icon && icon.type === 'image') { icon.x = 12; icon.y = 58; icon.w = 9; icon.h = 12; icon.fit = 'contain'; render(); }
+      iconPanel.classList.add('hidden');
+    };
+    iconGrid.appendChild(item);
+  });
+  iconButton.onclick = event => { event.stopPropagation(); iconPanel.classList.toggle('hidden'); };
+  $('closeIconLibrary').onclick = () => iconPanel.classList.add('hidden');
+  document.addEventListener('pointerdown', event => { if (!iconPanel.contains(event.target) && event.target !== iconButton) iconPanel.classList.add('hidden'); });
+  document.head.insertAdjacentHTML('beforeend', '<style>#iconLibraryBtn{white-space:nowrap}.icon-library-head{display:flex;align-items:center;justify-content:space-between;color:#ffd166}.icon-library-head button{padding:3px 8px}.icon-library{position:fixed;z-index:160;top:70px;left:50%;transform:translateX(-50%);width:min(720px,calc(100vw - 24px));max-height:calc(100vh - 92px);overflow:auto;padding:14px;background:#111b2c;border:1px solid #50617d;border-radius:12px;box-shadow:0 24px 70px #000d}.icon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}.icon-choice{display:flex;flex-direction:column;align-items:center;gap:5px;min-height:86px;padding:8px 5px;font-size:10px;background:#18243a}.icon-choice img{width:42px;height:42px}.icon-choice:hover{border-color:#ffb11b;transform:translateY(-1px)}</style>');
   refreshUndoButtons();
   render();
 })();
