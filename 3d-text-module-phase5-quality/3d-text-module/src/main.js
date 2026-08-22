@@ -49,6 +49,7 @@ const viewportEl = document.getElementById('viewport');
 const safeAreaSelect = document.getElementById('safeAreaSelect');
 const safeAreaGuide = document.getElementById('safeAreaGuide');
 const safeAreaLabel = document.getElementById('safeAreaLabel');
+const safeAreaNote = document.getElementById('safeAreaNote');
 const textTemplateGrid = document.getElementById('textTemplateGrid');
 
 const contentModeGrid = document.getElementById('contentModeGrid');
@@ -4728,7 +4729,11 @@ function renderSafeAreaGuide() {
     if (safeAreaGuide) safeAreaGuide.hidden = true;
     return;
   }
-  const [frameW, frameH] = state.safeArea.split(':').map(Number);
+  // The export frame previews the exact crop aspect ratio of the selected download size.
+  const exportSize = exportResolutionSelect?.value?.split('x').map(Number);
+  const [frameW, frameH] = state.safeArea === 'export'
+    ? (exportSize || [])
+    : state.safeArea.split(':').map(Number);
   const hostW = viewportEl.clientWidth;
   const hostH = viewportEl.clientHeight;
   if (!frameW || !frameH || !hostW || !hostH) return;
@@ -4742,7 +4747,14 @@ function renderSafeAreaGuide() {
   safeAreaGuide.style.left = `${Math.round((hostW - width) / 2)}px`;
   safeAreaGuide.style.top = `${Math.round((hostH - height) / 2)}px`;
   safeAreaGuide.hidden = false;
-  if (safeAreaLabel) safeAreaLabel.textContent = `${state.safeArea} SAFE FRAME`;
+  if (safeAreaLabel) {
+    safeAreaLabel.textContent = state.safeArea === 'export'
+      ? `${frameW}×${frameH} OUTPUT FRAME`
+      : `${state.safeArea} SAFE FRAME`;
+  }
+  if (safeAreaNote && state.safeArea === 'export') {
+    safeAreaNote.textContent = `নীল ফ্রেমটিই ${frameW}×${frameH} ডাউনলোড স্ক্রিন। ফ্রেমের বাইরের অংশ কেটে যাবে—তাই লেখা/শেপ সম্পূর্ণ নীল ফ্রেমের ভেতরে রাখুন।`;
+  }
 }
 window.addEventListener('resize', handleResize);
 handleResize();
@@ -6087,7 +6099,10 @@ turntableLengthRange.addEventListener('input', () => {
   updateExportSourceNote();
 });
 
-exportResolutionSelect.addEventListener('change', updateGifSizeEstimate);
+exportResolutionSelect.addEventListener('change', () => {
+  updateGifSizeEstimate();
+  if (state.safeArea === 'export') renderSafeAreaGuide();
+});
 exportFpsSelect.addEventListener('change', updateGifSizeEstimate);
 gifQualitySelect.addEventListener('change', updateGifSizeEstimate);
 
@@ -6994,7 +7009,7 @@ function reset3DStudio() {
   clearTimeout(saveTimeout); // prevent an older debounced save restoring cleared work
   saveTimeout = null;
   state.contentMode = 'text';
-  state.safeArea = 'none';
+  state.safeArea = 'export';
   state.text = 'Warisha Fashion';
   state.stickerText = 'Warisha Fashion';
   state.fontFamily = 'helvetiker';
@@ -7049,7 +7064,7 @@ function reset3DStudio() {
   animState.loop = false;
 
   if (textInput) textInput.value = state.text;
-  if (safeAreaSelect) safeAreaSelect.value = 'none';
+  if (safeAreaSelect) safeAreaSelect.value = 'export';
   if (stickerTextInput) stickerTextInput.value = state.stickerText;
   if (sizeRange) sizeRange.value = 70;
   if (depthRange) depthRange.value = 18;

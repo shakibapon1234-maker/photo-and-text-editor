@@ -36099,6 +36099,7 @@ var viewportEl = document.getElementById("viewport");
 var safeAreaSelect = document.getElementById("safeAreaSelect");
 var safeAreaGuide = document.getElementById("safeAreaGuide");
 var safeAreaLabel = document.getElementById("safeAreaLabel");
+var safeAreaNote = document.getElementById("safeAreaNote");
 var textTemplateGrid = document.getElementById("textTemplateGrid");
 var contentModeGrid = document.getElementById("contentModeGrid");
 var textContentSection = document.getElementById("textContentSection");
@@ -39985,7 +39986,8 @@ function renderSafeAreaGuide() {
     if (safeAreaGuide) safeAreaGuide.hidden = true;
     return;
   }
-  const [frameW, frameH] = state.safeArea.split(":").map(Number);
+  const exportSize = exportResolutionSelect?.value?.split("x").map(Number);
+  const [frameW, frameH] = state.safeArea === "export" ? exportSize || [] : state.safeArea.split(":").map(Number);
   const hostW = viewportEl.clientWidth;
   const hostH = viewportEl.clientHeight;
   if (!frameW || !frameH || !hostW || !hostH) return;
@@ -40004,7 +40006,12 @@ function renderSafeAreaGuide() {
   safeAreaGuide.style.left = `${Math.round((hostW - width) / 2)}px`;
   safeAreaGuide.style.top = `${Math.round((hostH - height) / 2)}px`;
   safeAreaGuide.hidden = false;
-  if (safeAreaLabel) safeAreaLabel.textContent = `${state.safeArea} SAFE FRAME`;
+  if (safeAreaLabel) {
+    safeAreaLabel.textContent = state.safeArea === "export" ? `${frameW}\xD7${frameH} OUTPUT FRAME` : `${state.safeArea} SAFE FRAME`;
+  }
+  if (safeAreaNote && state.safeArea === "export") {
+    safeAreaNote.textContent = `\u09A8\u09C0\u09B2 \u09AB\u09CD\u09B0\u09C7\u09AE\u099F\u09BF\u0987 ${frameW}\xD7${frameH} \u09A1\u09BE\u0989\u09A8\u09B2\u09CB\u09A1 \u09B8\u09CD\u0995\u09CD\u09B0\u09BF\u09A8\u0964 \u09AB\u09CD\u09B0\u09C7\u09AE\u09C7\u09B0 \u09AC\u09BE\u0987\u09B0\u09C7\u09B0 \u0985\u0982\u09B6 \u0995\u09C7\u099F\u09C7 \u09AF\u09BE\u09AC\u09C7\u2014\u09A4\u09BE\u0987 \u09B2\u09C7\u0996\u09BE/\u09B6\u09C7\u09AA \u09B8\u09AE\u09CD\u09AA\u09C2\u09B0\u09CD\u09A3 \u09A8\u09C0\u09B2 \u09AB\u09CD\u09B0\u09C7\u09AE\u09C7\u09B0 \u09AD\u09C7\u09A4\u09B0\u09C7 \u09B0\u09BE\u0996\u09C1\u09A8\u0964`;
+  }
 }
 window.addEventListener("resize", handleResize);
 handleResize();
@@ -41230,7 +41237,10 @@ turntableLengthRange.addEventListener("input", () => {
   turntableLengthValue.textContent = `${(Number(turntableLengthRange.value) / 1e3).toFixed(1)}s`;
   updateExportSourceNote();
 });
-exportResolutionSelect.addEventListener("change", updateGifSizeEstimate);
+exportResolutionSelect.addEventListener("change", () => {
+  updateGifSizeEstimate();
+  if (state.safeArea === "export") renderSafeAreaGuide();
+});
 exportFpsSelect.addEventListener("change", updateGifSizeEstimate);
 gifQualitySelect.addEventListener("change", updateGifSizeEstimate);
 gifTransparentToggle.addEventListener("change", () => {
@@ -42029,7 +42039,7 @@ function reset3DStudio() {
   clearTimeout(saveTimeout);
   saveTimeout = null;
   state.contentMode = "text";
-  state.safeArea = "none";
+  state.safeArea = "export";
   state.text = "Warisha Fashion";
   state.stickerText = "Warisha Fashion";
   state.fontFamily = "helvetiker";
@@ -42083,7 +42093,7 @@ function reset3DStudio() {
   animState.easing = "easeOut";
   animState.loop = false;
   if (textInput) textInput.value = state.text;
-  if (safeAreaSelect) safeAreaSelect.value = "none";
+  if (safeAreaSelect) safeAreaSelect.value = "export";
   if (stickerTextInput) stickerTextInput.value = state.stickerText;
   if (sizeRange) sizeRange.value = 70;
   if (depthRange) depthRange.value = 18;
