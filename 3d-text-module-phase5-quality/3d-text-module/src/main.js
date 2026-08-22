@@ -1423,7 +1423,7 @@ function buildCanvasCardMaterials(frontTex, backTex, isImage = false) {
 
   // For text card with gradient or photo card, faceColor is #ffffff to preserve exact texture gradient/photo colors.
   // For solid text card, faceColor is state.color!
-  const isTexturePreserved = isImage || state.colorMode === 'gradient';
+  const isTexturePreserved = isImage || state.colorMode === 'gradient' || state.contentMode === 'sticker';
   const faceColor = isTexturePreserved ? '#ffffff' : state.color;
 
   const frontMat = buildMaterial(state.materialType, faceColor);

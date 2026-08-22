@@ -37300,7 +37300,7 @@ function registerBundledCanvasFont() {
 }
 function buildCanvasCardMaterials(frontTex, backTex, isImage = false) {
   const sideMat = state.contentMode === "sticker" ? new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }) : buildMaterial(state.materialType, state.color);
-  const isTexturePreserved = isImage || state.colorMode === "gradient";
+  const isTexturePreserved = isImage || state.colorMode === "gradient" || state.contentMode === "sticker";
   const faceColor = isTexturePreserved ? "#ffffff" : state.color;
   const frontMat = buildMaterial(state.materialType, faceColor);
   frontMat.map = frontTex;
