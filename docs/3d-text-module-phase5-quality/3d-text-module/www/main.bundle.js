@@ -34884,6 +34884,22 @@ function estimateGifFrameCount(totalMs, fps, isAnimatedOrTurntable) {
 function estimateGifSizeBytes(width, height, frameCount) {
   return Math.round(width * height * 0.28 * frameCount);
 }
+var GIF_ALPHA_DITHER_4X4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+function prepareTransparentGifFrame(ctx, width, height, keyRgb) {
+  const frame = ctx.getImageData(0, 0, width, height);
+  const { data } = frame;
+  for (let i = 0; i < data.length; i += 4) {
+    const pixel = i / 4;
+    const threshold = GIF_ALPHA_DITHER_4X4[(Math.floor(pixel / width) & 3) * 4 + (pixel & 3)] * 16;
+    if (data[i + 3] <= threshold) {
+      data[i] = keyRgb[0];
+      data[i + 1] = keyRgb[1];
+      data[i + 2] = keyRgb[2];
+    }
+    data[i + 3] = 255;
+  }
+  ctx.putImageData(frame, 0, 0);
+}
 async function exportGif(deps, opts, callbacks = {}) {
   const { onProgress, onStatus } = callbacks;
   const { renderer: renderer2, camera: camera2, scene: scene2, canvas: canvas2 } = deps;
@@ -34898,6 +34914,7 @@ async function exportGif(deps, opts, callbacks = {}) {
   const baseRotYRad = deps.state.rotY * Math.PI / 180;
   const KEY_COLOR = "#ff00fe";
   const KEY_COLOR_NUM = 16711934;
+  const KEY_RGB = [255, 0, 254];
   const backgroundColor = opts.transparentBg ? KEY_COLOR : opts.backgroundColor || "#ffffff";
   const compositeCanvas = document.createElement("canvas");
   compositeCanvas.width = opts.width;
@@ -34930,9 +34947,15 @@ async function exportGif(deps, opts, callbacks = {}) {
       }
     }
     renderer2.render(scene2, camera2);
-    compositeCtx.fillStyle = backgroundColor;
-    compositeCtx.fillRect(0, 0, opts.width, opts.height);
-    compositeCtx.drawImage(canvas2, 0, 0, opts.width, opts.height);
+    if (opts.transparentBg) {
+      compositeCtx.clearRect(0, 0, opts.width, opts.height);
+      compositeCtx.drawImage(canvas2, 0, 0, opts.width, opts.height);
+      prepareTransparentGifFrame(compositeCtx, opts.width, opts.height, KEY_RGB);
+    } else {
+      compositeCtx.fillStyle = backgroundColor;
+      compositeCtx.fillRect(0, 0, opts.width, opts.height);
+      compositeCtx.drawImage(canvas2, 0, 0, opts.width, opts.height);
+    }
     gif.addFrame(compositeCtx, { copy: true, delay: delayMsPerFrame });
     onProgress?.((i + 1) / frameCount * 0.5);
     onStatus?.(`\u09AB\u09CD\u09B0\u09C7\u09AE ${i + 1}/${frameCount} \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7\u2026`);

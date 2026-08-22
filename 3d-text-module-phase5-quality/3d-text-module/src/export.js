@@ -273,6 +273,28 @@ export function estimateGifSizeBytes(width, height, frameCount) {
   return Math.round(width * height * 0.28 * frameCount);
 }
 
+// GIF supports just one transparent palette entry, not partial alpha. Before
+// adding a transparent frame, turn alpha into an ordered-dither pattern so a
+// soft black shadow never gets blended into the magenta chroma key.
+const GIF_ALPHA_DITHER_4X4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+
+function prepareTransparentGifFrame(ctx, width, height, keyRgb) {
+  const frame = ctx.getImageData(0, 0, width, height);
+  const { data } = frame;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const pixel = i / 4;
+    const threshold = GIF_ALPHA_DITHER_4X4[((Math.floor(pixel / width) & 3) * 4) + (pixel & 3)] * 16;
+    if (data[i + 3] <= threshold) {
+      data[i] = keyRgb[0];
+      data[i + 1] = keyRgb[1];
+      data[i + 2] = keyRgb[2];
+    }
+    data[i + 3] = 255; // gif.js ignores alpha; retained pixels are opaque.
+  }
+  ctx.putImageData(frame, 0, 0);
+}
+
 // ---------- GIF (deterministic virtual clock, reuses PNG's frame loop) ----------
 // deps: same shape as exportPngSequence's deps (renderer, camera, scene,
 //       canvas, state, getTextMesh, ANIMATION_PRESETS, EASINGS,
@@ -308,6 +330,7 @@ export async function exportGif(deps, opts, callbacks = {}) {
   // punch holes in the output.
   const KEY_COLOR = '#ff00fe';
   const KEY_COLOR_NUM = 0xff00fe;
+  const KEY_RGB = [255, 0, 254];
   const backgroundColor = opts.transparentBg ? KEY_COLOR : (opts.backgroundColor || '#ffffff');
 
   // Composite canvas: same size as the export resolution, opaque, reused
@@ -348,15 +371,18 @@ export async function exportGif(deps, opts, callbacks = {}) {
 
     renderer.render(scene, camera);
 
-    // Flatten the renderer's transparent canvas onto the opaque backing
-    // color first — gif.js/its worker has no concept of alpha, it only
-    // ever sees solid RGB pixels (plus the one registered transparent
-    // palette index), so skipping this step would silently turn every
-    // transparent pixel black instead of either see-through or the chosen
-    // background color.
-    compositeCtx.fillStyle = backgroundColor;
-    compositeCtx.fillRect(0, 0, opts.width, opts.height);
-    compositeCtx.drawImage(canvas, 0, 0, opts.width, opts.height);
+    if (opts.transparentBg) {
+      // Do not blend the partial-alpha shadow over the magenta key color;
+      // that is what made the downloaded GIF's shadow appear purple.
+      compositeCtx.clearRect(0, 0, opts.width, opts.height);
+      compositeCtx.drawImage(canvas, 0, 0, opts.width, opts.height);
+      prepareTransparentGifFrame(compositeCtx, opts.width, opts.height, KEY_RGB);
+    } else {
+      // Visible-background GIFs are composited onto the selected color.
+      compositeCtx.fillStyle = backgroundColor;
+      compositeCtx.fillRect(0, 0, opts.width, opts.height);
+      compositeCtx.drawImage(canvas, 0, 0, opts.width, opts.height);
+    }
 
     gif.addFrame(compositeCtx, { copy: true, delay: delayMsPerFrame });
 
