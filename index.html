@@ -361,6 +361,53 @@
       }
     }
 
+    // Animated tools use a compact video handoff; still-image tools retain
+    // the original PNG asset flow above.
+    const sendActiveToPresentationImage = sendActiveToPresentation;
+    async function sendActiveToPresentation() {
+      const animated = [
+        ['frame3d', '3D Studio video', '#scene-canvas'],
+        ['frameLogo', 'Logo Motion video', '#spinCanvas'],
+        ['framePromo', 'Promo Motion video', '#c']
+      ];
+      const active = animated.find(([id]) => document.getElementById(id).classList.contains('active'));
+      if (!active) return sendActiveToPresentationImage();
+      const [frameId, name, selector] = active, frame = document.getElementById(frameId), button = document.getElementById('sendActiveToPresentationBtn');
+      try {
+        const canvas = (frame.contentDocument || frame.contentWindow.document).querySelector(selector);
+        if (!canvas?.captureStream || !window.MediaRecorder) throw new Error('Video capture is unavailable');
+        const promoDuration = frameId === 'framePromo' ? Number((frame.contentDocument || frame.contentWindow.document).getElementById('duration')?.value || 5) * 1000 : 5000;
+        const duration = Math.min(8000, Math.max(3000, promoDuration));
+        button.disabled = true; button.textContent = '⏳ ভিডিও তৈরি হচ্ছে…';
+        const stream = canvas.captureStream(24), chunks = [];
+        const recorder = new MediaRecorder(stream, { mimeType: 'video/webm', videoBitsPerSecond: 1200000 });
+        recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+        recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const presentation = document.getElementById('framePresentation');
+          const add = () => {
+            const receiver = presentation.contentWindow?.PresentationMedia;
+            if (!receiver) throw new Error('Presentation video receiver is not ready');
+            receiver.addBlob(blob);
+            button.disabled = false; button.textContent = '📤 Presentation-এ পাঠান';
+            alert(`✅ ${name} current slide-এ video হিসেবে যুক্ত হয়েছে।`);
+          };
+          try {
+            if (!presentation.getAttribute('src')) {
+              presentation.src = presentation.dataset.src || 'presentation-studio.html';
+              presentation.addEventListener('load', () => setTimeout(add, 300), { once: true });
+            } else add();
+            switchTab('presentation');
+          } catch (error) { console.error(error); button.disabled = false; button.textContent = '📤 Presentation-এ পাঠান'; alert('ভিডিও পাঠানো যায়নি। Presentation tab একবার খুলে আবার চেষ্টা করুন।'); }
+        };
+        recorder.start(); const started = performance.now();
+        const finish = now => { if (now - started < duration) requestAnimationFrame(finish); else recorder.stop(); };
+        requestAnimationFrame(finish);
+      } catch (error) {
+        console.error(error); button.disabled = false; button.textContent = '📤 Presentation-এ পাঠান';
+        alert('এই preview থেকে video তৈরি করা যায়নি। Tool-টি আগে চালু করে আবার চেষ্টা করুন।');
+      }
+    }
     // Auto-restore active tab on refresh/page load
     document.addEventListener('DOMContentLoaded', () => {
       let savedTab = 'photo';

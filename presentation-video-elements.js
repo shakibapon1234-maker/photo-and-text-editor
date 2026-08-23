@@ -11,6 +11,14 @@
     const item = {id:crypto.randomUUID(), type:'video', src, x:18, y:30, w:46, h:34, rotation:0, transparency:'black'};
     active().elements.push(item); selected=item.id; render();
   }
+  window.PresentationMedia = {
+    addBlob(blob) {
+      if (!blob || typeof blob.arrayBuffer !== 'function') return;
+      const reader = new FileReader();
+      reader.onload = () => addVideo(reader.result);
+      reader.readAsDataURL(blob);
+    }
+  };
   $('videoInput').addEventListener('change', event => {
     const file = event.target.files?.[0]; if (!file) return;
     const reader = new FileReader(); reader.onload = () => addVideo(reader.result); reader.readAsDataURL(file);
