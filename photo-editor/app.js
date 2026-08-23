@@ -1340,6 +1340,7 @@
                     assets.push({ src: reader.result, added: Date.now(), name: originalFile?.name || 'Photo Editor image' });
                     localStorage.setItem(PRESENTATION_ASSET_KEY, JSON.stringify(assets.slice(-30)));
                 }
+                localStorage.setItem('presentation-studio-pending-asset-v1', JSON.stringify({ src: reader.result, added: Date.now(), name: originalFile?.name || 'Photo Editor image' }));
                 showToast('📊 ছবিটি Presentation Asset Library-তে পাঠানো হয়েছে', 'success');
             } catch (_) {
                 showToast('❌ Presentation asset save করা যায়নি', 'error');

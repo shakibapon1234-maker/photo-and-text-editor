@@ -42198,6 +42198,7 @@ function send3DToPresentation() {
     if (!assets.some((asset) => asset.src === src)) {
       assets.push({ src, added: Date.now(), name: "3D Text Studio output" });
       localStorage.setItem(key, JSON.stringify(assets.slice(-30)));
+      localStorage.setItem("presentation-studio-pending-asset-v1", JSON.stringify({ src, added: Date.now(), name: "3D Text Studio output" }));
     }
     alert("3D output Presentation Asset Library-\u09A4\u09C7 \u09AA\u09BE\u09A0\u09BE\u09A8\u09CB \u09B9\u09DF\u09C7\u099B\u09C7\u0964");
   } catch (err) {

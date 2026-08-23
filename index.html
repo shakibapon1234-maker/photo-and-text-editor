@@ -353,6 +353,7 @@
         const items = JSON.parse(localStorage.getItem(key) || '[]');
         items.push({ src: dataUrl, added: Date.now(), name });
         localStorage.setItem(key, JSON.stringify(items.slice(-30)));
+        localStorage.setItem('presentation-studio-pending-asset-v1', JSON.stringify({ src: dataUrl, added: Date.now(), name }));
         alert(`✅ ${name} Presentation Asset Library-তে পাঠানো হয়েছে।`);
       } catch (err) {
         console.error(err);

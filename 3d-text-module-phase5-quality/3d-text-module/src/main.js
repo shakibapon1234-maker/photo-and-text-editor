@@ -7145,6 +7145,7 @@ function send3DToPresentation() {
       assets.push({ src, added: Date.now(), name: '3D Text Studio output' });
       localStorage.setItem(key, JSON.stringify(assets.slice(-30)));
     }
+    localStorage.setItem('presentation-studio-pending-asset-v1', JSON.stringify({ src, added: Date.now(), name: '3D Text Studio output' }));
     alert('3D output Presentation Asset Library-তে পাঠানো হয়েছে।');
   } catch (err) { console.error(err); alert('Presentation-এ পাঠানো যায়নি।'); }
 }

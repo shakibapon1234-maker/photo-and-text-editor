@@ -9,12 +9,55 @@
 </head>
 <body>
 <header class="top"><div class="brand">▣ <span>Presentation</span> Studio</div><button class="primary" id="newSlide">＋ New Slide</button><button id="duplicateSlide">⧉ Duplicate</button><button id="addText">T Add Text</button><label class="file-label">🖼 Add Image<input id="imageInput" type="file" accept="image/*"></label><button id="assetBtn">▦ Assets</button><button id="presentBtn">▶ Present</button><button id="saveProject">💾 Save Project</button><button id="loadProject">⇧ Load Project</button><input id="projectInput" class="hidden" type="file" accept="application/json"></header>
-<main class="workspace"><aside class="left"><div class="section-title">SLIDES</div><div id="slideList" class="slide-list"></div><div class="slide-actions"><button id="moveUp">↑ Move</button><button id="moveDown">↓ Move</button><button class="danger" id="deleteSlide">⌫ Delete</button><button id="templateBtn">✨ Template</button></div><p class="hint">Slide thumbnail-এ click করে slide বাছাই করুন।</p></aside><section class="stage-wrap"><div id="slide" class="slide"><div class="drop-note">Drop image here</div></div></section><aside class="right"><div class="section-title">SLIDE DESIGN</div><label class="field">Background<select id="background"><option value="fashion">Fashion Dark</option><option value="luxury">Luxury Gold</option><option value="ocean">Ocean Blue</option><option value="clean">Clean White</option><option value="custom">Custom Color</option></select></label><label class="field" id="bgCustomWrap">Background color<input id="bgColor" type="color" value="#17233c"></label><label class="field">Transition<select id="transition"><option value="fade">Fade</option><option value="slide">Slide</option><option value="zoom">Zoom</option><option value="none">None</option></select></label><label class="field">Auto-play seconds<input id="autoDuration" type="number" min="0" max="60" value="0"></label><div id="emptyInspector" class="hint">Slide-এর text বা image select করলে edit options এখানে দেখা যাবে।</div><div id="textInspector" class="hidden"><div class="section-title">TEXT</div><label class="field">Text<textarea id="textValue"></textarea></label><div class="row"><label class="field">Color<input id="textColor" type="color" value="#ffffff"></label><label class="field">Size<input id="textSize" type="number" min="10" max="180" value="42"></label></div><label class="field">Font weight<select id="textWeight"><option value="500">Regular</option><option value="700">Bold</option><option value="900">Extra Bold</option></select></label></div><div id="imageInspector" class="hidden"><div class="section-title">IMAGE</div><button id="saveAssetBtn">＋ Save selected to Assets</button><p class="hint">Drag image to move. Corner sizing is the next enhancement; use Delete to remove it.</p></div><div class="section-title" style="margin-top:18px">POWER FEATURES</div><p class="hint">• Drag images from your computer onto slide<br>• Double-click text directly on the slide to edit<br>• Ctrl/Cmd + C and Ctrl/Cmd + V duplicates selected object<br>• Projects save as a portable JSON file</p></aside></main>
+<main class="workspace"><aside class="left"><div class="section-title">SLIDES</div><div id="slideList" class="slide-list"></div><div class="slide-actions"><button id="moveUp">↑ Move</button><button id="moveDown">↓ Move</button><button class="danger" id="deleteSlide">⌫ Delete</button><button id="templateBtn">✨ Template</button></div><p class="hint">Slide thumbnail-এ click করে slide বাছাই করুন।</p></aside><section class="stage-wrap"><div id="slide" class="slide"><div class="drop-note">Drop image here</div></div></section><aside class="right"><div class="section-title">SLIDE DESIGN</div><label class="field">Background<select id="background"><option value="fashion">Fashion Dark</option><option value="luxury">Luxury Gold</option><option value="ocean">Ocean Blue</option><option value="clean">Clean White</option><option value="custom">Custom Color</option></select></label><label class="field" id="bgCustomWrap">Background color<input id="bgColor" type="color" value="#17233c"></label><label class="field">Transition<select id="transition"><option value="fade">Fade</option><option value="slide">Slide</option><option value="zoom">Zoom</option><option value="none">None</option></select></label><label class="field">Auto-play seconds<input id="autoDuration" type="number" min="0" max="60" value="0"></label><div id="emptyInspector" class="hint">Slide-এর text বা image select করলে edit options এখানে দেখা যাবে।</div><div id="textInspector" class="hidden"><div class="section-title">TEXT</div><label class="field">Text<textarea id="textValue"></textarea></label><div class="row"><label class="field">Color<input id="textColor" type="color" value="#ffffff"></label><label class="field">Size<input id="textSize" type="number" min="10" max="180" value="42"></label></div><label class="field">Font weight<select id="textWeight"><option value="500">Regular</option><option value="700">Bold</option><option value="900">Extra Bold</option></select></label></div><div id="imageInspector" class="hidden"><div class="section-title">IMAGE</div><button id="saveAssetBtn">＋ Save selected to Assets</button><p class="hint">Image select করুন। উপরের Move handle দিয়ে সরান, Rotate handle দিয়ে ঘোরান। GIF upload/drop করলে animation থাকবে।</p></div><div class="section-title" style="margin-top:18px">POWER FEATURES</div><p class="hint">• Drag images from your computer onto slide<br>• Double-click text directly on the slide to edit<br>• Ctrl/Cmd + C and Ctrl/Cmd + V duplicates selected object<br>• Projects save as a portable JSON file</p></aside></main>
 <script>
+function addImageTransformHandles(){
+  const el=selectedEl();
+  if(!el||el.type!=='image')return;
+  const node=$('slide').querySelector('.image-el[data-id="'+el.id+'"]');
+  if(!node)return;
+  node.querySelectorAll('.image-move-handle,.image-rotate-handle,.image-resize-handle').forEach(handle=>handle.remove());
+  [['image-move-handle','Move image','Move'],['image-rotate-handle','Rotate image','Rotate'],['image-resize-handle','Resize image','Resize']].forEach(([className,title,label])=>{
+    const handle=document.createElement('div');
+    handle.className=className;handle.title=title;handle.setAttribute('aria-label',title);handle.textContent=label;handle.contentEditable='false';node.appendChild(handle);
+  });
+}
+
+function rotateImageFromHandle(event,node,el){
+  const stage=$('slide').getBoundingClientRect(),centerX=stage.left+(el.x+el.w/2)*stage.width/100,centerY=stage.top+(el.y+el.h/2)*stage.height/100;
+  const move=moveEvent=>{el.rotation=Math.round((Math.atan2(moveEvent.clientY-centerY,moveEvent.clientX-centerX)*180/Math.PI+90+360)%360);node.style.transform='rotate('+el.rotation+'deg)';};
+  const end=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);render()};
+  window.addEventListener('pointermove',move);window.addEventListener('pointerup',end,{once:true});
+}
+
+function moveImageFromHandle(event,node,el){
+  const stage=$('slide').getBoundingClientRect();
+  drag={el,r:stage,dx:event.clientX-stage.left-el.x*stage.width/100,dy:event.clientY-stage.top-el.y*stage.height/100,moved:false};
+  window.__presentationLiveDrag=true;node.setPointerCapture?.(event.pointerId);
+}
+
+function resizeImageFromHandle(event,node,el){
+  const stage=$('slide').getBoundingClientRect(),ratio=Math.max(.1,el.w/Math.max(.1,el.h));
+  const move=moveEvent=>{const width=Math.max(4,Math.min(100-el.x,(moveEvent.clientX-stage.left)/stage.width*100-el.x));el.w=width;el.h=Math.min(100-el.y,Math.max(4,width/ratio));node.style.width=el.w+'%';node.style.height=el.h+'%';};
+  const end=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);render()};
+  window.addEventListener('pointermove',move);window.addEventListener('pointerup',end,{once:true});
+}
+
+function addImageTransformHandles(){
+  const el=selectedEl();
+  if(!el||el.type!=='image')return;
+  const node=$('slide').querySelector('.image-el[data-id="'+el.id+'"]');
+  if(!node)return;
+  node.querySelectorAll('.image-move-handle,.image-rotate-handle,.image-resize-handle').forEach(handle=>handle.remove());
+  [['image-move-handle','Move image','Move'],['image-rotate-handle','Rotate image','Rotate'],['image-resize-handle','Resize image','Resize']].forEach(([className,title,label])=>{
+    const handle=document.createElement('div');handle.className=className;handle.title=title;handle.setAttribute('aria-label',title);handle.textContent=label;handle.contentEditable='false';node.appendChild(handle);
+  });
+}
+
 const $=id=>document.getElementById(id);const themes={fashion:'linear-gradient(135deg,#170b32,#192d58)',luxury:'linear-gradient(135deg,#1d1307,#76500a)',ocean:'linear-gradient(135deg,#06203d,#0c5d86)',royal:'linear-gradient(135deg,#2b1055,#7597de)',blush:'linear-gradient(135deg,#5e1938,#f06292)',emerald:'linear-gradient(135deg,#063b36,#16a085)',sunset:'linear-gradient(135deg,#5b1a13,#f59e0b)',clean:'#f8fafc'};let slides=[makeSlide()],current=0,selected=null,drag=null;
 function makeSlide(){return{background:'fashion',bgColor:'#17233c',elements:[{id:crypto.randomUUID(),type:'text',text:'আপনার অসাধারণ Presentation',x:9,y:16,w:82,h:14,size:52,color:'#ffffff',weight:'900'},{id:crypto.randomUUID(),type:'text',text:'শুরু করুন আপনার গল্প, পণ্য বা আইডিয়া দিয়ে',x:10,y:35,w:65,h:8,size:24,color:'#ffd166',weight:'700'}]}}
 function active(){return slides[current]}function styleSlide(){const s=active();$('slide').style.background=s.background==='custom'?s.bgColor:themes[s.background];}
-function render(){styleSlide();const box=$('slide');box.querySelectorAll('.element').forEach(e=>e.remove());active().elements.forEach(el=>{const node=document.createElement('div');node.className='element '+el.type+(selected===el.id?' selected':'');node.dataset.id=el.id;node.style.cssText=`left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;`;if(el.type==='text'){node.classList.add('text-el');node.textContent=el.text;node.style.color=el.color;node.style.fontSize=el.size+'px';node.style.fontWeight=el.weight;node.style.transform='rotate('+(Number(el.rotation)||0)+'deg)';node.style.transformOrigin='center center';node.ondblclick=()=>{selected=el.id;render();$('textValue').focus()}}else{node.classList.add('image-el');node.innerHTML=`<img src="${el.src}">`}node.addEventListener('pointerdown',startDrag);box.appendChild(node)});renderSlides();renderInspector()}
+function render(){styleSlide();const box=$('slide');box.querySelectorAll('.element').forEach(e=>e.remove());active().elements.forEach(el=>{const node=document.createElement('div');node.className='element '+el.type+(selected===el.id?' selected':'');node.dataset.id=el.id;node.style.cssText=`left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;`;if(el.type==='text'){node.classList.add('text-el');node.textContent=el.text;node.style.color=el.color;node.style.fontSize=el.size+'px';node.style.fontWeight=el.weight;node.style.transform='rotate('+(Number(el.rotation)||0)+'deg)';node.style.transformOrigin='center center';node.ondblclick=()=>{selected=el.id;render();$('textValue').focus()}}else{node.classList.add('image-el');node.innerHTML=`<img src="${el.src}" draggable="false">`;const image=node.querySelector('img');image.style.pointerEvents='none';image.draggable=false;node.addEventListener('click',event=>{event.stopPropagation();selected=el.id;node.classList.add('selected');renderInspector();addImageTransformHandles()})}node.addEventListener('pointerdown',startDrag);box.appendChild(node)});renderSlides();renderInspector()}
 function renderSlides(){const list=$('slideList');list.innerHTML='';slides.forEach((s,i)=>{const n=document.createElement('div');n.className='slide-thumb '+(i===current?'active':'');n.style.background=s.background==='custom'?s.bgColor:themes[s.background];n.innerHTML=`<span class="num">${i+1}</span>`;s.elements.forEach(el=>{const mini=document.createElement('div');mini.style.cssText=`position:absolute;left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;overflow:hidden;white-space:pre-wrap;word-break:break-word;line-height:1.12;${el.type==='text'?`color:${el.color};font-size:${Math.max(4,el.size*.115)}px;font-weight:${el.weight};padding:1px`:'background:#ffffff12'}`;if(el.type==='image'){const img=document.createElement('img');img.src=el.src;img.style.cssText='width:100%;height:100%;display:block;object-fit:cover';mini.appendChild(img)}else mini.textContent=el.text;n.appendChild(mini)});n.onclick=()=>{current=i;selected=null;render()};list.appendChild(n)})}
 function selectedEl(){return active().elements.find(e=>e.id===selected)}function renderInspector(){const el=selectedEl();$('emptyInspector').classList.toggle('hidden',!!el);$('textInspector').classList.toggle('hidden',!el||el.type!=='text');$('imageInspector').classList.toggle('hidden',!el||el.type!=='image');if(el?.type==='text'){$('textValue').value=el.text;$('textColor').value=el.color;$('textSize').value=el.size;$('textWeight').value=el.weight}const s=active();$('background').value=s.background;$('bgColor').value=s.bgColor;$('bgCustomWrap').classList.toggle('hidden',s.background!=='custom')}
 function startDrag(e){selected=e.currentTarget.dataset.id;const r=$('slide').getBoundingClientRect(),el=selectedEl();drag={el,r,dx:e.clientX-r.left-el.x*r.width/100,dy:e.clientY-r.top-el.y*r.height/100};window.__presentationLiveDrag=true;e.currentTarget.classList.add('selected');e.currentTarget.setPointerCapture(e.pointerId);renderInspector();renderSlides()}
@@ -83,7 +126,7 @@ let autosaveTimer=0;const renderBeforeAutosave=render;render=function(){renderBe
 // keeping the saved slide state unchanged.
 function previewSelectedAnimation(){const el=selectedEl();if(!el||!el.animation||el.animation==='none')return;const node=$('slide').querySelector('.element[data-id="'+el.id+'"]');if(!node)return;const delay=Math.max(0,Number(el.animationDelay)||0)*1000,duration=Math.max(.1,Number(el.animationDuration)||.6)*1000;const effects={fade:[{opacity:0},{opacity:1}],slideLeft:[{opacity:0,transform:'translateX(-55px)'},{opacity:1,transform:'translateX(0)'}],slideUp:[{opacity:0,transform:'translateY(55px)'},{opacity:1,transform:'translateY(0)'}],zoom:[{opacity:0,transform:'scale(.82)'},{opacity:1,transform:'scale(1)'}],pop:[{opacity:0,transform:'scale(.25)'},{opacity:1,transform:'scale(1.13)',offset:.72},{opacity:1,transform:'scale(1)'}]};node.getAnimations().forEach(a=>a.cancel());node.animate(effects[el.animation]||effects.fade,{duration,delay,easing:'cubic-bezier(.2,.8,.2,1)',fill:'both'});}
 ['elementAnimation','animationDelay','animationDuration'].forEach(id=>$(id).addEventListener('change',()=>{setTimeout(previewSelectedAnimation,0)}));$('elementAnimation').addEventListener('input',()=>setTimeout(previewSelectedAnimation,0));
-</script><script src="presentation-shapes.js"></script><script src="presentation-shapes-player.js"></script><script src="presentation-tables.js"></script><script src="presentation-shape-transforms.js"></script><script src="presentation-shape-colors.js"></script><script src="presentation-shape-text.js"></script><script src="presentation-toolbar.js"></script><script src="presentation-exports.js"></script><script src="presentation-color-toolbar.js"></script><script src="presentation-animations-plus.js"></script><script src="presentation-background-animation-ui.js"></script><script src="presentation-bullets.js"></script><script src="presentation-editing-fixes.js"></script><script src="presentation-list-types.js"></script><script src="presentation-typing-fix.js"></script><script src="presentation-text-tools-fix.js"></script><script src="presentation-bullet-styles.js"></script><script src="presentation-fonts.js"></script><script src="presentation-text-formatting.js"></script><script src="presentation-text-tools-dock.js"></script><script src="presentation-3d-shapes.js"></script><script src="presentation-layout-templates.js"></script><script src="presentation-shape-appearance.js"></script><script src="presentation-text-gradient-history.js"></script><script src="presentation-animated-backgrounds.js"></script><script src="presentation-background-overlay-fix.js"></script><script src="presentation-broll-presets.js"></script><script src="presentation-brand-kit.js"></script><script src="presentation-smart-guides.js"></script><script src="presentation-glass-effects.js"></script><script src="presentation-magic-decks.js"></script><script src="presentation-charts.js"></script><script src="presentation-presenter-links.js"></script><script src="presentation-smart-designer.js"></script><script src="presentation-cinematic-timing.js"></script><script src="presentation-soundtrack.js"></script><script src="presentation-text-autofit.js"></script><script src="presentation-color-key.js"></script><script src="presentation-shape-actions.js"></script><script src="presentation-slide-controls.js"></script><script src="presentation-player-fix.js"></script>
+</script><script src="presentation-shapes.js"></script><script src="presentation-shapes-player.js"></script><script src="presentation-tables.js"></script><script src="presentation-shape-transforms.js"></script><script src="presentation-shape-colors.js"></script><script src="presentation-shape-text.js"></script><script src="presentation-toolbar.js"></script><script src="presentation-exports.js"></script><script src="presentation-color-toolbar.js"></script><script src="presentation-animations-plus.js"></script><script src="presentation-background-animation-ui.js"></script><script src="presentation-bullets.js"></script><script src="presentation-editing-fixes.js"></script><script src="presentation-list-types.js"></script><script src="presentation-typing-fix.js"></script><script src="presentation-text-tools-fix.js"></script><script src="presentation-bullet-styles.js"></script><script src="presentation-fonts.js"></script><script src="presentation-text-formatting.js"></script><script src="presentation-text-tools-dock.js"></script><script src="presentation-3d-shapes.js"></script><script src="presentation-layout-templates.js"></script><script src="presentation-shape-appearance.js"></script><script src="presentation-text-gradient-history.js"></script><script src="presentation-animated-backgrounds.js"></script><script src="presentation-background-overlay-fix.js"></script><script src="presentation-broll-presets.js"></script><script src="presentation-brand-kit.js"></script><script src="presentation-smart-guides.js"></script><script src="presentation-glass-effects.js"></script><script src="presentation-magic-decks.js"></script><script src="presentation-charts.js"></script><script src="presentation-presenter-links.js"></script><script src="presentation-smart-designer.js"></script><script src="presentation-cinematic-timing.js"></script><script src="presentation-soundtrack.js"></script><script src="presentation-text-autofit.js"></script><script src="presentation-color-key.js"></script><script src="presentation-shape-actions.js"></script><script src="presentation-slide-controls.js"></script><script src="presentation-gif-background-fix.js"></script><script src="presentation-player-fix.js"></script><script src="presentation-free-resize.js"></script><script src="presentation-media-placement.js"></script><script src="presentation-animation-loop.js"></script><script src="presentation-animation-sequence.js"></script><script src="presentation-slide-navigator.js"></script>
 <script>
 // Stable rotation shortcut: select text, then Alt + Left/Right (5 degrees).
 window.addEventListener('keydown', event => {
@@ -134,13 +177,14 @@ function addTextTransformHandle(){
   const node=$('slide').querySelector('.text-el[data-id="'+el.id+'"]');
   if(!node)return;
   node.querySelectorAll('.text-move-handle,.text-rotate-handle').forEach(handle=>handle.remove());
-  el.text=String(el.text||'').replace(/(?:\r?\n)(?:Move\r?\nRotate)+\s*$/,'');
   node.contentEditable='false';
-  node.textContent='';
-  const content=document.createElement('span');
-  content.className='text-content';content.contentEditable='true';content.spellcheck=false;content.textContent=el.text;
-  content.addEventListener('input',event=>{event.stopImmediatePropagation();el.text=content.innerText.replace(/\r/g,'');if(typeof fitSelectedTextBox==='function'){fitSelectedTextBox();node.style.height=el.h+'%';}renderSlides();});
-  node.appendChild(content);
+  let content=node.querySelector('.text-content');
+  if(!content){
+    el.text=String(el.text||'').replace(/(?:\r?\n)(?:Move\r?\nRotate)+\s*$/,'');
+    node.textContent='';content=document.createElement('span');content.className='text-content';content.contentEditable='true';content.spellcheck=false;content.textContent=el.text;
+    content.addEventListener('input',event=>{event.stopImmediatePropagation();el.text=content.innerText.replace(/\r/g,'');if(typeof fitSelectedTextBox==='function'){fitSelectedTextBox();node.style.height=el.h+'%';}renderSlides();});
+    node.appendChild(content);
+  }
   [['text-move-handle','Move text box','Move'],['text-rotate-handle','Rotate text','Rotate']].forEach(([className,title,label])=>{
     const handle=document.createElement('div');
     handle.className=className;handle.title=title;handle.setAttribute('aria-label',title);handle.contentEditable='false';handle.textContent=label;
@@ -175,5 +219,66 @@ document.addEventListener('pointerdown',event=>{
   }
   selected=node.dataset.id;document.querySelectorAll('.text-el').forEach(text=>text.classList.toggle('selected',text===node));renderInspector();addTextTransformHandle();
 },true);
+const originalImageAwareRender=render;
+render=function(){
+  originalImageAwareRender();
+  active().elements.filter(el=>el.type==='image').forEach(el=>{
+    const node=$('slide').querySelector('.image-el[data-id="'+el.id+'"]');
+    if(node)node.style.transform='rotate('+(Number(el.rotation)||0)+'deg)';
+  });
+  addImageTransformHandles();
+};
+document.head.insertAdjacentHTML('beforeend','<style>.image-el{overflow:visible;user-select:none}.image-el img{pointer-events:none!important;user-select:none}.image-move-handle,.image-rotate-handle,.image-resize-handle{position:absolute;width:40px;height:18px;border:1px solid #1769e8;border-radius:4px;background:#fff;color:#1769e8;font:700 9px Arial;text-align:center;line-height:16px;cursor:grab;z-index:6;user-select:none}.image-move-handle,.image-rotate-handle{left:50%;transform:translateX(-50%)}.image-move-handle{top:6px}.image-rotate-handle{top:30px}.image-resize-handle{right:-20px;bottom:-20px;cursor:nwse-resize}.image-rotate-handle:after{content:"";position:absolute;left:19px;top:16px;height:13px;border-left:2px solid #ffb11b}</style>');
+document.addEventListener('pointerdown',event=>{
+  const target=event.target,node=target.closest&&target.closest('.image-el');
+  if(!node)return;
+  event.stopImmediatePropagation();selected=node.dataset.id;
+  document.querySelectorAll('.element').forEach(item=>item.classList.toggle('selected',item===node));renderInspector();addImageTransformHandles();
+  const handle=target.closest('.image-move-handle,.image-rotate-handle,.image-resize-handle');
+  if(!handle)return;
+  const el=selectedEl();
+  if(handle.classList.contains('image-move-handle')){moveImageFromHandle(event,node,el);return;}
+  if(handle.classList.contains('image-resize-handle')){resizeImageFromHandle(event,node,el);return;}
+  rotateImageFromHandle(event,node,el);
+},true);
+$('slide').addEventListener('pointerdown',event=>{if(!event.target.closest('.element')){selected=null;render()}},true);
+document.addEventListener('pointerdown',event=>{if(!event.target.closest('.element')&&!event.target.closest('.right')&&!event.target.closest('#textToolsMenu,#textTools')){selected=null;render()}},true);
+document.addEventListener('selectionchange',()=>{
+  const anchor=window.getSelection()?.anchorNode;
+  const content=anchor?.nodeType===Node.ELEMENT_NODE?anchor.closest?.('.text-content'):anchor?.parentElement?.closest?.('.text-content');
+  const node=content?.closest('.text-el');
+  if(node){selected=node.dataset.id;node.classList.add('selected');renderInspector();addTextTransformHandle();}
+});
+try{const pending=JSON.parse(localStorage.getItem('presentation-studio-pending-asset-v1')||'null');if(pending?.src){addImage(pending.src);localStorage.removeItem('presentation-studio-pending-asset-v1');}}catch(_){/* ignore invalid cross-tool handoff */}
+document.addEventListener('change',event=>{
+  if(event.target?.id!=='backgroundImageInput')return;
+  const file=event.target.files?.[0];
+  if(!file||file.type!=='image/gif')return;
+  event.stopImmediatePropagation();
+  const reader=new FileReader();reader.onload=()=>addImage(reader.result);reader.readAsDataURL(file);
+},true);
+const inlineTextColorPanel=document.createElement('div');
+inlineTextColorPanel.id='inlineTextColorPanel';
+inlineTextColorPanel.innerHTML='<div class="section-title">TEXT COLOR</div><div class="inline-color-modes"><button type="button" id="inlineSolidMode">Solid</button><button type="button" id="inlineGradientMode">Gradient</button></div><label class="field" id="inlineSolidColorField">Solid color<input id="inlineSolidColor" type="color" value="#ffffff"></label><div id="inlineGradientFields" class="inline-gradient-fields hidden"><label class="field">Start color<input id="inlineGradientStart" type="color" value="#ffffff"></label><label class="field">End color<input id="inlineGradientEnd" type="color" value="#4f8df7"></label><label class="field">Angle<input id="inlineGradientAngle" type="number" min="0" max="360" value="90"></label></div>';
+document.querySelector('#textInspector').appendChild(inlineTextColorPanel);
+document.head.insertAdjacentHTML('beforeend','<style>.inline-color-modes{display:grid;grid-template-columns:1fr 1fr;gap:6px}.inline-color-modes button.active{border-color:#ffb11b;background:#315184}.inline-gradient-fields{display:grid;grid-template-columns:1fr 1fr;gap:7px}.inline-gradient-fields .field:last-child{grid-column:1/-1}</style>');
+function syncInlineTextColor(){
+  const el=selectedEl(),visible=!!el&&el.type==='text';
+  inlineTextColorPanel.classList.toggle('hidden',!visible);
+  if(!visible)return;
+  const gradient=!!el.textGradient;
+  $('inlineSolidMode').classList.toggle('active',!gradient);$('inlineGradientMode').classList.toggle('active',gradient);
+  $('inlineSolidColorField').classList.toggle('hidden',gradient);$('inlineGradientFields').classList.toggle('hidden',!gradient);
+  $('inlineSolidColor').value=el.color||'#ffffff';$('inlineGradientStart').value=el.color||'#ffffff';$('inlineGradientEnd').value=el.textGradientTo||'#4f8df7';$('inlineGradientAngle').value=el.textGradientAngle??90;
+}
+const inspectorWithInlineTextColor=renderInspector;
+renderInspector=function(){inspectorWithInlineTextColor();syncInlineTextColor()};
+function updateInlineTextColor(fn){const el=selectedEl();if(!el||el.type!=='text')return;fn(el);render()}
+$('inlineSolidMode').onclick=()=>updateInlineTextColor(el=>el.textGradient=false);
+$('inlineGradientMode').onclick=()=>updateInlineTextColor(el=>{el.textGradient=true;el.textGradientTo=el.textGradientTo||'#4f8df7'});
+$('inlineSolidColor').oninput=event=>updateInlineTextColor(el=>{el.color=event.target.value;el.textGradient=false});
+$('inlineGradientStart').oninput=event=>updateInlineTextColor(el=>{el.color=event.target.value;el.textGradient=true});
+$('inlineGradientEnd').oninput=event=>updateInlineTextColor(el=>{el.textGradientTo=event.target.value;el.textGradient=true});
+$('inlineGradientAngle').oninput=event=>updateInlineTextColor(el=>{el.textGradientAngle=Number(event.target.value)||0;el.textGradient=true});
 render();
 </script></body></html>
