@@ -32,6 +32,10 @@
   function schedule() { if (!ready) return; clearTimeout(timer); timer=setTimeout(saveNow,350); }
   const renderBeforeReliableSave = render;
   render = function () { renderBeforeReliableSave(); schedule(); };
+  // Some inspector controls update the slide model without re-rendering.
+  // They can dispatch this event to get the same durable-save behaviour.
+  window.addEventListener('presentation:change', schedule);
+  window.presentationSaveNow = saveNow;
   window.addEventListener('beforeunload', () => { clearTimeout(timer); saveNow(); });
   window.presentationRestorePreviousVersion = async () => {
     if (!db) return false;
