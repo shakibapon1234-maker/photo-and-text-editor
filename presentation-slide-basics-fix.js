@@ -44,6 +44,19 @@
   const before = renderSlides;
   renderSlides = function () {
     before();
+    // Mirror uploaded media in thumbnails so they match the editable slide.
+    $('slideList').querySelectorAll('.slide-thumb').forEach((thumb, index) => {
+      const slide = slides[index];
+      if (!slide || !slide.bgMedia) return;
+      const media = document.createElement(slide.bgMediaType === 'video' ? 'video' : 'img');
+      media.className = 'slide-thumb-background'; media.src = slide.bgMedia;
+      if (media.tagName === 'VIDEO') { media.muted = true; media.autoplay = true; media.loop = true; media.playsInline = true; }
+      media.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none;opacity:' + (Number(slide.bgMediaOpacity ?? 100) / 100);
+      const number = thumb.querySelector('.num');
+      thumb.insertBefore(media, number ? number.nextSibling : thumb.firstChild);
+      if (number) number.style.zIndex = '2';
+      [...thumb.children].forEach(child => { if (child !== media && child !== number) child.style.zIndex = '1'; });
+    });
     const box = $('slideQuickNavList'); if (!box) return;
     box.replaceChildren();
     slides.forEach((slide, index) => {

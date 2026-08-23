@@ -3,7 +3,9 @@
   let edit = null;
   document.head.insertAdjacentHTML('beforeend', `<style>
     #mediaPlacement{margin-top:10px;padding-top:10px;border-top:1px solid #35445f}.media-placement-hint{margin:7px 0 0;font-size:11px;line-height:1.4;color:#98a8c4}
-    #animatedBackgroundLayer.media-unlocked{inset:auto!important;z-index:20!important;overflow:visible!important;pointer-events:auto!important;border:2px solid #ffb11b;box-shadow:0 0 0 1px #0008}
+    /* Keep inserted slide objects above an editable background. */
+    #animatedBackgroundLayer.media-unlocked{inset:auto!important;z-index:0!important;overflow:visible!important;pointer-events:auto!important;border:2px solid #ffb11b;box-shadow:0 0 0 1px #0008}
+    .slide>.element{z-index:3!important}
     #animatedBackgroundLayer.media-unlocked img,#animatedBackgroundLayer.media-unlocked video{pointer-events:none!important}
     .media-place-handle{position:absolute;z-index:4;width:13px;height:13px;background:#fff;border:2px solid #1769e8;border-radius:2px;box-shadow:0 1px 4px #0009;touch-action:none}
     .media-place-handle.n,.media-place-handle.s{left:50%;transform:translateX(-50%);cursor:ns-resize}.media-place-handle.e,.media-place-handle.w{top:50%;transform:translateY(-50%);cursor:ew-resize}
@@ -11,7 +13,7 @@
   </style>`);
   const card = document.createElement('div');
   card.id = 'mediaPlacement'; card.className = 'hidden';
-  card.innerHTML = '<div class="section-title">GIF / VIDEO POSITION</div><button id="unlockMediaPlacement" type="button">Unlock placement</button><button id="resetMediaPlacement" type="button" style="margin-left:6px">Reset</button><p class="media-placement-hint">Unlocked: drag the GIF/video anywhere in the slide. Use the 8 handles to resize width and height independently.</p>';
+  card.innerHTML = '<div class="section-title">BACKGROUND POSITION</div><button id="unlockMediaPlacement" type="button">Edit background position</button><button id="resetMediaPlacement" type="button" style="margin-left:6px">Reset</button><p class="media-placement-hint">This controls the background only. To move a logo or photo added with Insert, click that object and drag it directly — no unlock is needed.</p>';
   $('backgroundUpload').append(card);
   const state = () => active();
   function normalise(s) { s.bgMediaX = Number.isFinite(s.bgMediaX) ? s.bgMediaX : 0; s.bgMediaY = Number.isFinite(s.bgMediaY) ? s.bgMediaY : 0; s.bgMediaW = Number.isFinite(s.bgMediaW) ? s.bgMediaW : 100; s.bgMediaH = Number.isFinite(s.bgMediaH) ? s.bgMediaH : 100; }
