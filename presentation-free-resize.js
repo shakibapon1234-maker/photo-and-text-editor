@@ -38,10 +38,10 @@
     const px = (event.clientX - rect.left) / rect.width * 100;
     const py = (event.clientY - rect.top) / rect.height * 100;
     let x = start.x, y = start.y, w = start.w, h = start.h;
-    if (side.includes('e')) w = Math.max(MIN_SIZE, Math.min(100 - x, px - x));
-    if (side.includes('s')) h = Math.max(MIN_SIZE, Math.min(100 - y, py - y));
-    if (side.includes('w')) { x = Math.max(0, Math.min(start.x + start.w - MIN_SIZE, px)); w = start.x + start.w - x; }
-    if (side.includes('n')) { y = Math.max(0, Math.min(start.y + start.h - MIN_SIZE, py)); h = start.y + start.h - y; }
+    if (side.includes('e')) w = Math.max(MIN_SIZE, px - x);
+    if (side.includes('s')) h = Math.max(MIN_SIZE, py - y);
+    if (side.includes('w')) { x = Math.min(start.x + start.w - MIN_SIZE, px); w = start.x + start.w - x; }
+    if (side.includes('n')) { y = Math.min(start.y + start.h - MIN_SIZE, py); h = start.y + start.h - y; }
     item.x = x; item.y = y; item.w = w; item.h = h;
     // Corner resizing enlarges/shrinks text too, so a larger text box does
     // not leave the text looking tiny inside it.

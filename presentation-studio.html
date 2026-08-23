@@ -43,6 +43,13 @@ function resizeImageFromHandle(event,node,el){
   window.addEventListener('pointermove',move);window.addEventListener('pointerup',end,{once:true});
 }
 
+function resizeTextFromHandle(event,node,el){
+  const stage=$('slide').getBoundingClientRect(),ratio=Math.max(.1,el.w/Math.max(.1,el.h));
+  const move=moveEvent=>{const width=Math.max(4,Math.min(100-el.x,(moveEvent.clientX-stage.left)/stage.width*100-el.x));el.w=width;el.h=Math.min(100-el.y,Math.max(4,width/ratio));node.style.width=el.w+'%';node.style.height=el.h+'%';};
+  const end=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);render()};
+  window.addEventListener('pointermove',move);window.addEventListener('pointerup',end,{once:true});
+}
+
 function addImageTransformHandles(){
   const el=selectedEl();
   if(!el||el.type!=='image')return;
@@ -126,7 +133,7 @@ let autosaveTimer=0;const renderBeforeAutosave=render;render=function(){renderBe
 // keeping the saved slide state unchanged.
 function previewSelectedAnimation(){const el=selectedEl();if(!el||!el.animation||el.animation==='none')return;const node=$('slide').querySelector('.element[data-id="'+el.id+'"]');if(!node)return;const delay=Math.max(0,Number(el.animationDelay)||0)*1000,duration=Math.max(.1,Number(el.animationDuration)||.6)*1000;const effects={fade:[{opacity:0},{opacity:1}],slideLeft:[{opacity:0,transform:'translateX(-55px)'},{opacity:1,transform:'translateX(0)'}],slideUp:[{opacity:0,transform:'translateY(55px)'},{opacity:1,transform:'translateY(0)'}],zoom:[{opacity:0,transform:'scale(.82)'},{opacity:1,transform:'scale(1)'}],pop:[{opacity:0,transform:'scale(.25)'},{opacity:1,transform:'scale(1.13)',offset:.72},{opacity:1,transform:'scale(1)'}]};node.getAnimations().forEach(a=>a.cancel());node.animate(effects[el.animation]||effects.fade,{duration,delay,easing:'cubic-bezier(.2,.8,.2,1)',fill:'both'});}
 ['elementAnimation','animationDelay','animationDuration'].forEach(id=>$(id).addEventListener('change',()=>{setTimeout(previewSelectedAnimation,0)}));$('elementAnimation').addEventListener('input',()=>setTimeout(previewSelectedAnimation,0));
-</script><script src="presentation-shapes.js"></script><script src="presentation-shapes-player.js"></script><script src="presentation-tables.js"></script><script src="presentation-shape-transforms.js"></script><script src="presentation-shape-colors.js"></script><script src="presentation-shape-text.js"></script><script src="presentation-toolbar.js"></script><script src="presentation-exports.js"></script><script src="presentation-color-toolbar.js"></script><script src="presentation-animations-plus.js"></script><script src="presentation-background-animation-ui.js"></script><script src="presentation-bullets.js"></script><script src="presentation-editing-fixes.js"></script><script src="presentation-list-types.js"></script><script src="presentation-typing-fix.js"></script><script src="presentation-text-tools-fix.js"></script><script src="presentation-bullet-styles.js"></script><script src="presentation-fonts.js"></script><script src="presentation-text-formatting.js"></script><script src="presentation-text-tools-dock.js"></script><script src="presentation-3d-shapes.js"></script><script src="presentation-layout-templates.js"></script><script src="presentation-shape-appearance.js"></script><script src="presentation-text-gradient-history.js"></script><script src="presentation-animated-backgrounds.js"></script><script src="presentation-background-overlay-fix.js"></script><script src="presentation-broll-presets.js"></script><script src="presentation-brand-kit.js"></script><script src="presentation-smart-guides.js"></script><script src="presentation-glass-effects.js"></script><script src="presentation-magic-decks.js"></script><script src="presentation-charts.js"></script><script src="presentation-presenter-links.js"></script><script src="presentation-smart-designer.js"></script><script src="presentation-cinematic-timing.js"></script><script src="presentation-soundtrack.js"></script><script src="presentation-text-autofit.js"></script><script src="presentation-color-key.js"></script><script src="presentation-shape-actions.js"></script><script src="presentation-slide-controls.js"></script><script src="presentation-gif-background-fix.js"></script><script src="presentation-player-fix.js"></script><script src="presentation-free-resize.js"></script><script src="presentation-media-placement.js"></script><script src="presentation-animation-loop.js"></script><script src="presentation-animation-sequence.js"></script><script src="presentation-slide-navigator.js"></script><script src="presentation-slide-basics-fix.js"></script>
+</script><script src="presentation-shapes.js"></script><script src="presentation-shapes-player.js"></script><script src="presentation-tables.js"></script><script src="presentation-shape-transforms.js"></script><script src="presentation-shape-colors.js"></script><script src="presentation-shape-text.js"></script><script src="presentation-toolbar.js"></script><script src="presentation-exports.js"></script><script src="presentation-color-toolbar.js"></script><script src="presentation-animations-plus.js"></script><script src="presentation-background-animation-ui.js"></script><script src="presentation-bullets.js"></script><script src="presentation-editing-fixes.js"></script><script src="presentation-list-types.js"></script><script src="presentation-typing-fix.js"></script><script src="presentation-text-tools-fix.js"></script><script src="presentation-bullet-styles.js"></script><script src="presentation-fonts.js"></script><script src="presentation-text-formatting.js"></script><script src="presentation-text-tools-dock.js"></script><script src="presentation-3d-shapes.js"></script><script src="presentation-layout-templates.js"></script><script src="presentation-shape-appearance.js"></script><script src="presentation-text-gradient-history.js"></script><script src="presentation-animated-backgrounds.js"></script><script src="presentation-background-overlay-fix.js"></script><script src="presentation-broll-presets.js"></script><script src="presentation-brand-kit.js"></script><script src="presentation-smart-guides.js"></script><script src="presentation-glass-effects.js"></script><script src="presentation-magic-decks.js"></script><script src="presentation-charts.js"></script><script src="presentation-presenter-links.js"></script><script src="presentation-smart-designer.js"></script><script src="presentation-cinematic-timing.js"></script><script src="presentation-soundtrack.js"></script><script src="presentation-text-autofit.js"></script><script src="presentation-color-key.js"></script><script src="presentation-shape-actions.js"></script><script src="presentation-slide-controls.js"></script><script src="presentation-gif-background-fix.js"></script><script src="presentation-player-fix.js"></script><script src="presentation-media-placement.js"></script><script src="presentation-animation-loop.js"></script><script src="presentation-animation-sequence.js"></script><script src="presentation-slide-navigator.js"></script><script src="presentation-slide-basics-fix.js"></script><script src="presentation-reliable-autosave.js"></script>
 <script>
 // Stable rotation shortcut: select text, then Alt + Left/Right (5 degrees).
 window.addEventListener('keydown', event => {
@@ -176,23 +183,23 @@ function addTextTransformHandle(){
   if(!el||el.type!=='text')return;
   const node=$('slide').querySelector('.text-el[data-id="'+el.id+'"]');
   if(!node)return;
-  node.querySelectorAll('.text-move-handle,.text-rotate-handle').forEach(handle=>handle.remove());
+  node.querySelectorAll('.text-move-handle,.text-rotate-handle,.text-resize-handle').forEach(handle=>handle.remove());
   node.contentEditable='false';
   let content=node.querySelector('.text-content');
   if(!content){
     el.text=String(el.text||'').replace(/(?:\r?\n)(?:Move\r?\nRotate)+\s*$/,'');
     node.textContent='';content=document.createElement('span');content.className='text-content';content.contentEditable='true';content.spellcheck=false;content.textContent=el.text;
     content.addEventListener('input',event=>{event.stopImmediatePropagation();el.text=content.innerText.replace(/\r/g,'');if(typeof fitSelectedTextBox==='function'){fitSelectedTextBox();node.style.height=el.h+'%';}renderSlides();});
-    node.appendChild(content);
+    node.appendChild(content);content.focus();
   }
-  [['text-move-handle','Move text box','Move'],['text-rotate-handle','Rotate text','Rotate']].forEach(([className,title,label])=>{
+  [['text-move-handle','Move text box','Move'],['text-rotate-handle','Rotate text','Rotate'],['text-resize-handle','Resize text','Resize']].forEach(([className,title,label])=>{
     const handle=document.createElement('div');
     handle.className=className;handle.title=title;handle.setAttribute('aria-label',title);handle.contentEditable='false';handle.textContent=label;
     node.appendChild(handle);
   });
 }
 
-document.head.insertAdjacentHTML('beforeend','<style>.text-el{overflow:visible}.text-content{display:block;min-height:100%;cursor:text;user-select:text}.text-move-handle,.text-rotate-handle{position:absolute;left:50%;width:40px;height:18px;transform:translateX(-50%);border:1px solid #1769e8;border-radius:4px;background:#fff;color:#1769e8;font:700 9px Arial;text-align:center;line-height:16px;cursor:grab;z-index:6;user-select:none}.text-move-handle{top:-25px}.text-rotate-handle{top:-50px}.text-rotate-handle:after{content:"";position:absolute;left:19px;top:16px;height:13px;border-left:2px solid #ffb11b}</style>');
+document.head.insertAdjacentHTML('beforeend','<style>.text-el{overflow:visible}.text-content{display:block;min-height:100%;cursor:text;user-select:text}.text-move-handle,.text-rotate-handle,.text-resize-handle{position:absolute;left:50%;width:40px;height:18px;transform:translateX(-50%);border:1px solid #1769e8;border-radius:4px;background:#fff;color:#1769e8;font:700 9px Arial;text-align:center;line-height:16px;cursor:grab;z-index:6;user-select:none}.text-move-handle{top:-25px}.text-rotate-handle{top:-50px}.text-resize-handle{top:6px}.text-rotate-handle:after{content:"";position:absolute;left:19px;top:16px;height:13px;border-left:2px solid #ffb11b}.slide{overflow:visible}</style>');
 startDrag=function(event){
   const node=event.currentTarget?.dataset?.id?event.currentTarget:event.target.closest('.element');
   if(!node)return;
@@ -207,11 +214,12 @@ document.addEventListener('pointerdown',event=>{
   const target=event.target;
   const node=target.closest&&target.closest('.text-el');
   if(!node)return;
-  const item=target.closest('.text-move-handle,.text-rotate-handle');
+  const item=target.closest('.text-move-handle,.text-rotate-handle,.text-resize-handle');
   if(item){
     event.preventDefault();event.stopImmediatePropagation();selected=node.dataset.id;
     const el=selectedEl(),stage=$('slide').getBoundingClientRect();
     if(item.classList.contains('text-move-handle')){startDrag(event);return;}
+    if(item.classList.contains('text-resize-handle')){resizeTextFromHandle(event,node,el);return;}
     const centerX=stage.left+(el.x+el.w/2)*stage.width/100,centerY=stage.top+(el.y+el.h/2)*stage.height/100;
     const move=moveEvent=>{el.rotation=Math.round((Math.atan2(moveEvent.clientY-centerY,moveEvent.clientX-centerX)*180/Math.PI+90+360)%360);node.style.transform='rotate('+el.rotation+'deg)';};
     const end=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);render()};
