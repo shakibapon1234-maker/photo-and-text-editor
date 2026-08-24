@@ -3708,9 +3708,75 @@
             wandActionBtns.style.display = 'flex';
         }
 
-        function applyWandAction(mode) {
+        // GIF files used to be flattened because canvas exports only one GIF
+        // frame. WebCodecs decodes every source frame and gif.js encodes the
+        // edited frames back into an actual animated GIF.
+        async function applyWandToGif(mode, w, h) {
+            if (!window.ImageDecoder || !window.GIF || !originalFile) {
+                throw new Error('এই browser-এ animated GIF export সাপোর্ট নেই');
+            }
+            const decoder = new ImageDecoder({ data: await originalFile.arrayBuffer(), type: 'image/gif' });
+            await decoder.tracks.ready;
+            const track = decoder.tracks.selectedTrack;
+            const frameCount = track.frameCount || 1;
+            const gif = new GIF({ workers: 2, quality: 10, width: w, height: h, repeat: 0, transparent: 0x00ff00, workerScript: '../gif.worker.js' });
+            const fill = mode === 'fill' ? hexToRgb(wandFillColor.value) : null;
+            const work = document.createElement('canvas');
+            work.width = w; work.height = h;
+            const workCtx = work.getContext('2d', { willReadFrequently: true });
+            for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+                const decoded = await decoder.decode({ frameIndex });
+                const bitmap = decoded.image;
+                workCtx.clearRect(0, 0, w, h);
+                workCtx.drawImage(bitmap, 0, 0, w, h);
+                const pixels = workCtx.getImageData(0, 0, w, h);
+                for (let i = 0; i < w * h; i++) {
+                    if (!wandMask[i]) continue;
+                    const p = i * 4;
+                    if (mode === 'remove') {
+                        // GIF supports one transparent colour. Reserve vivid
+                        // green for it, then tell gif.js to make it transparent.
+                        pixels.data[p] = 0; pixels.data[p + 1] = 255; pixels.data[p + 2] = 0; pixels.data[p + 3] = 255;
+                    } else {
+                        pixels.data[p] = fill.r; pixels.data[p + 1] = fill.g; pixels.data[p + 2] = fill.b; pixels.data[p + 3] = 255;
+                    }
+                }
+                workCtx.putImageData(pixels, 0, 0);
+                gif.addFrame(workCtx, { copy: true, delay: Math.max(20, Math.round((decoded.image.duration || 100000) / 1000)) });
+                decoded.image.close?.();
+                showToast(`GIF frame প্রসেস হচ্ছে: ${frameIndex + 1}/${frameCount}`, 'success');
+            }
+            decoder.close();
+            return new Promise((resolve, reject) => {
+                gif.on('finished', resolve);
+                gif.on('abort', () => reject(new Error('GIF export বন্ধ হয়েছে')));
+                gif.render();
+            });
+        }
+
+        async function applyWandAction(mode) {
             if (!wandMask) return;
             const w = wandMaskW, h = wandMaskH;
+            if (originalFile?.type === 'image/gif') {
+                try {
+                    wandStatus.textContent = '⏳ Animated GIF-এর সব frame process হচ্ছে…';
+                    const gifBlob = await applyWandToGif(mode, w, h);
+                    processedBlob = gifBlob;
+                    const url = URL.createObjectURL(gifBlob);
+                    originalImage = new Image();
+                    originalImage.src = url;
+                    previewImage.src = url;
+                    downloadSection.style.display = 'block';
+                    downloadBtn.setAttribute('data-ext', 'gif');
+                    pushHistory(gifBlob, mode === 'remove' ? 'Animated GIF Magic Wand → Remove' : 'Animated GIF Magic Wand → Fill');
+                    showToast('✅ Animated GIF তৈরি হয়েছে — এখন GIF হিসেবেই ডাউনলোড হবে।', 'success');
+                    deactivateWand();
+                    return;
+                } catch (error) {
+                    showToast(`❌ GIF export করা যায়নি: ${error.message}`, 'error');
+                    return;
+                }
+            }
             canvas.width = w; canvas.height = h;
             ctx.clearRect(0, 0, w, h);
             ctx.drawImage(originalImage, 0, 0, w, h);
