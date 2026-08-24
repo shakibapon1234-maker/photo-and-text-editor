@@ -4,7 +4,6 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Photo & 3D Text Studio</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -374,8 +373,15 @@
       if (!active) return sendActiveToPresentationImage();
       const [frameId, name, selector] = active, frame = document.getElementById(frameId), button = document.getElementById('sendActiveToPresentationBtn');
       try {
-        const canvas = (frame.contentDocument || frame.contentWindow.document).querySelector(selector);
+        const sourceDoc = frame.contentDocument || frame.contentWindow.document;
+        const canvas = sourceDoc.querySelector(selector);
         if (!canvas?.captureStream || !window.MediaRecorder) throw new Error('Video capture is unavailable');
+        // 3D Studio renders its preset only after Play/Restart. Trigger it before
+        // capture, so the transferred WebM contains the actual animation, not a still.
+        if (frameId === 'frame3d') {
+          const play = sourceDoc.getElementById('animPlayBtn');
+          if (play && !play.disabled) { play.click(); await new Promise(resolve => setTimeout(resolve, 120)); }
+        }
         const promoDuration = frameId === 'framePromo' ? Number((frame.contentDocument || frame.contentWindow.document).getElementById('duration')?.value || 5) * 1000 : 5000;
         const duration = Math.min(8000, Math.max(3000, promoDuration));
         button.disabled = true; button.textContent = '⏳ ভিডিও তৈরি হচ্ছে…';

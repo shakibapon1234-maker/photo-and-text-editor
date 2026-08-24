@@ -5130,6 +5130,20 @@
             return ocrFileInput.files[0];
         }
 
+        let ocrEnginePromise = null;
+        function loadOcrEngine() {
+            if (window.Tesseract) return Promise.resolve(window.Tesseract);
+            if (ocrEnginePromise) return ocrEnginePromise;
+            ocrEnginePromise = new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+                script.onload = () => window.Tesseract ? resolve(window.Tesseract) : reject(new Error('OCR engine did not load'));
+                script.onerror = () => reject(new Error('OCR engine could not be downloaded'));
+                document.head.appendChild(script);
+            });
+            return ocrEnginePromise;
+        }
+
         ocrRunBtn.addEventListener('click', async () => {
             if (isOcrRunning) return;
 
@@ -5146,6 +5160,7 @@
             ocrStatus.textContent = 'প্রসেস করছে... (প্রথমবারে ল্যাঙ্গুয়েজ ডাউনলোড হতে পারে)';
 
             try {
+                const Tesseract = await loadOcrEngine();
                 const worker = await Tesseract.createWorker(lang, 1, {
                     logger: m => {
                         if (m.status === 'recognizing text') {

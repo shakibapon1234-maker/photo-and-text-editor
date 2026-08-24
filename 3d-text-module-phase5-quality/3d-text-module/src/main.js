@@ -1381,29 +1381,8 @@ function registerBundledCanvasFont() {
       } catch (err) {
         console.warn('Failed to add bundled Bengali font to document.fonts', err);
       }
-    }).catch(async (err) => {
+    }).catch((err) => {
       console.warn('Bundled Bengali font not found or failed to load:', fontUrl, err);
-      // Fallback: inject Google Fonts link for Noto Sans Bengali and wait
-      // for it to be available via `document.fonts.load`. This requires
-      // network but keeps behaviour deterministic if the user prefers not
-      // to add a TTF file manually.
-      try {
-        const gfHref = 'https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600&display=swap';
-        if (!document.querySelector(`link[href="${gfHref}"]`)) {
-          const l = document.createElement('link');
-          l.rel = 'stylesheet';
-          l.href = gfHref;
-          document.head.appendChild(l);
-        }
-        // Wait for the font to load (weight 600 used in canvas draws)
-        await document.fonts.load('600 220px "Noto Sans Bengali"');
-        console.log('Google Fonts Noto Sans Bengali loaded fallback');
-        if (state && state.contentMode === 'text' && isBanglaText(state.text)) {
-          scheduleRebuild();
-        }
-      } catch (gerr) {
-        console.warn('Google Fonts fallback failed', gerr);
-      }
     });
   } catch (e) {
     console.warn('registerBundledCanvasFont failed', e);
