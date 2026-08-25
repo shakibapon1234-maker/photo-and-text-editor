@@ -123,6 +123,7 @@ export function initShapeStudio({
   // footprint); the layer's own `size` value later scales the whole group.
   // ---------------------------------------------------------------------
   const S = 50;
+  const TAU = Math.PI * 2;
   function regularPolygon(sides, r, rot = -Math.PI / 2) {
     const pts = [];
     for (let i = 0; i < sides; i++) {
@@ -193,8 +194,21 @@ export function initShapeStudio({
         return [...body, ...tail];
       },
     },
+    capsule: { label: 'Glass Capsule', icon: '▱', points: () => roundedRectPoints(S * 3.1, S * 0.82, S * 0.40, 18) },
+    glassCard: { label: 'Glass Card', icon: '▣', points: () => roundedRectPoints(S * 2.75, S * 1.75, 20, 18) },
+    arch: { label: 'Arch', icon: '∩', points: () => {
+      const pts = [[-S, -S * 0.8], [S, -S * 0.8], [S, 0]];
+      for (let i = 0; i <= 24; i++) { const a = i * Math.PI / 24; pts.push([Math.cos(a) * S, Math.sin(a) * S]); }
+      pts.push([-S, 0]); return pts;
+    } },
+    ticket: { label: 'Ticket', icon: '🎟', points: () => [[-S * 1.7, S * 0.72], [S * 1.7, S * 0.72], [S * 1.7, S * 0.22], [S * 1.48, 0], [S * 1.7, -S * 0.22], [S * 1.7, -S * 0.72], [-S * 1.7, -S * 0.72], [-S * 1.7, -S * 0.22], [-S * 1.48, 0], [-S * 1.7, S * 0.22]] },
+    ribbon: { label: 'Ribbon', icon: '🎗', points: () => [[-S * 1.9, S * 0.55], [S * 1.45, S * 0.55], [S * 1.9, 0], [S * 1.45, -S * 0.55], [-S * 1.9, -S * 0.55], [-S * 1.55, 0]] },
+    burst: { label: 'Burst', icon: '✦', points: () => { const pts = []; for (let i = 0; i < 24; i++) { const a = -Math.PI / 2 + i * TAU / 24; const r = i % 2 ? S * 0.58 : S; pts.push([Math.cos(a) * r, Math.sin(a) * r]); } return pts; } },
+    chevron: { label: 'Chevron', icon: '❯', points: () => [[-S, S], [-S * 0.25, S], [S, 0], [-S * 0.25, -S], [-S, -S], [S * 0.2, 0]] },
+    badge: { label: 'Badge', icon: '✪', points: () => { const pts = []; for (let i = 0; i < 16; i++) { const a = -Math.PI / 2 + i * TAU / 16; const r = i % 2 ? S * 0.86 : S; pts.push([Math.cos(a) * r, Math.sin(a) * r]); } return pts; } },
+    cloud: { label: 'Cloud', icon: '☁', points: () => { const pts = []; for (let i = 0; i <= 40; i++) { const a = i * TAU / 40; const r = S * (0.76 + 0.13 * Math.sin(a * 3) + 0.10 * Math.sin(a * 5)); pts.push([Math.cos(a) * r * 1.35, Math.sin(a) * r * 0.72]); } return pts; } },
   };
-  const PRESET_ORDER = ['textBox', 'rect', 'roundedRect', 'circle', 'ellipse', 'triangle', 'pentagon', 'hexagon', 'star', 'heart', 'arrow', 'speech'];
+  const PRESET_ORDER = ['textBox', 'rect', 'roundedRect', 'capsule', 'glassCard', 'arch', 'ticket', 'ribbon', 'burst', 'chevron', 'badge', 'cloud', 'circle', 'ellipse', 'triangle', 'pentagon', 'hexagon', 'star', 'heart', 'arrow', 'speech'];
 
   // ---------------------------------------------------------------------
   // Texture helpers
@@ -627,6 +641,26 @@ export function initShapeStudio({
       layer.text = 'আপনার টেক্সট';
       layer.fillColor = '#172554';
       layer.borderColor = '#fbbf24';
+    }
+    if (presetType === 'glassCard' || presetType === 'capsule') {
+      layer.text = presetType === 'glassCard' ? 'YOUR HEADLINE' : 'NEW • OFFER • NOW';
+      layer.fillMode = 'gradient';
+      layer.gradientColor1 = '#0ea5e9';
+      layer.gradientColor2 = '#7c3aed';
+      layer.borderEnabled = true;
+      layer.borderColor = '#ffffff';
+      layer.borderWidth = 3;
+      layer.reflectionEnabled = true;
+      layer.reflectionIntensity = 0.85;
+      layer.opacity = 0.72;
+      layer.depth = 18;
+    }
+    if (presetType === 'ticket' || presetType === 'ribbon' || presetType === 'badge' || presetType === 'burst') {
+      layer.fillMode = 'gradient';
+      layer.gradientColor1 = '#fbbf24';
+      layer.gradientColor2 = '#f43f5e';
+      layer.borderEnabled = true;
+      layer.borderColor = '#fff7ed';
     }
     // small stagger so stacked adds are still visible/selectable
     const n = order.length;

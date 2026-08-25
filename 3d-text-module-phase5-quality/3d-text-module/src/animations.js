@@ -309,11 +309,65 @@ export const ANIMATION_PRESETS = {
       return { pos: [posX, 0, 0], rot: [rotX, rotY, 0], scaleMul: scale, opacityMul: 1, emissiveMul };
     },
   },
+
+  // Short-form social entrances.  These deliberately combine depth, rotation
+  // and a tiny settle so they read well in the first second of a Reel.
+  slamIn: {
+    label: 'Slam In',
+    apply: (t) => {
+      const settle = Math.sin(t * Math.PI * 2.5) * Math.pow(1 - t, 2) * 0.18;
+      return { pos: [0, 0, -180 * (1 - t)], rot: [0, 0, -0.22 * (1 - t)], scaleMul: t + settle, opacityMul: Math.min(1, t * 3) };
+    },
+  },
+  whipInLeft: {
+    label: 'Whip In Left',
+    apply: (t) => ({ pos: [-420 * (1 - t), 24 * Math.sin(t * Math.PI) * (1 - t), 0], rot: [0, 0, -0.55 * (1 - t)], scaleMul: 0.82 + 0.18 * t, opacityMul: Math.min(1, t * 2.5) }),
+  },
+  whipInRight: {
+    label: 'Whip In Right',
+    apply: (t) => ({ pos: [420 * (1 - t), 24 * Math.sin(t * Math.PI) * (1 - t), 0], rot: [0, 0, 0.55 * (1 - t)], scaleMul: 0.82 + 0.18 * t, opacityMul: Math.min(1, t * 2.5) }),
+  },
+  rouletteIn: {
+    label: 'Roulette In',
+    apply: (t) => ({ pos: [0, 0, -55 * (1 - t)], rot: [0, 0, TAU * 1.5 * (1 - t)], scaleMul: 0.35 + 0.65 * t, opacityMul: Math.min(1, t * 2) }),
+  },
+  foldReveal: {
+    label: 'Fold Reveal',
+    apply: (t) => ({ pos: [0, 0, 0], rot: [Math.PI * 0.72 * (1 - t), 0, 0], scaleMul: 0.78 + 0.22 * t, opacityMul: Math.min(1, t * 2.2) }),
+  },
+  diagonalBurst: {
+    label: 'Diagonal Burst',
+    apply: (t) => ({ pos: [260 * (1 - t), 180 * (1 - t), -100 * (1 - t)], rot: [0, -0.45 * (1 - t), 0.28 * (1 - t)], scaleMul: 0.55 + 0.45 * t, opacityMul: Math.min(1, t * 2.4) }),
+  },
   logoSpin: {
     // The same steady full-circle motion as the Photo Editor logo maker.
     // It is continuous so the preview and exported GIF/WebM both loop cleanly.
     label: '🔄 Logo Spin (লোগোর মতো ঘূর্ণন)',
     continuous: true,
     apply: (t) => ({ pos: [0, 0, 0], rot: [0, 0, t * TAU], scaleMul: 1, opacityMul: 1 }),
+  },
+  hoverTilt: {
+    label: 'Hover Tilt',
+    continuous: true,
+    apply: (t) => {
+      const wave = Math.sin(t * TAU);
+      return { pos: [Math.sin(t * TAU) * 13, wave * 16, 10 + Math.cos(t * TAU) * 12], rot: [0.07 * Math.cos(t * TAU), 0.16 * wave, 0.035 * wave], scaleMul: 1 + 0.035 * Math.cos(t * TAU), opacityMul: 1 };
+    },
+  },
+  heartbeat: {
+    label: 'Heartbeat',
+    continuous: true,
+    apply: (t) => {
+      const beat = Math.pow(Math.max(0, Math.sin(t * TAU * 2)), 10) * 0.16 + Math.pow(Math.max(0, Math.sin(t * TAU * 2 - 0.55)), 14) * 0.09;
+      return { pos: [0, 0, beat * 35], rot: [0, 0, 0], scaleMul: 1 + beat, opacityMul: 0.88 + beat * 0.75, emissiveMul: 0.7 + beat * 2.2 };
+    },
+  },
+  orbitGlow: {
+    label: 'Orbit Glow',
+    continuous: true,
+    apply: (t) => {
+      const a = t * TAU;
+      return { pos: [Math.cos(a) * 18, Math.sin(a) * 12, Math.sin(a) * 18], rot: [0.06 * Math.sin(a), 0.18 * Math.cos(a), 0], scaleMul: 1 + 0.045 * Math.sin(a), opacityMul: 1, emissiveMul: 1 + 0.9 * ((Math.sin(a) + 1) / 2) };
+    },
   },
 };

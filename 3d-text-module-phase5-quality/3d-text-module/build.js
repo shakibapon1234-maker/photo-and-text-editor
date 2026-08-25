@@ -49,10 +49,12 @@ esbuild
     const htmlPath = path.join(wwwDir, 'index.html');
     if (fs.existsSync(htmlPath)) {
       let html = fs.readFileSync(htmlPath, 'utf8');
-      if (/src="main\.bundle\.js\?v=\d+"/.test(html)) {
-        html = html.replace(/src="main\.bundle\.js\?v=\d+"/g, 'src="main.bundle.js"');
+      if (/src="main\.bundle\.js(?:\?v=[^"]*)?"/.test(html)) {
+        // A fresh bundle must not be hidden behind the browser's module cache.
+        // This is especially important when the suite is kept open in Electron.
+        html = html.replace(/src="main\.bundle\.js(?:\?v=[^"]*)?"/g, `src="main.bundle.js?v=${timestamp}"`);
         fs.writeFileSync(htmlPath, html, 'utf8');
-        console.log('Cleaned www/index.html script tag');
+        console.log('Updated www/index.html bundle cache version');
       }
     }
 

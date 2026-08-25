@@ -34732,12 +34732,65 @@ var ANIMATION_PRESETS = {
       return { pos: [posX, 0, 0], rot: [rotX, rotY, 0], scaleMul: scale, opacityMul: 1, emissiveMul };
     }
   },
+  // Short-form social entrances.  These deliberately combine depth, rotation
+  // and a tiny settle so they read well in the first second of a Reel.
+  slamIn: {
+    label: "Slam In",
+    apply: (t) => {
+      const settle = Math.sin(t * Math.PI * 2.5) * Math.pow(1 - t, 2) * 0.18;
+      return { pos: [0, 0, -180 * (1 - t)], rot: [0, 0, -0.22 * (1 - t)], scaleMul: t + settle, opacityMul: Math.min(1, t * 3) };
+    }
+  },
+  whipInLeft: {
+    label: "Whip In Left",
+    apply: (t) => ({ pos: [-420 * (1 - t), 24 * Math.sin(t * Math.PI) * (1 - t), 0], rot: [0, 0, -0.55 * (1 - t)], scaleMul: 0.82 + 0.18 * t, opacityMul: Math.min(1, t * 2.5) })
+  },
+  whipInRight: {
+    label: "Whip In Right",
+    apply: (t) => ({ pos: [420 * (1 - t), 24 * Math.sin(t * Math.PI) * (1 - t), 0], rot: [0, 0, 0.55 * (1 - t)], scaleMul: 0.82 + 0.18 * t, opacityMul: Math.min(1, t * 2.5) })
+  },
+  rouletteIn: {
+    label: "Roulette In",
+    apply: (t) => ({ pos: [0, 0, -55 * (1 - t)], rot: [0, 0, TAU * 1.5 * (1 - t)], scaleMul: 0.35 + 0.65 * t, opacityMul: Math.min(1, t * 2) })
+  },
+  foldReveal: {
+    label: "Fold Reveal",
+    apply: (t) => ({ pos: [0, 0, 0], rot: [Math.PI * 0.72 * (1 - t), 0, 0], scaleMul: 0.78 + 0.22 * t, opacityMul: Math.min(1, t * 2.2) })
+  },
+  diagonalBurst: {
+    label: "Diagonal Burst",
+    apply: (t) => ({ pos: [260 * (1 - t), 180 * (1 - t), -100 * (1 - t)], rot: [0, -0.45 * (1 - t), 0.28 * (1 - t)], scaleMul: 0.55 + 0.45 * t, opacityMul: Math.min(1, t * 2.4) })
+  },
   logoSpin: {
     // The same steady full-circle motion as the Photo Editor logo maker.
     // It is continuous so the preview and exported GIF/WebM both loop cleanly.
     label: "\u{1F504} Logo Spin (\u09B2\u09CB\u0997\u09CB\u09B0 \u09AE\u09A4\u09CB \u0998\u09C2\u09B0\u09CD\u09A3\u09A8)",
     continuous: true,
     apply: (t) => ({ pos: [0, 0, 0], rot: [0, 0, t * TAU], scaleMul: 1, opacityMul: 1 })
+  },
+  hoverTilt: {
+    label: "Hover Tilt",
+    continuous: true,
+    apply: (t) => {
+      const wave = Math.sin(t * TAU);
+      return { pos: [Math.sin(t * TAU) * 13, wave * 16, 10 + Math.cos(t * TAU) * 12], rot: [0.07 * Math.cos(t * TAU), 0.16 * wave, 0.035 * wave], scaleMul: 1 + 0.035 * Math.cos(t * TAU), opacityMul: 1 };
+    }
+  },
+  heartbeat: {
+    label: "Heartbeat",
+    continuous: true,
+    apply: (t) => {
+      const beat = Math.pow(Math.max(0, Math.sin(t * TAU * 2)), 10) * 0.16 + Math.pow(Math.max(0, Math.sin(t * TAU * 2 - 0.55)), 14) * 0.09;
+      return { pos: [0, 0, beat * 35], rot: [0, 0, 0], scaleMul: 1 + beat, opacityMul: 0.88 + beat * 0.75, emissiveMul: 0.7 + beat * 2.2 };
+    }
+  },
+  orbitGlow: {
+    label: "Orbit Glow",
+    continuous: true,
+    apply: (t) => {
+      const a = t * TAU;
+      return { pos: [Math.cos(a) * 18, Math.sin(a) * 12, Math.sin(a) * 18], rot: [0.06 * Math.sin(a), 0.18 * Math.cos(a), 0], scaleMul: 1 + 0.045 * Math.sin(a), opacityMul: 1, emissiveMul: 1 + 0.9 * ((Math.sin(a) + 1) / 2) };
+    }
   }
 };
 
@@ -35108,6 +35161,7 @@ function initShapeStudio({
     clearAllBtn: $("shapeClearAllBtn")
   };
   const S = 50;
+  const TAU2 = Math.PI * 2;
   function regularPolygon(sides, r, rot = -Math.PI / 2) {
     const pts = [];
     for (let i = 0; i < sides; i++) {
@@ -35194,9 +35248,50 @@ function initShapeStudio({
         const tail = [[-S * 0.25, -S * 0.55], [-S * 0.45, -S * 0.95], [S * 0.1, -S * 0.5]];
         return [...body, ...tail];
       }
-    }
+    },
+    capsule: { label: "Glass Capsule", icon: "\u25B1", points: () => roundedRectPoints(S * 3.1, S * 0.82, S * 0.4, 18) },
+    glassCard: { label: "Glass Card", icon: "\u25A3", points: () => roundedRectPoints(S * 2.75, S * 1.75, 20, 18) },
+    arch: { label: "Arch", icon: "\u2229", points: () => {
+      const pts = [[-S, -S * 0.8], [S, -S * 0.8], [S, 0]];
+      for (let i = 0; i <= 24; i++) {
+        const a = i * Math.PI / 24;
+        pts.push([Math.cos(a) * S, Math.sin(a) * S]);
+      }
+      pts.push([-S, 0]);
+      return pts;
+    } },
+    ticket: { label: "Ticket", icon: "\u{1F39F}", points: () => [[-S * 1.7, S * 0.72], [S * 1.7, S * 0.72], [S * 1.7, S * 0.22], [S * 1.48, 0], [S * 1.7, -S * 0.22], [S * 1.7, -S * 0.72], [-S * 1.7, -S * 0.72], [-S * 1.7, -S * 0.22], [-S * 1.48, 0], [-S * 1.7, S * 0.22]] },
+    ribbon: { label: "Ribbon", icon: "\u{1F397}", points: () => [[-S * 1.9, S * 0.55], [S * 1.45, S * 0.55], [S * 1.9, 0], [S * 1.45, -S * 0.55], [-S * 1.9, -S * 0.55], [-S * 1.55, 0]] },
+    burst: { label: "Burst", icon: "\u2726", points: () => {
+      const pts = [];
+      for (let i = 0; i < 24; i++) {
+        const a = -Math.PI / 2 + i * TAU2 / 24;
+        const r = i % 2 ? S * 0.58 : S;
+        pts.push([Math.cos(a) * r, Math.sin(a) * r]);
+      }
+      return pts;
+    } },
+    chevron: { label: "Chevron", icon: "\u276F", points: () => [[-S, S], [-S * 0.25, S], [S, 0], [-S * 0.25, -S], [-S, -S], [S * 0.2, 0]] },
+    badge: { label: "Badge", icon: "\u272A", points: () => {
+      const pts = [];
+      for (let i = 0; i < 16; i++) {
+        const a = -Math.PI / 2 + i * TAU2 / 16;
+        const r = i % 2 ? S * 0.86 : S;
+        pts.push([Math.cos(a) * r, Math.sin(a) * r]);
+      }
+      return pts;
+    } },
+    cloud: { label: "Cloud", icon: "\u2601", points: () => {
+      const pts = [];
+      for (let i = 0; i <= 40; i++) {
+        const a = i * TAU2 / 40;
+        const r = S * (0.76 + 0.13 * Math.sin(a * 3) + 0.1 * Math.sin(a * 5));
+        pts.push([Math.cos(a) * r * 1.35, Math.sin(a) * r * 0.72]);
+      }
+      return pts;
+    } }
   };
-  const PRESET_ORDER = ["textBox", "rect", "roundedRect", "circle", "ellipse", "triangle", "pentagon", "hexagon", "star", "heart", "arrow", "speech"];
+  const PRESET_ORDER = ["textBox", "rect", "roundedRect", "capsule", "glassCard", "arch", "ticket", "ribbon", "burst", "chevron", "badge", "cloud", "circle", "ellipse", "triangle", "pentagon", "hexagon", "star", "heart", "arrow", "speech"];
   function buildGradientTexture(c1, c2, angleDeg) {
     const size = 256;
     const cnv = document.createElement("canvas");
@@ -35587,6 +35682,26 @@ function initShapeStudio({
       layer.text = "\u0986\u09AA\u09A8\u09BE\u09B0 \u099F\u09C7\u0995\u09CD\u09B8\u099F";
       layer.fillColor = "#172554";
       layer.borderColor = "#fbbf24";
+    }
+    if (presetType === "glassCard" || presetType === "capsule") {
+      layer.text = presetType === "glassCard" ? "YOUR HEADLINE" : "NEW \u2022 OFFER \u2022 NOW";
+      layer.fillMode = "gradient";
+      layer.gradientColor1 = "#0ea5e9";
+      layer.gradientColor2 = "#7c3aed";
+      layer.borderEnabled = true;
+      layer.borderColor = "#ffffff";
+      layer.borderWidth = 3;
+      layer.reflectionEnabled = true;
+      layer.reflectionIntensity = 0.85;
+      layer.opacity = 0.72;
+      layer.depth = 18;
+    }
+    if (presetType === "ticket" || presetType === "ribbon" || presetType === "badge" || presetType === "burst") {
+      layer.fillMode = "gradient";
+      layer.gradientColor1 = "#fbbf24";
+      layer.gradientColor2 = "#f43f5e";
+      layer.borderEnabled = true;
+      layer.borderColor = "#fff7ed";
     }
     const n = order.length;
     layer.posX = n % 5 * 8 - 16;
@@ -37299,24 +37414,8 @@ function registerBundledCanvasFont() {
       } catch (err) {
         console.warn("Failed to add bundled Bengali font to document.fonts", err);
       }
-    }).catch(async (err) => {
+    }).catch((err) => {
       console.warn("Bundled Bengali font not found or failed to load:", fontUrl, err);
-      try {
-        const gfHref = "https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600&display=swap";
-        if (!document.querySelector(`link[href="${gfHref}"]`)) {
-          const l = document.createElement("link");
-          l.rel = "stylesheet";
-          l.href = gfHref;
-          document.head.appendChild(l);
-        }
-        await document.fonts.load('600 220px "Noto Sans Bengali"');
-        console.log("Google Fonts Noto Sans Bengali loaded fallback");
-        if (state && state.contentMode === "text" && isBanglaText(state.text)) {
-          scheduleRebuild();
-        }
-      } catch (gerr) {
-        console.warn("Google Fonts fallback failed", gerr);
-      }
     });
   } catch (e) {
     console.warn("registerBundledCanvasFont failed", e);
@@ -42198,8 +42297,8 @@ function send3DToPresentation() {
     if (!assets.some((asset) => asset.src === src)) {
       assets.push({ src, added: Date.now(), name: "3D Text Studio output" });
       localStorage.setItem(key, JSON.stringify(assets.slice(-30)));
-      localStorage.setItem("presentation-studio-pending-asset-v1", JSON.stringify({ src, added: Date.now(), name: "3D Text Studio output" }));
     }
+    localStorage.setItem("presentation-studio-pending-asset-v1", JSON.stringify({ src, added: Date.now(), name: "3D Text Studio output" }));
     alert("3D output Presentation Asset Library-\u09A4\u09C7 \u09AA\u09BE\u09A0\u09BE\u09A8\u09CB \u09B9\u09DF\u09C7\u099B\u09C7\u0964");
   } catch (err) {
     console.error(err);
