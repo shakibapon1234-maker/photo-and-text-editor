@@ -370,7 +370,9 @@ export function initShapeStudio({
     const lineHeight = fontSize * 1.24;
     const startY = (canvas.height - lines.length * lineHeight) / 2 + fontSize * 0.88;
     const lineParts = lines.map((line) => splitGraphemes(line));
-    const totalGraphemes = Math.max(1, lineParts.reduce((sum, parts) => sum + parts.filter((part) => part.trim()).length, 0));
+    // Count spaces too. Otherwise the reveal counter and the text slice use
+    // different units, making a sentence finish one letter short.
+    const totalGraphemes = Math.max(1, lineParts.reduce((sum, parts) => sum + parts.length, 0));
     let lastVisibleGraphemes = -1;
     const paintTextReveal = (progress = 1) => {
       const visibleTotal = Math.floor(Math.min(1, Math.max(0, progress)) * totalGraphemes + 1e-8);
@@ -395,7 +397,7 @@ export function initShapeStudio({
           ctx.fillText(line, canvas.width / 2, y);
           ctx.restore();
         }
-        remaining -= parts.filter((part) => part.trim()).length;
+        remaining -= parts.length;
       });
     };
     paintTextReveal(1);
@@ -1125,7 +1127,11 @@ export function initShapeStudio({
   wireProp(el.threeDToggle, () => selectedId && updateLayer(selectedId, { is3D: el.threeDToggle.checked }));
   wireProp(el.depth, () => selectedId && updateLayer(selectedId, { depth: Number(el.depth.value) }));
 
-  wireProp(el.textInput, () => selectedId && updateLayer(selectedId, { text: el.textInput.value }));
+  wireProp(el.textInput, () => {
+    if (!selectedId) return;
+    updateLayer(selectedId, { text: el.textInput.value });
+    persist(true);
+  });
   wireProp(el.textColor, () => selectedId && updateLayer(selectedId, { textColor: el.textColor.value }));
   if (el.textFillModeGrid) {
     el.textFillModeGrid.addEventListener('click', (e) => {
@@ -1164,15 +1170,20 @@ export function initShapeStudio({
   // Persistence
   // ---------------------------------------------------------------------
   let persistTimer = null;
-  function persist() {
+  function persist(immediate = false) {
     clearTimeout(persistTimer);
-    persistTimer = setTimeout(() => {
+    const write = () => {
       try {
         const data = { order, layers: order.map((id) => layers.get(id).layer) };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       } catch (_) { /* ignore quota errors */ }
-    }, 250);
+    };
+    if (immediate) write();
+    else persistTimer = setTimeout(write, 250);
   }
+
+  // Close/reload may happen before the normal 250 ms debounce completes.
+  window.addEventListener('pagehide', () => persist(true));
 
   function restore() {
     try {
@@ -1224,6 +1235,7 @@ export function initShapeStudio({
     getSelectedTextUnitCount,
     getSnapshot,
     restoreSnapshot,
+    flush: () => persist(true),
     clearAll,
   };
 }

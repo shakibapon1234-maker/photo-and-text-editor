@@ -234,9 +234,10 @@ export async function exportPngSequence(deps, opts, callbacks = {}) {
     // frame's canvas content would be overwritten by the next render() call
     // otherwise, since there's only one shared canvas/backbuffer.
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!blob) throw new Error('PNG frame তৈরি করা যায়নি—আবার চেষ্টা করুন।');
     zip.file(`frame_${String(i + 1).padStart(pad, '0')}.png`, blob);
 
-    onProgress?.((i + 1) / frameCount);
+    onProgress?.(((i + 1) / frameCount) * 0.75);
     onStatus?.(`ফ্রেম ${i + 1}/${frameCount} ক্যাপচার হচ্ছে…`);
   }
 
@@ -247,8 +248,13 @@ export async function exportPngSequence(deps, opts, callbacks = {}) {
   onStatus?.('ZIP প্যাক করা হচ্ছে…');
   const zipBlob = await zip.generateAsync({
     type: 'blob',
-    compression: 'DEFLATE',
-    compressionOptions: { level: 6 },
+    // PNG frames are already compressed. Re-compressing them is slow and
+    // gives almost no size benefit, especially for 1080p exports.
+    compression: 'STORE',
+  }, (metadata) => {
+    const percent = Math.max(0, Math.min(100, metadata.percent || 0));
+    onProgress?.(0.75 + percent / 100 * 0.25);
+    onStatus?.(`ZIP প্যাক করা হচ্ছে… ${Math.round(percent)}%`);
   });
 
   return { blob: zipBlob, frameCount, width: opts.width, height: opts.height };
@@ -397,7 +403,9 @@ export async function exportGif(deps, opts, callbacks = {}) {
   onStatus?.('GIF এনকোড হচ্ছে (এতে কিছুটা সময় লাগতে পারে)…');
   const blob = await new Promise((resolve, reject) => {
     gif.on('progress', (p) => {
-      onProgress?.(0.5 + p * 0.5); // encoding = second half of progress
+      const safeProgress = Math.max(0, Math.min(1, p || 0));
+      onProgress?.(0.5 + safeProgress * 0.5); // encoding = second half of progress
+      onStatus?.(`GIF এনকোড হচ্ছে… ${Math.round(safeProgress * 100)}%`);
     });
     gif.on('finished', (encodedBlob) => resolve(encodedBlob));
     gif.on('abort', () => reject(new Error('GIF এনকোডিং বাতিল হয়েছে')));

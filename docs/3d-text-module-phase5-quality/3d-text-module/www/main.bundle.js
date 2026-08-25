@@ -34916,8 +34916,9 @@ async function exportPngSequence(deps, opts, callbacks = {}) {
     }
     renderer2.render(scene2, camera2);
     const blob = await new Promise((resolve) => canvas2.toBlob(resolve, "image/png"));
+    if (!blob) throw new Error("PNG frame \u09A4\u09C8\u09B0\u09BF \u0995\u09B0\u09BE \u09AF\u09BE\u09DF\u09A8\u09BF\u2014\u0986\u09AC\u09BE\u09B0 \u099A\u09C7\u09B7\u09CD\u099F\u09BE \u0995\u09B0\u09C1\u09A8\u0964");
     zip.file(`frame_${String(i + 1).padStart(pad, "0")}.png`, blob);
-    onProgress?.((i + 1) / frameCount);
+    onProgress?.((i + 1) / frameCount * 0.75);
     onStatus?.(`\u09AB\u09CD\u09B0\u09C7\u09AE ${i + 1}/${frameCount} \u0995\u09CD\u09AF\u09BE\u09AA\u099A\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7\u2026`);
   }
   deps.resetMeshToBaseTransform();
@@ -34926,8 +34927,13 @@ async function exportPngSequence(deps, opts, callbacks = {}) {
   onStatus?.("ZIP \u09AA\u09CD\u09AF\u09BE\u0995 \u0995\u09B0\u09BE \u09B9\u099A\u09CD\u099B\u09C7\u2026");
   const zipBlob = await zip.generateAsync({
     type: "blob",
-    compression: "DEFLATE",
-    compressionOptions: { level: 6 }
+    // PNG frames are already compressed. Re-compressing them is slow and
+    // gives almost no size benefit, especially for 1080p exports.
+    compression: "STORE"
+  }, (metadata) => {
+    const percent = Math.max(0, Math.min(100, metadata.percent || 0));
+    onProgress?.(0.75 + percent / 100 * 0.25);
+    onStatus?.(`ZIP \u09AA\u09CD\u09AF\u09BE\u0995 \u0995\u09B0\u09BE \u09B9\u099A\u09CD\u099B\u09C7\u2026 ${Math.round(percent)}%`);
   });
   return { blob: zipBlob, frameCount, width: opts.width, height: opts.height };
 }
@@ -35019,7 +35025,9 @@ async function exportGif(deps, opts, callbacks = {}) {
   onStatus?.("GIF \u098F\u09A8\u0995\u09CB\u09A1 \u09B9\u099A\u09CD\u099B\u09C7 (\u098F\u09A4\u09C7 \u0995\u09BF\u099B\u09C1\u099F\u09BE \u09B8\u09AE\u09AF\u09BC \u09B2\u09BE\u0997\u09A4\u09C7 \u09AA\u09BE\u09B0\u09C7)\u2026");
   const blob = await new Promise((resolve, reject) => {
     gif.on("progress", (p) => {
-      onProgress?.(0.5 + p * 0.5);
+      const safeProgress = Math.max(0, Math.min(1, p || 0));
+      onProgress?.(0.5 + safeProgress * 0.5);
+      onStatus?.(`GIF \u098F\u09A8\u0995\u09CB\u09A1 \u09B9\u099A\u09CD\u099B\u09C7\u2026 ${Math.round(safeProgress * 100)}%`);
     });
     gif.on("finished", (encodedBlob) => resolve(encodedBlob));
     gif.on("abort", () => reject(new Error("GIF \u098F\u09A8\u0995\u09CB\u09A1\u09BF\u0982 \u09AC\u09BE\u09A4\u09BF\u09B2 \u09B9\u09AF\u09BC\u09C7\u099B\u09C7")));
@@ -35449,7 +35457,7 @@ function initShapeStudio({
     const lineHeight = fontSize * 1.24;
     const startY = (canvas2.height - lines.length * lineHeight) / 2 + fontSize * 0.88;
     const lineParts = lines.map((line) => splitGraphemes2(line));
-    const totalGraphemes = Math.max(1, lineParts.reduce((sum, parts) => sum + parts.filter((part) => part.trim()).length, 0));
+    const totalGraphemes = Math.max(1, lineParts.reduce((sum, parts) => sum + parts.length, 0));
     let lastVisibleGraphemes = -1;
     const paintTextReveal = (progress = 1) => {
       const visibleTotal = Math.floor(Math.min(1, Math.max(0, progress)) * totalGraphemes + 1e-8);
@@ -35474,7 +35482,7 @@ function initShapeStudio({
           ctx.fillText(line, canvas2.width / 2, y);
           ctx.restore();
         }
-        remaining -= parts.filter((part) => part.trim()).length;
+        remaining -= parts.length;
       });
     };
     paintTextReveal(1);
@@ -36122,7 +36130,11 @@ function initShapeStudio({
   wireProp(el.reflectionIntensity, () => selectedId && updateLayer(selectedId, { reflectionIntensity: Number(el.reflectionIntensity.value) / 100 }));
   wireProp(el.threeDToggle, () => selectedId && updateLayer(selectedId, { is3D: el.threeDToggle.checked }));
   wireProp(el.depth, () => selectedId && updateLayer(selectedId, { depth: Number(el.depth.value) }));
-  wireProp(el.textInput, () => selectedId && updateLayer(selectedId, { text: el.textInput.value }));
+  wireProp(el.textInput, () => {
+    if (!selectedId) return;
+    updateLayer(selectedId, { text: el.textInput.value });
+    persist(true);
+  });
   wireProp(el.textColor, () => selectedId && updateLayer(selectedId, { textColor: el.textColor.value }));
   if (el.textFillModeGrid) {
     el.textFillModeGrid.addEventListener("click", (e) => {
@@ -36159,16 +36171,19 @@ function initShapeStudio({
     if (confirm("\u09B8\u09AC \u09B6\u09C7\u09AA \u09AE\u09C1\u099B\u09C7 \u09AB\u09C7\u09B2\u09AC\u09C7\u09A8?")) clearAll();
   });
   let persistTimer = null;
-  function persist() {
+  function persist(immediate = false) {
     clearTimeout(persistTimer);
-    persistTimer = setTimeout(() => {
+    const write = () => {
       try {
         const data = { order, layers: order.map((id) => layers.get(id).layer) };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       } catch (_) {
       }
-    }, 250);
+    };
+    if (immediate) write();
+    else persistTimer = setTimeout(write, 250);
   }
+  window.addEventListener("pagehide", () => persist(true));
   function restore() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -36216,6 +36231,7 @@ function initShapeStudio({
     getSelectedTextUnitCount,
     getSnapshot,
     restoreSnapshot,
+    flush: () => persist(true),
     clearAll
   };
 }
@@ -40466,6 +40482,7 @@ rotXRange.addEventListener("input", () => {
 });
 function saveStudioState() {
   try {
+    shapeStudio?.flush?.();
     const toSave = {
       text: state.text,
       fontFamily: state.fontFamily,
@@ -40569,6 +40586,11 @@ function saveStudioStateDebounced() {
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(saveStudioState, 300);
 }
+window.addEventListener("pagehide", () => {
+  clearTimeout(saveTimeout);
+  saveTimeout = null;
+  saveStudioState();
+});
 function loadStudioState() {
   try {
     const raw = localStorage.getItem("3d_studio_saved_state");

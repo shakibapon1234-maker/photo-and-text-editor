@@ -5094,6 +5094,9 @@ rotXRange.addEventListener('input', () => {
 // ---------- State Auto-Save & Restore (Persist across page refresh) ----------
 function saveStudioState() {
   try {
+    // Shape layers have their own small debounce; flush them whenever the
+    // main studio saves so a just-typed card headline survives a reload.
+    shapeStudio?.flush?.();
     const toSave = {
       text: state.text,
       fontFamily: state.fontFamily,
@@ -5194,6 +5197,12 @@ function saveStudioStateDebounced() {
   if (saveTimeout) clearTimeout(saveTimeout);
   saveTimeout = setTimeout(saveStudioState, 300);
 }
+
+window.addEventListener('pagehide', () => {
+  clearTimeout(saveTimeout);
+  saveTimeout = null;
+  saveStudioState();
+});
 
 function loadStudioState() {
   try {
