@@ -264,15 +264,15 @@ export function initShapeStudio({
   function getLayerPoints(layer) {
     if (layer.presetType === 'freehand') return layer.freehandPoints;
     if (layer.presetType === 'textBox') {
-      // One-row caption box: its width follows the longest typed line rather
-      // than staying a fixed rectangle. The cap protects the scene from an
-      // accidentally enormous caption while still expanding far beyond the
-      // standard shape width.
+      // Caption boxes should hug their text.  In particular, do not make the
+      // background wider merely because the text-size slider changes: that
+      // made larger lettering look no larger in the export, surrounded by an
+      // ever-growing empty frame.  The width is based only on the typed line;
+      // buildShapeTextMesh then lets the selected type size fill that frame.
       const lines = String(layer.text || 'টেক্সট বক্স').split(/\r?\n/);
       const longest = Math.max(1, ...lines.map((line) => splitGraphemes(line).filter((char) => char.trim()).length));
-      const textScale = Math.max(0.55, (layer.textSize || 32) / 32);
-      const width = Math.max(S * 2.4, Math.min(S * 9, S * (1.35 + longest * 0.42 * textScale)));
-      return roundedRectPoints(width, S * 0.82, 12);
+      const width = Math.max(S * 1.35, Math.min(S * 4.8, S * (0.64 + longest * 0.195)));
+      return roundedRectPoints(width, S * 0.42, 12);
     }
     const preset = PRESETS[layer.presetType] || PRESETS.rect;
     return preset.points();
@@ -323,18 +323,22 @@ export function initShapeStudio({
   }
 
   function buildShapeTextMesh(layer, box, depth) {
-    const safeW = Math.max(24, box.w * 0.78);
-    const safeH = Math.max(20, box.h * 0.66);
+    // Keep only a small, deliberate inset.  This is especially important for
+    // textBox, whose purpose is a close-fitting text background rather than a
+    // large card with a tiny label in the centre.
+    const isCaptionBox = layer.presetType === 'textBox';
+    const safeW = Math.max(24, box.w * (isCaptionBox ? 0.96 : 0.78));
+    const safeH = Math.max(20, box.h * (isCaptionBox ? 0.9 : 0.66));
     const canvas = document.createElement('canvas');
     canvas.width = 1536;
     canvas.height = Math.max(512, Math.round(canvas.width * safeH / safeW));
     const ctx = canvas.getContext('2d');
-    const padX = canvas.width * 0.06;
-    const padY = canvas.height * 0.08;
+    const padX = canvas.width * (isCaptionBox ? 0.012 : 0.06);
+    const padY = canvas.height * (isCaptionBox ? 0.025 : 0.08);
     const maxWidth = canvas.width - padX * 2;
     const maxHeight = canvas.height - padY * 2;
     const textStyle = getShapeTextStyle(layer);
-    const requested = Math.max(18, Math.round(canvas.height * (layer.textSize / 100) * 0.9));
+    const requested = Math.max(18, Math.round(canvas.height * (layer.textSize / 100) * (isCaptionBox ? 1.7 : 0.9)));
     let fontSize = requested;
     let lines = [];
     for (; fontSize >= 12; fontSize -= 2) {
@@ -525,7 +529,10 @@ export function initShapeStudio({
     }
 
     // ---- reflection (mirrored, fading duplicate under the shape) ----
-    if (layer.reflectionEnabled && layer.reflectionIntensity > 0) {
+    // The global Reflection / Environment Lighting switch must also hide a
+    // shape's mirrored floor reflection. Keep the layer preference intact so
+    // enabling the global switch again restores it.
+    if (layer.reflectionEnabled && layer.reflectionsOn !== false && layer.reflectionIntensity > 0) {
       const flatGeo = new THREE.ShapeGeometry(shapePath, 16);
       normalizeCapUVs(flatGeo, box.w, box.h);
       const reflMat = layer.fillMode === 'gradient'
@@ -741,7 +748,14 @@ export function initShapeStudio({
     const { pos, rot, scaleMul, opacityMul, emissiveMul, reveal } = preset.apply(t);
     const { group, layer } = entry;
     group.position.set(layer.posX + (pos ? pos[0] : 0), layer.posY + (pos ? pos[1] : 0), layer.posZ + (pos ? pos[2] : 0));
-    group.rotation.set(0, 0, THREE.MathUtils.degToRad(layer.rotationZ) + (rot ? rot[2] : 0));
+    // Shape presets can animate in all three dimensions.  Previously we
+    // applied only the Z component, which made effects such as Shine Sweep,
+    // Flip, and 3D Rotate appear static on shape text boxes.
+    group.rotation.set(
+      rot ? rot[0] : 0,
+      rot ? rot[1] : 0,
+      THREE.MathUtils.degToRad(layer.rotationZ) + (rot ? rot[2] : 0)
+    );
     group.scale.setScalar(layer.scaleMul * Math.max(0, scaleMul === undefined ? 1 : scaleMul));
     group.visible = opacityMul === undefined || opacityMul > 0.005;
     group.traverse((child) => {
@@ -885,6 +899,10 @@ export function initShapeStudio({
     viewportEl.style.cursor = on ? 'crosshair' : '';
   }
 
+  let isCameraOrbiting = false;
+  let isCameraPanning = false;
+  let cameraControlsBeforeGesture = null;
+
   function onPointerDown(e) {
     if (!isActive()) return;
     if (e.button !== 0) return;
@@ -901,6 +919,34 @@ export function initShapeStudio({
       e.preventDefault();
       return;
     }
+     // Shift+LeftClick → Orbit (rotate 3D view around the scene)
+    if (e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      isCameraOrbiting = true;
+      cameraControlsBeforeGesture = {
+        enabled: controls.enabled,
+        leftButton: controls.mouseButtons?.LEFT,
+      };
+      controls.enabled = true;
+      if (controls.mouseButtons) controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+      viewportEl.style.cursor = 'crosshair';
+      e.preventDefault();
+      // This handler is registered during capture, so OrbitControls receives
+      // the same event afterwards with the temporary mapping above.
+      return;
+    }
+     // Ctrl+LeftClick → Pan (move the camera view)
+    if ((e.ctrlKey || e.altKey || e.metaKey) && !e.shiftKey) {
+      isCameraPanning = true;
+      cameraControlsBeforeGesture = {
+        enabled: controls.enabled,
+        leftButton: controls.mouseButtons?.LEFT,
+      };
+      controls.enabled = true;
+      if (controls.mouseButtons) controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
+      viewportEl.style.cursor = 'move';
+      e.preventDefault();
+      return;
+    }
     const hitId = pickLayerAt(e.clientX, e.clientY);
     if (hitId) {
       selectLayer(hitId);
@@ -911,12 +957,12 @@ export function initShapeStudio({
       dragLayerStart = { x: entry.layer.posX, y: entry.layer.posY };
       viewportEl.style.cursor = 'grabbing';
       e.preventDefault();
-      // Stop this pointerdown from also reaching OrbitControls (it listens
-      // on the canvas/renderer element too). Without this, the very first
-      // down-event of a drag can still kick off a camera rotate/pan before
-      // `controls.enabled = false` above takes effect, which shifts the
-      // whole scene — making every shape on screen appear to move along
-      // with the one actually being dragged.
+       // Stop this pointerdown from also reaching OrbitControls (it listens
+       // on the canvas/renderer element too). Without this, the very first
+       // down-event of a drag can still kick off a camera rotate/pan before
+       // `controls.enabled = false` above takes effect, which shifts the
+       // whole scene — making every shape on screen appear to move along
+       // with the one actually being dragged.
       e.stopPropagation();
     } else {
       selectLayer(null);
@@ -949,25 +995,58 @@ export function initShapeStudio({
 
   function onPointerUp() {
     if (isDrawing) {
-      isDrawing = false;
-      if (previewLine) { scene.remove(previewLine); previewLine.geometry.dispose(); previewLine.material.dispose(); previewLine = null; }
-      if (drawPts.length >= 3) addFreehand(drawPts);
-      setFreehandMode(false);
-      controls.enabled = true;
+       isDrawing = false;
+       if (previewLine) { scene.remove(previewLine); previewLine.geometry.dispose(); previewLine.material.dispose(); previewLine = null; }
+       if (drawPts.length >= 3) addFreehand(drawPts);
+       setFreehandMode(false);
+       controls.enabled = true;
+       return;
+     }
+    if (isCameraOrbiting || isCameraPanning) {
+      isCameraOrbiting = false;
+      isCameraPanning = false;
+      if (cameraControlsBeforeGesture) {
+        controls.enabled = cameraControlsBeforeGesture.enabled;
+        if (controls.mouseButtons && cameraControlsBeforeGesture.leftButton !== undefined) {
+          controls.mouseButtons.LEFT = cameraControlsBeforeGesture.leftButton;
+        }
+        cameraControlsBeforeGesture = null;
+      }
+      viewportEl.style.cursor = '';
       return;
     }
-    if (isDraggingLayer) {
-      isDraggingLayer = false;
-      controls.enabled = true;
-      viewportEl.style.cursor = '';
-      persist();
-    }
+     if (isDraggingLayer) {
+       isDraggingLayer = false;
+       controls.enabled = true;
+       viewportEl.style.cursor = '';
+       persist();
+     }
   }
 
-  viewportEl.addEventListener('pointerdown', onPointerDown);
+  viewportEl.addEventListener('pointerdown', onPointerDown, { capture: true });
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
   window.addEventListener('pointercancel', onPointerUp);
+
+   // Hover cursor feedback for Shift/Ctrl modifier keys
+   window.addEventListener('keydown', (e) => {
+     if (!isActive()) return;
+     if (isDrawing || isDraggingLayer || isCameraOrbiting || isCameraPanning) return;
+     const tag = (e.target.tagName || '').toLowerCase();
+     if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+     if (e.key === 'Shift' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+       viewportEl.style.cursor = 'crosshair';
+     } else if ((e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') && !e.shiftKey) {
+       viewportEl.style.cursor = 'move';
+     }
+   });
+   window.addEventListener('keyup', (e) => {
+     if (!isActive()) return;
+     if (isDrawing || isDraggingLayer || isCameraOrbiting || isCameraPanning) return;
+     if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') {
+       viewportEl.style.cursor = '';
+     }
+   });
 
   // Copy / Paste
   window.addEventListener('keydown', (e) => {
@@ -1223,6 +1302,8 @@ export function initShapeStudio({
       }
     },
     hasSelection: () => !!selectedId,
+    hasLayers: () => order.length > 0,
+    getExportGroup: () => root,
     getSelectedGroup: () => (selectedId ? layers.get(selectedId)?.group || null : null),
     applySharedAppearance,
     applySelectedTextColor(color) {

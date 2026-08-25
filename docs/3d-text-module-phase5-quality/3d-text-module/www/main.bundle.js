@@ -35354,9 +35354,8 @@ function initShapeStudio({
     if (layer.presetType === "textBox") {
       const lines = String(layer.text || "\u099F\u09C7\u0995\u09CD\u09B8\u099F \u09AC\u0995\u09CD\u09B8").split(/\r?\n/);
       const longest = Math.max(1, ...lines.map((line) => splitGraphemes2(line).filter((char) => char.trim()).length));
-      const textScale = Math.max(0.55, (layer.textSize || 32) / 32);
-      const width = Math.max(S * 2.4, Math.min(S * 9, S * (1.35 + longest * 0.42 * textScale)));
-      return roundedRectPoints(width, S * 0.82, 12);
+      const width = Math.max(S * 1.35, Math.min(S * 4.8, S * (0.64 + longest * 0.195)));
+      return roundedRectPoints(width, S * 0.42, 12);
     }
     const preset = PRESETS[layer.presetType] || PRESETS.rect;
     return preset.points();
@@ -35412,18 +35411,19 @@ function initShapeStudio({
     return lines.length ? lines : [""];
   }
   function buildShapeTextMesh(layer, box, depth) {
-    const safeW = Math.max(24, box.w * 0.78);
-    const safeH = Math.max(20, box.h * 0.66);
+    const isCaptionBox = layer.presetType === "textBox";
+    const safeW = Math.max(24, box.w * (isCaptionBox ? 0.96 : 0.78));
+    const safeH = Math.max(20, box.h * (isCaptionBox ? 0.9 : 0.66));
     const canvas2 = document.createElement("canvas");
     canvas2.width = 1536;
     canvas2.height = Math.max(512, Math.round(canvas2.width * safeH / safeW));
     const ctx = canvas2.getContext("2d");
-    const padX = canvas2.width * 0.06;
-    const padY = canvas2.height * 0.08;
+    const padX = canvas2.width * (isCaptionBox ? 0.012 : 0.06);
+    const padY = canvas2.height * (isCaptionBox ? 0.025 : 0.08);
     const maxWidth = canvas2.width - padX * 2;
     const maxHeight = canvas2.height - padY * 2;
     const textStyle = getShapeTextStyle(layer);
-    const requested = Math.max(18, Math.round(canvas2.height * (layer.textSize / 100) * 0.9));
+    const requested = Math.max(18, Math.round(canvas2.height * (layer.textSize / 100) * (isCaptionBox ? 1.7 : 0.9)));
     let fontSize = requested;
     let lines = [];
     for (; fontSize >= 12; fontSize -= 2) {
@@ -35583,7 +35583,7 @@ function initShapeStudio({
       borderMesh.userData.layerId = layer.id;
       group.add(borderMesh);
     }
-    if (layer.reflectionEnabled && layer.reflectionIntensity > 0) {
+    if (layer.reflectionEnabled && layer.reflectionsOn !== false && layer.reflectionIntensity > 0) {
       const flatGeo = new THREE.ShapeGeometry(shapePath, 16);
       normalizeCapUVs(flatGeo, box.w, box.h);
       const reflMat = layer.fillMode === "gradient" ? new THREE.MeshBasicMaterial({ map: buildGradientTexture(layer.gradientColor1, layer.gradientColor2, layer.gradientAngle), transparent: true, opacity: layer.reflectionIntensity * 0.55, alphaMap: fadeAlphaTexture, side: THREE.DoubleSide, depthWrite: false }) : new THREE.MeshBasicMaterial({ color: layer.fillColor, transparent: true, opacity: layer.reflectionIntensity * 0.55, alphaMap: fadeAlphaTexture, side: THREE.DoubleSide, depthWrite: false });
@@ -35781,7 +35781,11 @@ function initShapeStudio({
     const { pos, rot, scaleMul, opacityMul, emissiveMul, reveal } = preset.apply(t);
     const { group, layer } = entry;
     group.position.set(layer.posX + (pos ? pos[0] : 0), layer.posY + (pos ? pos[1] : 0), layer.posZ + (pos ? pos[2] : 0));
-    group.rotation.set(0, 0, THREE.MathUtils.degToRad(layer.rotationZ) + (rot ? rot[2] : 0));
+    group.rotation.set(
+      rot ? rot[0] : 0,
+      rot ? rot[1] : 0,
+      THREE.MathUtils.degToRad(layer.rotationZ) + (rot ? rot[2] : 0)
+    );
     group.scale.setScalar(layer.scaleMul * Math.max(0, scaleMul === void 0 ? 1 : scaleMul));
     group.visible = opacityMul === void 0 || opacityMul > 5e-3;
     group.traverse((child) => {
@@ -35915,6 +35919,9 @@ function initShapeStudio({
     if (el.freehandHint) el.freehandHint.style.display = on ? "block" : "none";
     viewportEl2.style.cursor = on ? "crosshair" : "";
   }
+  let isCameraOrbiting = false;
+  let isCameraPanning = false;
+  let cameraControlsBeforeGesture = null;
   function onPointerDown(e) {
     if (!isActive()) return;
     if (e.button !== 0) return;
@@ -35928,6 +35935,30 @@ function initShapeStudio({
       const mat = new THREE.LineBasicMaterial({ color: 16763904 });
       previewLine = new THREE.Line(geo, mat);
       scene2.add(previewLine);
+      e.preventDefault();
+      return;
+    }
+    if (e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      isCameraOrbiting = true;
+      cameraControlsBeforeGesture = {
+        enabled: controls2.enabled,
+        leftButton: controls2.mouseButtons?.LEFT
+      };
+      controls2.enabled = true;
+      if (controls2.mouseButtons) controls2.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+      viewportEl2.style.cursor = "crosshair";
+      e.preventDefault();
+      return;
+    }
+    if ((e.ctrlKey || e.altKey || e.metaKey) && !e.shiftKey) {
+      isCameraPanning = true;
+      cameraControlsBeforeGesture = {
+        enabled: controls2.enabled,
+        leftButton: controls2.mouseButtons?.LEFT
+      };
+      controls2.enabled = true;
+      if (controls2.mouseButtons) controls2.mouseButtons.LEFT = THREE.MOUSE.PAN;
+      viewportEl2.style.cursor = "move";
       e.preventDefault();
       return;
     }
@@ -35983,6 +36014,19 @@ function initShapeStudio({
       controls2.enabled = true;
       return;
     }
+    if (isCameraOrbiting || isCameraPanning) {
+      isCameraOrbiting = false;
+      isCameraPanning = false;
+      if (cameraControlsBeforeGesture) {
+        controls2.enabled = cameraControlsBeforeGesture.enabled;
+        if (controls2.mouseButtons && cameraControlsBeforeGesture.leftButton !== void 0) {
+          controls2.mouseButtons.LEFT = cameraControlsBeforeGesture.leftButton;
+        }
+        cameraControlsBeforeGesture = null;
+      }
+      viewportEl2.style.cursor = "";
+      return;
+    }
     if (isDraggingLayer) {
       isDraggingLayer = false;
       controls2.enabled = true;
@@ -35990,10 +36034,28 @@ function initShapeStudio({
       persist();
     }
   }
-  viewportEl2.addEventListener("pointerdown", onPointerDown);
+  viewportEl2.addEventListener("pointerdown", onPointerDown, { capture: true });
   window.addEventListener("pointermove", onPointerMove);
   window.addEventListener("pointerup", onPointerUp);
   window.addEventListener("pointercancel", onPointerUp);
+  window.addEventListener("keydown", (e) => {
+    if (!isActive()) return;
+    if (isDrawing || isDraggingLayer || isCameraOrbiting || isCameraPanning) return;
+    const tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || e.target.isContentEditable) return;
+    if (e.key === "Shift" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      viewportEl2.style.cursor = "crosshair";
+    } else if ((e.key === "Control" || e.key === "Alt" || e.key === "Meta") && !e.shiftKey) {
+      viewportEl2.style.cursor = "move";
+    }
+  });
+  window.addEventListener("keyup", (e) => {
+    if (!isActive()) return;
+    if (isDrawing || isDraggingLayer || isCameraOrbiting || isCameraPanning) return;
+    if (e.key === "Shift" || e.key === "Control" || e.key === "Alt" || e.key === "Meta") {
+      viewportEl2.style.cursor = "";
+    }
+  });
   window.addEventListener("keydown", (e) => {
     if (!isActive()) return;
     const tag = (e.target.tagName || "").toLowerCase();
@@ -36219,6 +36281,8 @@ function initShapeStudio({
       }
     },
     hasSelection: () => !!selectedId,
+    hasLayers: () => order.length > 0,
+    getExportGroup: () => root,
     getSelectedGroup: () => selectedId ? layers.get(selectedId)?.group || null : null,
     applySharedAppearance,
     applySelectedTextColor(color) {
@@ -40158,7 +40222,6 @@ function scheduleRebuild() {
   clearTimeout(rebuildTimer);
   rebuildTimer = setTimeout(() => {
     if (state.contentMode === "shape" && shapeStudio) {
-      shapeStudio.applySharedAppearance();
       saveStudioStateDebounced();
       return;
     }
@@ -41391,7 +41454,8 @@ gifTransparentToggle.addEventListener("change", () => {
   gifBackgroundColorField.hidden = gifTransparentToggle.checked;
 });
 exportBtn.addEventListener("click", async () => {
-  if (!textMesh) {
+  const hasExportableObject = state.contentMode === "shape" ? shapeStudio?.hasLayers?.() : !!textMesh;
+  if (!hasExportableObject) {
     updateExportProgress(0, "\u0995\u09CB\u09A8\u09CB \u0985\u09CD\u09AF\u09BE\u0995\u09CD\u099F\u09BF\u09AD \u0985\u09AC\u099C\u09C7\u0995\u09CD\u099F \u09A8\u09C7\u0987 \u2014 \u0986\u0997\u09C7 \u099F\u09C7\u0995\u09CD\u09B8\u099F \u09B2\u09BF\u0996\u09C1\u09A8 \u09AC\u09BE \u099B\u09AC\u09BF \u0986\u09AA\u09B2\u09CB\u09A1 \u0995\u09B0\u09C1\u09A8\u0964");
     return;
   }
@@ -41439,7 +41503,9 @@ exportBtn.addEventListener("click", async () => {
     animState,
     ANIMATION_PRESETS,
     EASINGS,
-    getTextMesh: () => textMesh,
+    // Static shape exports render the whole Shape Studio root. For turntable
+    // exports, return the selected layer so only that layer rotates.
+    getTextMesh: () => state.contentMode === "shape" ? shapeStudio?.getSelectedGroup?.() : textMesh,
     applyPresetOffset,
     resetMeshToBaseTransform,
     handleResize,

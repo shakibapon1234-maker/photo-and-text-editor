@@ -4744,7 +4744,9 @@ function scheduleRebuild() {
   clearTimeout(rebuildTimer);
   rebuildTimer = setTimeout(() => {
     if (state.contentMode === 'shape' && shapeStudio) {
-      shapeStudio.applySharedAppearance();
+      // Shape layers own their colour, text size and geometry. Applying the
+      // shared appearance here made an unrelated Size slider change replace
+      // the selected shape's fill with the main studio colour/gradient.
       saveStudioStateDebounced();
       return;
     }
@@ -6102,7 +6104,10 @@ exportBtn.addEventListener('click', async () => {
   // §8.2: image mode with nothing uploaded yet has no active mesh — nothing
   // meaningful to export (an all-transparent clip), so bail with a status
   // note instead of silently producing an empty file.
-  if (!textMesh) {
+  const hasExportableObject = state.contentMode === 'shape'
+    ? shapeStudio?.hasLayers?.()
+    : !!textMesh;
+  if (!hasExportableObject) {
     updateExportProgress(0, 'কোনো অ্যাক্টিভ অবজেক্ট নেই — আগে টেক্সট লিখুন বা ছবি আপলোড করুন।');
     return;
   }
@@ -6169,7 +6174,9 @@ exportBtn.addEventListener('click', async () => {
     animState,
     ANIMATION_PRESETS,
     EASINGS,
-    getTextMesh: () => textMesh,
+    // Static shape exports render the whole Shape Studio root. For turntable
+    // exports, return the selected layer so only that layer rotates.
+    getTextMesh: () => state.contentMode === 'shape' ? shapeStudio?.getSelectedGroup?.() : textMesh,
     applyPresetOffset,
     resetMeshToBaseTransform,
     handleResize,

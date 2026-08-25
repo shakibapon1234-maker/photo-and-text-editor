@@ -1307,7 +1307,7 @@
         }
 
         const ext = processedBlob.type.split('/')[1] === 'jpeg' ? 'jpg' : processedBlob.type.split('/')[1];
-        const baseName = originalFile.name.replace(/\.[^/.]+$/, '');
+        const baseName = (originalFile?.name || 'edited-image').replace(/\.[^/.]+$/, '');
         const fileName = `${baseName}_edited.${ext}`;
 
         const url = URL.createObjectURL(processedBlob);
@@ -1317,7 +1317,7 @@
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
 
         showToast('📁 ফাইল ডাউনলোড হচ্ছে!', 'success');
     });
