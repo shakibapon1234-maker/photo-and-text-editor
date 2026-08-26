@@ -42,6 +42,8 @@
       <button id="ctx-center" title="Align center">☰</button>
       <button id="ctx-right"  title="Align right">➡</button>
       <div class="ctx-sep"></div>
+      <button id="ctx-duplicate" title="Duplicate (Ctrl+D)">⧉ Duplicate</button>
+      <div class="ctx-sep"></div>
       <span class="ctx-hint">Double-click text to edit</span>
     </div>
 
@@ -81,6 +83,8 @@
       <button id="ctx-shape-rot-0" title="Snap Horizontal (0°)">0°</button>
       <button id="ctx-shape-rot-90" title="Snap Vertical (90°)">90°</button>
       <button id="ctx-shape-flip" title="Flip 180°">↔ Flip</button>
+      <div class="ctx-sep"></div>
+      <button id="ctx-shape-duplicate" title="Duplicate Shape (Ctrl+D)">⧉ Duplicate</button>
       <div class="ctx-sep"></div>
       <span class="ctx-hint">Double-click shape to type</span>
     </div>
@@ -184,6 +188,10 @@
       applyShape(item => {
         item.rotation = ((Number(item.rotation) || 0) + 180) % 360;
       });
+    } else if (id === 'ctx-shape-duplicate' || id === 'ctx-duplicate') {
+      if (typeof window.duplicatePresentationElement === 'function') {
+        window.duplicatePresentationElement();
+      }
     }
     // Image buttons
     else if (id === 'ctx-flip-h') {

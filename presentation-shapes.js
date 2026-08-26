@@ -176,6 +176,7 @@
           <label class="field">Text color<input id="shapeTextColor" type="color"></label>
           <label class="field">Text size<input id="shapeTextSize" type="number" min="8" max="120"></label>
         </div>
+        <button id="shapeDuplicateBtn" style="width:100%;margin-top:10px;background:#203354;border-color:#4f8df7">⧉ Duplicate Shape (Ctrl+D)</button>
       </div>
     `);
   }
@@ -322,5 +323,12 @@
   }
   if ($('addShape')) $('addShape').onclick = () => $('shapeGallery')?.classList.remove('hidden');
   if ($('closeShapes')) $('closeShapes').onclick = () => $('shapeGallery')?.classList.add('hidden');
+  if ($('shapeDuplicateBtn')) {
+    $('shapeDuplicateBtn').onclick = () => {
+      if (typeof window.duplicatePresentationElement === 'function') {
+        window.duplicatePresentationElement();
+      }
+    };
+  }
   render();
 })();
