@@ -42428,6 +42428,65 @@ function importPendingPhotoEditorImage() {
   img.src = src;
 }
 importPendingPhotoEditorImage();
+function importPendingDesignToolsText(payload) {
+  if (!payload || typeof payload.text !== "string") return;
+  const themes = {
+    fashion: { bg: "#312e81", material: "glossy" },
+    luxury: { bg: "#3b260d", material: "metallic" },
+    neon: { bg: "#111827", material: "neon" },
+    minimal: { bg: "#1f2937", material: "matte" },
+    wedding: { bg: "#7c2d52", material: "glossy" },
+    sale: { bg: "#b91c1c", material: "glossy" }
+  };
+  const theme = themes[payload.style] || themes.fashion;
+  const text = payload.text.trim().slice(0, 160) || "NEW COLLECTION";
+  const color = /^#[0-9a-f]{6}$/i.test(payload.color || "") ? payload.color : "#ffffff";
+  stopAnimation();
+  syncStudioText(text);
+  state.contentMode = "sticker";
+  state.stickerShape = "textBox";
+  state.stickerText = text;
+  state.stickerBgColor = theme.bg;
+  state.stickerTextColor = color;
+  state.stickerWith3DText = true;
+  state.materialType = theme.material;
+  state.size = Math.max(35, Math.min(120, Math.round((Number(payload.size) || 82) * 0.85)));
+  if (textInput) textInput.value = text;
+  if (stickerTextInput) stickerTextInput.value = text;
+  if (stickerBgColorPicker) stickerBgColorPicker.value = theme.bg;
+  if (stickerTextColorPicker) stickerTextColorPicker.value = color;
+  if (sizeRange) sizeRange.value = String(state.size);
+  if (sizeValue) sizeValue.textContent = String(state.size);
+  if (stickerWith3DTextCheckbox) stickerWith3DTextCheckbox.checked = true;
+  setActivePreset(contentModeGrid, "content", "sticker");
+  setActivePreset(stickerShapeGrid, "stickerShape", "textBox");
+  setActivePreset(materialPresetGrid, "material", theme.material);
+  textContentSection.hidden = true;
+  imageContentSection.hidden = true;
+  stickerContentSection.hidden = false;
+  if (cubeContentSection) cubeContentSection.hidden = true;
+  if (shapeContentSection) shapeContentSection.hidden = true;
+  if (curveSection) curveSection.hidden = false;
+  stickerContentSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  rebuildTextMesh();
+  updateExportSourceNote();
+  saveStudioStateDebounced();
+  statusNote.textContent = "Design Tools-\u098F\u09B0 \u09B2\u09C7\u0996\u09BE 3D Text Box \u09B9\u09BF\u09B8\u09C7\u09AC\u09C7 \u098F\u09B8\u09C7\u099B\u09C7 \u2014 \u0985\u09CD\u09AF\u09BE\u09A8\u09BF\u09AE\u09C7\u09B6\u09A8 \u09AC\u09C7\u099B\u09C7 GIF \u09AC\u09BE WebM \u098F\u0995\u09CD\u09B8\u09AA\u09CB\u09B0\u09CD\u099F \u0995\u09B0\u09C1\u09A8\u0964";
+  statusNote.hidden = false;
+}
+function consumePendingDesignToolsText() {
+  let payload = null;
+  try {
+    payload = JSON.parse(localStorage.getItem("3d-studio-pending-design-v1") || "null");
+    localStorage.removeItem("3d-studio-pending-design-v1");
+  } catch (_) {
+  }
+  importPendingDesignToolsText(payload);
+}
+window.addEventListener("message", (event) => {
+  if (event.data?.type === "design-tools-to-3d") importPendingDesignToolsText(event.data.payload);
+});
+consumePendingDesignToolsText();
 /*! Bundled license information:
 
 jszip/dist/jszip.min.js:
