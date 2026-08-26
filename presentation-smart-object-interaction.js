@@ -58,12 +58,43 @@
     node.append(handle);
   }
 
+  // ── Track rapid pointerdown pairs so we can detect double-click ourselves.
+  // (browser dblclick never fires because we capture+stop pointerdown)
+  let _soi_lastId = null, _soi_lastT = 0;
+  const SOI_DBLCLICK_MS = 350;
+  // Flag for presentation-editing-fixes.js to skip its fallback listener.
+  window.__soi_loaded = true;
+
   // Capture at window level before legacy object listeners can cancel dragging.
   window.addEventListener('pointerdown', event => {
+    if (event.target.isContentEditable || event.target.closest?.('[contenteditable="true"]')) return;
     const node = event.target.closest?.('#slide .element');
     if (!node || event.target.closest('.free-resize-handle,.smart-resize-handle,.smart-rotate-handle')) return;
     const item = active().elements.find(el => el.id === node.dataset.id);
     if (!item) return;
+
+    // Double-click detection: if editing-fixes.js already called stopImmediatePropagation
+    // on this same event (for inline edit), we will not reach here.
+    // But as a safety guard: if this pointerdown looks like the 2nd of a double-click,
+    // skip drag so inline editing can take over.
+    const now = Date.now();
+    if (now - _soi_lastT < SOI_DBLCLICK_MS && _soi_lastId === item.id &&
+        (item.type === 'text' || item.type === 'shape')) {
+      // Double-click detected → skip drag, activate inline editing.
+      event.preventDefault(); event.stopImmediatePropagation();
+      selectNode(item);
+      _soi_lastId = null; _soi_lastT = 0;
+      // Call globally-exposed inline edit functions (defined by presentation-editing-fixes.js
+      // which loads after this file but before any user interaction).
+      if (item.type === 'text' && typeof window.activateInlineTextEdit === 'function') {
+        window.activateInlineTextEdit(item);
+      } else if (item.type === 'shape' && typeof window.activateInlineShapeEdit === 'function') {
+        window.activateInlineShapeEdit(item);
+      }
+      return;
+    }
+    _soi_lastId = item.id; _soi_lastT = now;
+
     event.preventDefault(); event.stopImmediatePropagation();
     const canvas = $('slide'); canvas.setPointerCapture?.(event.pointerId);
     const rect = canvas.getBoundingClientRect();

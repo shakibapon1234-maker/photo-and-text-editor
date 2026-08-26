@@ -24,6 +24,7 @@
     action={kind,item,side,rect,start:{x:item.x,y:item.y,w:item.w,h:item.h,rotation:Number(item.rotation)||0},dx:event.clientX-rect.left-item.x*rect.width/100,dy:event.clientY-rect.top-item.y*rect.height/100};
     stage.setPointerCapture?.(event.pointerId);
   }
+  let _hardLastClick = 0, _hardLastId = null;
   // Object itself always moves. Handles are the only resize/rotate entry points.
   window.addEventListener('pointerdown',event=>{
     const handle=event.target.closest?.('.hard-resize,.hard-rotate');
@@ -35,8 +36,31 @@
       begin(handle.classList.contains('hard-rotate')?'rotate':'resize',event,item,side||'');
       return;
     }
+    // If user is editing text (contentEditable is active), do NOT drag or preventDefault
+    if (event.target.isContentEditable || event.target.closest?.('[contenteditable="true"], .text-content[contenteditable="true"]')) {
+      return;
+    }
     const node=event.target.closest?.('#slide .element'); if(!node)return;
     const item=active().elements.find(x=>x.id===node.dataset.id);if(!item)return;
+
+    // Double-click detection for text and shapes
+    const now = Date.now();
+    if ((event.detail >= 2 || (now - _hardLastClick < 350 && _hardLastId === item.id)) && (item.type === 'text' || item.type === 'shape')) {
+      _hardLastClick = 0;
+      _hardLastId = null;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      selected = item.id;
+      if (item.type === 'text' && typeof window.activateInlineTextEdit === 'function') {
+        window.activateInlineTextEdit(item);
+      } else if (item.type === 'shape' && typeof window.activateInlineShapeEdit === 'function') {
+        window.activateInlineShapeEdit(item);
+      }
+      return;
+    }
+    _hardLastClick = now;
+    _hardLastId = item.id;
+
     event.preventDefault();event.stopImmediatePropagation();selected=item.id;render();begin('move',event,item);
   },true);
   window.addEventListener('pointermove',event=>{
