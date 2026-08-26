@@ -1,8 +1,8 @@
 /**
  * presentation-context-toolbar.js
  * Microsoft Word-style context toolbar.
- * • Text selected/clicked   → Text Size, Text Color, Bold/Italic/Underline, Alignment
- * • Shape clicked           → Fill Color, Border Color, Opacity, Rotate
+ * • Text selected/clicked   → Text Size, Text Color, Box BG, Opacity, Bold/Italic/Underline, Alignment
+ * • Shape clicked           → Fill Color, Border Color, Border px, Opacity + Shape Text (Size, Color, B/I/U, Alignment)
  * • Image clicked           → Opacity, Flip H/V, Fit/Cover toggle
  *
  * The bar appears just below the top header and hides when nothing is selected.
@@ -45,30 +45,45 @@
       <span class="ctx-hint">Double-click text to edit</span>
     </div>
 
-    <!-- SHAPE section -->
+    <!-- SHAPE section (with both Shape styling and Shape Text styling) -->
     <div class="ctx-group ctx-hidden" id="ctx-shape">
       <label class="ctx-label">Fill
         <input id="ctx-shape-fill" type="color" value="#4f8df7" title="Shape fill color">
       </label>
       <label class="ctx-label">Border
-        <input id="ctx-shape-border" type="color" value="#1769e8" title="Shape border color">
+        <input id="ctx-shape-border" type="color" value="#ffffff" title="Shape border color">
       </label>
       <label class="ctx-label">Border px
-        <input id="ctx-shape-bw" type="number" min="0" max="20" value="0" title="Border width">
+        <input id="ctx-shape-bw" type="number" min="0" max="20" value="2" title="Border width">
       </label>
       <label class="ctx-label">Opacity
-        <input id="ctx-shape-opacity" type="range" min="0" max="100" value="100" title="Opacity">
-        <span id="ctx-shape-opacity-val">100%</span>
+        <input id="ctx-shape-opacity" type="range" min="0" max="100" value="100" title="Opacity" style="width:52px;accent-color:#ffb11b">
+        <span id="ctx-shape-opacity-val" style="font-size:10px;color:#ffd166;min-width:28px">100%</span>
       </label>
       <div class="ctx-sep"></div>
-      <span class="ctx-hint">Double-click shape to edit text</span>
+      <label class="ctx-label">Text Size
+        <input id="ctx-shape-text-size" type="number" min="8" max="120" value="18" title="Shape text size" style="width:42px">
+      </label>
+      <label class="ctx-label">Text Color
+        <input id="ctx-shape-text-color" type="color" value="#ffffff" title="Shape text color">
+      </label>
+      <div class="ctx-sep"></div>
+      <button id="ctx-shape-bold" title="Bold"><b>B</b></button>
+      <button id="ctx-shape-italic" title="Italic"><i>I</i></button>
+      <button id="ctx-shape-under" title="Underline"><u>U</u></button>
+      <div class="ctx-sep"></div>
+      <button id="ctx-shape-left" title="Align left">⬅</button>
+      <button id="ctx-shape-center" title="Align center">☰</button>
+      <button id="ctx-shape-right" title="Align right">➡</button>
+      <div class="ctx-sep"></div>
+      <span class="ctx-hint">Double-click shape to type</span>
     </div>
 
     <!-- IMAGE section -->
     <div class="ctx-group ctx-hidden" id="ctx-image">
       <label class="ctx-label">Opacity
-        <input id="ctx-img-opacity" type="range" min="0" max="100" value="100" title="Opacity">
-        <span id="ctx-img-opacity-val">100%</span>
+        <input id="ctx-img-opacity" type="range" min="0" max="100" value="100" title="Opacity" style="width:64px;accent-color:#ffb11b">
+        <span id="ctx-img-opacity-val" style="font-size:10px;color:#ffd166;min-width:28px">100%</span>
       </label>
       <div class="ctx-sep"></div>
       <button id="ctx-flip-h" title="Flip horizontal">↔ Flip H</button>
@@ -81,14 +96,75 @@
   `;
   document.body.prepend(bar);
 
-  // Stop clicks/pointerdowns inside toolbar from bubbling or triggering deselect handlers
-  ['pointerdown', 'mousedown', 'touchstart', 'click'].forEach(evt => {
-    bar.addEventListener(evt, e => {
-      e.stopPropagation();
-    }, true);
-    bar.addEventListener(evt, e => {
-      e.stopPropagation();
-    }, false);
+  // Stop pointerdown from bubbling to document deselect listeners
+  bar.addEventListener('pointerdown', e => e.stopPropagation());
+  bar.addEventListener('mousedown', e => e.stopPropagation());
+
+  // Direct event delegation for all toolbar buttons
+  bar.addEventListener('click', event => {
+    event.stopPropagation();
+    const btn = event.target.closest('button');
+    if (!btn) return;
+    const id = btn.id;
+
+    // Text buttons
+    if (id === 'ctx-bold') {
+      applyText(item => {
+        const isBold = (item.weight === '900' || item.weight === 'bold' || item.weight === '700' || item.weight === '800');
+        item.weight = isBold ? 'normal' : '900';
+      });
+    } else if (id === 'ctx-italic') {
+      applyText(item => {
+        item.fontStyle = (item.fontStyle === 'italic') ? 'normal' : 'italic';
+      });
+    } else if (id === 'ctx-under') {
+      applyText(item => {
+        item.textDecoration = (item.textDecoration === 'underline') ? 'none' : 'underline';
+      });
+    } else if (id === 'ctx-left') {
+      applyText(item => { item.textAlign = 'left'; });
+    } else if (id === 'ctx-center') {
+      applyText(item => { item.textAlign = 'center'; });
+    } else if (id === 'ctx-right') {
+      applyText(item => { item.textAlign = 'right'; });
+    } else if (id === 'ctx-box-clear') {
+      applyText(item => {
+        item.boxBg = 'transparent';
+        item.boxOpacity = 0;
+        $('ctx-box-opacity').value = 0;
+        $('ctx-box-opacity-val').textContent = '0%';
+      });
+    }
+    // Shape text buttons
+    else if (id === 'ctx-shape-bold') {
+      applyShape(item => {
+        const isBold = (item.textWeight === '900' || item.textWeight === 'bold' || item.weight === '900' || item.weight === 'bold');
+        item.textWeight = isBold ? 'normal' : '900';
+        item.weight = item.textWeight;
+      });
+    } else if (id === 'ctx-shape-italic') {
+      applyShape(item => {
+        item.fontStyle = (item.fontStyle === 'italic') ? 'normal' : 'italic';
+      });
+    } else if (id === 'ctx-shape-under') {
+      applyShape(item => {
+        item.textDecoration = (item.textDecoration === 'underline') ? 'none' : 'underline';
+      });
+    } else if (id === 'ctx-shape-left') {
+      applyShape(item => { item.textAlign = 'left'; });
+    } else if (id === 'ctx-shape-center') {
+      applyShape(item => { item.textAlign = 'center'; });
+    } else if (id === 'ctx-shape-right') {
+      applyShape(item => { item.textAlign = 'right'; });
+    }
+    // Image buttons
+    else if (id === 'ctx-flip-h') {
+      applyImage(item => { item.flipH = !item.flipH; });
+    } else if (id === 'ctx-flip-v') {
+      applyImage(item => { item.flipV = !item.flipV; });
+    } else if (id === 'ctx-fit-cover') {
+      applyImage(item => { item.objectFit = (item.objectFit === 'contain') ? 'cover' : 'contain'; });
+    }
   });
 
   /* ── CSS ─────────────────────────────────────────────────────────────────── */
@@ -135,7 +211,7 @@
       color: #98a8c4;
       white-space: nowrap;
     }
-    #ctx-size {
+    #ctx-size, #ctx-shape-text-size {
       width: 46px;
       padding: 3px 4px;
       background: #131f33;
@@ -144,8 +220,8 @@
       color: #fff;
       font: 12px inherit;
     }
-    #ctx-color, #ctx-shape-fill, #ctx-shape-border,
-    #ctx-img-opacity-swatch {
+    #ctx-color, #ctx-shape-fill, #ctx-shape-border, #ctx-shape-text-color,
+    #ctx-box-color {
       width: 28px; height: 24px;
       padding: 1px;
       border: 1px solid #3a4e6b;
@@ -161,16 +237,6 @@
       border-radius: 5px;
       color: #fff;
       font: 12px inherit;
-    }
-    #ctx-shape-opacity, #ctx-img-opacity {
-      width: 64px;
-      accent-color: #ffb11b;
-      cursor: pointer;
-    }
-    #ctx-shape-opacity-val, #ctx-img-opacity-val {
-      font-size: 10px;
-      color: #ffd166;
-      min-width: 28px;
     }
     #ctx-toolbar button {
       padding: 3px 8px;
@@ -217,20 +283,19 @@
 
     if (item.type === 'text') {
       showGroup('ctx-text');
-      // Size
       $('ctx-size').value = item.size || 38;
-      // Text color
       $('ctx-color').value = item.color || '#ffffff';
-      // Box background
+      
       const boxOpacity = item.boxOpacity !== undefined ? Math.round(item.boxOpacity * 100) : 0;
       $('ctx-box-color').value = item.boxBg || '#000000';
       $('ctx-box-opacity').value = boxOpacity;
       $('ctx-box-opacity-val').textContent = boxOpacity + '%';
-      // Style toggles
-      $('ctx-bold').classList.toggle('ctx-active', item.weight === '900');
+
+      const isBold = (item.weight === '900' || item.weight === 'bold' || item.weight === '700' || item.weight === '800');
+      $('ctx-bold').classList.toggle('ctx-active', isBold);
       $('ctx-italic').classList.toggle('ctx-active', item.fontStyle === 'italic');
       $('ctx-under').classList.toggle('ctx-active', item.textDecoration === 'underline');
-      // Alignment
+
       const align = item.textAlign || 'center';
       $('ctx-left').classList.toggle('ctx-active', align === 'left');
       $('ctx-center').classList.toggle('ctx-active', align === 'center');
@@ -238,16 +303,44 @@
     }
     else if (item.type === 'shape') {
       showGroup('ctx-shape');
-      $('ctx-shape-fill').value   = item.fillColor   || item.color || '#4f8df7';
-      $('ctx-shape-border').value = item.borderColor || '#1769e8';
-      $('ctx-shape-bw').value     = item.borderWidth !== undefined ? item.borderWidth : 0;
-      const op = item.opacity !== undefined ? Math.round(item.opacity * 100) : 100;
+      const fillVal = item.fill || item.fillColor || item.color || '#4f8df7';
+      const strokeVal = item.stroke || item.borderColor || '#ffffff';
+      const lineVal = item.line !== undefined ? item.line : (item.borderWidth !== undefined ? item.borderWidth : 2);
+      
+      // Calculate opacity cleanly (handling both 0..1 and 0..100)
+      let op = 100;
+      if (item.opacity !== undefined) {
+        const num = Number(item.opacity);
+        op = num <= 1 ? Math.round(num * 100) : Math.round(num);
+      }
+
+      $('ctx-shape-fill').value   = fillVal;
+      $('ctx-shape-border').value = strokeVal;
+      $('ctx-shape-bw').value     = lineVal;
       $('ctx-shape-opacity').value = op;
       $('ctx-shape-opacity-val').textContent = op + '%';
+
+      // Shape text options
+      $('ctx-shape-text-size').value = item.textSize || 18;
+      $('ctx-shape-text-color').value = item.textColor || '#ffffff';
+
+      const isBold = (item.textWeight === '900' || item.textWeight === 'bold' || item.weight === '900' || item.weight === 'bold');
+      $('ctx-shape-bold').classList.toggle('ctx-active', isBold);
+      $('ctx-shape-italic').classList.toggle('ctx-active', item.fontStyle === 'italic');
+      $('ctx-shape-under').classList.toggle('ctx-active', item.textDecoration === 'underline');
+
+      const align = item.textAlign || 'center';
+      $('ctx-shape-left').classList.toggle('ctx-active', align === 'left');
+      $('ctx-shape-center').classList.toggle('ctx-active', align === 'center');
+      $('ctx-shape-right').classList.toggle('ctx-active', align === 'right');
     }
     else if (item.type === 'image') {
       showGroup('ctx-image');
-      const op = item.opacity !== undefined ? Math.round(item.opacity * 100) : 100;
+      let op = 100;
+      if (item.opacity !== undefined) {
+        const num = Number(item.opacity);
+        op = num <= 1 ? Math.round(num * 100) : Math.round(num);
+      }
       $('ctx-img-opacity').value = op;
       $('ctx-img-opacity-val').textContent = op + '%';
     }
@@ -284,7 +377,6 @@
   // Box background color
   $('ctx-box-color').addEventListener('input', () => applyText(item => {
     item.boxBg = $('ctx-box-color').value;
-    // If opacity was 0, bump it to 100 so the color is immediately visible
     if ((item.boxOpacity || 0) === 0) { item.boxOpacity = 1; $('ctx-box-opacity').value = 100; $('ctx-box-opacity-val').textContent = '100%'; }
   }));
 
@@ -293,21 +385,6 @@
     $('ctx-box-opacity-val').textContent = val + '%';
     applyText(item => item.boxOpacity = val / 100);
   });
-
-  $('ctx-box-clear').addEventListener('click', () => applyText(item => { item.boxBg = 'transparent'; item.boxOpacity = 0; $('ctx-box-opacity').value = 0; $('ctx-box-opacity-val').textContent = '0%'; }));
-
-  $('ctx-bold').addEventListener('click', () =>
-    applyText(item => item.weight = item.weight === '900' ? '700' : '900'));
-
-  $('ctx-italic').addEventListener('click', () =>
-    applyText(item => item.fontStyle = item.fontStyle === 'italic' ? 'normal' : 'italic'));
-
-  $('ctx-under').addEventListener('click', () =>
-    applyText(item => item.textDecoration = item.textDecoration === 'underline' ? 'none' : 'underline'));
-
-  ['left','center','right'].forEach(align =>
-    $('ctx-' + align).addEventListener('click', () =>
-      applyText(item => item.textAlign = align)));
 
   /* ── SHAPE controls ─────────────────────────────────────────────────────── */
   function applyShape(fn) {
@@ -322,19 +399,44 @@
   }
 
   $('ctx-shape-fill').addEventListener('input', () =>
-    applyShape(item => { item.fillColor = $('ctx-shape-fill').value; item.color = item.fillColor; }));
+    applyShape(item => {
+      const val = $('ctx-shape-fill').value;
+      item.fill = val;
+      item.fillColor = val;
+      item.color = val;
+    }));
 
   $('ctx-shape-border').addEventListener('input', () =>
-    applyShape(item => item.borderColor = $('ctx-shape-border').value));
+    applyShape(item => {
+      const val = $('ctx-shape-border').value;
+      item.stroke = val;
+      item.borderColor = val;
+    }));
 
   $('ctx-shape-bw').addEventListener('input', () =>
-    applyShape(item => item.borderWidth = Math.max(0, +$('ctx-shape-bw').value || 0)));
+    applyShape(item => {
+      const val = Math.max(0, +$('ctx-shape-bw').value || 0);
+      item.line = val;
+      item.borderWidth = val;
+    }));
 
   $('ctx-shape-opacity').addEventListener('input', () => {
     const val = +$('ctx-shape-opacity').value;
     $('ctx-shape-opacity-val').textContent = val + '%';
-    applyShape(item => item.opacity = val / 100);
+    applyShape(item => {
+      item.opacity = val;
+    });
   });
+
+  $('ctx-shape-text-size').addEventListener('input', () =>
+    applyShape(item => {
+      item.textSize = Math.max(8, +$('ctx-shape-text-size').value || 18);
+    }));
+
+  $('ctx-shape-text-color').addEventListener('input', () =>
+    applyShape(item => {
+      item.textColor = $('ctx-shape-text-color').value;
+    }));
 
   /* ── IMAGE controls ─────────────────────────────────────────────────────── */
   function applyImage(fn) {
@@ -354,40 +456,41 @@
     applyImage(item => item.opacity = val / 100);
   });
 
-  $('ctx-flip-h').addEventListener('click', () =>
-    applyImage(item => item.flipH = !item.flipH));
-
-  $('ctx-flip-v').addEventListener('click', () =>
-    applyImage(item => item.flipV = !item.flipV));
-
-  $('ctx-fit-cover').addEventListener('click', () =>
-    applyImage(item => item.objectFit = (item.objectFit === 'contain') ? 'cover' : 'contain'));
-
-  /* ── Extend render() to apply image opacity and flip ────────────────────── */
+  /* ── Extend render() to apply text styling, shape colors, image opacity ─── */
   const _prevRender = render;
   render = function() {
     _prevRender();
     active().elements.forEach(item => {
-      if (item.type === 'image') {
-        const node = $('slide').querySelector('.image-el[data-id="' + item.id + '"]');
-        if (!node) return;
-        const img = node.querySelector('img');
-        if (img) {
-          // Opacity
-          node.style.opacity = item.opacity !== undefined ? item.opacity : 1;
-          // Flip
-          const sx = item.flipH ? -1 : 1, sy = item.flipV ? -1 : 1;
-          const baseRot = 'rotate(' + (Number(item.rotation) || 0) + 'deg)';
-          node.style.transform = baseRot + ' scale(' + sx + ',' + sy + ')';
-          // Fit/Cover
-          img.style.objectFit = item.objectFit || 'cover';
-        }
-      }
       if (item.type === 'text') {
         const node = $('slide').querySelector('.text-el[data-id="' + item.id + '"]');
         if (!node) return;
+
+        const isBold = (item.weight === '900' || item.weight === 'bold' || item.weight === '700' || item.weight === '800');
+        const isItalic = (item.fontStyle === 'italic');
+        const isUnderline = (item.textDecoration === 'underline');
+        const weightVal = isBold ? '900' : 'normal';
+        const alignVal = item.textAlign || 'center';
+
+        node.style.fontWeight = weightVal;
+        node.style.fontStyle = isItalic ? 'italic' : 'normal';
+        node.style.textDecoration = isUnderline ? 'underline' : 'none';
+        node.style.textDecorationThickness = '2.5px';
+        node.style.textUnderlineOffset = '5px';
+        node.style.textAlign = alignVal;
+
+        const content = node.querySelector('.text-content');
+        if (content) {
+          content.style.fontWeight = weightVal;
+          content.style.fontStyle = isItalic ? 'italic' : 'normal';
+          content.style.textDecoration = isUnderline ? 'underline' : 'none';
+          content.style.textDecorationThickness = '2.5px';
+          content.style.textUnderlineOffset = '5px';
+          content.style.textAlign = alignVal;
+          content.style.transform = isItalic ? 'skewX(-12deg)' : 'none';
+          content.style.transformOrigin = 'left center';
+        }
+
         if (item.boxOpacity && item.boxOpacity > 0 && item.boxBg && item.boxBg !== 'transparent') {
-          // Build rgba from hex + opacity
           const hex = item.boxBg.replace('#','');
           const r = parseInt(hex.substring(0,2),16), g = parseInt(hex.substring(2,4),16), b = parseInt(hex.substring(4,6),16);
           node.style.background = 'rgba('+r+','+g+','+b+','+item.boxOpacity+')';
@@ -399,11 +502,55 @@
       if (item.type === 'shape') {
         const node = $('slide').querySelector('.shape-el[data-id="' + item.id + '"]');
         if (!node) return;
-        if (item.opacity !== undefined) node.style.opacity = item.opacity;
-        if (item.borderColor) node.style.borderColor = item.borderColor;
-        if (item.borderWidth !== undefined) {
-          node.style.borderWidth = item.borderWidth + 'px';
-          node.style.borderStyle = item.borderWidth > 0 ? 'solid' : 'none';
+
+        const fillVal = item.fill || item.fillColor || item.color || '#4f8df7';
+        const strokeVal = item.stroke || item.borderColor || '#ffffff';
+        const lineVal = item.line !== undefined ? item.line : (item.borderWidth !== undefined ? item.borderWidth : 2);
+        
+        let opVal = 1;
+        if (item.opacity !== undefined) {
+          const num = Number(item.opacity);
+          opVal = (num <= 1 ? num : num / 100);
+        }
+
+        node.style.setProperty('--sf', fillVal);
+        node.style.setProperty('--ss', strokeVal);
+        node.style.setProperty('--sl', lineVal + 'px');
+        node.style.setProperty('--so', opVal);
+        node.style.background = fillVal;
+        node.style.borderColor = strokeVal;
+        node.style.borderWidth = lineVal + 'px';
+        node.style.borderStyle = lineVal > 0 ? 'solid' : 'none';
+        node.style.opacity = opVal;
+
+        const label = node.querySelector('.shape-label');
+        if (label) {
+          const isBold = (item.textWeight === '900' || item.textWeight === 'bold' || item.weight === '900' || item.weight === 'bold');
+          const isItalic = (item.fontStyle === 'italic');
+          const isUnderline = (item.textDecoration === 'underline');
+
+          label.style.color = item.textColor || '#ffffff';
+          label.style.fontSize = (item.textSize || 18) + 'px';
+          label.style.fontWeight = isBold ? '900' : 'normal';
+          label.style.fontStyle = isItalic ? 'italic' : 'normal';
+          label.style.textDecoration = isUnderline ? 'underline' : 'none';
+          label.style.textDecorationThickness = '2px';
+          label.style.textUnderlineOffset = '4px';
+          label.style.justifyContent = (item.textAlign === 'left') ? 'flex-start' : (item.textAlign === 'right') ? 'flex-end' : 'center';
+          label.style.textAlign = item.textAlign || 'center';
+          label.style.transform = isItalic ? 'skewX(-12deg)' : 'none';
+        }
+      }
+      if (item.type === 'image') {
+        const node = $('slide').querySelector('.image-el[data-id="' + item.id + '"]');
+        if (!node) return;
+        const img = node.querySelector('img');
+        if (img) {
+          node.style.opacity = item.opacity !== undefined ? item.opacity : 1;
+          const sx = item.flipH ? -1 : 1, sy = item.flipV ? -1 : 1;
+          const baseRot = 'rotate(' + (Number(item.rotation) || 0) + 'deg)';
+          node.style.transform = baseRot + ' scale(' + sx + ',' + sy + ')';
+          img.style.objectFit = item.objectFit || 'cover';
         }
       }
     });
@@ -412,11 +559,11 @@
   /* ── Also sync bar when selectionchange happens (text cursor position) ──── */
   document.addEventListener('selectionchange', () => {
     const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) return; // only sync when text is actually selected
+    if (!sel || sel.isCollapsed) return;
     const anchor = sel.anchorNode;
     const textEl = anchor?.nodeType === Node.TEXT_NODE
-      ? anchor.parentElement?.closest('.text-el')
-      : anchor?.closest?.('.text-el');
+      ? anchor.parentElement?.closest('.text-el, .shape-el')
+      : anchor?.closest?.('.text-el, .shape-el');
     if (!textEl) return;
     const id = textEl.dataset?.id;
     if (!id) return;
