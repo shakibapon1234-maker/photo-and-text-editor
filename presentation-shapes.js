@@ -93,6 +93,7 @@
         return `<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><rect x="2" y="2" width="96" height="56" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" /></svg>`;
     }
   }
+  window.getShapeSvg = getShapeSvg;
 
   const css = `
     /* Shape wrapper MUST be transparent with no outer rectangle border */

@@ -1,1 +1,247 @@
-(()=>{const $=id=>document.getElementById(id),input=$('backgroundImageInput');input.accept='image/*,video/mp4,video/webm,video/ogg';const holder=$('backgroundUpload');holder.querySelector('.file-label').childNodes[0].textContent='Upload GIF / Video Background';holder.insertAdjacentHTML('beforeend','<div id="mediaBackgroundControls" class="hidden"><label class="field">Video speed<select id="bgPlaybackRate"><option value="0.5">0.5x</option><option value="1">1x Normal</option><option value="1.5">1.5x</option><option value="2">2x</option></select></label><div class="row"><label class="field">Overlay<input id="bgOverlayColor" type="color" value="#000000"></label><label class="field">Overlay opacity<input id="bgOverlayOpacity" type="number" min="0" max="100" value="10"></label></div><div class="row"><label class="field">Media opacity<input id="bgMediaOpacity" type="number" min="0" max="100" value="100"></label><label class="field">Blur<input id="bgMediaBlur" type="number" min="0" max="30" value="0"></label></div></div>');document.head.insertAdjacentHTML('beforeend','<style>#animatedBackgroundLayer{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}#animatedBackgroundLayer img,#animatedBackgroundLayer video{width:100%;height:100%;object-fit:cover;display:block}.slide>.element{z-index:1}.slide>.drop-note{z-index:5}</style>');function normalize(s){s.bgPlaybackRate=Number(s.bgPlaybackRate||1);s.bgOverlayColor=s.bgOverlayColor||'#000000';s.bgOverlayOpacity=Number(s.bgOverlayOpacity??10);s.bgMediaOpacity=Number(s.bgMediaOpacity??100);s.bgMediaBlur=Number(s.bgMediaBlur??0)}function layer(){const s=active(),slide=$('slide');normalize(s);let l=$('animatedBackgroundLayer');if(!s.bgMedia){if(l)l.remove();$('mediaBackgroundControls').classList.add('hidden');return}$('mediaBackgroundControls').classList.remove('hidden');if(!l){l=document.createElement('div');l.id='animatedBackgroundLayer';slide.insertBefore(l,slide.firstChild)}const tag=s.bgMediaType==='video'?'video':'img',old=l.firstElementChild;if(!old||old.tagName.toLowerCase()!==tag||old.src!==s.bgMedia){l.innerHTML='';const m=document.createElement(tag);m.src=s.bgMedia;if(tag==='video'){m.autoplay=true;m.loop=true;m.muted=true;m.playsInline=true;m.playbackRate=s.bgPlaybackRate;m.play().catch(()=>{})}l.appendChild(m)}const media=l.firstElementChild;if(tag==='video')media.playbackRate=s.bgPlaybackRate;l.style.opacity=s.bgMediaOpacity/100;l.style.filter='blur('+s.bgMediaBlur+'px) scale('+(s.bgMediaBlur?1.04:1)+')';l.style.background='linear-gradient('+s.bgOverlayColor+Math.round(s.bgOverlayOpacity/100*255).toString(16).padStart(2,'0')+','+s.bgOverlayColor+Math.round(s.bgOverlayOpacity/100*255).toString(16).padStart(2,'0')+')'}const baseStyle=styleSlide;styleSlide=function(){baseStyle();const s=active();if(s.bgMedia){$('slide').style.background='#000';layer()}else layer()};input.onchange=e=>{const f=e.target.files[0];if(!f||!(f.type.startsWith('image/')||f.type.startsWith('video/')))return;const r=new FileReader();r.onload=()=>{const s=active();s.background='media';s.bgMedia=r.result;s.bgMediaType=f.type.startsWith('video/')?'video':'image';normalize(s);render()};r.readAsDataURL(f)};$('clearBackgroundImage').onclick=()=>{const s=active();delete s.bgMedia;delete s.bgMediaType;delete s.bgImage;s.background='fashion';render()};['bgPlaybackRate','bgOverlayColor','bgOverlayOpacity','bgMediaOpacity','bgMediaBlur'].forEach(id=>$(id).oninput=()=>{const s=active();if(!s.bgMedia)return;s.bgPlaybackRate=+$('bgPlaybackRate').value||1;s.bgOverlayColor=$('bgOverlayColor').value;s.bgOverlayOpacity=Math.max(0,Math.min(100,+$('bgOverlayOpacity').value||0));s.bgMediaOpacity=Math.max(0,Math.min(100,+$('bgMediaOpacity').value||0));s.bgMediaBlur=Math.max(0,+$('bgMediaBlur').value||0);layer()});const inspect=renderInspector;renderInspector=function(){inspect();const s=active();normalize(s);$('mediaBackgroundControls').classList.toggle('hidden',!s.bgMedia);if(s.bgMedia){$('bgPlaybackRate').value=s.bgPlaybackRate;$('bgOverlayColor').value=s.bgOverlayColor;$('bgOverlayOpacity').value=s.bgOverlayOpacity;$('bgMediaOpacity').value=s.bgMediaOpacity;$('bgMediaBlur').value=s.bgMediaBlur}};function buildPlayer(download){const data=JSON.stringify(slides).replace(/</g,'\\u003c'),colors=JSON.stringify(themes),code="const slides="+data+";const themes="+colors+";let i=0,t;function media(q,s){if(!q.bgMedia)return;const m=document.createElement(q.bgMediaType==='video'?'video':'img');m.src=q.bgMedia;m.className='bg';if(m.tagName==='VIDEO'){m.autoplay=true;m.loop=true;m.muted=true;m.playsInline=true;m.playbackRate=q.bgPlaybackRate||1}m.style.opacity=(q.bgMediaOpacity??100)/100;m.style.filter='blur('+(q.bgMediaBlur||0)+'px) scale('+(q.bgMediaBlur?1.04:1)+')';s.append(m);if(q.bgOverlayOpacity){const o=document.createElement('div');o.className='overlay';o.style.background=q.bgOverlayColor||'#000';o.style.opacity=(q.bgOverlayOpacity||0)/100;s.append(o)}}function add(e,s){const n=document.createElement('div');n.className='el '+e.type+' '+(e.type==='shape'?'shape-'+(e.shape||'rect'):'');n.style.cssText='left:'+e.x+'%;top:'+e.y+'%;width:'+e.w+'%;height:'+e.h+'%;font-size:'+(e.size||e.textSize||18)+'px;color:'+(e.color||e.textColor||'#fff')+';font-weight:'+(e.weight||e.textWeight||700)+';font-family:'+(e.fontFamily||'Arial')+';transform:rotate('+(e.rotation||0)+'deg);--f:'+(e.fill||'#4f8df7')+';--o:'+(e.stroke||'#fff')+';--l:'+(e.line??2)+'px';if(e.textGradient){n.style.color='transparent';n.style.backgroundImage='linear-gradient('+(e.textGradientAngle??90)+'deg,'+(e.color||'#fff')+','+(e.textGradientTo||'#4f8df7')+')';n.style.backgroundClip='text';n.style.webkitBackgroundClip='text';n.style.webkitTextFillColor='transparent'}if(e.type==='image'){const im=new Image();im.src=e.src;n.append(im)}else if(e.type==='table'){const q=document.createElement('table');(e.data||[]).forEach(r=>{const tr=document.createElement('tr');r.forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.append(td)});q.append(tr)});n.append(q)}else n.textContent=e.text||'';s.append(n)}function r(){const q=slides[i],s=document.querySelector('#s');s.style.background=q.background==='custom'?q.bgColor:(themes[q.background]||'#17233c');s.replaceChildren();media(q,s);const content=document.createElement('div');content.className='content';q.elements.forEach(e=>add(e,content));s.append(content);clearTimeout(t);if(q.autoDuration>0)t=setTimeout(next,q.autoDuration*1000)}function next(){i=(i+1)%slides.length;r()}r();onkeydown=e=>{if(e.key==='ArrowRight'||e.key===' '){next()}if(e.key==='ArrowLeft'){i=(i+slides.length-1)%slides.length;r()}if(e.key==='Escape')close()}";const css='*{box-sizing:border-box}body{margin:0;background:#000;overflow:hidden;font-family:Arial}.slide{width:100vw;height:100vh;position:relative;overflow:hidden}.bg,.overlay{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.overlay{pointer-events:none}.content{position:absolute;inset:0;z-index:1}.el{position:absolute;white-space:pre-wrap;line-height:1.15}.image img{width:100%;height:100%;object-fit:cover}.shape{background:var(--f);border:var(--l) solid var(--o);display:flex;align-items:center;justify-content:center;text-align:center}.shape-round{border-radius:16px}.shape-oval{border-radius:50%}.shape-diamond{clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}.shape-triangle{clip-path:polygon(50% 0,100% 100%,0 100%)}.shape-star5{clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 94%,50% 72%,21% 94%,32% 57%,2% 35%,39% 35%)}.table{background:#fff;color:#17223a}.table table{width:100%;height:100%;border-collapse:collapse}.table td{border:1px solid #98a6bd;padding:4px}.table tr:first-child td{background:#4f8df7;color:#fff;font-weight:700}';if(download){const doc='<!doctype html><meta charset="utf-8"><title>My Animated Slideshow</title><style>'+css+'</style><div id="s" class="slide"></div><script>'+code+'<\\/script>';const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([doc],{type:'text/html'}));a.download='my-animated-slideshow.html';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}else{const w=window.open('','presentation','popup,width=1280,height=720');if(!w)return;w.document.write('<style>'+css+'</style><div id="s" class="slide"></div><script>'+code+'<\\/script>');w.document.close()}}$('presentBtn').onclick=()=>buildPlayer(false);$('downloadSlideshow').onclick=()=>buildPlayer(true);render()})();
+(() => {
+  const $ = id => document.getElementById(id);
+  const input = $('backgroundImageInput');
+  if (input) input.accept = 'image/*,video/mp4,video/webm,video/ogg';
+  const holder = $('backgroundUpload');
+  if (holder) {
+    const label = holder.querySelector('.file-label');
+    if (label && label.childNodes[0]) label.childNodes[0].textContent = 'Upload GIF / Video Background';
+    if (!$('mediaBackgroundControls')) {
+      holder.insertAdjacentHTML('beforeend', `
+        <div id="mediaBackgroundControls" class="hidden">
+          <label class="field">Video speed
+            <select id="bgPlaybackRate">
+              <option value="0.5">0.5x</option>
+              <option value="1">1x Normal</option>
+              <option value="1.5">1.5x</option>
+              <option value="2">2x</option>
+            </select>
+          </label>
+          <div class="row">
+            <label class="field">Overlay<input id="bgOverlayColor" type="color" value="#000000"></label>
+            <label class="field">Overlay opacity<input id="bgOverlayOpacity" type="number" min="0" max="100" value="10"></label>
+          </div>
+          <div class="row">
+            <label class="field">Media opacity<input id="bgMediaOpacity" type="number" min="0" max="100" value="100"></label>
+            <label class="field">Blur<input id="bgMediaBlur" type="number" min="0" max="30" value="0"></label>
+          </div>
+        </div>
+      `);
+    }
+  }
+
+  // ── Critical CSS: isolate video layer repaint from the rest of the slide ──
+  document.head.insertAdjacentHTML('beforeend', `
+    <style>
+      #animatedBackgroundLayer {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        overflow: hidden;
+        pointer-events: none;
+        /* GPU compositing layer — isolated from slide element repaints */
+        transform: translateZ(0);
+        will-change: opacity, filter;
+        contain: strict;
+        isolation: isolate;
+      }
+      #animatedBackgroundLayer img, #animatedBackgroundLayer video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        transform: translateZ(0);
+        will-change: transform;
+        backface-visibility: hidden;
+      }
+      /* Pause visual feedback when dragging to reduce GPU pressure */
+      #slide.is-dragging #animatedBackgroundLayer video {
+        animation-play-state: paused;
+      }
+      .slide > .element { z-index: 1; }
+      .slide > .drop-note { z-index: 5; }
+    </style>
+  `);
+
+  function normalize(s) {
+    s.bgPlaybackRate = Number(s.bgPlaybackRate || 1);
+    s.bgOverlayColor = s.bgOverlayColor || '#000000';
+    s.bgOverlayOpacity = Number(s.bgOverlayOpacity ?? 10);
+    s.bgMediaOpacity = Number(s.bgMediaOpacity ?? 100);
+    s.bgMediaBlur = Number(s.bgMediaBlur ?? 0);
+  }
+
+  // ── Layer state cache — avoid re-applying identical values ────────────────
+  let _layerCache = '';
+
+  function layer(force = false) {
+    const s = active(), slide = $('slide');
+    if (!slide) return;
+    normalize(s);
+
+    if (!s.bgMedia) {
+      const l = $('animatedBackgroundLayer');
+      if (l) l.remove();
+      if ($('mediaBackgroundControls')) $('mediaBackgroundControls').classList.add('hidden');
+      _layerCache = '';
+      return;
+    }
+
+    // Build a cache key from all relevant props
+    const cacheKey = [s.bgMedia, s.bgMediaType, s.bgPlaybackRate,
+      s.bgOverlayColor, s.bgOverlayOpacity, s.bgMediaOpacity, s.bgMediaBlur].join('|');
+
+    // ⬛ Skip work if nothing changed and not forced
+    if (!force && cacheKey === _layerCache) return;
+    _layerCache = cacheKey;
+
+    if ($('mediaBackgroundControls')) $('mediaBackgroundControls').classList.remove('hidden');
+
+    let l = $('animatedBackgroundLayer');
+    if (!l) {
+      l = document.createElement('div');
+      l.id = 'animatedBackgroundLayer';
+      slide.insertBefore(l, slide.firstChild);
+    }
+
+    const tag = s.bgMediaType === 'video' ? 'video' : 'img';
+    let media = l.firstElementChild;
+
+    if (!media || media.tagName.toLowerCase() !== tag || media.dataset.src !== s.bgMedia) {
+      l.innerHTML = '';
+      media = document.createElement(tag);
+      media.src = s.bgMedia;
+      media.dataset.src = s.bgMedia;
+      if (tag === 'video') {
+        media.autoplay = true;
+        media.loop = true;
+        media.muted = true;
+        media.playsInline = true;
+        media.playbackRate = s.bgPlaybackRate;
+        // Pause video while editor is loading, play once ready
+        media.addEventListener('canplay', () => {
+          media.play().catch(() => {});
+        }, { once: true });
+        media.play().catch(() => {});
+      }
+      l.appendChild(media);
+    }
+
+    if (tag === 'video' && media.playbackRate !== s.bgPlaybackRate) {
+      media.playbackRate = s.bgPlaybackRate;
+    }
+
+    // Apply visual properties only (no layout changes)
+    l.style.opacity = s.bgMediaOpacity / 100;
+    l.style.filter = s.bgMediaBlur ? ('blur(' + s.bgMediaBlur + 'px) scale(1.04)') : 'none';
+    const hex = Math.round((s.bgOverlayOpacity / 100) * 255).toString(16).padStart(2, '0');
+    l.style.background = 'linear-gradient(' + s.bgOverlayColor + hex + ',' + s.bgOverlayColor + hex + ')';
+  }
+
+  // ── Pause video during live drags to free up GPU bandwidth ───────────────
+  let _dragPaused = false;
+
+  function pauseVideosForDrag() {
+    if (_dragPaused) return;
+    _dragPaused = true;
+    const l = $('animatedBackgroundLayer');
+    const vid = l && l.querySelector('video');
+    if (vid && !vid.paused) vid.pause();
+    $('slide')?.classList.add('is-dragging');
+  }
+
+  function resumeVideosAfterDrag() {
+    if (!_dragPaused) return;
+    _dragPaused = false;
+    const l = $('animatedBackgroundLayer');
+    const vid = l && l.querySelector('video');
+    if (vid && vid.paused) vid.play().catch(() => {});
+    $('slide')?.classList.remove('is-dragging');
+  }
+
+  // Hook into drag lifecycle flags set by presentation-studio.html
+  const origPointermove = window.__bgMedia_pointermoveInstalled;
+  if (!origPointermove) {
+    window.__bgMedia_pointermoveInstalled = true;
+    window.addEventListener('pointermove', () => {
+      if (window.__presentationLiveDrag) pauseVideosForDrag();
+    }, { passive: true });
+    window.addEventListener('pointerup', () => {
+      resumeVideosAfterDrag();
+    }, { passive: true });
+    window.addEventListener('pointercancel', () => {
+      resumeVideosAfterDrag();
+    }, { passive: true });
+  }
+
+  // ── styleSlide hook — skip layer() during live drags ─────────────────────
+  const baseStyle = styleSlide;
+  styleSlide = function () {
+    baseStyle();
+    const s = active();
+    if (s.bgMedia) $('slide').style.background = '#000';
+    // Skip video layer update during drags — video is paused anyway
+    if (!window.__presentationLiveDrag) {
+      layer();
+    }
+  };
+
+  if (input) {
+    input.onchange = e => {
+      const f = e.target.files[0];
+      if (!f || !(f.type.startsWith('image/') || f.type.startsWith('video/'))) return;
+      const r = new FileReader();
+      r.onload = () => {
+        const s = active();
+        s.background = 'media';
+        s.bgMedia = r.result;
+        s.bgMediaType = f.type.startsWith('video/') ? 'video' : 'image';
+        normalize(s);
+        _layerCache = ''; // force re-apply
+        render();
+      };
+      r.readAsDataURL(f);
+    };
+  }
+
+  if ($('clearBackgroundImage')) {
+    $('clearBackgroundImage').onclick = () => {
+      const s = active();
+      delete s.bgMedia; delete s.bgMediaType; delete s.bgImage;
+      s.background = 'fashion';
+      _layerCache = '';
+      render();
+    };
+  }
+
+  ['bgPlaybackRate', 'bgOverlayColor', 'bgOverlayOpacity', 'bgMediaOpacity', 'bgMediaBlur'].forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    el.oninput = () => {
+      const s = active();
+      if (!s.bgMedia) return;
+      s.bgPlaybackRate = +$('bgPlaybackRate').value || 1;
+      s.bgOverlayColor = $('bgOverlayColor').value;
+      s.bgOverlayOpacity = Math.max(0, Math.min(100, +$('bgOverlayOpacity').value || 0));
+      s.bgMediaOpacity = Math.max(0, Math.min(100, +$('bgMediaOpacity').value || 0));
+      s.bgMediaBlur = Math.max(0, +$('bgMediaBlur').value || 0);
+      _layerCache = ''; // force re-apply on next layer() call
+      layer(true);
+    };
+  });
+
+  const inspect = renderInspector;
+  renderInspector = function () {
+    inspect();
+    const s = active();
+    normalize(s);
+    if ($('mediaBackgroundControls')) $('mediaBackgroundControls').classList.toggle('hidden', !s.bgMedia);
+    if (s.bgMedia) {
+      if ($('bgPlaybackRate')) $('bgPlaybackRate').value = s.bgPlaybackRate;
+      if ($('bgOverlayColor')) $('bgOverlayColor').value = s.bgOverlayColor;
+      if ($('bgOverlayOpacity')) $('bgOverlayOpacity').value = s.bgOverlayOpacity;
+      if ($('bgMediaOpacity')) $('bgMediaOpacity').value = s.bgMediaOpacity;
+      if ($('bgMediaBlur')) $('bgMediaBlur').value = s.bgMediaBlur;
+    }
+  };
+})();

@@ -109,7 +109,6 @@
       const isNativeInput = ['input', 'textarea'].includes(tagName);
 
       if (isNativeInput) {
-        // Allow standard selection inside inspector fields or inputs
         return;
       }
 
@@ -219,7 +218,6 @@
       $('zoomPercentageBadge').onclick = e => { e.stopPropagation(); window.setPresentationZoom(1.0); };
     }
 
-    // Ctrl + Wheel Zoom Listener
     stageWrap.addEventListener('wheel', event => {
       if (event.ctrlKey || event.metaKey) {
         event.preventDefault();
@@ -230,7 +228,6 @@
     }, { passive: false });
   }
 
-  // Also catch document level wheel with Ctrl if over workspace
   document.addEventListener('wheel', event => {
     if (event.ctrlKey || event.metaKey) {
       const stageWrap = document.querySelector('.stage-wrap');
@@ -244,9 +241,70 @@
   }, { passive: false });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 4. Shape & Element Copy / Duplicate System (Ctrl+C, Ctrl+V, Ctrl+D)
+  // 4. Image Upload & Replacement Engine
   // ──────────────────────────────────────────────────────────────────────────
+  let _fileInput = null;
+  window.uploadOrReplaceImage = function(targetItem) {
+    if (!targetItem) {
+      targetItem = typeof selectedEl === 'function' ? selectedEl() : null;
+    }
+    if (!_fileInput) {
+      _fileInput = document.createElement('input');
+      _fileInput.type = 'file';
+      _fileInput.accept = 'image/*';
+      _fileInput.style.display = 'none';
+      document.body.appendChild(_fileInput);
+    }
+    _fileInput.onchange = e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const src = reader.result;
+        if (targetItem) {
+          if (targetItem.type === 'image') {
+            targetItem.src = src;
+          } else if (targetItem.type === 'shape') {
+            // Convert shape or assign image
+            targetItem.type = 'image';
+            targetItem.src = src;
+          } else {
+            targetItem.src = src;
+          }
+        } else {
+          // Insert new image
+          const newImg = {
+            id: crypto.randomUUID(),
+            type: 'image',
+            src,
+            x: 30,
+            y: 30,
+            w: 40,
+            h: 30,
+            rotation: 0
+          };
+          active().elements.push(newImg);
+          selected = newImg.id;
+        }
+        if (typeof render === 'function') render();
+        showToast('✓ Image uploaded successfully!');
+      };
+      reader.readAsDataURL(file);
+      _fileInput.value = '';
+    };
+    _fileInput.click();
+  };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 5. Shape & Element Copy / Duplicate System (Debounced & Single Copy)
+  // ──────────────────────────────────────────────────────────────────────────
+  let _lastDuplicateTime = 0;
+
   window.duplicatePresentationElement = function(item) {
+    const now = Date.now();
+    if (now - _lastDuplicateTime < 260) return; // Strict debounce to prevent double/triple creation
+    _lastDuplicateTime = now;
+
     if (!item) {
       item = typeof selectedEl === 'function' ? selectedEl() : null;
     }
@@ -259,7 +317,7 @@
     active().elements.push(copy);
     selected = copy.id;
     if (typeof render === 'function') render();
-    showToast(`✓ ${copy.type === 'shape' ? 'Shape' : 'Element'} duplicated!`);
+    showToast(`✓ ${copy.type === 'shape' ? 'Shape' : (copy.type === 'image' ? 'Image' : 'Element')} duplicated!`);
   };
 
   window.copyPresentationElement = function(item) {
@@ -268,7 +326,7 @@
     }
     if (!item) return;
     window.__presentationCopy = structuredClone(item);
-    showToast(`✓ ${item.type === 'shape' ? 'Shape' : 'Element'} copied! Press Ctrl+V to paste`);
+    showToast(`✓ ${item.type === 'shape' ? 'Shape' : (item.type === 'image' ? 'Image' : 'Element')} copied! Press Ctrl+V to paste`);
   };
 
   window.pastePresentationElement = function() {
@@ -280,9 +338,43 @@
     active().elements.push(copy);
     selected = copy.id;
     if (typeof render === 'function') render();
-    showToast(`✓ ${copy.type === 'shape' ? 'Shape' : 'Element'} pasted!`);
+    showToast(`✓ ${copy.type === 'shape' ? 'Shape' : (copy.type === 'image' ? 'Image' : 'Element')} pasted!`);
   };
 
+  window.deletePresentationElement = function(item) {
+    if (!item) {
+      item = typeof selectedEl === 'function' ? selectedEl() : null;
+    }
+    if (!item || !active() || !Array.isArray(active().elements)) return;
+    active().elements = active().elements.filter(x => x.id !== item.id);
+    selected = null;
+    if (typeof render === 'function') render();
+    showToast('✓ Element deleted');
+  };
+
+  window.bringElementForward = function(item) {
+    if (!item) item = typeof selectedEl === 'function' ? selectedEl() : null;
+    if (!item || !active() || !Array.isArray(active().elements)) return;
+    const es = active().elements, i = es.findIndex(e => e.id === item.id);
+    if (i >= 0 && i < es.length - 1) {
+      [es[i], es[i + 1]] = [es[i + 1], es[i]];
+      if (typeof render === 'function') render();
+      showToast('✓ Brought forward');
+    }
+  };
+
+  window.sendElementBackward = function(item) {
+    if (!item) item = typeof selectedEl === 'function' ? selectedEl() : null;
+    if (!item || !active() || !Array.isArray(active().elements)) return;
+    const es = active().elements, i = es.findIndex(e => e.id === item.id);
+    if (i > 0) {
+      [es[i], es[i - 1]] = [es[i - 1], es[i]];
+      if (typeof render === 'function') render();
+      showToast('✓ Sent backward');
+    }
+  };
+
+  // Keyboard shortcut listener
   window.addEventListener('keydown', event => {
     const isEditing = event.target && (event.target.isContentEditable || ['input','textarea','select'].includes((event.target.tagName||'').toLowerCase()));
     const item = typeof selectedEl === 'function' ? selectedEl() : null;
@@ -293,11 +385,11 @@
       const sel = window.getSelection();
       const hasTextSelection = sel && sel.toString().length > 0;
       if (isEditing && hasTextSelection) {
-        // Let standard text copy proceed
         return;
       }
       if (item) {
         event.preventDefault();
+        event.stopImmediatePropagation();
         window.copyPresentationElement(item);
       }
     }
@@ -305,30 +397,264 @@
     // Ctrl+V: Paste copied shape or element
     if ((event.ctrlKey || event.metaKey) && !event.shiftKey && key === 'v') {
       if (isEditing) {
-        // Let standard text paste proceed
         return;
       }
       if (window.__presentationCopy) {
         event.preventDefault();
+        event.stopImmediatePropagation();
         window.pastePresentationElement();
       }
     }
 
-    // Ctrl+D: Immediate duplicate shape or element
+    // Ctrl+D: Immediate single duplicate
     if ((event.ctrlKey || event.metaKey) && !event.shiftKey && key === 'd') {
       if (item && !isEditing) {
         event.preventDefault();
+        event.stopImmediatePropagation();
         window.duplicatePresentationElement(item);
       }
     }
-  }, false);
+  }, true);
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 5. Attach direct double-click and click listeners to all elements
+  // 6. Right Click Context Menu System (Edit Text, Upload Image, Duplicate, etc.)
+  // ──────────────────────────────────────────────────────────────────────────
+  let _contextMenu = null;
+
+  function hideContextMenu() {
+    if (_contextMenu) {
+      _contextMenu.classList.remove('open');
+      setTimeout(() => {
+        if (!_contextMenu?.classList.contains('open')) {
+          _contextMenu?.remove();
+          _contextMenu = null;
+        }
+      }, 120);
+    }
+  }
+
+  function showContextMenu(x, y, items) {
+    hideContextMenu();
+
+    _contextMenu = document.createElement('div');
+    _contextMenu.id = 'presentationContextMenu';
+    _contextMenu.className = 'presentation-context-menu';
+
+    items.forEach(it => {
+      if (it.divider) {
+        const sep = document.createElement('div');
+        sep.className = 'ctx-menu-divider';
+        _contextMenu.appendChild(sep);
+        return;
+      }
+
+      const row = document.createElement('button');
+      row.className = 'ctx-menu-item' + (it.danger ? ' danger' : '') + (it.disabled ? ' disabled' : '');
+      row.innerHTML = `
+        <span class="ctx-item-icon">${it.icon || '•'}</span>
+        <span class="ctx-item-label">${it.label}</span>
+        ${it.shortcut ? `<span class="ctx-item-shortcut">${it.shortcut}</span>` : ''}
+      `;
+      if (!it.disabled) {
+        row.onclick = e => {
+          e.stopPropagation();
+          hideContextMenu();
+          it.action();
+        };
+      }
+      _contextMenu.appendChild(row);
+    });
+
+    document.body.appendChild(_contextMenu);
+
+    const rect = _contextMenu.getBoundingClientRect();
+    const maxX = window.innerWidth - rect.width - 8;
+    const maxY = window.innerHeight - rect.height - 8;
+    const posX = Math.max(8, Math.min(x, maxX));
+    const posY = Math.max(8, Math.min(y, maxY));
+
+    _contextMenu.style.left = posX + 'px';
+    _contextMenu.style.top = posY + 'px';
+
+    requestAnimationFrame(() => {
+      _contextMenu?.classList.add('open');
+    });
+  }
+
+  document.addEventListener('contextmenu', event => {
+    const slide = $('slide');
+    if (!slide) return;
+
+    const elementNode = event.target.closest('#slide .element');
+    const onSlideCanvas = event.target.closest('#slide');
+
+    if (!elementNode && !onSlideCanvas) {
+      hideContextMenu();
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (elementNode) {
+      const id = elementNode.dataset.id;
+      selected = id;
+      const item = active()?.elements?.find(el => el.id === id);
+      if (typeof renderInspector === 'function') renderInspector();
+
+      const isTextOrShape = item && (item.type === 'text' || item.type === 'shape');
+      const menuItems = [];
+
+      if (isTextOrShape) {
+        menuItems.push({
+          icon: '✏️',
+          label: 'Edit Text (টেক্সট এডিট)',
+          shortcut: 'Dbl Click',
+          action: () => {
+            if (item.type === 'text') {
+              window.activateInlineTextEdit(item);
+            } else {
+              window.activateInlineShapeEdit(item);
+            }
+          }
+        });
+      }
+
+      // Upload / Replace Image option for shapes, image boxes, or templates
+      menuItems.push({
+        icon: '🖼️',
+        label: item.type === 'image' ? 'Replace Image (ছবি পরিবর্তন)' : 'Upload Image (ছবি যোগ করুন)',
+        action: () => window.uploadOrReplaceImage(item)
+      });
+
+      menuItems.push({ divider: true });
+
+      menuItems.push({
+        icon: '⧉',
+        label: 'Duplicate',
+        shortcut: 'Ctrl+D',
+        action: () => window.duplicatePresentationElement(item)
+      });
+
+      menuItems.push({
+        icon: '📋',
+        label: 'Copy',
+        shortcut: 'Ctrl+C',
+        action: () => window.copyPresentationElement(item)
+      });
+
+      if (window.__presentationCopy) {
+        menuItems.push({
+          icon: '📄',
+          label: 'Paste',
+          shortcut: 'Ctrl+V',
+          action: () => window.pastePresentationElement()
+        });
+      }
+
+      menuItems.push({ divider: true });
+
+      menuItems.push({
+        icon: '⬆️',
+        label: 'Bring Forward',
+        action: () => window.bringElementForward(item)
+      });
+
+      menuItems.push({
+        icon: '⬇️',
+        label: 'Send Backward',
+        action: () => window.sendElementBackward(item)
+      });
+
+      menuItems.push({ divider: true });
+
+      menuItems.push({
+        icon: '🗑️',
+        label: 'Delete Element',
+        shortcut: 'Delete',
+        danger: true,
+        action: () => window.deletePresentationElement(item)
+      });
+
+      showContextMenu(event.clientX, event.clientY, menuItems);
+
+    } else if (onSlideCanvas) {
+      // Right clicked on slide background
+      const menuItems = [
+        {
+          icon: 'T',
+          label: 'Add Text Box',
+          action: () => {
+            if (typeof addText === 'function') addText();
+          }
+        },
+        {
+          icon: '⬡',
+          label: 'Add Shapes',
+          action: () => {
+            $('shapeGallery')?.classList.remove('hidden');
+          }
+        },
+        {
+          icon: '🖼️',
+          label: 'Upload Image',
+          action: () => {
+            window.uploadOrReplaceImage();
+          }
+        },
+        {
+          icon: '✨',
+          label: 'Slide Templates',
+          action: () => {
+            $('layoutGallery')?.classList.remove('hidden');
+          }
+        }
+      ];
+
+      if (window.__presentationCopy) {
+        menuItems.unshift({
+          icon: '📄',
+          label: 'Paste Copied Object',
+          shortcut: 'Ctrl+V',
+          action: () => window.pastePresentationElement()
+        });
+      }
+
+      showContextMenu(event.clientX, event.clientY, menuItems);
+    }
+  }, true);
+
+  document.addEventListener('pointerdown', event => {
+    if (!event.target.closest('#presentationContextMenu')) {
+      hideContextMenu();
+    }
+  }, true);
+
+  window.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      hideContextMenu();
+    }
+  }, true);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 7. Attach direct double-click and click listeners to all elements
   // ──────────────────────────────────────────────────────────────────────────
   function bindInlineEditing() {
     const slide = $('slide');
     if (!slide) return;
+
+    // Handle Image elements: double click to replace image
+    slide.querySelectorAll('.image-el').forEach(node => {
+      const id = node.dataset.id;
+      const item = active()?.elements?.find(el => el.id === id);
+      if (!item) return;
+
+      node.ondblclick = e => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.uploadOrReplaceImage(item);
+      };
+    });
 
     // Handle Text elements
     slide.querySelectorAll('.text-el').forEach(node => {
@@ -336,7 +662,6 @@
       const item = active()?.elements?.find(el => el.id === id);
       if (!item) return;
 
-      // Ensure .text-content exists
       let content = node.querySelector('.text-content');
       if (!content) {
         const currentText = item.text || node.textContent || '';
@@ -349,7 +674,6 @@
         node.appendChild(content);
       }
 
-      // Double-click to edit text
       node.ondblclick = e => {
         e.preventDefault();
         e.stopPropagation();
@@ -362,7 +686,6 @@
         window.activateInlineTextEdit(item);
       };
 
-      // When in edit mode, allow typing and cursor placement without starting drag
       content.onpointerdown = e => {
         if (content.contentEditable === 'true') {
           e.stopPropagation();
@@ -374,28 +697,23 @@
         }
       };
 
-      // Input sync
       content.oninput = e => {
         e.stopPropagation();
         item.text = (content.innerText || content.textContent || '').replace(/\r/g, '');
         if ($('textValue')) $('textValue').value = item.text;
         if (typeof fitSelectedTextBox === 'function') fitSelectedTextBox();
-        if (typeof renderSlides === 'function') renderSlides();
-        try {
-          localStorage.setItem('presentation-studio-autosave-v1', JSON.stringify({ slides, current }));
-        } catch (_) {}
+        if (typeof window.renderSlideThumbnailsMaster === 'function') window.renderSlideThumbnailsMaster();
+        else if (typeof renderSlides === 'function') renderSlides();
+        window.dispatchEvent(new CustomEvent('presentation:change'));
       };
 
-      // Blur to save and lock
       content.onblur = () => {
         content.contentEditable = 'false';
         const host = content.closest('.text-el');
         if (host) host.classList.remove('inline-editing');
         item.text = (content.innerText || content.textContent || '').replace(/\r/g, '');
         if ($('textValue')) $('textValue').value = item.text;
-        try {
-          localStorage.setItem('presentation-studio-autosave-v1', JSON.stringify({ slides, current }));
-        } catch (_) {}
+        window.dispatchEvent(new CustomEvent('presentation:change'));
       };
     });
 
@@ -430,60 +748,19 @@
         e.stopPropagation();
         item.text = (label.innerText || label.textContent || '').replace(/\r/g, '');
         if ($('shapeText')) $('shapeText').value = item.text;
-        if (typeof renderSlides === 'function') renderSlides();
-        try {
-          localStorage.setItem('presentation-studio-autosave-v1', JSON.stringify({ slides, current }));
-        } catch (_) {}
+        if (typeof window.renderSlideThumbnailsMaster === 'function') window.renderSlideThumbnailsMaster();
+        else if (typeof renderSlides === 'function') renderSlides();
+        window.dispatchEvent(new CustomEvent('presentation:change'));
       };
 
       label.onblur = () => {
         label.contentEditable = 'false';
         label.closest('.shape-el')?.classList.remove('inline-editing');
         item.text = (label.innerText || label.textContent || '').replace(/\r/g, '');
+        window.dispatchEvent(new CustomEvent('presentation:change'));
       };
     });
   }
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // Double-tap/Double-click capture at document level (safety net)
-  // ──────────────────────────────────────────────────────────────────────────
-  document.addEventListener('pointerdown', event => {
-    // If target is already an active contentEditable, do nothing so typing works
-    if (event.target.isContentEditable || event.target.closest?.('[contenteditable="true"]')) {
-      event.stopPropagation();
-      return;
-    }
-
-    const node = event.target.closest?.('#slide .element');
-    if (!node) { _lastClickId = null; _lastClickTime = 0; return; }
-
-    // Skip handles
-    if (event.target.closest?.('.hard-resize,.hard-rotate,.smart-resize-handle,.smart-rotate-handle,.free-resize-handle')) {
-      return;
-    }
-
-    const id = node.dataset.id;
-    const now = Date.now();
-
-    if (now - _lastClickTime < DBLCLICK_MS && _lastClickId === id) {
-      // Second tap on the same element -> trigger edit mode
-      _lastClickId = null;
-      _lastClickTime = 0;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-
-      const item = active()?.elements?.find(el => el.id === id);
-      if (item?.type === 'text') {
-        window.activateInlineTextEdit(item);
-      } else if (item?.type === 'shape') {
-        window.activateInlineShapeEdit(item);
-      }
-      return;
-    }
-
-    _lastClickId = id;
-    _lastClickTime = now;
-  }, true);
 
   // Hook into render() to bind inline editing listeners on each render
   const _origRender = render;
@@ -491,7 +768,6 @@
     _origRender();
     bindInlineEditing();
     setupZoomControls();
-    // Maintain zoom transform on re-renders
     const slide = $('slide');
     if (slide && _zoomLevel !== 1.0) {
       slide.style.transform = `scale(${_zoomLevel})`;
@@ -499,8 +775,6 @@
     }
   };
 
-  // Ensure the bubble-phase drag starter used by base text/image elements never
-  // moves a text box while it is being inline-edited.
   const _origStartDrag = window.startDrag;
   if (typeof _origStartDrag === 'function') {
     window.startDrag = function(e) {
@@ -515,7 +789,6 @@
   // ──────────────────────────────────────────────────────────────────────────
   document.head.insertAdjacentHTML('beforeend', `
     <style>
-      /* Prevent unwanted text selection on UI frames */
       body, .workspace, .top, .left, .right, .stage-wrap, .slide, .element, #ctx-toolbar {
         -webkit-user-select: none;
         user-select: none;
@@ -602,6 +875,74 @@
       #presentation-toast.show {
         opacity: 1;
         transform: translateX(-50%) translateY(0);
+      }
+
+      /* Right-Click Context Menu */
+      .presentation-context-menu {
+        position: fixed;
+        z-index: 99999;
+        min-width: 200px;
+        background: #0f172a;
+        border: 1px solid #334155;
+        border-radius: 10px;
+        padding: 6px;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(12px);
+        opacity: 0;
+        transform: scale(0.95);
+        transform-origin: top left;
+        transition: opacity 0.12s ease, transform 0.12s ease;
+        pointer-events: auto;
+      }
+      .presentation-context-menu.open {
+        opacity: 1;
+        transform: scale(1);
+      }
+      .ctx-menu-item {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        padding: 7px 10px;
+        border: none;
+        background: transparent;
+        color: #e2e8f0;
+        font-size: 12px;
+        font-weight: 600;
+        border-radius: 6px;
+        cursor: pointer;
+        text-align: left;
+        transition: background 0.12s, color 0.12s;
+      }
+      .ctx-menu-item:hover {
+        background: #2563eb;
+        color: #ffffff;
+      }
+      .ctx-menu-item.danger:hover {
+        background: #dc2626;
+        color: #ffffff;
+      }
+      .ctx-item-icon {
+        margin-right: 8px;
+        font-size: 13px;
+        width: 16px;
+        text-align: center;
+      }
+      .ctx-item-label {
+        flex: 1;
+      }
+      .ctx-item-shortcut {
+        font-size: 10px;
+        color: #94a3b8;
+        margin-left: 12px;
+        font-weight: 500;
+      }
+      .ctx-menu-item:hover .ctx-item-shortcut {
+        color: #dbeafe;
+      }
+      .ctx-menu-divider {
+        height: 1px;
+        background: #1e293b;
+        margin: 4px 6px;
       }
     </style>
   `);

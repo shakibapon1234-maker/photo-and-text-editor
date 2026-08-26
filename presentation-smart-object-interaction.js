@@ -140,20 +140,12 @@
     event.preventDefault(); event.stopImmediatePropagation(); $('slide').releasePointerCapture?.(event.pointerId); moving = null; rotating = null; drag = null; render();
   }, true);
 
-  // The thumbnail needs the same static background treatment as the canvas,
-  // including animated B-roll. It is a deliberately static preview.
+  // The master thumbnail renderer (presentation-slide-basics-fix.js) now handles
+  // broll background colours directly, so no extra patching is needed here.
   const earlierSlides = renderSlides;
   renderSlides = function () {
     earlierSlides();
-    $('slideList').querySelectorAll('.slide-thumb').forEach((thumb, index) => {
-      const slide = slides[index]; if (!slide || !slide.brollPreset || slide.brollPreset === 'none') return;
-      if (thumb.querySelector('.slide-thumb-broll')) return;
-      const colors = { sky:'linear-gradient(165deg,#0762a3,#79cdf3 48%,#d9f4ff)', aurora:'linear-gradient(135deg,#051531,#156d89 52%,#663a9c)', space:'radial-gradient(circle at 72% 20%,#ffe18a 0 2%,transparent 5%),#020617', night:'linear-gradient(155deg,#030914,#0d2145 58%,#291529)', sunset:'linear-gradient(175deg,#642160,#ec6e69 45%,#ffbf62 72%,#72587f)', water:'linear-gradient(#084f71,#078fba 45%,#015278)' };
-      const broll = document.createElement('div'); broll.className = 'slide-thumb-broll'; broll.style.cssText = 'position:absolute;inset:0;z-index:0;pointer-events:none;background:' + (colors[slide.brollPreset] || '#102044');
-      const num = thumb.querySelector('.num'); thumb.insertBefore(broll, thumb.firstChild);
-      if (num) num.style.zIndex = '3';
-      [...thumb.children].forEach(child => { if (child !== broll && child !== num && !child.classList.contains('slide-thumb-background')) child.style.zIndex = '2'; });
-    });
+    // broll thumbnail backgrounds are now built by window.renderSlideThumbnailsMaster
   };
   document.head.insertAdjacentHTML('beforeend', '<style>.smart-resize-handle{position:absolute;z-index:21;width:12px;height:12px;background:#fff;border:2px solid #1769e8;border-radius:2px;box-shadow:0 1px 4px #0009;touch-action:none}.smart-resize-handle.n,.smart-resize-handle.s{left:50%;transform:translateX(-50%);cursor:ns-resize}.smart-resize-handle.e,.smart-resize-handle.w{top:50%;transform:translateY(-50%);cursor:ew-resize}.smart-resize-handle.n{top:-8px}.smart-resize-handle.s{bottom:-8px}.smart-resize-handle.e{right:-8px}.smart-resize-handle.w{left:-8px}.smart-resize-handle.nw{left:-8px;top:-8px;cursor:nwse-resize}.smart-resize-handle.ne{right:-8px;top:-8px;cursor:nesw-resize}.smart-resize-handle.sw{left:-8px;bottom:-8px;cursor:nesw-resize}.smart-resize-handle.se{right:-8px;bottom:-8px;cursor:nwse-resize}</style>');
   function addSmartResizeHandles(){
