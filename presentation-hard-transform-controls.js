@@ -2,12 +2,21 @@
   const $ = id => document.getElementById(id);
   let action = null;
   document.head.insertAdjacentHTML('beforeend', `<style>
-    .image-move-handle,.image-rotate-handle,.image-resize-handle,.text-move-handle,.text-rotate-handle,.text-resize-handle,.shape-handle{display:none!important}.slide{overflow:visible}.element.selected{z-index:500!important;overflow:visible!important}.hard-resize{position:absolute;z-index:99;width:13px;height:13px;background:#fff;border:2px solid #1769e8;border-radius:2px;box-shadow:0 1px 5px #000;touch-action:none}.hard-resize.n,.hard-resize.s{left:50%;transform:translateX(-50%);cursor:ns-resize}.hard-resize.e,.hard-resize.w{top:50%;transform:translateY(-50%);cursor:ew-resize}.hard-resize.n{top:-9px}.hard-resize.s{bottom:-9px}.hard-resize.e{right:-9px}.hard-resize.w{left:-9px}.hard-resize.nw{left:-9px;top:-9px;cursor:nwse-resize}.hard-resize.ne{right:-9px;top:-9px;cursor:nesw-resize}.hard-resize.sw{left:-9px;bottom:-9px;cursor:nesw-resize}.hard-resize.se{right:-9px;bottom:-9px;cursor:nwse-resize}.hard-rotate{position:absolute;z-index:100;left:50%;top:-34px;transform:translateX(-50%);width:18px;height:18px;border-radius:50%;border:2px solid #1769e8;background:#fff;box-shadow:0 1px 5px #000;cursor:grab;touch-action:none}.hard-rotate:after{content:'';position:absolute;left:6px;top:16px;height:15px;border-left:2px solid #ffb11b}</style>`);
+    .image-move-handle,.image-rotate-handle,.image-resize-handle,.text-move-handle,.text-rotate-handle,.text-resize-handle,.shape-handle{display:none!important}.slide{overflow:visible}.element.selected{z-index:500!important;overflow:visible!important}.hard-resize{position:absolute;z-index:99;width:13px;height:13px;background:#fff;border:2px solid #1769e8;border-radius:2px;box-shadow:0 1px 5px #000;touch-action:none}.hard-resize.n,.hard-resize.s{left:50%;transform:translateX(-50%);cursor:ns-resize}.hard-resize.e,.hard-resize.w{top:50%;transform:translateY(-50%);cursor:ew-resize}.hard-resize.n{top:-9px}.hard-resize.s{bottom:-9px}.hard-resize.e{right:-9px}.hard-resize.w{left:-9px}.hard-resize.nw{left:-9px;top:-9px;cursor:nwse-resize}.hard-resize.ne{right:-9px;top:-9px;cursor:nesw-resize}.hard-resize.sw{left:-9px;bottom:-9px;cursor:nesw-resize}.hard-resize.se{right:-9px;bottom:-9px;cursor:nwse-resize}.hard-rotate{position:absolute;z-index:100;left:50%;top:-34px;transform:translateX(-50%);width:18px;height:18px;border-radius:50%;border:2px solid #1769e8;background:#fff;box-shadow:0 1px 5px #000;cursor:grab;touch-action:none}.hard-rotate:after{content:'';position:absolute;left:6px;top:16px;height:15px;border-left:2px solid #ffb11b}.shape-hard-control{right:auto!important;bottom:auto!important;transform:translate(-50%,-50%)!important}</style>`);
   const nodeFor = item => item && $('slide').querySelector('.element[data-id="'+item.id+'"]');
   function controls() {
+    $('slide').querySelectorAll('.shape-hard-control').forEach(x=>x.remove());
     const item=selectedEl(), node=nodeFor(item); if(!item||!node)return;
     node.querySelectorAll('.hard-resize,.hard-rotate').forEach(x=>x.remove());
-    ['n','e','s','w','nw','ne','sw','se'].forEach(side=>{const h=document.createElement('i');h.className='hard-resize '+side;h.onpointerdown=e=>begin('resize',e,item,side);node.append(h)});
+    const sides=['n','e','s','w','nw','ne','sw','se'];
+    // CSS clip-path also clips descendants. Render shape handles on the slide
+    // instead of inside the shape so arrows, triangles, stars, etc. remain resizable.
+    if(item.type==='shape'){
+      const positions={n:[item.x+item.w/2,item.y],e:[item.x+item.w,item.y+item.h/2],s:[item.x+item.w/2,item.y+item.h],w:[item.x,item.y+item.h/2],nw:[item.x,item.y],ne:[item.x+item.w,item.y],sw:[item.x,item.y+item.h],se:[item.x+item.w,item.y+item.h]};
+      sides.forEach(side=>{const h=document.createElement('i');h.className='hard-resize shape-hard-control '+side;h.style.left=positions[side][0]+'%';h.style.top=positions[side][1]+'%';h.onpointerdown=e=>begin('resize',e,item,side);$('slide').append(h)});
+      return;
+    }
+    sides.forEach(side=>{const h=document.createElement('i');h.className='hard-resize '+side;h.onpointerdown=e=>begin('resize',e,item,side);node.append(h)});
     const r=document.createElement('i');r.className='hard-rotate';r.onpointerdown=e=>begin('rotate',e,item);node.append(r);
   }
   function begin(kind,event,item,side='') {
