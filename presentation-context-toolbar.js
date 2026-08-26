@@ -76,6 +76,12 @@
       <button id="ctx-shape-center" title="Align center">☰</button>
       <button id="ctx-shape-right" title="Align right">➡</button>
       <div class="ctx-sep"></div>
+      <button id="ctx-shape-rot-ccw" title="Rotate -45°">⟲ -45°</button>
+      <button id="ctx-shape-rot-cw" title="Rotate +45°">⟳ +45°</button>
+      <button id="ctx-shape-rot-0" title="Snap Horizontal (0°)">0°</button>
+      <button id="ctx-shape-rot-90" title="Snap Vertical (90°)">90°</button>
+      <button id="ctx-shape-flip" title="Flip 180°">↔ Flip</button>
+      <div class="ctx-sep"></div>
       <span class="ctx-hint">Double-click shape to type</span>
     </div>
 
@@ -156,6 +162,28 @@
       applyShape(item => { item.textAlign = 'center'; });
     } else if (id === 'ctx-shape-right') {
       applyShape(item => { item.textAlign = 'right'; });
+    }
+    // Shape quick rotation & flip buttons
+    else if (id === 'ctx-shape-rot-ccw') {
+      applyShape(item => {
+        item.rotation = ((Number(item.rotation) || 0) - 45 + 360) % 360;
+      });
+    } else if (id === 'ctx-shape-rot-cw') {
+      applyShape(item => {
+        item.rotation = ((Number(item.rotation) || 0) + 45) % 360;
+      });
+    } else if (id === 'ctx-shape-rot-0') {
+      applyShape(item => {
+        item.rotation = 0;
+      });
+    } else if (id === 'ctx-shape-rot-90') {
+      applyShape(item => {
+        item.rotation = 90;
+      });
+    } else if (id === 'ctx-shape-flip') {
+      applyShape(item => {
+        item.rotation = ((Number(item.rotation) || 0) + 180) % 360;
+      });
     }
     // Image buttons
     else if (id === 'ctx-flip-h') {

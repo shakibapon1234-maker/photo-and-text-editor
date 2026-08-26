@@ -253,8 +253,8 @@ document.addEventListener('pointerdown',event=>{
   if(handle.classList.contains('image-resize-handle')){resizeImageFromHandle(event,node,el);return;}
   rotateImageFromHandle(event,node,el);
 },true);
-$('slide').addEventListener('pointerdown',event=>{if(!event.target.closest('.element')&&!event.target.closest('#ctx-toolbar')){selected=null;render()}},true);
-document.addEventListener('pointerdown',event=>{if(!event.target.closest('.element')&&!event.target.closest('.right')&&!event.target.closest('#textToolsMenu,#textTools')&&!event.target.closest('#ctx-toolbar')){selected=null;render()}},true);
+$('slide').addEventListener('pointerdown',event=>{if(!event.target.closest('.element,.hard-resize,.hard-rotate')&&!event.target.closest('#ctx-toolbar')){selected=null;render()}},true);
+document.addEventListener('pointerdown',event=>{if(!event.target.closest('.element,.hard-resize,.hard-rotate')&&!event.target.closest('.right')&&!event.target.closest('#textToolsMenu,#textTools')&&!event.target.closest('#ctx-toolbar')){selected=null;render()}},true);
 document.addEventListener('selectionchange',()=>{
   const anchor=window.getSelection()?.anchorNode;
   const content=anchor?.nodeType===Node.ELEMENT_NODE?anchor.closest?.('.text-content'):anchor?.parentElement?.closest?.('.text-content');
@@ -293,4 +293,4 @@ $('inlineGradientStart').oninput=event=>updateInlineTextColor(el=>{el.color=even
 $('inlineGradientEnd').oninput=event=>updateInlineTextColor(el=>{el.textGradientTo=event.target.value;el.textGradient=true});
 $('inlineGradientAngle').oninput=event=>updateInlineTextColor(el=>{el.textGradientAngle=Number(event.target.value)||0;el.textGradient=true});
 render();
-</script><script src="presentation-hard-transform-controls.js?v=5"></script><script src="presentation-shape-rotate-control.js?v=1"></script><script src="presentation-shape-rotate-overlay.js?v=3"></script><script src="presentation-video-elements.js?v=3"></script><script src="presentation-3d-text-live.js?v=1"></script><script src="presentation-shape-resize-fix.js?v=1"></script><script src="presentation-editing-fixes.js?v=5"></script><script src="presentation-context-toolbar.js?v=9"></script></body></html>
+</script><script src="presentation-hard-transform-controls.js?v=15"></script><script src="presentation-shape-rotate-control.js?v=1"></script><script src="presentation-shape-rotate-overlay.js?v=4"></script><script src="presentation-video-elements.js?v=3"></script><script src="presentation-3d-text-live.js?v=1"></script><script src="presentation-shape-resize-fix.js?v=2"></script><script src="presentation-editing-fixes.js?v=7"></script><script src="presentation-context-toolbar.js?v=15"></script></body></html>
