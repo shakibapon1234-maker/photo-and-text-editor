@@ -174,6 +174,8 @@
     // 4. Element selection
     const node = event.target.closest?.('#slide .element');
     if (!node) return;
+    // While a text box is in inline-edit mode, skip move/resize so text can be selected.
+    if (node.classList.contains('inline-editing')) return;
 
     const item = active()?.elements?.find(x => x.id === node.dataset.id);
     if (!item) return;

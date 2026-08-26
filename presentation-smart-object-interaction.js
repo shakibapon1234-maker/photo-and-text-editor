@@ -69,6 +69,9 @@
   window.addEventListener('pointerdown', event => {
     if (event.target.isContentEditable || event.target.closest?.('[contenteditable="true"]')) return;
     const node = event.target.closest?.('#slide .element');
+    // While a text box is in inline-edit mode, don't start a move — let the
+    // native caret/selection work so the user can select text instead.
+    if (node && node.classList.contains('inline-editing')) return;
     if (!node || event.target.closest('.free-resize-handle,.smart-resize-handle,.smart-rotate-handle')) return;
     const item = active().elements.find(el => el.id === node.dataset.id);
     if (!item) return;
@@ -105,6 +108,10 @@
   $('slide').addEventListener('pointerdown', event => {
     const node = event.target.closest?.('.element');
     if (!node || event.target.closest('.free-resize-handle,.smart-resize-handle,.smart-rotate-handle')) return;
+    // Never start a move from inside an editable text region (shape labels are
+    // always contentEditable) — let the user select/caret text instead.
+    if (event.target.isContentEditable || event.target.closest?.('[contenteditable="true"]')) return;
+    if (node.classList.contains('inline-editing')) return;
     const item = active().elements.find(el => el.id === node.dataset.id);
     if (!item) return;
     event.stopImmediatePropagation();

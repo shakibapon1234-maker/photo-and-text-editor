@@ -29,6 +29,10 @@
       node.appendChild(content);
     }
 
+    // Flag the element as actively being edited so drag/resize handlers can
+    // skip it and let the native text caret/selection work instead.
+    node.classList.add('inline-editing');
+
     content.contentEditable = 'true';
     content.spellcheck = false;
     content.focus();
@@ -57,6 +61,9 @@
       if (typeof render === 'function') render();
       return;
     }
+    // Flag the shape element as actively being edited so drag/resize handlers
+    // skip it and the native text selection works.
+    node.closest('.shape-el')?.classList.add('inline-editing');
     node.contentEditable = 'true';
     node.spellcheck = false;
     node.focus();
@@ -139,6 +146,8 @@
       // Blur to save and lock
       content.onblur = () => {
         content.contentEditable = 'false';
+        const host = content.closest('.text-el');
+        if (host) host.classList.remove('inline-editing');
         item.text = (content.innerText || content.textContent || '').replace(/\r/g, '');
         if ($('textValue')) $('textValue').value = item.text;
         try {
@@ -186,6 +195,7 @@
 
       label.onblur = () => {
         label.contentEditable = 'false';
+        label.closest('.shape-el')?.classList.remove('inline-editing');
         item.text = (label.innerText || label.textContent || '').replace(/\r/g, '');
       };
     });
@@ -238,6 +248,20 @@
     _origRender();
     bindInlineEditing();
   };
+
+  // Ensure the bubble-phase drag starter used by base text/image elements never
+  // moves a text box while it is being inline-edited.
+  const _origStartDrag = window.startDrag;
+  if (typeof _origStartDrag === 'function') {
+    window.startDrag = function(e) {
+      const el = e && e.currentTarget;
+      if (el && el.classList && el.classList.contains('inline-editing')) return;
+      return _origStartDrag(e);
+    };
+  }
+
+  // Visual cue + allow text selection across the whole editable box.
+  document.head.insertAdjacentHTML('beforeend', '<style>.text-el.inline-editing{cursor:text;user-select:text}.text-el.inline-editing .text-content{user-select:text}</style>');
 
   bindInlineEditing();
 })();
