@@ -297,7 +297,90 @@
   }
 
   function openPresenter() {
-    // Remove any existing overlay first
+    // ── Step 1: Read the editor slide's actual rendered pixel size ────────────
+    const editorSlide = $('slide');
+    if (!editorSlide) return;
+    const savedCurrent = current;
+    const savedSelected = selected;
+
+    // Measure before hiding (accurate layout)
+    const slideW = editorSlide.offsetWidth  || 960;
+    const slideH = editorSlide.offsetHeight || 540;
+
+    // Hide editor slide so the render loop doesn't flash on screen
+    editorSlide.style.visibility = 'hidden';
+
+    // ── Step 2: Capture one clone per slide via the editor's own render() ─────
+    const clones = [];
+    for (let i = 0; i < slides.length; i++) {
+      current = i; selected = null;
+      render(); // full multi-module editor pipeline
+
+      const clone = editorSlide.cloneNode(true);
+
+      // ⬛ BUG FIX 1: cloneNode inherits inline visibility:hidden — clear it
+      clone.style.visibility = 'visible';
+
+      // ⬛ BUG FIX 2: keep a unique id so clones don't conflict; #slide CSS
+      //   rules are what give the slide its dimensions & background. Instead
+      //   of removing the id (which loses all CSS), we rename it.
+      clone.id = '__pres_slide_' + i;
+      clone.classList.add('pres-slide-clone');
+
+      // Remove editor-only chrome
+      clone.classList.remove('dragging');
+      clone.querySelectorAll(
+        '.smart-resize-handle,.rotate-handle,[data-editor-only],' +
+        '.selection-overlay,.context-toolbar,.selection-handle,.drop-note'
+      ).forEach(el => el.remove());
+      clone.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+      clone.querySelectorAll('[contenteditable]').forEach(el => {
+        el.removeAttribute('contenteditable');
+        el.removeAttribute('spellcheck');
+      });
+      // Start hidden; shown by showSlide()
+      clone.style.display = 'none';
+      clone.style.pointerEvents = 'none';
+
+      clones.push(clone);
+    }
+
+    // Restore editor
+    current = savedCurrent; selected = savedSelected;
+    editorSlide.style.visibility = '';
+    render();
+
+    // ── Step 3: CSS that makes the clones fill the fullscreen stage ──────────
+    // The clones have the editor's pixel dimensions (e.g. 960×540).
+    // We scale them up to fill the viewport using CSS transform.
+    const existingStyle = $('__pres_clone_style');
+    if (existingStyle) existingStyle.remove();
+    const cloneStyle = document.createElement('style');
+    cloneStyle.id = '__pres_clone_style';
+    cloneStyle.textContent = `
+      #__pres_stage {
+        position: relative;
+        overflow: hidden;
+        background: #000;
+      }
+      .pres-slide-clone {
+        position: absolute !important;
+        inset: 0 !important;
+        width: ${slideW}px !important;
+        height: ${slideH}px !important;
+        left: 50% !important;
+        top: 50% !important;
+        transform-origin: center center !important;
+        transform: translate(-50%, -50%) scale(var(--pres-scale, 1)) !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        cursor: default !important;
+      }
+    `;
+    document.head.appendChild(cloneStyle);
+
+    // ── Step 4: Build the overlay ─────────────────────────────────────────────
     const existing = $('__pres_overlay');
     if (existing) existing.remove();
 
@@ -306,114 +389,68 @@
 
     const stage = document.createElement('div');
     stage.id = '__pres_stage';
-    overlay.appendChild(stage);
+    clones.forEach(c => stage.appendChild(c));
 
     const controls = document.createElement('div');
     controls.id = '__pres_controls';
     controls.innerHTML = '<button id="__pres_voice">🎙 Voice: Off</button><span id="__pres_status">Click/→ next · ← back · Esc exit</span>';
+
+    overlay.appendChild(stage);
     overlay.appendChild(controls);
-
     document.body.appendChild(overlay);
-
-    // Prevent editor interactions while presenting
     document.body.style.overflow = 'hidden';
 
-    const themeMap = (typeof themes !== 'undefined') ? themes : {};
-    let idx = 0, autoTimer = null, recognition = null;
+    // Calculate scale to fit slide into viewport
+    function recalcScale() {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const scale = Math.min(vw / slideW, vh / slideH);
+      document.documentElement.style.setProperty('--pres-scale', scale);
+      stage.style.width = vw + 'px';
+      stage.style.height = vh + 'px';
+    }
+    recalcScale();
+    window.addEventListener('resize', recalcScale);
 
-    function drawSlide() {
-      const slide = slides[idx];
-      stage.replaceChildren();
+    let idx = 0, autoTimer = null, recognition = null, currentClone = null;
 
-      // Background
-      if (slide.background === 'custom') {
-        stage.style.background = slide.bgColor || '#17233c';
-      } else if (slide.background === 'image' && slide.bgImage) {
-        stage.style.backgroundImage = 'linear-gradient(#00000018,#00000018),url("' + slide.bgImage + '")';
-        stage.style.backgroundSize = 'cover';
-        stage.style.backgroundPosition = 'center';
-      } else {
-        stage.style.background = themeMap[slide.background] || '#17233c';
-        stage.style.backgroundImage = '';
-      }
-
-      // bgMedia (uploaded video/gif background)
-      if (slide.bgMedia) {
-        const mediaEl = document.createElement(slide.bgMediaType === 'video' ? 'video' : 'img');
-        mediaEl.className = 'bg-media';
-        mediaEl.src = slide.bgMedia;
-        if (mediaEl.tagName === 'VIDEO') {
-          mediaEl.autoplay = true; mediaEl.loop = true; mediaEl.muted = true; mediaEl.playsInline = true;
-          mediaEl.playbackRate = slide.bgPlaybackRate || 1;
-          mediaEl.play().catch(() => {});
-        }
-        mediaEl.style.opacity = (slide.bgMediaOpacity ?? 100) / 100;
-        if (slide.bgMediaBlur) mediaEl.style.filter = 'blur(' + slide.bgMediaBlur + 'px) scale(1.04)';
-        stage.appendChild(mediaEl);
-
-        if (slide.bgOverlayOpacity) {
-          const ov = document.createElement('div');
-          ov.className = 'bg-overlay';
-          const hex = Math.round((slide.bgOverlayOpacity / 100) * 255).toString(16).padStart(2, '0');
-          ov.style.background = (slide.bgOverlayColor || '#000000') + hex;
-          stage.appendChild(ov);
-        }
-      }
-
-      // broll animated background
-      if (slide.brollPreset && slide.brollPreset !== 'none') {
-        const broll = document.createElement('div');
-        broll.id = 'brollLayer';
-        broll.className = slide.brollPreset + ' speed-' + (slide.brollSpeed || 'normal');
-        stage.appendChild(broll);
-      }
-
-      // Content layer (z-index above backgrounds)
-      const contentLayer = document.createElement('div');
-      contentLayer.className = 'content-layer';
-      stage.appendChild(contentLayer);
-
-      // Elements
-      (slide.elements || []).forEach(el => {
-        const node = buildElement(el);
-        contentLayer.appendChild(node);
-
-        // Element animations
-        if (el.animation && animFrames[el.animation]) {
-          node.animate(animFrames[el.animation], {
-            duration: Math.max(.1, Number(el.animationDuration) || .6) * 1000,
-            delay: Math.max(0, Number(el.animationDelay) || 0) * 1000,
-            iterations: el.animationLoop ? Infinity : 1,
-            easing: 'cubic-bezier(.2,.8,.2,1)',
-            fill: 'both'
-          });
-        }
+    function showSlide(i) {
+      idx = ((i % clones.length) + clones.length) % clones.length;
+      if (currentClone) currentClone.style.display = 'none';
+      currentClone = clones[idx];
+      currentClone.style.display = 'block';
+      // Re-play video elements (cloneNode pauses them)
+      currentClone.querySelectorAll('video').forEach(vid => {
+        vid.muted = true; vid.loop = true;
+        vid.play().catch(() => {});
       });
-
-      // Auto-advance
+      // Re-trigger element animations
+      const sl = slides[idx];
+      (sl?.elements || []).forEach(el => {
+        if (!el.animation || !animFrames[el.animation]) return;
+        const node = currentClone.querySelector('.element[data-id="' + el.id + '"]');
+        if (!node) return;
+        node.getAnimations().forEach(a => a.cancel());
+        node.animate(animFrames[el.animation], {
+          duration: Math.max(.1, Number(el.animationDuration) || .6) * 1000,
+          delay: Math.max(0, Number(el.animationDelay) || 0) * 1000,
+          iterations: el.animationLoop ? Infinity : 1,
+          easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'both'
+        });
+      });
       clearTimeout(autoTimer);
-      if (Number(slide.autoDuration) > 0) {
-        autoTimer = setTimeout(() => advance(1), Number(slide.autoDuration) * 1000);
-      }
+      if (Number(sl?.autoDuration) > 0)
+        autoTimer = setTimeout(() => showSlide(idx + 1), Number(sl.autoDuration) * 1000);
     }
 
-    function advance(step) {
-      idx = (idx + step + slides.length) % slides.length;
-      drawSlide();
-    }
+    function advance(step) { showSlide(idx + step); }
 
-    // Keyboard
     function onKey(e) {
       if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') { e.preventDefault(); advance(1); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); advance(-1); }
       else if (e.key === 'Escape') { closePlayer(); }
     }
     document.addEventListener('keydown', onKey);
-
-    // Click to advance (not on controls)
-    overlay.addEventListener('click', e => {
-      if (!e.target.closest('#__pres_controls')) advance(1);
-    });
+    overlay.addEventListener('click', e => { if (!e.target.closest('#__pres_controls')) advance(1); });
 
     function stopVoice() {
       if (recognition) { recognition.onend = null; recognition.stop(); recognition = null; }
@@ -436,9 +473,7 @@
           else if (/exit|close|বন্ধ/.test(w)) closePlayer();
         }
       };
-      recognition.onerror = e => {
-        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') stopVoice();
-      };
+      recognition.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') stopVoice(); };
       recognition.onend = () => { if (recognition) try { recognition.start(); } catch(_) {} };
       recognition.start();
       const vb = $('__pres_voice');
@@ -450,15 +485,17 @@
     if (voiceBtn) voiceBtn.onclick = e => { e.stopPropagation(); recognition ? stopVoice() : startVoice(); };
 
     function closePlayer() {
-      clearTimeout(autoTimer);
-      stopVoice();
+      clearTimeout(autoTimer); stopVoice();
       document.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', recalcScale);
       document.body.style.overflow = '';
+      $('__pres_clone_style')?.remove();
       overlay.remove();
     }
 
-    drawSlide();
+    showSlide(savedCurrent);
   }
+
 
   // ── Assign the SINGLE authoritative presentBtn handler ───────────────────
   // Use a MutationObserver + setTimeout to ensure this runs LAST,
