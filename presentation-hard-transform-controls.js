@@ -137,11 +137,10 @@
     } catch (_) {}
   }
 
-  let _lastDownTime = 0, _lastDownId = null;
+  let _lastDownTime = 0, _lastDownId = null, _pendingDrag = null;
 
-  // Window-level capture listener
   window.addEventListener('pointerdown', event => {
-    // 1. Intercept handles FIRST with stopImmediatePropagation so deselect listeners NEVER fire
+    // 1. Intercept handles FIRST
     const handle = event.target.closest?.('.hard-resize, .hard-rotate');
     if (handle) {
       event.preventDefault();
@@ -161,33 +160,42 @@
       return;
     }
 
-    // 2. Ignore toolbar clicks
-    if (event.target.closest?.('#ctx-toolbar, #assetDrawer, #shapeGallery')) {
+    // 2. Ignore toolbar clicks and input panels
+    if (event.target.closest?.('#ctx-toolbar, #assetDrawer, #shapeGallery, #textToolsMenu, .top, .right, .left, input, textarea, select')) {
       return;
     }
 
-    // 3. If editing text (contentEditable is active), do NOT drag or preventDefault
-    if (event.target.isContentEditable || event.target.closest?.('[contenteditable="true"], .text-content[contenteditable="true"]')) {
+    // 3. If currently inside active inline text editing, allow text caret / typing / selection natively
+    if (event.target.isContentEditable || event.target.closest?.('[contenteditable="true"], .inline-editing')) {
       return;
     }
 
     // 4. Element selection
     const node = event.target.closest?.('#slide .element');
-    if (!node) return;
-    // While a text box is in inline-edit mode, skip move/resize so text can be selected.
-    if (node.classList.contains('inline-editing')) return;
+    if (!node) {
+      // Clicked on background canvas: end any active inline text edit
+      document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+        el.contentEditable = 'false';
+        el.closest('.element')?.classList.remove('inline-editing');
+      });
+      return;
+    }
 
     const item = active()?.elements?.find(x => x.id === node.dataset.id);
     if (!item) return;
 
-    // 5. Double-click detection for inline editing
+    // 5. Double-click detection: activate on-canvas inline text editing
     const now = Date.now();
-    if ((event.detail >= 2 || (now - _lastDownTime < 350 && _lastDownId === item.id)) && (item.type === 'text' || item.type === 'shape')) {
-      _lastDownTime = 0;
-      _lastDownId = null;
+    const isDbl = (event.detail >= 2 || (now - _lastDownTime < 380 && _lastDownId === item.id));
+    _lastDownTime = now;
+    _lastDownId = item.id;
+
+    if (isDbl && (item.type === 'text' || item.type === 'shape')) {
       event.preventDefault();
+      event.stopPropagation();
       event.stopImmediatePropagation();
       selected = item.id;
+      _pendingDrag = null;
       if (item.type === 'text' && typeof window.activateInlineTextEdit === 'function') {
         window.activateInlineTextEdit(item);
       } else if (item.type === 'shape' && typeof window.activateInlineShapeEdit === 'function') {
@@ -196,18 +204,37 @@
       return;
     }
 
-    _lastDownTime = now;
-    _lastDownId = item.id;
-
-    // 6. Select and start smooth drag move
-    event.preventDefault();
-    event.stopImmediatePropagation();
+    // 6. Select element & queue drag (Smooth & effortless dragging for Text, Shapes, and Images)
     selected = item.id;
-    render();
-    begin('move', event, item);
+    document.querySelectorAll('#slide .element').forEach(el => el.classList.toggle('selected', el === node));
+    updateHandles();
+    if (typeof renderInspector === 'function') renderInspector();
+
+    _pendingDrag = { event, item };
   }, true);
 
+  const DRAG_THRESHOLD = 5; // pixels
+
   window.addEventListener('pointermove', event => {
+    // If we have a pending drag, check threshold before starting
+    if (_pendingDrag && !action) {
+      // NEVER start drag if the element is in inline text edit mode
+      const pendingNode = $('slide')?.querySelector('.element[data-id="' + _pendingDrag.item.id + '"]');
+      if (pendingNode && (pendingNode.classList.contains('inline-editing') || pendingNode.contentEditable === 'true')) {
+        _pendingDrag = null;
+        return;
+      }
+      const dx = Math.abs(event.clientX - _pendingDrag.event.clientX);
+      const dy = Math.abs(event.clientY - _pendingDrag.event.clientY);
+      if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+        // Threshold crossed — start the drag now
+        begin('move', _pendingDrag.event, _pendingDrag.item);
+        _pendingDrag = null;
+      } else {
+        return;
+      }
+    }
+
     if (!action) return;
     event.preventDefault();
     event.stopPropagation();
@@ -299,6 +326,7 @@
   }, true);
 
   window.addEventListener('pointerup', event => {
+    _pendingDrag = null; // Cancel any pending drag that didn't start
     if (!action) return;
     event.preventDefault();
     event.stopPropagation();

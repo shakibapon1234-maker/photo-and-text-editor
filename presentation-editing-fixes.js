@@ -25,76 +25,114 @@
   window.showPresentationToast = showToast;
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 1. Activate Inline Text Editing
+  // 1. Activate Direct On-Screen Inline Text Editing
   // ──────────────────────────────────────────────────────────────────────────
   window.activateInlineTextEdit = function(item) {
     if (!item) return;
     selected = item.id;
     
-    // Find the text DOM node
     const node = $('slide')?.querySelector('.text-el[data-id="' + item.id + '"]');
-    if (!node) {
-      if (typeof render === 'function') render();
-      return;
-    }
+    if (!node) return;
 
-    // Make sure .text-content exists
-    let content = node.querySelector('.text-content');
-    if (!content) {
-      node.textContent = '';
-      content = document.createElement('span');
-      content.className = 'text-content';
-      content.textContent = item.text || '';
-      node.appendChild(content);
-    }
-
-    // Flag the element as actively being edited so drag/resize handlers can
-    // skip it and let the native text caret/selection work instead.
     node.classList.add('inline-editing');
+    node.contentEditable = 'true';
+    node.spellcheck = false;
+    node.style.setProperty('user-select', 'text', 'important');
+    node.style.setProperty('-webkit-user-select', 'text', 'important');
+    node.style.setProperty('cursor', 'text', 'important');
+    node.style.setProperty('outline', '2px dashed #4f8df7', 'important');
+    node.style.setProperty('outline-offset', '3px', 'important');
+    node.style.setProperty('caret-color', '#ffd166', 'important');
 
-    content.contentEditable = 'true';
-    content.spellcheck = false;
-    content.focus();
+    // Remove transform handles while editing
+    node.querySelectorAll('.hard-resize, .hard-rotate').forEach(h => h.remove());
 
-    // Place cursor at the end
-    try {
-      const range = document.createRange();
-      const sel = window.getSelection();
-      range.selectNodeContents(content);
-      range.collapse(false);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    } catch (_) {}
+    setTimeout(() => {
+      node.focus();
+      try {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch (_) {}
+    }, 10);
+
+    node.oninput = e => {
+      e.stopPropagation();
+      item.text = (node.innerText || node.textContent || '').replace(/\r/g, '');
+      if ($('textValue')) $('textValue').value = item.text;
+      if (typeof window.renderSlideThumbnailsMaster === 'function') window.renderSlideThumbnailsMaster();
+      window.dispatchEvent(new CustomEvent('presentation:change'));
+    };
+
+    node.onblur = () => {
+      node.contentEditable = 'false';
+      node.classList.remove('inline-editing');
+      node.style.outline = '';
+      node.style.outlineOffset = '';
+      item.text = (node.innerText || node.textContent || '').replace(/\r/g, '');
+      if ($('textValue')) $('textValue').value = item.text;
+      if (typeof render === 'function') render();
+      window.dispatchEvent(new CustomEvent('presentation:change'));
+    };
 
     if (typeof renderInspector === 'function') renderInspector();
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Activate Inline Shape Editing
+  // Activate Direct On-Screen Inline Shape Editing
   // ──────────────────────────────────────────────────────────────────────────
   window.activateInlineShapeEdit = function(item) {
     if (!item) return;
     selected = item.id;
-    const node = $('slide')?.querySelector('.shape-el[data-id="' + item.id + '"] .shape-label');
-    if (!node) {
-      if (typeof render === 'function') render();
-      return;
+    const node = $('slide')?.querySelector('.shape-el[data-id="' + item.id + '"]');
+    if (!node) return;
+    let label = node.querySelector('.shape-label');
+    if (!label) {
+      label = document.createElement('div');
+      label.className = 'shape-label';
+      node.appendChild(label);
     }
-    // Flag the shape element as actively being edited so drag/resize handlers
-    // skip it and the native text selection works.
-    node.closest('.shape-el')?.classList.add('inline-editing');
-    node.contentEditable = 'true';
-    node.spellcheck = false;
-    node.focus();
+    
+    node.classList.add('inline-editing');
+    label.contentEditable = 'true';
+    label.spellcheck = false;
+    label.style.setProperty('user-select', 'text', 'important');
+    label.style.setProperty('-webkit-user-select', 'text', 'important');
+    label.style.setProperty('cursor', 'text', 'important');
+    label.style.setProperty('pointer-events', 'auto', 'important');
+    label.style.setProperty('caret-color', '#ffd166', 'important');
 
-    try {
-      const range = document.createRange();
-      const sel = window.getSelection();
-      range.selectNodeContents(node);
-      range.collapse(false);
-      sel.removeAllRanges();
-      sel.addRange(range);
-    } catch (_) {}
+    node.querySelectorAll('.hard-resize, .hard-rotate').forEach(h => h.remove());
+
+    setTimeout(() => {
+      label.focus();
+      try {
+        const range = document.createRange();
+        range.selectNodeContents(label);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch (_) {}
+    }, 10);
+
+    label.oninput = e => {
+      e.stopPropagation();
+      item.text = (label.innerText || label.textContent || '').replace(/\r/g, '');
+      if ($('shapeText')) $('shapeText').value = item.text;
+      if (typeof window.renderSlideThumbnailsMaster === 'function') window.renderSlideThumbnailsMaster();
+      window.dispatchEvent(new CustomEvent('presentation:change'));
+    };
+
+    label.onblur = () => {
+      label.contentEditable = 'false';
+      node.classList.remove('inline-editing');
+      label.style.pointerEvents = 'none';
+      item.text = (label.innerText || label.textContent || '').replace(/\r/g, '');
+      if (typeof render === 'function') render();
+      window.dispatchEvent(new CustomEvent('presentation:change'));
+    };
 
     if (typeof renderInspector === 'function') renderInspector();
   };
@@ -648,53 +686,10 @@
       const id = node.dataset.id;
       const item = active()?.elements?.find(el => el.id === id);
       if (!item) return;
-
-      // Single click on selected text or double click on any text activates edit
-      node.onclick = e => {
-        if (selected === id) {
-          window.activateInlineTextEdit(item);
-        }
-      };
       node.ondblclick = e => {
         e.preventDefault();
         e.stopPropagation();
-        window.activateInlineTextEdit(item);
-      };
-
-      content.ondblclick = e => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.activateInlineTextEdit(item);
-      };
-
-      content.onpointerdown = e => {
-        if (content.contentEditable === 'true') {
-          e.stopPropagation();
-        }
-      };
-      content.onmousedown = e => {
-        if (content.contentEditable === 'true') {
-          e.stopPropagation();
-        }
-      };
-
-      content.oninput = e => {
-        e.stopPropagation();
-        item.text = (content.innerText || content.textContent || '').replace(/\r/g, '');
-        if ($('textValue')) $('textValue').value = item.text;
-        if (typeof fitSelectedTextBox === 'function') fitSelectedTextBox();
-        if (typeof window.renderSlideThumbnailsMaster === 'function') window.renderSlideThumbnailsMaster();
-        else if (typeof renderSlides === 'function') renderSlides();
-        window.dispatchEvent(new CustomEvent('presentation:change'));
-      };
-
-      content.onblur = () => {
-        content.contentEditable = 'false';
-        const host = content.closest('.text-el');
-        if (host) host.classList.remove('inline-editing');
-        item.text = (content.innerText || content.textContent || '').replace(/\r/g, '');
-        if ($('textValue')) $('textValue').value = item.text;
-        window.dispatchEvent(new CustomEvent('presentation:change'));
+        if (typeof window.uploadOrReplaceImage === 'function') window.uploadOrReplaceImage(item);
       };
     });
 
@@ -774,10 +769,21 @@
         -webkit-user-select: none;
         user-select: none;
       }
-      .text-el.inline-editing {
+      .text-el.inline-editing,
+      .text-el[contenteditable="true"] {
         cursor: text !important;
         -webkit-user-select: text !important;
         user-select: text !important;
+        pointer-events: auto !important;
+        outline: 2px solid #4f8df7 !important;
+        outline-offset: 2px !important;
+        caret-color: #ffb11b !important;
+      }
+      .element.inline-editing,
+      .element[contenteditable="true"] {
+        -webkit-user-select: text !important;
+        user-select: text !important;
+        pointer-events: auto !important;
       }
       .text-el.inline-editing .text-content,
       .shape-el.inline-editing .shape-label,

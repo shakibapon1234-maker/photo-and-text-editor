@@ -123,12 +123,18 @@
       text-align: center;
       overflow: hidden;
       line-height: 1.15;
-      cursor: text;
+      cursor: default;
       outline: 0;
       word-break: break-word;
       z-index: 2;
-      user-select: text;
-      pointer-events: auto;
+      user-select: none;
+      pointer-events: none;
+    }
+    .shape-el.inline-editing .shape-label {
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      pointer-events: auto !important;
+      cursor: text !important;
     }
     .shape-label:focus {
       box-shadow: inset 0 0 0 1px #ffffffaa;
