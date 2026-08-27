@@ -76,6 +76,13 @@
       tab.ids.forEach(id => {
         let control = id === 'imageInput' ? $('imageInput')?.closest('label') : $(id);
         if (!control) {
+          if (id === 'previewSlideBtn') {
+            control = document.createElement('button');
+            control.id = 'previewSlideBtn';
+            control.textContent = '🎬 Preview Current Slide';
+            control.title = 'Preview only the currently active slide';
+            menu.appendChild(control);
+          }
           if (id === 'addChart') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Chart'));
           if (id === 'addGlassCard') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Glass'));
           if (id === 'magicDeckBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Magic Deck'));
@@ -92,17 +99,17 @@
       });
     });
 
-    top.querySelectorAll(':scope > button, :scope > label.file-label').forEach(b => {
-      const txt = (b.textContent || '').toLowerCase();
-      if (txt.includes('undo') || txt.includes('redo')) {
-        b.style.marginLeft = '4px';
-        return;
-      }
-      if (b.closest('#toolbarGroups') || b.classList.contains('brand')) return;
-
-      const designMenu = groups.querySelector('.toolbar-group[data-group="design"] .toolbar-menu');
-      if (designMenu) designMenu.appendChild(b);
-    });
+    // Label clarify
+    const pBtn = $('presentBtn');
+    if (pBtn) {
+      pBtn.textContent = '▶ Play Slideshow (All Slides)';
+      pBtn.title = 'Play full multi-slide presentation starting from beginning';
+    }
+    const pvBtn = $('presenterView') || $('previewSlideBtn');
+    if (pvBtn) {
+      pvBtn.textContent = '🎬 Preview Current Slide';
+      pvBtn.title = 'Preview only the currently active running slide';
+    }
   }
 
   // Inject Styles (Horizontal Layout 'flex-flow: row wrap')
@@ -215,10 +222,11 @@
       color: #fff !important;
       font-weight: 700 !important;
     }
-    .toolbar-menu #saveProject, .toolbar-menu #downloadSlideshow {
-      background: #0f766e !important;
-      border-color: #50c7b5 !important;
+    .toolbar-menu #presenterView, .toolbar-menu #previewSlideBtn {
+      background: #4f46e5 !important;
+      border-color: #a5b4fc !important;
       color: #fff !important;
+      font-weight: 700 !important;
     }
   `;
 
@@ -229,8 +237,10 @@
     }
   });
 
-  // ── HIGH-SPEED ON-DEMAND IN-PAGE PRESENTER ──
-  function openPresenter() {
+  // ── ON-DEMAND PRESENTER ENGINE ──
+  // singleSlideOnly = true -> Previews ONLY the running active slide
+  // singleSlideOnly = false -> Full Slideshow across all slides
+  function openPresenter(singleSlideOnly = false) {
     if (!slides.length) return;
 
     const slideW = 960;
@@ -325,7 +335,14 @@
 
     const controls = document.createElement('div');
     controls.id = '__pres_controls';
-    controls.innerHTML = '<button id="__pres_prev">◀ Prev</button><span id="__pres_status" style="font-size:13px;color:#ffd166;font-weight:800;padding:0 6px">1 / ' + slides.length + '</span><button id="__pres_next">Next ▶</button><button id="__pres_voice">🎤 Voice</button><button id="__pres_fs">⛶ Fullscreen</button><button id="__pres_exit" style="background:#be123c;border-color:#fb7185">✕ Exit</button>';
+
+    if (singleSlideOnly) {
+      // Single Current Slide Preview Mode
+      controls.innerHTML = '<span id="__pres_status" style="font-size:13px;color:#ffd166;font-weight:800;padding:0 6px">🎬 Running Slide Preview (Slide ' + ((current || 0) + 1) + ')</span><button id="__pres_replay" style="background:#0284c7;border-color:#38bdf8">↺ Replay Slide</button><button id="__pres_fs">⛶ Fullscreen</button><button id="__pres_exit" style="background:#be123c;border-color:#fb7185">✕ Exit Preview</button>';
+    } else {
+      // Full Multi-Slide Slideshow Mode
+      controls.innerHTML = '<button id="__pres_prev">◀ Prev</button><span id="__pres_status" style="font-size:13px;color:#ffd166;font-weight:800;padding:0 6px">1 / ' + slides.length + '</span><button id="__pres_next">Next ▶</button><button id="__pres_voice">🎤 Voice</button><button id="__pres_fs">⛶ Fullscreen</button><button id="__pres_exit" style="background:#be123c;border-color:#fb7185">✕ Exit</button>';
+    }
 
     overlay.appendChild(stageContainer);
     overlay.appendChild(controls);
@@ -340,11 +357,11 @@
     recalcScale();
     window.addEventListener('resize', recalcScale);
 
-    let idx = current || 0, autoTimer = null, recognition = null;
+    let idx = singleSlideOnly ? (current || 0) : 0, autoTimer = null, recognition = null;
 
-    // High-speed on-demand slide builder (builds ONLY current slide instantly)
+    // High-speed on-demand slide builder
     function renderPresenterSlide(i) {
-      idx = ((i % slides.length) + slides.length) % slides.length;
+      idx = singleSlideOnly ? (current || 0) : (((i % slides.length) + slides.length) % slides.length);
       const sl = slides[idx];
       stage.replaceChildren();
 
@@ -503,7 +520,7 @@
 
         contentLayer.appendChild(node);
 
-        // Apply element animation
+        // Apply element animation with infinite loop support
         if (el.animation && frames[el.animation]) {
           node.animate(frames[el.animation], {
             duration: Math.max(0.1, Number(el.animationDuration) || 0.6) * 1000,
@@ -515,16 +532,25 @@
         }
       });
 
-      $('__pres_status').textContent = (idx + 1) + ' / ' + slides.length;
-
-      clearTimeout(autoTimer);
-      if (Number(sl.autoDuration) > 0)
-        autoTimer = setTimeout(() => advance(1), Number(sl.autoDuration) * 1000);
+      if (!singleSlideOnly) {
+        $('__pres_status').textContent = (idx + 1) + ' / ' + slides.length;
+        clearTimeout(autoTimer);
+        if (Number(sl.autoDuration) > 0)
+          autoTimer = setTimeout(() => advance(1), Number(sl.autoDuration) * 1000);
+      }
     }
 
-    function advance(step) { renderPresenterSlide(idx + step); }
+    function advance(step) {
+      if (singleSlideOnly) return;
+      renderPresenterSlide(idx + step);
+    }
 
     function onKey(e) {
+      if (singleSlideOnly) {
+        if (e.key === 'Escape') closePlayer();
+        if (e.key === 'r' || e.key === 'R') renderPresenterSlide(idx);
+        return;
+      }
       if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown' || e.key === 'Enter') { e.preventDefault(); advance(1); }
       else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); advance(-1); }
       else if (e.key === 'Home') { renderPresenterSlide(0); }
@@ -535,11 +561,17 @@
 
     overlay.addEventListener('click', e => {
       if (e.target.closest('#__pres_controls')) return;
-      advance(1);
+      if (!singleSlideOnly) advance(1);
     });
 
-    $('__pres_prev').onclick = e => { e.stopPropagation(); advance(-1); };
-    $('__pres_next').onclick = e => { e.stopPropagation(); advance(1); };
+    if (singleSlideOnly) {
+      const rep = $('__pres_replay');
+      if (rep) rep.onclick = e => { e.stopPropagation(); renderPresenterSlide(idx); };
+    } else {
+      $('__pres_prev').onclick = e => { e.stopPropagation(); advance(-1); };
+      $('__pres_next').onclick = e => { e.stopPropagation(); advance(1); };
+    }
+
     $('__pres_exit').onclick = e => { e.stopPropagation(); closePlayer(); };
     $('__pres_fs').onclick = e => {
       e.stopPropagation();
@@ -570,7 +602,9 @@
       recognition.start();
       $('__pres_voice')?.classList.add('voice-on');
     }
-    $('__pres_voice').onclick = e => { e.stopPropagation(); recognition ? stopVoice() : startVoice(); };
+    if ($('__pres_voice')) {
+      $('__pres_voice').onclick = e => { e.stopPropagation(); recognition ? stopVoice() : startVoice(); };
+    }
 
     function closePlayer() {
       clearTimeout(autoTimer); stopVoice();
@@ -592,14 +626,14 @@
     if (pBtn) {
       pBtn.onclick = e => {
         if (e) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); }
-        openPresenter();
+        openPresenter(false); // Full slideshow from slide 1
       };
     }
-    const prevBtn = $('previewSlideBtn');
+    const prevBtn = $('previewSlideBtn') || $('presenterView');
     if (prevBtn) {
       prevBtn.onclick = e => {
         if (e) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); }
-        openPresenter();
+        openPresenter(true); // Preview ONLY the currently active running slide
       };
     }
   }

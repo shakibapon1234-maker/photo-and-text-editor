@@ -2,12 +2,57 @@
   const $ = id => document.getElementById(id);
   const panel = $('animationInspector');
   if (!panel) return;
-  panel.insertAdjacentHTML('beforeend', '<label id="animationLoopRow" class="field" style="display:flex;align-items:center;gap:8px"><input id="animationLoop" type="checkbox" style="width:auto;margin:0">Loop animation continuously</label><p class="hint" id="animationLoopHint">Best for Float, Spin, 3D Spin, Pulse, Bounce, Swing, Jello, and Shake.</p>');
-  const loop = $('animationLoop'), row = $('animationLoopRow');
-  const emphasis = new Set(['pulse','bounce','spin','spin3d','swing','float','jello','shake']);
-  function sync() { const e = selectedEl(); if (!e) return; loop.checked = !!e.animationLoop; const canLoop = emphasis.has(e.animation || ''); row.classList.toggle('hidden', !e || e.animation === 'none'); loop.disabled = !canLoop; $('animationLoopHint').textContent = canLoop ? 'Loop repeats this motion until the slide changes.' : 'Loop is available for motion effects such as Float, Spin, 3D Spin, Pulse, Bounce, Swing, Jello, and Shake.'; }
-  loop.addEventListener('change', () => { const e = selectedEl(); if (!e || !emphasis.has(e.animation)) { loop.checked = false; return; } e.animationLoop = loop.checked; });
-  $('elementAnimation').addEventListener('change', () => { const e = selectedEl(); if (e && !emphasis.has(e.animation)) e.animationLoop = false; setTimeout(sync, 0); });
-  const before = renderInspector; renderInspector = function(){ before(); sync(); };
-  renderInspector();
+
+  let loopRow = $('animationLoopRow');
+  if (!loopRow) {
+    panel.insertAdjacentHTML('beforeend', '<label id="animationLoopRow" class="field" style="display:flex;align-items:center;gap:8px;margin-top:8px;cursor:pointer"><input id="animationLoop" type="checkbox" style="width:16px;height:16px;margin:0;cursor:pointer"><strong style="color:#ffd166">Loop animation continuously</strong></label><p class="hint" id="animationLoopHint">Repeats this motion continuously without stopping.</p>');
+    loopRow = $('animationLoopRow');
+  }
+
+  const loop = $('animationLoop');
+
+  function sync() {
+    const e = typeof selectedEl === 'function' ? selectedEl() : null;
+    if (!e) {
+      if (loopRow) loopRow.classList.add('hidden');
+      return;
+    }
+    const hasAnim = e.animation && e.animation !== 'none';
+    if (loopRow) loopRow.classList.toggle('hidden', !hasAnim);
+    if (loop) {
+      loop.disabled = !hasAnim;
+      loop.checked = !!e.animationLoop;
+    }
+    const hint = $('animationLoopHint');
+    if (hint) {
+      hint.textContent = hasAnim ? 'Repeats this motion continuously without stopping.' : 'Select an animation first to enable continuous looping.';
+    }
+  }
+
+  if (loop) {
+    loop.onchange = () => {
+      const e = typeof selectedEl === 'function' ? selectedEl() : null;
+      if (!e) return;
+      e.animationLoop = loop.checked;
+      if (typeof window.previewLiveAnimation === 'function' && e.animation && e.animation !== 'none') {
+        window.previewLiveAnimation(e);
+      }
+      window.dispatchEvent(new CustomEvent('presentation:change'));
+    };
+  }
+
+  const animSelect = $('elementAnimation');
+  if (animSelect) {
+    animSelect.addEventListener('change', () => {
+      setTimeout(sync, 0);
+    });
+  }
+
+  const before = renderInspector;
+  renderInspector = function() {
+    if (typeof before === 'function') before();
+    sync();
+  };
+
+  sync();
 })();
