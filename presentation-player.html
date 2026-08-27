@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Presentation Player — Projector & Display</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #060913; color: #fff;
+      font-family: 'Outfit', 'Inter', Arial, 'Noto Sans Bengali', system-ui, sans-serif;
+      overflow: hidden; user-select: none;
+    }
+
+    /* ── Dropzone / Start Screen ────────────────────────────────────────── */
+    #dropzone {
+      position: fixed; inset: 0; z-index: 1000;
+      background: radial-gradient(circle at center, #152238 0%, #080d1a 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 24px; text-align: center;
+    }
+    #dropzone.hidden { display: none; }
+    .drop-card {
+      max-width: 520px; width: 100%; padding: 36px 28px;
+      background: rgba(23, 35, 60, 0.75);
+      border: 2px dashed #4f8df7; border-radius: 18px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+      backdrop-filter: blur(14px);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .drop-card.drag-over { transform: scale(1.02); border-color: #ffd166; background: rgba(35, 55, 90, 0.85); }
+    .drop-icon { font-size: 48px; margin-bottom: 12px; }
+    .drop-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; color: #fff; }
+    .drop-desc { font-size: 14px; color: #9bb0d3; line-height: 1.5; margin-bottom: 22px; }
+    .btn-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px; font-size: 14px; font-weight: 700;
+      border-radius: 8px; border: 1px solid #4f8df7;
+      background: #1769e8; color: #fff; cursor: pointer;
+      transition: all 0.15s ease; text-decoration: none;
+    }
+    .btn:hover { background: #1b74ff; transform: translateY(-1px); box-shadow: 0 6px 18px rgba(23, 105, 232, 0.4); }
+    .btn-secondary { background: #22334d; border-color: #6079a3; }
+    .btn-secondary:hover { background: #2c4263; border-color: #8da6d0; }
+    input[type="file"] { display: none; }
+
+    /* ── Viewport Stage (16:9 scaled) ─────────────────────────────────── */
+    #stageContainer {
+      position: fixed; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: #000;
+    }
+    #stage {
+      position: relative;
+      width: 960px; height: 540px;
+      transform-origin: center center;
+      transform: scale(var(--pres-scale, 1));
+      background: #17233c; overflow: hidden;
+      box-shadow: 0 0 40px rgba(0,0,0,0.8);
+    }
+
+    /* ── Background Media & B-Roll ────────────────────────────────────── */
+    .bg-media {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; z-index: 0; pointer-events: none;
+      transform: translateZ(0);
+    }
+    .bg-overlay {
+      position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    }
+    #brollLayer {
+      position: absolute; inset: 0; z-index: 0;
+      overflow: hidden; pointer-events: none; transform: translateZ(0);
+    }
+    #brollLayer:before, #brollLayer:after {
+      content: ""; position: absolute; inset: -10%;
+      background-repeat: no-repeat; will-change: transform; transform: translate3d(0,0,0);
+    }
+    #brollLayer.space { background: radial-gradient(circle at 72% 20%,#ffe18a 0 2%,transparent 5%), radial-gradient(circle at 19% 88%,#5933a0 0 10%,transparent 24%), #020617; }
+    #brollLayer.space:before { background-image: radial-gradient(#fff 0 1px, transparent 2px); background-size: 55px 48px; animation: broll_bd 18s linear infinite; }
+    #brollLayer.space:after { background: radial-gradient(ellipse, transparent 0 42%, #8168ff77 44%, transparent 48%); animation: broll_bs 22s linear infinite; }
+    #brollLayer.aurora { background: #051531; }
+    #brollLayer.aurora:before { background: radial-gradient(ellipse at 23% 84%, #1dffc099 0 18%, transparent 52%), radial-gradient(ellipse at 65% 38%, #49a9ffb8 0 20%, transparent 55%), radial-gradient(ellipse at 94% 66%, #c85eff99 0 18%, transparent 51%); filter: blur(16px); animation: broll_ba 10s ease-in-out infinite alternate; }
+    #brollLayer.sky { background: linear-gradient(165deg, #0762a3, #79cdf3 48%, #d9f4ff); }
+    #brollLayer.sky:before { background: radial-gradient(ellipse at 15% 35%, #fff 0 9%, transparent 25%), radial-gradient(ellipse at 52% 62%, #ffffffdd 0 11%, transparent 28%), radial-gradient(ellipse at 90% 20%, #fff 0 9%, transparent 27%); filter: blur(6px); animation: broll_bc 14s linear infinite; }
+    #brollLayer.sky:after { inset: auto 20% 38% auto; width: 36px; height: 12px; background: #fff; clip-path: polygon(0 45%,60% 43%,90% 0,100% 0,75% 47%,100% 75%,100% 90%,60% 59%,0 59%); animation: broll_bp 9s linear infinite; }
+    #brollLayer.night { background: linear-gradient(155deg, #030914, #0d2145 58%, #291529); }
+    #brollLayer.night:before { inset: auto -5% 0; height: 45%; background: repeating-linear-gradient(90deg, #07111e 0 30px, #26384d 31px 55px, #07111e 56px 76px); clip-path: polygon(0 32%,8% 17%,16% 37%,23% 5%,32% 25%,41% 12%,49% 35%,60% 4%,70% 30%,79% 10%,89% 32%,100% 13%,100% 100%,0 100%); animation: broll_bn 8s linear infinite; }
+    #brollLayer.night:after { background-image: radial-gradient(#ffe075 0 1px, transparent 2px), radial-gradient(#fff 0 1px, transparent 2px); background-size: 37px 31px, 91px 73px; animation: broll_bd 13s linear infinite reverse; }
+    #brollLayer.sunset { background: linear-gradient(175deg, #642160, #ec6e69 45%, #ffbf62 72%, #72587f); }
+    #brollLayer.sunset:before { background: radial-gradient(ellipse at 13% 70%, #ffc76c 0 8%, transparent 25%), radial-gradient(ellipse at 51% 73%, #ffdb9b 0 5%, transparent 18%), radial-gradient(ellipse at 85% 53%, #ffb08b 0 9%, transparent 26%); filter: blur(10px); animation: broll_bc 17s linear infinite reverse; }
+    #brollLayer.water { background: linear-gradient(#084f71, #078fba 45%, #015278); }
+    #brollLayer.water:before { background: repeating-radial-gradient(ellipse at 48% 108%, #b9f8ff77 0 1px, transparent 2px 15px); transform-origin: 50% 100%; animation: broll_bw 5s ease-in-out infinite alternate; }
+    #brollLayer.water:after { background: linear-gradient(110deg, transparent 35%, #d9ffff66 46%, transparent 55%); animation: broll_bh 5s linear infinite; }
+    #brollLayer.speed-slow:before, #brollLayer.speed-slow:after { animation-duration: 18s !important; }
+    #brollLayer.speed-fast:before, #brollLayer.speed-fast:after { animation-duration: 5s !important; }
+    @keyframes broll_bd { to { transform: translate3d(-9%, -6%, 0); } }
+    @keyframes broll_bs { to { transform: rotate(360deg); } }
+    @keyframes broll_ba { to { transform: translate3d(8%, 0, 0) scale(1.12); opacity: 0.78; } }
+    @keyframes broll_bc { to { transform: translate3d(14%, 0, 0); } }
+    @keyframes broll_bp { from { transform: translate3d(-70vw, 35vh, 0) scale(0.7); } to { transform: translate3d(55vw, -25vh, 0) scale(1.15); } }
+    @keyframes broll_bn { to { transform: translate3d(-7%, 0, 0); } }
+    @keyframes broll_bh { from { transform: translate3d(-80%, 0, 0); } to { transform: translate3d(80%, 0, 0); } }
+    @keyframes broll_bw { to { transform: scale(1.2, 1.08) translate3d(0, -3%, 0); } }
+
+    /* ── Content Elements ───────────────────────────────────────────────── */
+    .content-layer { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+    .element {
+      position: absolute;
+      line-height: 1.2;
+      box-sizing: border-box;
+      animation-fill-mode: both;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: break-word;
+      transform-origin: center center;
+    }
+    .element.image-el { overflow: hidden; background: transparent; }
+    .element.image-el img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .element.image-el.fit-cover img { object-fit: cover; }
+    .element.video-el { overflow: hidden; background: transparent; }
+    .element.video-el video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .element.video-el.key-black video { mix-blend-mode: screen; }
+    .element.video-el.key-light video { mix-blend-mode: multiply; }
+    .element.shape-el { background: transparent !important; overflow: visible !important; }
+    .element.shape-el .shape-body { position: absolute; inset: 0; pointer-events: none; }
+    .element.shape-el .shape-label {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      text-align: center; overflow: hidden; word-break: break-word;
+      overflow-wrap: break-word;
+      line-height: 1.25; z-index: 2;
+      padding: 10px 14px; box-sizing: border-box;
+    }
+    .element.table-el { background: #fff; color: #17223a; overflow: hidden; }
+    .element.table-el table { border-collapse: collapse; width: 100%; height: 100%; table-layout: fixed; }
+    .element.table-el td { border: 1px solid #98a6bd; padding: 4px; font-size: inherit; vertical-align: middle; word-break: break-word; }
+    .element.table-el tr:first-child td { background: #4f8df7; color: #fff; font-weight: 700; }
+
+    /* ── Floating Controls Bar ────────────────────────────────────────── */
+    #controls {
+      position: fixed; z-index: 200;
+      bottom: 20px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 16px; border-radius: 40px;
+      background: rgba(10, 16, 30, 0.85);
+      border: 1px solid rgba(80, 120, 180, 0.35);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(14px);
+      opacity: 0; transition: opacity 0.3s ease;
+    }
+    body:hover #controls, #controls:hover { opacity: 1; }
+    .ctrl-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 38px; height: 38px; border-radius: 50%;
+      background: #1c2b42; border: 1px solid #4a6288;
+      color: #fff; font-size: 16px; cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .ctrl-btn:hover { background: #2d456b; border-color: #79abff; transform: scale(1.08); }
+    .ctrl-btn.voice-on { background: #a85008; border-color: #ffb11b; }
+    .ctrl-info { font-size: 13px; color: #c4d7f5; font-weight: 700; padding: 0 6px; white-space: nowrap; }
+
+    /* ── Slide Quick Navigator Drawer ─────────────────────────────────── */
+    #navDrawer {
+      position: fixed; z-index: 300;
+      top: 0; bottom: 0; right: -320px; width: 300px;
+      background: rgba(12, 18, 34, 0.95);
+      border-left: 1px solid #2d4063;
+      box-shadow: -10px 0 40px rgba(0,0,0,0.8);
+      backdrop-filter: blur(16px);
+      transition: right 0.25s ease;
+      display: flex; flex-direction: column; padding: 16px;
+    }
+    #navDrawer.open { right: 0; }
+    .drawer-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .drawer-title { font-size: 14px; font-weight: 700; color: #ffd166; letter-spacing: 0.5px; }
+    .drawer-close { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; }
+    .thumb-grid { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+    .thumb-item {
+      display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+      background: #17243c; border: 1px solid #2d4063; border-radius: 8px;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .thumb-item:hover { background: #23375a; border-color: #4f8df7; }
+    .thumb-item.active { border-color: #ffd166; background: #243a60; }
+    .thumb-num { font-weight: 700; font-size: 14px; color: #79abff; }
+    .thumb-label { font-size: 12px; color: #cbd9f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  </style>
+</head>
+<body>
+
+  <div id="dropzone">
+    <div class="drop-card" id="dropCard">
+      <div class="drop-icon">📽️</div>
+      <h1 class="drop-title">Presentation Player</h1>
+      <p class="drop-desc">
+        Presentation Studio থেকে Export করা <strong>.json</strong> ফাইলটি এখানে Drop করুন অথবা নিচের বাটনে ক্লিক করে ফাইলটি ওপেন করুন।
+      </p>
+      <div class="btn-row">
+        <label class="btn">
+          📁 Load Presentation (.json)
+          <input type="file" id="fileInput" accept=".json,application/json">
+        </label>
+        <button class="btn btn-secondary" id="demoBtn">▶ Demo Slide</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="stageContainer">
+    <div id="stage"></div>
+  </div>
+
+  <div id="controls">
+    <button class="ctrl-btn" id="prevBtn" title="Previous Slide (←)">◀</button>
+    <span class="ctrl-info" id="slideInfo">1 / 1</span>
+    <button class="ctrl-btn" id="nextBtn" title="Next Slide (→ / Space)">▶</button>
+    <button class="ctrl-btn" id="voiceBtn" title="Voice Control (Bengali / English)">🎤</button>
+    <button class="ctrl-btn" id="fsBtn" title="Fullscreen (F / F11)">⛶</button>
+    <button class="ctrl-btn" id="listBtn" title="Slide List (L)">☰</button>
+    <button class="ctrl-btn" id="loadNewBtn" title="Load another project">📁</button>
+  </div>
+
+  <div id="navDrawer">
+    <div class="drawer-head">
+      <span class="drawer-title">SLIDE LIST</span>
+      <button class="drawer-close" id="closeDrawer">✕</button>
+    </div>
+    <div class="thumb-grid" id="thumbGrid"></div>
+  </div>
+
+  <script>
+    function getShapeSvg(shape) {
+      const s = shape || 'rect';
+      switch(s) {
+        case 'line':
+          return '<svg viewBox="0 0 100 20" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><line x1="0" y1="10" x2="100" y2="10" stroke="var(--sf, #4f8df7)" stroke-width="var(--sl, 4px)" stroke-linecap="round" /></svg>';
+        case 'arrowLineRight':
+          return '<svg viewBox="0 0 100 20" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><line x1="0" y1="10" x2="86" y2="10" stroke="var(--sf, #4f8df7)" stroke-width="var(--sl, 4px)" stroke-linecap="round" /><polygon points="84,2 100,10 84,18" fill="var(--sf, #4f8df7)" /></svg>';
+        case 'arrowLineLeft':
+          return '<svg viewBox="0 0 100 20" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><line x1="14" y1="10" x2="100" y2="10" stroke="var(--sf, #4f8df7)" stroke-width="var(--sl, 4px)" stroke-linecap="round" /><polygon points="16,2 0,10 16,18" fill="var(--sf, #4f8df7)" /></svg>';
+        case 'doubleArrowLine':
+          return '<svg viewBox="0 0 100 20" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><line x1="14" y1="10" x2="86" y2="10" stroke="var(--sf, #4f8df7)" stroke-width="var(--sl, 4px)" /><polygon points="16,2 0,10 16,18" fill="var(--sf, #4f8df7)" /><polygon points="84,2 100,10 84,18" fill="var(--sf, #4f8df7)" /></svg>';
+        case 'arrowRight':
+          return '<svg viewBox="0 0 100 50" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="0,15 62,15 62,0 100,25 62,50 62,35 0,35" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'arrowLeft':
+          return '<svg viewBox="0 0 100 50" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="38,0 38,15 100,15 100,35 38,35 38,50 0,25" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'arrowUp':
+          return '<svg viewBox="0 0 50 100" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="25,0 50,38 35,38 35,100 15,100 15,38 0,38" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'arrowDown':
+          return '<svg viewBox="0 0 50 100" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="15,0 35,0 35,62 50,62 25,100 0,62 15,62" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'chevron':
+          return '<svg viewBox="0 0 100 50" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="0,0 70,0 100,25 70,50 0,50 30,25" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'round':
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><rect x="2" y="2" width="96" height="56" rx="14" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" /></svg>';
+        case 'oval':
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><ellipse cx="50" cy="30" rx="48" ry="28" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" /></svg>';
+        case 'diamond':
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="50,2 98,30 50,58 2,30" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'triangle':
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="50,2 98,58 2,58" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'rightTriangle':
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="2,2 98,58 2,58" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'parallelogram':
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="20,2 98,2 80,58 2,58" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'trapezoid':
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="20,2 80,2 98,58 2,58" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'pentagon':
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="50,2 98,22 80,58 20,58 2,22" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'hexagon':
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="25,2 75,2 98,30 75,58 25,58 2,30" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'star5':
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="50,2 61,22 84,22 65,36 72,58 50,44 28,58 35,36 16,22 39,22" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'star4':
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="50,2 62,22 98,30 62,38 50,58 38,38 2,30 38,22" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'heart':
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><path d="M50 55 C20 40, 2 25, 2 14 C2 5, 14 2, 24 2 C35 2, 45 10, 50 16 C55 10, 65 2, 76 2 C86 2, 98 5, 98 14 C98 25, 80 40, 50 55 Z" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'cloud':
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><path d="M20 48 A14 14 0 0 1 12 28 A16 16 0 0 1 35 14 A22 22 0 0 1 70 12 A18 18 0 0 1 88 28 A14 14 0 0 1 80 48 Z" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'callout':
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="2,2 98,2 98,42 45,42 30,58 35,42 2,42" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>';
+        case 'thought':
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><ellipse cx="50" cy="26" rx="46" ry="22" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" /><circle cx="22" cy="52" r="4" fill="var(--sf, #4f8df7)" /><circle cx="14" cy="58" r="2.5" fill="var(--sf, #4f8df7)" /></svg>';
+        case 'cube3d':
+          return '<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="50,15 85,32 50,50 15,32" fill="var(--sf, #4f8df7)" opacity="0.9"/><polygon points="15,32 50,50 50,85 15,68" fill="var(--sf, #4f8df7)" opacity="0.75"/><polygon points="50,50 85,32 85,68 50,85" fill="var(--sf, #4f8df7)" opacity="0.6"/></svg>';
+        case 'sphere3d':
+          return '<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><defs><radialGradient id="presSphere" cx="35%" cy="30%"><stop offset="0%" stop-color="#fff" stop-opacity="0.9"/><stop offset="40%" stop-color="var(--sf, #4f8df7)"/><stop offset="100%" stop-color="#000" stop-opacity="0.7"/></radialGradient></defs><circle cx="50" cy="50" r="44" fill="url(#presSphere)"/></svg>';
+        default:
+          return '<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><rect x="2" y="2" width="96" height="56" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" /></svg>';
+      }
+    }
+
+    const animFrames = {
+      fade:[{opacity:0},{opacity:1}], appear:[{opacity:0},{opacity:1}],
+      slideLeft:[{opacity:0,transform:'translateX(-90px)'},{opacity:1,transform:'none'}],
+      slideRight:[{opacity:0,transform:'translateX(90px)'},{opacity:1,transform:'none'}],
+      slideUp:[{opacity:0,transform:'translateY(70px)'},{opacity:1,transform:'none'}],
+      slideDown:[{opacity:0,transform:'translateY(-70px)'},{opacity:1,transform:'none'}],
+      zoom:[{opacity:0,transform:'scale(.2)'},{opacity:1,transform:'scale(1)'}],
+      pop:[{opacity:0,transform:'scale(.2)'},{opacity:1,transform:'scale(1.15)',offset:.7},{opacity:1,transform:'scale(1)'}],
+      flipX:[{opacity:0,transform:'perspective(400px) rotateX(90deg)'},{opacity:1,transform:'perspective(400px) rotateX(0)'}],
+      flipY:[{opacity:0,transform:'perspective(400px) rotateY(90deg)'},{opacity:1,transform:'perspective(400px) rotateY(0)'}],
+      wipeLeft:[{opacity:0,clipPath:'inset(0 100% 0 0)'},{opacity:1,clipPath:'inset(0 0 0 0)'}],
+      pulse:[{transform:'scale(1)'},{transform:'scale(1.12)'},{transform:'scale(1)'}],
+      bounce:[{transform:'translateY(0)'},{transform:'translateY(-28px)'},{transform:'translateY(0)'}],
+      spin:[{transform:'rotate(0)'},{transform:'rotate(360deg)'}],
+      spin3d:[{transform:'perspective(700px) rotateY(0deg)'},{transform:'perspective(700px) rotateY(360deg)'}],
+      swing:[{transform:'rotate(0)'},{transform:'rotate(15deg)'},{transform:'rotate(-10deg)'},{transform:'rotate(0)'}],
+      float:[{transform:'translateY(0)'},{transform:'translateY(-20px)'},{transform:'translateY(0)'}],
+      jello:[{transform:'skew(0)'},{transform:'skew(-12deg,-12deg)'},{transform:'skew(7deg,7deg)'},{transform:'skew(0)'}],
+      shake:[{transform:'translateX(0)'},{transform:'translateX(-18px)'},{transform:'translateX(18px)'},{transform:'translateX(0)'}],
+      fadeOut:[{opacity:1},{opacity:0}],
+      zoomOut:[{opacity:1,transform:'scale(1)'},{opacity:0,transform:'scale(.2)'}],
+      slideOutRight:[{opacity:1,transform:'none'},{opacity:0,transform:'translateX(120px)'}]
+    };
+
+    const themes = {
+      fashion: 'linear-gradient(135deg, #170b32, #192d58)',
+      luxury: 'linear-gradient(135deg, #1d1307, #76500a)',
+      ocean: 'linear-gradient(135deg, #06203d, #0c5d86)',
+      royal: 'linear-gradient(135deg, #2b1055, #7597de)',
+      blush: 'linear-gradient(135deg, #5e1938, #f06292)',
+      emerald: 'linear-gradient(135deg, #063b36, #16a085)',
+      sunset: 'linear-gradient(135deg, #5b1a13, #f59e0b)',
+      clean: '#f8fafc'
+    };
+
+    let slides = [];
+    let currentIndex = 0;
+    let autoTimer = null;
+    let recognition = null;
+
+    function buildElement(el) {
+      const node = document.createElement('div');
+      const rot = Number(el.rotation) || 0;
+
+      if (el.type === 'shape') {
+        node.className = 'element shape-el' + (el.shape ? ' shape-' + el.shape : '');
+        const fillVal = el.fill || el.fillColor || el.bgColor || el.color || '#4f8df7';
+        const strokeVal = el.stroke || el.borderColor || el.lineColor || '#ffffff';
+        const lineVal = el.line !== undefined ? Number(el.line) : (el.borderWidth !== undefined ? Number(el.borderWidth) : 2);
+        let opVal = 1;
+        if (el.opacity !== undefined) {
+          const num = Number(el.opacity);
+          opVal = num <= 1 ? num : num / 100;
+        }
+        node.style.cssText = 'left:' + el.x + '%;top:' + el.y + '%;width:' + el.w + '%;height:' + el.h + '%;transform:rotate(' + rot + 'deg);transform-origin:center center;';
+
+        const body = document.createElement('div');
+        body.className = 'shape-body';
+        body.style.opacity = opVal;
+
+        let svg = getShapeSvg(el.shape);
+        svg = svg.replace(/var\(--sf[^)]*\)/g, fillVal)
+                 .replace(/var\(--ss[^)]*\)/g, strokeVal)
+                 .replace(/var\(--sl[^)]*\)/g, lineVal + 'px');
+        body.innerHTML = svg;
+        node.appendChild(body);
+
+        if (el.text) {
+          const label = document.createElement('div');
+          label.className = 'shape-label';
+          const txtColor = el.textColor || el.color || '#ffffff';
+          const txtSize = Number(el.textSize || el.size || 18);
+          const txtWeight = el.textWeight || el.weight || '700';
+          label.style.color = txtColor;
+          label.style.fontSize = txtSize + 'px';
+          label.style.fontWeight = (txtWeight === '900' || txtWeight === 'bold') ? '900' : '700';
+          label.style.fontFamily = el.fontFamily || 'Inter, Arial, "Noto Sans Bengali", sans-serif';
+          label.style.textAlign = el.textAlign || 'center';
+          label.style.lineHeight = el.lineSpacing || el.lineHeight || '1.25';
+          label.style.justifyContent = el.textAlign === 'left' ? 'flex-start' : el.textAlign === 'right' ? 'flex-end' : 'center';
+          label.style.wordBreak = 'break-word';
+          label.style.overflowWrap = 'break-word';
+          label.style.whiteSpace = 'pre-wrap';
+          label.style.padding = '8px 12px';
+          label.style.boxSizing = 'border-box';
+          label.textContent = el.text;
+          node.appendChild(label);
+        }
+
+      } else if (el.type === 'image') {
+        node.className = 'element image-el' + ((el.fit || 'contain') === 'cover' ? ' fit-cover' : '');
+        node.style.cssText = 'left:' + el.x + '%;top:' + el.y + '%;width:' + el.w + '%;height:' + el.h + '%;transform:rotate(' + rot + 'deg);transform-origin:center center;';
+        const img = new Image();
+        img.src = el.src;
+        img.draggable = false;
+        node.appendChild(img);
+
+      } else if (el.type === 'video') {
+        node.className = 'element video-el key-' + (el.transparency || 'none');
+        node.style.cssText = 'left:' + el.x + '%;top:' + el.y + '%;width:' + el.w + '%;height:' + el.h + '%;transform:rotate(' + rot + 'deg);transform-origin:center center;';
+        const vid = document.createElement('video');
+        vid.src = el.src; vid.autoplay = true; vid.loop = true; vid.muted = true; vid.playsInline = true;
+        vid.play().catch(() => {});
+        node.appendChild(vid);
+
+      } else if (el.type === 'table') {
+        node.className = 'element table-el';
+        node.style.cssText = 'left:' + el.x + '%;top:' + el.y + '%;width:' + el.w + '%;height:' + el.h + '%;transform:rotate(' + rot + 'deg);transform-origin:center center;font-size:' + (el.textSize || 14) + 'px;';
+        const table = document.createElement('table');
+        (el.data || []).forEach(row => {
+          const tr = document.createElement('tr');
+          row.forEach(cell => {
+            const td = document.createElement('td');
+            td.textContent = cell;
+            tr.appendChild(td);
+          });
+          table.appendChild(tr);
+        });
+        node.appendChild(table);
+
+      } else {
+        node.className = 'element text-el';
+        const textAlign = el.textAlign || 'center';
+        const lineH = el.lineSpacing || el.lineHeight || '1.2';
+        const fontW = el.weight || el.textWeight || '700';
+        const fontFam = el.fontFamily || 'Inter, Arial, "Noto Sans Bengali", sans-serif';
+        const fontSty = el.fontStyle || 'normal';
+        const textDec = el.textDecoration || 'none';
+        const pad = (el.padding !== undefined ? el.padding : 6) + 'px';
+        const txtColor = el.color || el.textColor || '#ffffff';
+        const txtSize = Number(el.size || el.textSize || 38);
+
+        let css = 'left:' + el.x + '%;top:' + el.y + '%;width:' + el.w + '%;height:' + el.h + '%;'
+          + 'font-size:' + txtSize + 'px;'
+          + 'font-weight:' + fontW + ';'
+          + 'font-style:' + fontSty + ';'
+          + 'text-decoration:' + textDec + ';'
+          + 'font-family:' + fontFam + ';'
+          + 'text-align:' + textAlign + ';'
+          + 'line-height:' + lineH + ';'
+          + 'padding:' + pad + ';'
+          + 'transform:rotate(' + rot + 'deg);transform-origin:center center;'
+          + 'white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;box-sizing:border-box;';
+
+        if (el.textGradient) {
+          css += 'background:linear-gradient(' + (el.textGradientAngle ?? 90) + 'deg, ' + txtColor + ', ' + (el.textGradientTo || '#4f8df7') + ');'
+               + '-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;';
+        } else {
+          css += 'color:' + txtColor + ';';
+        }
+
+        const boxBgColor = el.boxBg || el.backgroundColor || el.bgColor || (el.background && el.background.startsWith('#') ? el.background : null);
+        let boxOp = 1;
+        if (el.boxOpacity !== undefined) {
+          const num = Number(el.boxOpacity);
+          boxOp = num <= 1 ? num : num / 100;
+        }
+        if (boxBgColor && boxBgColor !== 'transparent' && boxOp > 0) {
+          if (boxBgColor.startsWith('#') && boxOp < 1) {
+            const hex = boxBgColor.replace('#', '');
+            const r = parseInt(hex.substring(0, 2), 16) || 0,
+                  g = parseInt(hex.substring(2, 4), 16) || 0,
+                  b = parseInt(hex.substring(4, 6), 16) || 0;
+            css += 'background-color:rgba(' + r + ',' + g + ',' + b + ',' + boxOp + ');border-radius:6px;';
+          } else {
+            css += 'background-color:' + boxBgColor + ';border-radius:6px;';
+          }
+          css += 'display:flex;align-items:center;justify-content:' + (textAlign === 'left' ? 'flex-start' : textAlign === 'right' ? 'flex-end' : 'center') + ';';
+        }
+
+        node.style.cssText = css;
+        node.textContent = el.text || '';
+      }
+
+      return node;
+    }
+
+    function drawSlide() {
+      const stage = document.getElementById('stage');
+      if (!slides.length || !stage) return;
+      const slide = slides[currentIndex];
+      stage.replaceChildren();
+
+      if (slide.background === 'custom') {
+        stage.style.background = slide.bgColor || '#17233c';
+        stage.style.backgroundImage = '';
+      } else if (slide.background === 'image' && slide.bgImage) {
+        stage.style.backgroundImage = 'linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url("' + slide.bgImage + '")';
+        stage.style.backgroundSize = 'cover';
+        stage.style.backgroundPosition = 'center';
+      } else {
+        stage.style.background = themes[slide.background] || '#17233c';
+        stage.style.backgroundImage = '';
+      }
+
+      if (slide.brollPreset && slide.brollPreset !== 'none') {
+        const broll = document.createElement('div');
+        broll.id = 'brollLayer';
+        broll.className = slide.brollPreset + ' speed-' + (slide.brollSpeed || 'normal');
+        stage.appendChild(broll);
+      }
+
+      if (slide.bgMedia) {
+        const mediaEl = document.createElement(slide.bgMediaType === 'video' ? 'video' : 'img');
+        mediaEl.className = 'bg-media';
+        mediaEl.src = slide.bgMedia;
+        if (mediaEl.tagName === 'VIDEO') {
+          mediaEl.autoplay = true; mediaEl.loop = true; mediaEl.muted = true; mediaEl.playsInline = true;
+          mediaEl.playbackRate = Number(slide.bgPlaybackRate || 1);
+          mediaEl.addEventListener('canplay', () => mediaEl.play().catch(() => {}), { once: true });
+          mediaEl.play().catch(() => {});
+        }
+        mediaEl.style.opacity = (slide.bgMediaOpacity !== undefined ? slide.bgMediaOpacity : 100) / 100;
+        if (slide.bgMediaBlur) mediaEl.style.filter = 'blur(' + slide.bgMediaBlur + 'px) scale(1.04)';
+        stage.appendChild(mediaEl);
+
+        if (slide.bgOverlayOpacity) {
+          const ov = document.createElement('div');
+          ov.className = 'bg-overlay';
+          const hex = Math.round((slide.bgOverlayOpacity / 100) * 255).toString(16).padStart(2, '0');
+          ov.style.background = (slide.bgOverlayColor || '#000000') + hex;
+          stage.appendChild(ov);
+        }
+      }
+
+      const contentLayer = document.createElement('div');
+      contentLayer.className = 'content-layer';
+      stage.appendChild(contentLayer);
+
+      (slide.elements || []).forEach(el => {
+        const node = buildElement(el);
+        contentLayer.appendChild(node);
+
+        if (el.animation && animFrames[el.animation]) {
+          node.animate(animFrames[el.animation], {
+            duration: Math.max(0.1, Number(el.animationDuration) || 0.6) * 1000,
+            delay: Math.max(0, Number(el.animationDelay) || 0) * 1000,
+            iterations: el.animationLoop ? Infinity : 1,
+            easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+            fill: 'both'
+          });
+        }
+      });
+
+      document.getElementById('slideInfo').textContent = (currentIndex + 1) + ' / ' + slides.length;
+      updateDrawerActive();
+
+      clearTimeout(autoTimer);
+      if (Number(slide.autoDuration) > 0) {
+        autoTimer = setTimeout(() => advance(1), Number(slide.autoDuration) * 1000);
+      }
+    }
+
+    function advance(step) {
+      if (!slides.length) return;
+      currentIndex = (currentIndex + step + slides.length) % slides.length;
+      drawSlide();
+    }
+
+    function resizeStage() {
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const scale = Math.min(vw / 960, vh / 540);
+      document.documentElement.style.setProperty('--pres-scale', scale);
+    }
+    window.addEventListener('resize', resizeStage);
+    resizeStage();
+
+    function loadDeck(jsonText) {
+      try {
+        const data = JSON.parse(jsonText);
+        slides = Array.isArray(data) ? data : (data.slides || [data]);
+        if (!slides.length) throw new Error('No slides found in project');
+        currentIndex = 0;
+        document.getElementById('dropzone').classList.add('hidden');
+        renderDrawer();
+        drawSlide();
+      } catch(err) {
+        alert('Invalid presentation JSON file: ' + err.message);
+      }
+    }
+
+    const dropzone = document.getElementById('dropzone');
+    const dropCard = document.getElementById('dropCard');
+    const fileInput = document.getElementById('fileInput');
+
+    fileInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => loadDeck(ev.target.result);
+      reader.readAsText(file);
+    });
+
+    ['dragenter', 'dragover'].forEach(name => {
+      window.addEventListener(name, e => {
+        e.preventDefault();
+        dropCard.classList.add('drag-over');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(name => {
+      window.addEventListener(name, e => {
+        e.preventDefault();
+        dropCard.classList.remove('drag-over');
+      });
+    });
+
+    window.addEventListener('drop', e => {
+      e.preventDefault();
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => loadDeck(ev.target.result);
+      reader.readAsText(file);
+    });
+
+    document.getElementById('demoBtn').addEventListener('click', () => {
+      const demoData = [
+        {
+          background: 'ocean',
+          brollPreset: 'aurora',
+          elements: [
+            { id: '1', type: 'text', text: 'Welcome to Presentation Player', x: 10, y: 15, w: 80, h: 15, size: 44, color: '#ffffff', weight: '900', textAlign: 'center', animation: 'zoom', boxBg: '#e11d48', boxOpacity: 1 },
+            { id: '2', type: 'shape', shape: 'round', fill: '#0f172a', stroke: '#10b981', line: 4, x: 15, y: 35, w: 70, h: 45, text: 'একটি আন্তর্জাতিক সংগঠন, যা বিশ্বের এয়ারলাইন্সগুলোর নিয়ম, নীতি, টিকিটিং, ফেয়ার সিস্টেম এবং নিরাপত্তা সংক্রান্ত বিষয়গুলো সমন্বয় করে।', textColor: '#ef4444', textSize: 24, textWeight: '900', animation: 'slideUp' },
+            { id: '3', type: 'text', text: 'Head Office- Canada', x: 30, y: 84, w: 40, h: 10, size: 24, color: '#ffffff', weight: '900', textAlign: 'center', boxBg: '#ff0000', boxOpacity: 1, animation: 'pop' }
+          ]
+        },
+        {
+          background: 'luxury',
+          brollPreset: 'space',
+          elements: [
+            { id: '4', type: 'text', text: 'Animated B-Roll & 3D Shapes', x: 10, y: 15, w: 80, h: 15, size: 42, color: '#ffd166', weight: '900', textAlign: 'center' },
+            { id: '5', type: 'shape', shape: 'star5', fill: '#f59e0b', stroke: '#ffffff', line: 3, x: 20, y: 40, w: 20, h: 35, animation: 'spin' },
+            { id: '6', type: 'shape', shape: 'diamond', fill: '#10b981', stroke: '#ffffff', line: 2, x: 45, y: 40, w: 20, h: 35, animation: 'pulse', animationLoop: true },
+            { id: '7', type: 'shape', shape: 'heart', fill: '#ec4899', stroke: '#ffffff', line: 2, x: 70, y: 40, w: 20, h: 35, animation: 'bounce', animationLoop: true }
+          ]
+        }
+      ];
+      loadDeck(JSON.stringify(demoData));
+    });
+
+    function renderDrawer() {
+      const grid = document.getElementById('thumbGrid');
+      grid.replaceChildren();
+      slides.forEach((sl, i) => {
+        const item = document.createElement('div');
+        item.className = 'thumb-item' + (i === currentIndex ? ' active' : '');
+        const firstText = (sl.elements || []).find(e => e.type === 'text' || e.text);
+        const title = firstText ? (firstText.text || '').slice(0, 30) : ('Slide ' + (i + 1));
+        item.innerHTML = '<span class="thumb-num">' + (i + 1) + '</span><span class="thumb-label">' + title + '</span>';
+        item.addEventListener('click', () => {
+          currentIndex = i;
+          drawSlide();
+          document.getElementById('navDrawer').classList.remove('open');
+        });
+        grid.appendChild(item);
+      });
+    }
+
+    function updateDrawerActive() {
+      const items = document.querySelectorAll('.thumb-item');
+      items.forEach((it, i) => it.classList.toggle('active', i === currentIndex));
+    }
+
+    document.getElementById('prevBtn').addEventListener('click', () => advance(-1));
+    document.getElementById('nextBtn').addEventListener('click', () => advance(1));
+    document.getElementById('listBtn').addEventListener('click', () => {
+      document.getElementById('navDrawer').classList.toggle('open');
+    });
+    document.getElementById('closeDrawer').addEventListener('click', () => {
+      document.getElementById('navDrawer').classList.remove('open');
+    });
+    document.getElementById('loadNewBtn').addEventListener('click', () => {
+      document.getElementById('dropzone').classList.remove('hidden');
+    });
+
+    document.getElementById('fsBtn').addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+
+    window.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown' || e.key === 'Enter') {
+        e.preventDefault(); advance(1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault(); advance(-1);
+      } else if (e.key === 'Home') {
+        currentIndex = 0; drawSlide();
+      } else if (e.key === 'End') {
+        currentIndex = slides.length - 1; drawSlide();
+      } else if (e.key.toLowerCase() === 'f') {
+        document.getElementById('fsBtn').click();
+      } else if (e.key.toLowerCase() === 'l') {
+        document.getElementById('listBtn').click();
+      } else if (e.key === 'Escape') {
+        document.getElementById('navDrawer').classList.remove('open');
+      }
+    });
+
+    document.getElementById('stageContainer').addEventListener('click', e => {
+      if (e.target.closest('#controls') || e.target.closest('#navDrawer') || e.target.closest('#dropzone')) return;
+      advance(1);
+    });
+
+    function stopVoice() {
+      if (recognition) { recognition.onend = null; recognition.stop(); recognition = null; }
+      const btn = document.getElementById('voiceBtn');
+      btn.classList.remove('voice-on');
+    }
+
+    function startVoice() {
+      const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!Speech) { alert('Your browser does not support Voice Recognition. Please use Chrome.'); return; }
+      recognition = new Speech();
+      recognition.lang = 'bn-BD';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.onresult = e => {
+        for (let n = e.resultIndex; n < e.results.length; n++) {
+          if (!e.results[n].isFinal) continue;
+          const w = e.results[n][0].transcript.toLowerCase();
+          if (/next|forward|সামনে|পরবর্তী|পরেরটা/.test(w)) advance(1);
+          else if (/back|previous|পেছনে|আগেরটা|আগের/.test(w)) advance(-1);
+        }
+      };
+      recognition.onerror = () => stopVoice();
+      recognition.onend = () => { if (recognition) try { recognition.start(); } catch(_) {} };
+      recognition.start();
+      document.getElementById('voiceBtn').classList.add('voice-on');
+    }
+
+    document.getElementById('voiceBtn').addEventListener('click', () => {
+      recognition ? stopVoice() : startVoice();
+    });
+  </script>
+</body>
+</html>

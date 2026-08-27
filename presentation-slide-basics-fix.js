@@ -1,10 +1,8 @@
 (() => {
-  // A new slide is a clean canvas. No demo Bengali/English placeholder text.
   makeSlide = function () {
     return { background:'fashion', bgColor:'#17233c', transition:'fade', autoDuration:0, elements:[] };
   };
 
-  // Remove only the obsolete starter placeholders restored from an old autosave.
   const starterTexts = new Set(['আপনার অসাধারণ Presentation','শুরু করুন আপনার গল্প, পণ্য বা আইডিয়া দিয়ে']);
   slides.forEach(slide => {
     if (!slide || !Array.isArray(slide.elements)) return;
@@ -40,7 +38,6 @@
   window.openPresentationSlide = selectSlide;
   window.deletePresentationSlide = removeSlide;
 
-  // Global capture handles thumbnail clicks
   window.addEventListener('pointerdown', event => {
     const thumb = event.target.closest && event.target.closest('#slideList .slide-thumb');
     if (!thumb) return;
@@ -55,10 +52,8 @@
     if (event.key === 'ArrowDown') { selectSlide(Math.min(slides.length - 1, current + 1), event); }
   }, true);
 
-  // Master High-Fidelity & Ultra-Fast Slide Thumbnail Renderer
+  // ── MASTER HIGH-FIDELITY SLIDE THUMBNAIL RENDERER ──
   window.renderSlideThumbnailsMaster = function () {
-    // ⬛ Skip thumbnail rebuild during live drags — thumbnails don't need
-    // real-time updates while the user is repositioning an element.
     if (window.__presentationLiveDrag) return;
 
     const list = $('slideList');
@@ -107,18 +102,20 @@
       numBadge.style.zIndex = '10';
       thumb.appendChild(numBadge);
 
-      // If slide has bgMedia (video or image background)
+      // Background Media (Video or Image)
       if (s.bgMedia) {
         const mediaWrap = document.createElement('div');
         mediaWrap.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:1;opacity:' + (Number(s.bgMediaOpacity ?? 100) / 100) + ';';
         if (s.bgMediaType === 'video') {
-          // Use a static CSS gradient instead of a live <video> element in
-          // thumbnails — avoids N concurrent video decoders in the sidebar.
-          mediaWrap.style.background = 'linear-gradient(135deg, #0a1628 0%, #1a3a5c 50%, #0d2340 100%)';
-          const label = document.createElement('div');
-          label.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#79abff;font-size:7px;font-weight:700;pointer-events:none;opacity:0.7;';
-          label.textContent = '▶ Video';
-          mediaWrap.appendChild(label);
+          const vid = document.createElement('video');
+          vid.src = s.bgMedia;
+          vid.muted = true;
+          vid.autoplay = true;
+          vid.loop = true;
+          vid.playsInline = true;
+          vid.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+          vid.play().catch(() => {});
+          mediaWrap.appendChild(vid);
         } else {
           const img = document.createElement('img');
           img.src = s.bgMedia;
@@ -134,14 +131,14 @@
         thumb.appendChild(mediaWrap);
       }
 
-      // 2. Slide Elements Layer
+      // 2. Elements Layer
       const elementsWrap = document.createElement('div');
       elementsWrap.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;overflow:hidden;';
 
       (s.elements || []).forEach(el => {
         const elBox = document.createElement('div');
         const rot = Number(el.rotation) || 0;
-        elBox.style.cssText = `position:absolute;left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;transform:rotate(${rot}deg);transform-origin:center center;overflow:hidden;box-sizing:border-box;pointer-events:none;`;
+        elBox.style.cssText = 'position:absolute;left:' + el.x + '%;top:' + el.y + '%;width:' + el.w + '%;height:' + el.h + '%;transform:rotate(' + rot + 'deg);transform-origin:center center;overflow:hidden;box-sizing:border-box;pointer-events:none;';
 
         if (el.type === 'shape') {
           const fillVal = el.fill || el.fillColor || el.color || '#4f8df7';
@@ -157,7 +154,7 @@
           const svgFn = window.getShapeSvg;
           if (typeof svgFn === 'function') {
             const body = document.createElement('div');
-            body.style.cssText = `position:absolute;inset:0;width:100%;height:100%;opacity:${opVal};pointer-events:none;`;
+            body.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;opacity:' + opVal + ';pointer-events:none;';
             body.innerHTML = svgFn(el.shape);
             elBox.appendChild(body);
           } else {
@@ -167,9 +164,9 @@
 
           if (el.text) {
             const label = document.createElement('div');
-            const fontSize = Math.max(3.5, (el.textSize || 18) * 0.16);
+            const fontSize = Math.max(3.5, (el.textSize || 18) * 0.17);
             const align = el.textAlign === 'left' ? 'flex-start' : el.textAlign === 'right' ? 'flex-end' : 'center';
-            label.style.cssText = `position:absolute;inset:1px;display:flex;align-items:center;justify-content:${align};text-align:${el.textAlign || 'center'};color:${el.textColor || '#ffffff'};font-size:${fontSize}px;font-weight:${el.textWeight || '700'};overflow:hidden;word-break:break-word;line-height:1.1;z-index:2;`;
+            label.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:' + align + ';text-align:' + (el.textAlign || 'center') + ';color:' + (el.textColor || '#ffffff') + ';font-size:' + fontSize + 'px;font-weight:' + (el.textWeight || '700') + ';overflow:hidden;word-break:break-word;line-height:1.15;padding:1px 3px;box-sizing:border-box;z-index:2;';
             label.textContent = el.text;
             elBox.appendChild(label);
           }
@@ -182,7 +179,11 @@
           const vid = document.createElement('video');
           vid.src = el.src;
           vid.muted = true;
+          vid.autoplay = true;
+          vid.loop = true;
+          vid.playsInline = true;
           vid.style.cssText = 'width:100%;height:100%;display:block;object-fit:cover;';
+          vid.play().catch(() => {});
           elBox.appendChild(vid);
         } else if (el.type === 'table') {
           const table = document.createElement('table');
@@ -202,11 +203,32 @@
           elBox.style.cssText += 'display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.08);border-radius:2px;color:' + (el.color || '#78e6ff') + ';font-size:6px;font-weight:bold;';
           elBox.textContent = '▥ ' + (el.title || 'Chart');
         } else {
-          // Regular text element
-          const fontSize = Math.max(3.5, (el.size || 24) * 0.16);
-          elBox.style.cssText += `color:${el.color || '#ffffff'};font-size:${fontSize}px;font-weight:${el.weight || '700'};line-height:1.12;white-space:pre-wrap;word-break:break-word;padding:1px;`;
+          // Regular text element with exact flex centering & background badge
+          const fontSize = Math.max(3.5, (el.size || 24) * 0.17);
+          const align = el.textAlign === 'left' ? 'flex-start' : el.textAlign === 'right' ? 'flex-end' : 'center';
+          
+          let txtCss = 'display:flex;align-items:center;justify-content:' + align + ';text-align:' + (el.textAlign || 'center') + ';color:' + (el.color || '#ffffff') + ';font-size:' + fontSize + 'px;font-weight:' + (el.weight || '700') + ';line-height:1.15;white-space:pre-wrap;word-break:break-word;padding:1px 2px;box-sizing:border-box;';
+          
+          const boxBgColor = el.boxBg || el.backgroundColor || el.bgColor || (el.background && el.background.startsWith('#') ? el.background : null);
+          let boxOp = 1;
+          if (el.boxOpacity !== undefined) {
+            const num = Number(el.boxOpacity);
+            boxOp = num <= 1 ? num : num / 100;
+          }
+          if (boxBgColor && boxBgColor !== 'transparent' && boxOp > 0) {
+            if (boxBgColor.startsWith('#') && boxOp < 1) {
+              const hex = boxBgColor.replace('#', '');
+              const r = parseInt(hex.substring(0, 2), 16) || 0,
+                    g = parseInt(hex.substring(2, 4), 16) || 0,
+                    b = parseInt(hex.substring(4, 6), 16) || 0;
+              txtCss += 'background:rgba(' + r + ',' + g + ',' + b + ',' + boxOp + ');border-radius:2px;';
+            } else {
+              txtCss += 'background:' + boxBgColor + ';border-radius:2px;';
+            }
+          }
+          elBox.style.cssText += txtCss;
           if (el.textGradient) {
-            elBox.style.backgroundImage = `linear-gradient(${el.textGradientAngle ?? 90}deg, ${el.color || '#ffffff'}, ${el.textGradientTo || '#4f8df7'})`;
+            elBox.style.backgroundImage = 'linear-gradient(' + (el.textGradientAngle ?? 90) + 'deg, ' + (el.color || '#ffffff') + ', ' + (el.textGradientTo || '#4f8df7') + ')';
             elBox.style.webkitBackgroundClip = 'text';
             elBox.style.webkitTextFillColor = 'transparent';
           }
@@ -230,15 +252,14 @@
     box.replaceChildren();
     slides.forEach((slide, index) => {
       const row = document.createElement('div'); row.className = 'slide-quick-row';
-      const open = document.createElement('button'); open.textContent = (index === current ? '● ' : '○ ') + 'Open Slide ' + (index + 1);
-      open.addEventListener('pointerdown', event => selectSlide(index, event), true);
-      open.addEventListener('click', event => selectSlide(index, event), true);
-      const del = document.createElement('button'); del.className = 'danger'; del.textContent = '×'; del.title = 'Delete Slide ' + (index + 1); del.disabled = slides.length === 1;
-      del.addEventListener('pointerdown', event => removeSlide(index, event), true);
-      row.append(open, del); box.append(row);
+      const open = document.createElement('button'); open.textContent = (index === current ? '▶ ' : '') + (index + 1) + '. Slide';
+      open.onclick = event => selectSlide(index, event);
+      row.appendChild(open);
+      box.appendChild(row);
     });
   };
 
-  renderSlides = window.renderSlideThumbnailsMaster;
-  render();
+  renderSlides = function() { window.renderSlideThumbnailsMaster(); };
+  window.renderSlides = renderSlides;
+  window.renderSlideThumbnailsMaster();
 })();

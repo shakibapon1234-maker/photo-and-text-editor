@@ -649,31 +649,12 @@
       const item = active()?.elements?.find(el => el.id === id);
       if (!item) return;
 
-      node.ondblclick = e => {
-        e.preventDefault();
-        e.stopPropagation();
-        window.uploadOrReplaceImage(item);
+      // Single click on selected text or double click on any text activates edit
+      node.onclick = e => {
+        if (selected === id) {
+          window.activateInlineTextEdit(item);
+        }
       };
-    });
-
-    // Handle Text elements
-    slide.querySelectorAll('.text-el').forEach(node => {
-      const id = node.dataset.id;
-      const item = active()?.elements?.find(el => el.id === id);
-      if (!item) return;
-
-      let content = node.querySelector('.text-content');
-      if (!content) {
-        const currentText = item.text || node.textContent || '';
-        node.textContent = '';
-        content = document.createElement('span');
-        content.className = 'text-content';
-        content.contentEditable = 'false';
-        content.spellcheck = false;
-        content.textContent = currentText;
-        node.appendChild(content);
-      }
-
       node.ondblclick = e => {
         e.preventDefault();
         e.stopPropagation();
