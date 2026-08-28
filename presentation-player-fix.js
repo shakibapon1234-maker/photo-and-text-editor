@@ -39,7 +39,7 @@
       {
         key: 'present',
         title: 'Present ▾',
-        ids: ['presentBtn', 'previewSlideBtn', 'presenterView', 'deckTimingBtn', 'soundtrackBtn']
+        ids: ['presentBtn', 'previewSlideBtn', 'deckTimingBtn', 'soundtrackBtn']
       }
     ];
 
@@ -99,13 +99,19 @@
       });
     });
 
+    // Hide any duplicate presenterView if previewSlideBtn exists
+    const pView = $('presenterView');
+    if (pView && pView.id === 'presenterView') {
+      pView.style.display = 'none';
+    }
+
     // Label clarify
     const pBtn = $('presentBtn');
     if (pBtn) {
       pBtn.textContent = '▶ Play Slideshow (All Slides)';
       pBtn.title = 'Play full multi-slide presentation starting from beginning';
     }
-    const pvBtn = $('presenterView') || $('previewSlideBtn');
+    const pvBtn = $('previewSlideBtn');
     if (pvBtn) {
       pvBtn.textContent = '🎬 Preview Current Slide';
       pvBtn.title = 'Preview only the currently active running slide';
@@ -222,7 +228,7 @@
       color: #fff !important;
       font-weight: 700 !important;
     }
-    .toolbar-menu #presenterView, .toolbar-menu #previewSlideBtn {
+    .toolbar-menu #previewSlideBtn {
       background: #4f46e5 !important;
       border-color: #a5b4fc !important;
       color: #fff !important;
@@ -237,11 +243,11 @@
     }
   });
 
-  // ── ON-DEMAND PRESENTER ENGINE ──
-  // singleSlideOnly = true -> Previews ONLY the running active slide
+  // ── ON-DEMAND PRESENTER ENGINE WITH STEP-BY-STEP CLICK ANIMATIONS ──
+  // singleSlideOnly = true  -> Previews ONLY the running active slide
   // singleSlideOnly = false -> Full Slideshow across all slides
   function openPresenter(singleSlideOnly = false) {
-    if (!slides.length) return;
+    if (!slides || !slides.length) return;
 
     const slideW = 960;
     const slideH = 540;
@@ -271,6 +277,7 @@
         align-items: center !important;
         justify-content: center !important;
         background: #000 !important;
+        cursor: pointer !important;
       }
       #__pres_stage {
         position: relative !important;
@@ -297,6 +304,7 @@
         backdrop-filter: blur(14px) !important;
         border: 1px solid rgba(80, 120, 180, 0.4) !important;
         box-shadow: 0 10px 30px rgba(0,0,0,0.7) !important;
+        cursor: default !important;
       }
       #__pres_controls button {
         border: 1px solid #4a6288 !important;
@@ -338,7 +346,7 @@
 
     if (singleSlideOnly) {
       // Single Current Slide Preview Mode
-      controls.innerHTML = '<span id="__pres_status" style="font-size:13px;color:#ffd166;font-weight:800;padding:0 6px">🎬 Running Slide Preview (Slide ' + ((current || 0) + 1) + ')</span><button id="__pres_replay" style="background:#0284c7;border-color:#38bdf8">↺ Replay Slide</button><button id="__pres_fs">⛶ Fullscreen</button><button id="__pres_exit" style="background:#be123c;border-color:#fb7185">✕ Exit Preview</button>';
+      controls.innerHTML = '<span id="__pres_status" style="font-size:13px;color:#ffd166;font-weight:800;padding:0 6px">🎬 Running Slide Preview (Slide ' + ((current || 0) + 1) + ')</span><button id="__pres_next_step">Next Step ▶</button><button id="__pres_replay" style="background:#0284c7;border-color:#38bdf8">↺ Replay</button><button id="__pres_fs">⛶ Fullscreen</button><button id="__pres_exit" style="background:#be123c;border-color:#fb7185">✕ Exit Preview</button>';
     } else {
       // Full Multi-Slide Slideshow Mode
       controls.innerHTML = '<button id="__pres_prev">◀ Prev</button><span id="__pres_status" style="font-size:13px;color:#ffd166;font-weight:800;padding:0 6px">1 / ' + slides.length + '</span><button id="__pres_next">Next ▶</button><button id="__pres_voice">🎤 Voice</button><button id="__pres_fs">⛶ Fullscreen</button><button id="__pres_exit" style="background:#be123c;border-color:#fb7185">✕ Exit</button>';
@@ -357,10 +365,97 @@
     recalcScale();
     window.addEventListener('resize', recalcScale);
 
-    let idx = singleSlideOnly ? (current || 0) : 0, autoTimer = null, recognition = null;
+    let idx = singleSlideOnly ? (current || 0) : 0;
+    let autoTimer = null;
+    let recognition = null;
+    let slideSteps = [];
+    let currentStepIdx = 0;
+    let chainedTimers = [];
 
-    // High-speed on-demand slide builder
+    const defaultFrames = {
+      fade:[{opacity:0},{opacity:1}], appear:[{opacity:0},{opacity:1}],
+      slideLeft:[{opacity:0,transform:'translateX(-90px)'},{opacity:1,transform:'none'}],
+      slideRight:[{opacity:0,transform:'translateX(90px)'},{opacity:1,transform:'none'}],
+      slideUp:[{opacity:0,transform:'translateY(70px)'},{opacity:1,transform:'none'}],
+      slideDown:[{opacity:0,transform:'translateY(-70px)'},{opacity:1,transform:'none'}],
+      zoom:[{opacity:0,transform:'scale(.2)'},{opacity:1,transform:'scale(1)'}],
+      pop:[{opacity:0,transform:'scale(.2)'},{opacity:1,transform:'scale(1.15)',offset:.7},{opacity:1,transform:'scale(1)'}],
+      flipX:[{opacity:0,transform:'perspective(400px) rotateX(90deg)'},{opacity:1,transform:'perspective(400px) rotateX(0)'}],
+      flipY:[{opacity:0,transform:'perspective(400px) rotateY(90deg)'},{opacity:1,transform:'perspective(400px) rotateY(0)'}],
+      wipeLeft:[{opacity:0,clipPath:'inset(0 100% 0 0)'},{opacity:1,clipPath:'inset(0 0 0 0)'}],
+      pulse:[{transform:'scale(1)'},{transform:'scale(1.12)'},{transform:'scale(1)'}],
+      bounce:[{transform:'translateY(0)'},{transform:'translateY(-28px)'},{transform:'translateY(0)'}],
+      spin:[{transform:'rotate(0)'},{transform:'rotate(360deg)'}],
+      spin3d:[{transform:'perspective(700px) rotateY(0deg)'},{transform:'perspective(700px) rotateY(360deg)'}],
+      swing:[{transform:'rotate(0)'},{transform:'rotate(15deg)'},{transform:'rotate(-10deg)'},{transform:'rotate(0)'}],
+      float:[{transform:'translateY(0)'},{transform:'translateY(-20px)'},{transform:'translateY(0)'}],
+      jello:[{transform:'skew(0)'},{transform:'skew(-12deg,-12deg)'},{transform:'skew(7deg,7deg)'},{transform:'skew(0)'}],
+      shake:[{transform:'translateX(0)'},{transform:'translateX(-18px)'},{transform:'translateX(18px)'},{transform:'translateX(0)'}],
+      fadeOut:[{opacity:1},{opacity:0}],
+      zoomOut:[{opacity:1,transform:'scale(1)'},{opacity:0,transform:'scale(.2)'}],
+      slideOutRight:[{opacity:1,transform:'none'},{opacity:0,transform:'translateX(120px)'}]
+    };
+    const frames = Object.assign({}, defaultFrames, window.animFrames || {});
+
+    function clearChainedTimers() {
+      chainedTimers.forEach(t => clearTimeout(t));
+      chainedTimers = [];
+    }
+
+    function playItem(item) {
+      item.node.style.visibility = 'visible';
+      item.node.animate(frames[item.el.animation], {
+        duration: item.duration,
+        delay: item.delay,
+        iterations: item.loop ? Infinity : 1,
+        easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+        fill: 'both'
+      });
+    }
+
+    function executeStepGroup(stepGroup) {
+      clearChainedTimers();
+      let baseMax = 0;
+      stepGroup.forEach(item => {
+        if (!item.isAfter) {
+          playItem(item);
+          baseMax = Math.max(baseMax, item.duration + item.delay);
+        }
+      });
+
+      let cumulative = baseMax;
+      stepGroup.filter(item => item.isAfter).forEach(item => {
+        const tm = setTimeout(() => {
+          playItem(item);
+        }, cumulative + item.delay);
+        chainedTimers.push(tm);
+        cumulative += item.delay + item.duration;
+      });
+    }
+
+    function updateStatusDisplay() {
+      const status = $('__pres_status');
+      if (!status) return;
+      if (singleSlideOnly) {
+        if (slideSteps.length > 0) {
+          status.textContent = '🎬 Slide Preview (Slide ' + (idx + 1) + ') · Step ' + currentStepIdx + '/' + slideSteps.length;
+        } else {
+          status.textContent = '🎬 Running Slide Preview (Slide ' + (idx + 1) + ')';
+        }
+      } else {
+        if (slideSteps.length > 0 && currentStepIdx < slideSteps.length) {
+          status.textContent = (idx + 1) + ' / ' + slides.length + ' · Step ' + (currentStepIdx + 1) + '/' + slideSteps.length;
+        } else {
+          status.textContent = (idx + 1) + ' / ' + slides.length;
+        }
+      }
+    }
+
+    // High-speed on-demand slide builder with Animation Sequencer
     function renderPresenterSlide(i) {
+      clearTimeout(autoTimer);
+      clearChainedTimers();
+
       idx = singleSlideOnly ? (current || 0) : (((i % slides.length) + slides.length) % slides.length);
       const sl = slides[idx];
       stage.replaceChildren();
@@ -414,9 +509,9 @@
       contentLayer.style.cssText = 'position:absolute;inset:0;z-index:2;pointer-events:none;';
       stage.appendChild(contentLayer);
 
-      const frames = window.animFrames || {};
+      const animList = [];
 
-      (sl.elements || []).forEach(el => {
+      (sl.elements || []).forEach((el, elemIdx) => {
         const node = document.createElement('div');
         const rot = Number(el.rotation) || 0;
 
@@ -520,56 +615,149 @@
 
         contentLayer.appendChild(node);
 
-        // Apply element animation with infinite loop support
-        if (el.animation && frames[el.animation]) {
-          node.animate(frames[el.animation], {
+        // Check if element has entrance/emphasis animation
+        const hasAnimation = el.animation && el.animation !== 'none' && frames[el.animation];
+        if (hasAnimation) {
+          node.style.visibility = 'hidden';
+          animList.push({
+            node,
+            el,
+            order: Number(el.animationOrder) || 0,
+            start: el.animationStart || 'click',
             duration: Math.max(0.1, Number(el.animationDuration) || 0.6) * 1000,
             delay: Math.max(0, Number(el.animationDelay) || 0) * 1000,
-            iterations: el.animationLoop ? Infinity : 1,
-            easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
-            fill: 'both'
+            loop: !!el.animationLoop,
+            index: elemIdx
           });
+        } else {
+          node.style.visibility = 'visible';
         }
       });
 
-      if (!singleSlideOnly) {
-        $('__pres_status').textContent = (idx + 1) + ' / ' + slides.length;
-        clearTimeout(autoTimer);
-        if (Number(sl.autoDuration) > 0)
-          autoTimer = setTimeout(() => advance(1), Number(sl.autoDuration) * 1000);
+      // ── Build Sequential Steps for Animations ──
+      slideSteps = [];
+      currentStepIdx = 0;
+
+      if (animList.length > 0) {
+        // Sort by order then by index
+        animList.sort((a, b) => (a.order - b.order) || (a.index - b.index));
+
+        let currentGroup = [];
+        animList.forEach((item, itIdx) => {
+          if (item.start === 'after') {
+            item.isAfter = true;
+            if (currentGroup.length > 0) {
+              currentGroup.push(item);
+            } else if (slideSteps.length > 0) {
+              slideSteps[slideSteps.length - 1].push(item);
+            } else {
+              currentGroup.push(item);
+            }
+          } else if (item.start === 'with') {
+            if (currentGroup.length > 0) {
+              currentGroup.push(item);
+            } else if (slideSteps.length > 0) {
+              slideSteps[slideSteps.length - 1].push(item);
+            } else {
+              currentGroup.push(item);
+            }
+          } else {
+            // 'click' or default step
+            if (currentGroup.length > 0) {
+              slideSteps.push(currentGroup);
+              currentGroup = [];
+            }
+            currentGroup.push(item);
+          }
+        });
+        if (currentGroup.length > 0) {
+          slideSteps.push(currentGroup);
+        }
+
+        // Check if the very first step is configured to trigger with slide start
+        if (slideSteps.length > 0 && slideSteps[0].length > 0 && slideSteps[0][0].start === 'with') {
+          executeStepGroup(slideSteps[0]);
+          currentStepIdx = 1;
+        }
+      }
+
+      updateStatusDisplay();
+
+      // Auto-advance if slide duration is set and not manual
+      if (!singleSlideOnly && Number(sl.autoDuration) > 0) {
+        autoTimer = setTimeout(() => advanceNext(), Number(sl.autoDuration) * 1000);
       }
     }
 
-    function advance(step) {
-      if (singleSlideOnly) return;
-      renderPresenterSlide(idx + step);
+    // Step forward: play next animation step, or go to next slide if all steps done
+    function advanceNext() {
+      clearTimeout(autoTimer);
+      if (currentStepIdx < slideSteps.length) {
+        const stepItems = slideSteps[currentStepIdx];
+        executeStepGroup(stepItems);
+        currentStepIdx++;
+        updateStatusDisplay();
+        return;
+      }
+
+      if (singleSlideOnly) {
+        const status = $('__pres_status');
+        if (status) {
+          status.textContent = '🎬 Preview Complete · Click Replay to restart';
+        }
+        return;
+      }
+
+      renderPresenterSlide(idx + 1);
+    }
+
+    // Step backward: go back to previous slide
+    function advancePrev() {
+      clearTimeout(autoTimer);
+      clearChainedTimers();
+      if (!singleSlideOnly) {
+        renderPresenterSlide(idx - 1);
+      } else {
+        renderPresenterSlide(idx);
+      }
     }
 
     function onKey(e) {
-      if (singleSlideOnly) {
-        if (e.key === 'Escape') closePlayer();
-        if (e.key === 'r' || e.key === 'R') renderPresenterSlide(idx);
+      if (e.key === 'Escape') {
+        closePlayer();
         return;
       }
-      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown' || e.key === 'Enter') { e.preventDefault(); advance(1); }
-      else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); advance(-1); }
-      else if (e.key === 'Home') { renderPresenterSlide(0); }
-      else if (e.key === 'End') { renderPresenterSlide(slides.length - 1); }
-      else if (e.key === 'Escape') { closePlayer(); }
+      if (e.key === 'r' || e.key === 'R') {
+        renderPresenterSlide(idx);
+        return;
+      }
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown' || e.key === 'Enter') {
+        e.preventDefault();
+        advanceNext();
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        advancePrev();
+      } else if (e.key === 'Home') {
+        if (!singleSlideOnly) renderPresenterSlide(0);
+      } else if (e.key === 'End') {
+        if (!singleSlideOnly) renderPresenterSlide(slides.length - 1);
+      }
     }
     document.addEventListener('keydown', onKey);
 
     overlay.addEventListener('click', e => {
       if (e.target.closest('#__pres_controls')) return;
-      if (!singleSlideOnly) advance(1);
+      advanceNext();
     });
 
     if (singleSlideOnly) {
+      const nextStepBtn = $('__pres_next_step');
+      if (nextStepBtn) nextStepBtn.onclick = e => { e.stopPropagation(); advanceNext(); };
       const rep = $('__pres_replay');
       if (rep) rep.onclick = e => { e.stopPropagation(); renderPresenterSlide(idx); };
     } else {
-      $('__pres_prev').onclick = e => { e.stopPropagation(); advance(-1); };
-      $('__pres_next').onclick = e => { e.stopPropagation(); advance(1); };
+      $('__pres_prev').onclick = e => { e.stopPropagation(); advancePrev(); };
+      $('__pres_next').onclick = e => { e.stopPropagation(); advanceNext(); };
     }
 
     $('__pres_exit').onclick = e => { e.stopPropagation(); closePlayer(); };
@@ -593,8 +781,8 @@
         for (let n = e.resultIndex; n < e.results.length; n++) {
           if (!e.results[n].isFinal) continue;
           const w = e.results[n][0].transcript.toLowerCase();
-          if (/next|forward|সামনে|পরবর্তী|পরেরটা/.test(w)) advance(1);
-          else if (/back|previous|পেছনে|আগেরটা|আগের/.test(w)) advance(-1);
+          if (/next|forward|সামনে|পরবর্তী|পরেরটা|নেক্সট/.test(w)) advanceNext();
+          else if (/back|previous|পেছনে|আগেরটা|আগের|পূর্ববর্তী/.test(w)) advancePrev();
         }
       };
       recognition.onerror = stopVoice;
@@ -607,7 +795,9 @@
     }
 
     function closePlayer() {
-      clearTimeout(autoTimer); stopVoice();
+      clearTimeout(autoTimer);
+      clearChainedTimers();
+      stopVoice();
       document.removeEventListener('keydown', onKey);
       window.removeEventListener('resize', recalcScale);
       document.body.style.overflow = '';
@@ -629,7 +819,7 @@
         openPresenter(false); // Full slideshow from slide 1
       };
     }
-    const prevBtn = $('previewSlideBtn') || $('presenterView');
+    const prevBtn = $('previewSlideBtn');
     if (prevBtn) {
       prevBtn.onclick = e => {
         if (e) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); }

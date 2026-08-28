@@ -659,34 +659,160 @@
       contentLayer.className = 'content-layer';
       stage.appendChild(contentLayer);
 
-      (slide.elements || []).forEach(el => {
+      const animList = [];
+
+      (slide.elements || []).forEach((el, elemIdx) => {
         const node = buildElement(el);
         contentLayer.appendChild(node);
 
-        if (el.animation && animFrames[el.animation]) {
-          node.animate(animFrames[el.animation], {
+        const hasAnimation = el.animation && animFrames[el.animation];
+        if (hasAnimation) {
+          node.style.visibility = 'hidden';
+          animList.push({
+            node,
+            el,
+            order: Number(el.animationOrder) || 0,
+            start: el.animationStart || 'click',
             duration: Math.max(0.1, Number(el.animationDuration) || 0.6) * 1000,
             delay: Math.max(0, Number(el.animationDelay) || 0) * 1000,
-            iterations: el.animationLoop ? Infinity : 1,
-            easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
-            fill: 'both'
+            loop: !!el.animationLoop,
+            index: elemIdx
           });
+        } else {
+          node.style.visibility = 'visible';
         }
       });
 
-      document.getElementById('slideInfo').textContent = (currentIndex + 1) + ' / ' + slides.length;
+      // Group into sequential steps
+      slideSteps = [];
+      currentStepIdx = 0;
+
+      if (animList.length > 0) {
+        animList.sort((a, b) => (a.order - b.order) || (a.index - b.index));
+
+        let currentGroup = [];
+        animList.forEach((item, itIdx) => {
+          if (item.start === 'after') {
+            item.isAfter = true;
+            if (currentGroup.length > 0) {
+              currentGroup.push(item);
+            } else if (slideSteps.length > 0) {
+              slideSteps[slideSteps.length - 1].push(item);
+            } else {
+              currentGroup.push(item);
+            }
+          } else if (item.start === 'with') {
+            if (currentGroup.length > 0) {
+              currentGroup.push(item);
+            } else if (slideSteps.length > 0) {
+              slideSteps[slideSteps.length - 1].push(item);
+            } else {
+              currentGroup.push(item);
+            }
+          } else {
+            // 'click' or default step
+            if (currentGroup.length > 0) {
+              slideSteps.push(currentGroup);
+              currentGroup = [];
+            }
+            currentGroup.push(item);
+          }
+        });
+        if (currentGroup.length > 0) {
+          slideSteps.push(currentGroup);
+        }
+
+        // Auto trigger first group if 'with'
+        if (slideSteps.length > 0 && slideSteps[0].length > 0 && slideSteps[0][0].start === 'with') {
+          executeStepGroup(slideSteps[0]);
+          currentStepIdx = 1;
+        }
+      }
+
+      updateInfoDisplay();
       updateDrawerActive();
 
       clearTimeout(autoTimer);
       if (Number(slide.autoDuration) > 0) {
-        autoTimer = setTimeout(() => advance(1), Number(slide.autoDuration) * 1000);
+        autoTimer = setTimeout(() => advanceNext(), Number(slide.autoDuration) * 1000);
       }
     }
 
-    function advance(step) {
+    let slideSteps = [];
+    let currentStepIdx = 0;
+    let chainedTimers = [];
+
+    function clearChainedTimers() {
+      chainedTimers.forEach(t => clearTimeout(t));
+      chainedTimers = [];
+    }
+
+    function playItem(item) {
+      item.node.style.visibility = 'visible';
+      item.node.animate(animFrames[item.el.animation], {
+        duration: item.duration,
+        delay: item.delay,
+        iterations: item.loop ? Infinity : 1,
+        easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+        fill: 'both'
+      });
+    }
+
+    function executeStepGroup(stepGroup) {
+      clearChainedTimers();
+      let baseMax = 0;
+      stepGroup.forEach(item => {
+        if (!item.isAfter) {
+          playItem(item);
+          baseMax = Math.max(baseMax, item.duration + item.delay);
+        }
+      });
+
+      let cumulative = baseMax;
+      stepGroup.filter(item => item.isAfter).forEach(item => {
+        const tm = setTimeout(() => {
+          playItem(item);
+        }, cumulative + item.delay);
+        chainedTimers.push(tm);
+        cumulative += item.delay + item.duration;
+      });
+    }
+
+    function updateInfoDisplay() {
+      const info = document.getElementById('slideInfo');
+      if (!info) return;
+      if (slideSteps.length > 0 && currentStepIdx < slideSteps.length) {
+        info.textContent = (currentIndex + 1) + ' / ' + slides.length + ' (Step ' + (currentStepIdx + 1) + '/' + slideSteps.length + ')';
+      } else {
+        info.textContent = (currentIndex + 1) + ' / ' + slides.length;
+      }
+    }
+
+    function advanceNext() {
+      clearTimeout(autoTimer);
+      if (currentStepIdx < slideSteps.length) {
+        const stepItems = slideSteps[currentStepIdx];
+        executeStepGroup(stepItems);
+        currentStepIdx++;
+        updateInfoDisplay();
+        return;
+      }
       if (!slides.length) return;
-      currentIndex = (currentIndex + step + slides.length) % slides.length;
+      currentIndex = (currentIndex + 1) % slides.length;
       drawSlide();
+    }
+
+    function advancePrev() {
+      clearTimeout(autoTimer);
+      clearChainedTimers();
+      if (!slides.length) return;
+      currentIndex = (currentIndex - 1 + slides.length) % slides.length;
+      drawSlide();
+    }
+
+    function advance(step) {
+      if (step > 0) advanceNext();
+      else advancePrev();
     }
 
     function resizeStage() {
