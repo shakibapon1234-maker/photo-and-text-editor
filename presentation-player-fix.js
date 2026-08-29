@@ -1,7 +1,7 @@
 (()=>{
   const $ = id => document.getElementById(id);
 
-  // ── Horizontal Ribbon Toolbar (Side-by-Side) ──
+  // ── Horizontal Ribbon Toolbar (5 Organized Dropdown Tabs + Direct Actions) ──
   function organizeToolbar() {
     const top = document.querySelector('.top');
     if (!top) return;
@@ -15,6 +15,13 @@
       else top.prepend(groups);
     }
 
+    let directActions = document.getElementById('directToolbarActions');
+    if (!directActions) {
+      directActions = document.createElement('div');
+      directActions.id = 'directToolbarActions';
+      top.appendChild(directActions);
+    }
+
     const tabs = [
       {
         key: 'slide',
@@ -24,22 +31,22 @@
       {
         key: 'insert',
         title: 'Insert ▾',
-        ids: ['addText', 'imageInput', 'assetBtn', 'addShape', 'add3dShape', 'addTable', 'addChart', 'addGlassCard', 'addHotspot', 'saveAssetBtn']
+        ids: ['addText', 'imageInput', 'assetBtn', 'addShape', 'add3dShape', 'addTable', 'addChart', 'addGlassCard', 'addHotspot', 'saveAssetBtn', 'videoElementBtn', 'toggleBullets', 'toggleNumbering', 'toggleAlphaList']
       },
       {
         key: 'design',
         title: 'Design ▾',
-        ids: ['smartDesignerBtn', 'magicDeckBtn', 'colorToolbarBtn', 'colorBtn', 'brandKitBtn', 'textTools', 'btnElementAnimation']
+        ids: ['smartDesign', 'smartDesignerBtn', 'magicDeck', 'magicDeckBtn', 'brandKit', 'brandKitBtn', 'quickColors', 'colorToolbarBtn', 'colorBtn', 'textTools', 'btnElementAnimation']
       },
       {
         key: 'export',
         title: 'Export ▾',
-        ids: ['saveProject', 'loadProject', 'downloadSlideshow', 'exportVideo']
+        ids: ['saveProject', 'loadProject', 'downloadSlideshow', 'exportVideo', 'restoreVaultBtn', 'projectInput']
       },
       {
         key: 'present',
         title: 'Present ▾',
-        ids: ['presentBtn', 'previewSlideBtn', 'deckTimingBtn', 'soundtrackBtn']
+        ids: ['presentBtn', 'previewSlideBtn', 'deckTiming', 'deckTimingBtn', 'soundtrack', 'soundtrackBtn', 'presenterView']
       }
     ];
 
@@ -85,11 +92,14 @@
           }
           if (id === 'addChart') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Chart'));
           if (id === 'addGlassCard') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Glass'));
-          if (id === 'magicDeckBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Magic Deck'));
-          if (id === 'smartDesignerBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Smart Design'));
-          if (id === 'colorToolbarBtn' || id === 'colorBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Color'));
-          if (id === 'btnElementAnimation') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Animate'));
-          if (id === 'deckTimingBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Timing'));
+          if (id === 'magicDeck' || id === 'magicDeckBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Magic Deck'));
+          if (id === 'smartDesign' || id === 'smartDesignerBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Smart Design'));
+          if (id === 'brandKit' || id === 'brandKitBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Brand'));
+          if (id === 'quickColors' || id === 'colorToolbarBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Colors'));
+          if (id === 'deckTiming' || id === 'deckTimingBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Timing'));
+          if (id === 'soundtrack' || id === 'soundtrackBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Soundtrack'));
+          if (id === 'restoreVaultBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('রিস্টোর') || b.id === 'restoreVaultBtn');
+          if (id === 'downloadSlideshow') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Download') || b.textContent.includes('Slideshow'));
         }
 
         if (control && control.parentElement !== menu) {
@@ -97,6 +107,50 @@
           menu.appendChild(control);
         }
       });
+    });
+
+    // Make Restore Vault button a prominent top-level button right on toolbarGroups
+    let vaultBtn = $('restoreVaultBtn') || Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('রিস্টোর') || b.id === 'restoreVaultBtn');
+    if (vaultBtn && vaultBtn.parentElement !== groups) {
+      vaultBtn.innerHTML = '🔄 রিস্টোর / ব্যাকআপ';
+      vaultBtn.style.cssText = 'background:#1e3a8a!important;border:1px solid #3b82f6!important;color:#ffffff!important;font-weight:800!important;padding:7px 14px!important;border-radius:7px!important;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;box-shadow:0 0 10px rgba(59,130,246,0.3);';
+      groups.appendChild(vaultBtn);
+    }
+    const exportMenuForRestore = groups.querySelector('.toolbar-menu[data-menu="export"]');
+    if (exportMenuForRestore && !$('exportRestoreBtn')) {
+      const exportRestore = document.createElement('button');
+      exportRestore.id = 'exportRestoreBtn';
+      exportRestore.innerHTML = '🔄 ব্যাকআপ ও রিস্টোর ভল্ট';
+      exportRestore.style.cssText = 'background:#1e3a8a;border:1px solid #3b82f6;color:#ffffff;font-weight:700;margin:0;';
+      exportRestore.onclick = () => {
+        if (typeof window.openRecoveryModal === 'function') window.openRecoveryModal();
+        else $('restoreVaultBtn')?.click();
+      };
+      exportMenuForRestore.appendChild(exportRestore);
+    }
+
+    // Move Direct Actions to right side
+    ['undoAction', 'redoAction', 'addAnimatedFrameBtn', 'add3dTextBtn', 'addVideoBtn'].forEach(id => {
+      let b = $(id);
+      if (!b) {
+        if (id === 'undoAction') b = Array.from(top.querySelectorAll('button')).find(x => x.textContent.trim() === 'Undo');
+        if (id === 'redoAction') b = Array.from(top.querySelectorAll('button')).find(x => x.textContent.trim() === 'Redo');
+        if (id === 'addAnimatedFrameBtn') b = Array.from(top.querySelectorAll('button')).find(x => x.textContent.includes('Frame'));
+        if (id === 'add3dTextBtn') b = Array.from(top.querySelectorAll('button')).find(x => x.textContent.includes('3D Text'));
+        if (id === 'addVideoBtn') b = Array.from(top.querySelectorAll('button')).find(x => x.textContent.includes('Video'));
+      }
+      if (b && b.parentElement !== directActions) {
+        directActions.appendChild(b);
+      }
+    });
+
+    // Clean up any other stray buttons in top bar into Export or Insert
+    const exportMenu = groups.querySelector('.toolbar-menu[data-menu="export"]');
+    Array.from(top.children).forEach(child => {
+      if (child.id === 'toolbarGroups' || child.id === 'directToolbarActions' || child.classList.contains('brand')) return;
+      if (child.tagName === 'BUTTON' || child.tagName === 'LABEL') {
+        exportMenu?.appendChild(child);
+      }
     });
 
     // Hide any duplicate presenterView if previewSlideBtn exists
@@ -150,6 +204,19 @@
       flex-wrap: nowrap !important;
       position: relative !important;
       z-index: 1001 !important;
+    }
+    #directToolbarActions {
+      display: flex !important;
+      align-items: center !important;
+      gap: 6px !important;
+      margin-left: auto !important;
+    }
+    #directToolbarActions button {
+      padding: 6px 12px !important;
+      font-size: 12px !important;
+      font-weight: 700 !important;
+      border-radius: 6px !important;
+      white-space: nowrap !important;
     }
     .toolbar-group {
       position: relative !important;
@@ -376,28 +443,308 @@
       const r = Number(rot) || 0;
       const rotStr = r ? (' rotate(' + r + 'deg)') : '';
       const baseMap = {
-        fade: [{ opacity: 0, transform: 'rotate(' + r + 'deg)' }, { opacity: 1, transform: 'rotate(' + r + 'deg)' }],
-        appear: [{ opacity: 0, transform: 'rotate(' + r + 'deg)' }, { opacity: 1, transform: 'rotate(' + r + 'deg)' }],
-        slideLeft: [{ opacity: 0, transform: 'translateX(-90px)' + rotStr }, { opacity: 1, transform: 'translateX(0)' + rotStr }],
-        slideRight: [{ opacity: 0, transform: 'translateX(90px)' + rotStr }, { opacity: 1, transform: 'translateX(0)' + rotStr }],
-        slideUp: [{ opacity: 0, transform: 'translateY(70px)' + rotStr }, { opacity: 1, transform: 'translateY(0)' + rotStr }],
-        slideDown: [{ opacity: 0, transform: 'translateY(-70px)' + rotStr }, { opacity: 1, transform: 'translateY(0)' + rotStr }],
-        zoom: [{ opacity: 0, transform: 'scale(.2)' + rotStr }, { opacity: 1, transform: 'scale(1)' + rotStr }],
-        pop: [{ opacity: 0, transform: 'scale(.2)' + rotStr }, { opacity: 1, transform: 'scale(1.15)' + rotStr, offset: 0.7 }, { opacity: 1, transform: 'scale(1)' + rotStr }],
-        flipX: [{ opacity: 0, transform: 'perspective(400px) rotateX(90deg)' + rotStr }, { opacity: 1, transform: 'perspective(400px) rotateX(0)' + rotStr }],
-        flipY: [{ opacity: 0, transform: 'perspective(400px) rotateY(90deg)' + rotStr }, { opacity: 1, transform: 'perspective(400px) rotateY(0)' + rotStr }],
-        wipeLeft: [{ opacity: 0, clipPath: 'inset(0 100% 0 0)', transform: 'rotate(' + r + 'deg)' }, { opacity: 1, clipPath: 'inset(0 0 0 0)', transform: 'rotate(' + r + 'deg)' }],
-        pulse: [{ transform: 'scale(1)' + rotStr }, { transform: 'scale(1.12)' + rotStr }, { transform: 'scale(1)' + rotStr }],
-        bounce: [{ transform: 'translateY(0)' + rotStr }, { transform: 'translateY(-28px)' + rotStr }, { transform: 'translateY(0)' + rotStr }],
-        spin: [{ transform: 'rotate(' + r + 'deg)' }, { transform: 'rotate(' + (r + 360) + 'deg)' }],
-        spin3d: [{ transform: 'perspective(700px) rotateY(0deg)' + rotStr }, { transform: 'perspective(700px) rotateY(360deg)' + rotStr }],
-        swing: [{ transform: 'rotate(' + r + 'deg)' }, { transform: 'rotate(' + (r + 15) + 'deg)' }, { transform: 'rotate(' + (r - 10) + 'deg)' }, { transform: 'rotate(' + r + 'deg)' }],
-        float: [{ transform: 'translateY(0)' + rotStr }, { transform: 'translateY(-20px)' + rotStr }, { transform: 'translateY(0)' + rotStr }],
-        jello: [{ transform: 'skew(0)' + rotStr }, { transform: 'skew(-12deg,-12deg)' + rotStr }, { transform: 'skew(7deg,7deg)' + rotStr }, { transform: 'skew(0)' + rotStr }],
-        shake: [{ transform: 'translateX(0)' + rotStr }, { transform: 'translateX(-18px)' + rotStr }, { transform: 'translateX(18px)' + rotStr }, { transform: 'translateX(0)' + rotStr }],
-        fadeOut: [{ opacity: 1, transform: 'rotate(' + r + 'deg)' }, { opacity: 0, transform: 'rotate(' + r + 'deg)' }],
-        zoomOut: [{ opacity: 1, transform: 'scale(1)' + rotStr }, { opacity: 0, transform: 'scale(.2)' + rotStr }],
-        slideOutRight: [{ opacity: 1, transform: 'translateX(0)' + rotStr }, { opacity: 0, transform: 'translateX(120px)' + rotStr }]
+        // ── Entrance Animations ──────────────────────────
+        fade: [
+          { opacity: 0, transform: 'rotate(' + r + 'deg)' },
+          { opacity: 1, transform: 'rotate(' + r + 'deg)' }
+        ],
+        appear: [
+          { opacity: 0, transform: 'rotate(' + r + 'deg)' },
+          { opacity: 1, transform: 'rotate(' + r + 'deg)' }
+        ],
+        slideLeft: [
+          { opacity: 0, transform: 'translateX(-90px)' + rotStr },
+          { opacity: 1, transform: 'translateX(0)' + rotStr }
+        ],
+        slideRight: [
+          { opacity: 0, transform: 'translateX(90px)' + rotStr },
+          { opacity: 1, transform: 'translateX(0)' + rotStr }
+        ],
+        slideUp: [
+          { opacity: 0, transform: 'translateY(70px)' + rotStr },
+          { opacity: 1, transform: 'translateY(0)' + rotStr }
+        ],
+        slideDown: [
+          { opacity: 0, transform: 'translateY(-70px)' + rotStr },
+          { opacity: 1, transform: 'translateY(0)' + rotStr }
+        ],
+        zoom: [
+          { opacity: 0, transform: 'scale(.2)' + rotStr },
+          { opacity: 1, transform: 'scale(1)' + rotStr }
+        ],
+        pop: [
+          { opacity: 0, transform: 'scale(.2)' + rotStr },
+          { opacity: 1, transform: 'scale(1.15)' + rotStr, offset: 0.7 },
+          { opacity: 1, transform: 'scale(1)' + rotStr }
+        ],
+        flipX: [
+          { opacity: 0, transform: 'perspective(500px) rotateX(90deg)' + rotStr },
+          { opacity: 1, transform: 'perspective(500px) rotateX(0deg)' + rotStr }
+        ],
+        flipY: [
+          { opacity: 0, transform: 'perspective(500px) rotateY(90deg)' + rotStr },
+          { opacity: 1, transform: 'perspective(500px) rotateY(0deg)' + rotStr }
+        ],
+        wipeLeft: [
+          { opacity: 0, clipPath: 'inset(0 100% 0 0)', transform: 'rotate(' + r + 'deg)' },
+          { opacity: 1, clipPath: 'inset(0 0 0 0)', transform: 'rotate(' + r + 'deg)' }
+        ],
+        wipeRight: [
+          { opacity: 0, clipPath: 'inset(0 0 0 100%)', transform: 'rotate(' + r + 'deg)' },
+          { opacity: 1, clipPath: 'inset(0 0 0 0)', transform: 'rotate(' + r + 'deg)' }
+        ],
+        wipeDown: [
+          { opacity: 0, clipPath: 'inset(0 0 100% 0)', transform: 'rotate(' + r + 'deg)' },
+          { opacity: 1, clipPath: 'inset(0 0 0 0)', transform: 'rotate(' + r + 'deg)' }
+        ],
+        wipeUp: [
+          { opacity: 0, clipPath: 'inset(100% 0 0 0)', transform: 'rotate(' + r + 'deg)' },
+          { opacity: 1, clipPath: 'inset(0 0 0 0)', transform: 'rotate(' + r + 'deg)' }
+        ],
+        curtainWipe: [
+          { opacity: 0, clipPath: 'circle(0% at 50% 50%)', transform: 'rotate(' + r + 'deg)' },
+          { opacity: 1, clipPath: 'circle(100% at 50% 50%)', transform: 'rotate(' + r + 'deg)' }
+        ],
+        zoomRotate: [
+          { opacity: 0, transform: 'scale(0.1) rotate(' + (r - 180) + 'deg)' },
+          { opacity: 1, transform: 'scale(1) rotate(' + r + 'deg)' }
+        ],
+        elasticDrop: [
+          { opacity: 0, transform: 'translateY(-140px) scale(0.7, 1.3)' + rotStr },
+          { opacity: 1, transform: 'translateY(18px) scale(1.12, 0.88)' + rotStr, offset: 0.65 },
+          { opacity: 1, transform: 'translateY(-6px) scale(0.96, 1.04)' + rotStr, offset: 0.85 },
+          { opacity: 1, transform: 'translateY(0) scale(1, 1)' + rotStr }
+        ],
+        swingDown: [
+          { opacity: 0, transform: 'perspective(600px) rotateX(-90deg)' + rotStr, transformOrigin: 'top center' },
+          { opacity: 1, transform: 'perspective(600px) rotateX(25deg)' + rotStr, transformOrigin: 'top center', offset: 0.6 },
+          { opacity: 1, transform: 'perspective(600px) rotateX(-10deg)' + rotStr, transformOrigin: 'top center', offset: 0.8 },
+          { opacity: 1, transform: 'perspective(600px) rotateX(0deg)' + rotStr, transformOrigin: 'top center' }
+        ],
+        blurFadeIn: [
+          { opacity: 0, filter: 'blur(20px)', transform: 'scale(1.15)' + rotStr },
+          { opacity: 1, filter: 'blur(0px)', transform: 'scale(1)' + rotStr }
+        ],
+        stamp: [
+          { opacity: 0, transform: 'scale(3)' + rotStr },
+          { opacity: 1, transform: 'scale(1)' + rotStr, offset: 0.6 },
+          { opacity: 1, transform: 'scale(1.08)' + rotStr, offset: 0.8 },
+          { opacity: 1, transform: 'scale(1)' + rotStr }
+        ],
+        rollIn: [
+          { opacity: 0, transform: 'translateX(-120px) rotate(' + (r - 120) + 'deg)' },
+          { opacity: 1, transform: 'translateX(0) rotate(' + r + 'deg)' }
+        ],
+        lightSpeed: [
+          { opacity: 0, transform: 'translateX(120px) skewX(-25deg)' + rotStr },
+          { opacity: 1, transform: 'translateX(-15px) skewX(10deg)' + rotStr, offset: 0.7 },
+          { opacity: 1, transform: 'translateX(0) skewX(0deg)' + rotStr }
+        ],
+        rubberBandIn: [
+          { opacity: 0, transform: 'scale(0.3)' + rotStr },
+          { opacity: 1, transform: 'scale(1.25, 0.75)' + rotStr, offset: 0.5 },
+          { opacity: 1, transform: 'scale(0.75, 1.25)' + rotStr, offset: 0.7 },
+          { opacity: 1, transform: 'scale(1.1, 0.9)' + rotStr, offset: 0.85 },
+          { opacity: 1, transform: 'scale(1, 1)' + rotStr }
+        ],
+        spiralIn: [
+          { opacity: 0, filter: 'blur(8px)', transform: 'scale(0.1) rotate(' + (r + 360) + 'deg)' },
+          { opacity: 1, filter: 'blur(0px)', transform: 'scale(1) rotate(' + r + 'deg)' }
+        ],
+        backInDown: [
+          { opacity: 0.2, transform: 'translateY(-180px) scale(0.6)' + rotStr },
+          { opacity: 1, transform: 'translateY(12px) scale(1.05)' + rotStr, offset: 0.7 },
+          { opacity: 1, transform: 'translateY(0) scale(1)' + rotStr }
+        ],
+        backInUp: [
+          { opacity: 0.2, transform: 'translateY(180px) scale(0.6)' + rotStr },
+          { opacity: 1, transform: 'translateY(-12px) scale(1.05)' + rotStr, offset: 0.7 },
+          { opacity: 1, transform: 'translateY(0) scale(1)' + rotStr }
+        ],
+
+        // ── Emphasis / Continuous / Attention Animations ──
+        pulse: [
+          { transform: 'scale(1)' + rotStr },
+          { transform: 'scale(1.12)' + rotStr, offset: 0.5 },
+          { transform: 'scale(1)' + rotStr }
+        ],
+        bounce: [
+          { transform: 'translateY(0)' + rotStr },
+          { transform: 'translateY(-28px)' + rotStr, offset: 0.4 },
+          { transform: 'translateY(0)' + rotStr, offset: 0.7 },
+          { transform: 'translateY(-12px)' + rotStr, offset: 0.85 },
+          { transform: 'translateY(0)' + rotStr }
+        ],
+        spin: [
+          { transform: 'rotate(' + r + 'deg)' },
+          { transform: 'rotate(' + (r + 360) + 'deg)' }
+        ],
+        spin3d: [
+          { transform: 'perspective(700px) rotateY(0deg)' + rotStr },
+          { transform: 'perspective(700px) rotateY(360deg)' + rotStr }
+        ],
+        flip3dX: [
+          { transform: 'perspective(700px) rotateX(0deg)' + rotStr },
+          { transform: 'perspective(700px) rotateX(360deg)' + rotStr }
+        ],
+        swing: [
+          { transform: 'rotate(' + r + 'deg)' },
+          { transform: 'rotate(' + (r + 15) + 'deg)', offset: 0.25 },
+          { transform: 'rotate(' + (r - 10) + 'deg)', offset: 0.5 },
+          { transform: 'rotate(' + (r + 6) + 'deg)', offset: 0.75 },
+          { transform: 'rotate(' + r + 'deg)' }
+        ],
+        float: [
+          { transform: 'translateY(0)' + rotStr },
+          { transform: 'translateY(-18px)' + rotStr, offset: 0.5 },
+          { transform: 'translateY(0)' + rotStr }
+        ],
+        jello: [
+          { transform: 'skew(0)' + rotStr },
+          { transform: 'skew(-12deg,-12deg)' + rotStr, offset: 0.3 },
+          { transform: 'skew(7deg,7deg)' + rotStr, offset: 0.6 },
+          { transform: 'skew(-3deg,-3deg)' + rotStr, offset: 0.8 },
+          { transform: 'skew(0)' + rotStr }
+        ],
+        shake: [
+          { transform: 'translateX(0)' + rotStr },
+          { transform: 'translateX(-18px)' + rotStr, offset: 0.2 },
+          { transform: 'translateX(18px)' + rotStr, offset: 0.4 },
+          { transform: 'translateX(-12px)' + rotStr, offset: 0.6 },
+          { transform: 'translateX(12px)' + rotStr, offset: 0.8 },
+          { transform: 'translateX(0)' + rotStr }
+        ],
+        heartbeat: [
+          { transform: 'scale(1)' + rotStr },
+          { transform: 'scale(1.18)' + rotStr, offset: 0.14 },
+          { transform: 'scale(1)' + rotStr, offset: 0.28 },
+          { transform: 'scale(1.24)' + rotStr, offset: 0.42 },
+          { transform: 'scale(1)' + rotStr, offset: 0.7 },
+          { transform: 'scale(1)' + rotStr }
+        ],
+        glowPulse: [
+          { filter: 'drop-shadow(0 0 0 rgba(79,141,247,0)) brightness(1)' },
+          { filter: 'drop-shadow(0 0 20px rgba(79,141,247,0.95)) brightness(1.3)', offset: 0.5 },
+          { filter: 'drop-shadow(0 0 0 rgba(79,141,247,0)) brightness(1)' }
+        ],
+        tilt3d: [
+          { transform: 'perspective(600px) rotateX(0deg) rotateY(0deg)' + rotStr },
+          { transform: 'perspective(600px) rotateX(15deg) rotateY(-18deg)' + rotStr, offset: 0.33 },
+          { transform: 'perspective(600px) rotateX(-12deg) rotateY(15deg)' + rotStr, offset: 0.66 },
+          { transform: 'perspective(600px) rotateX(0deg) rotateY(0deg)' + rotStr }
+        ],
+        tada: [
+          { transform: 'scale(1)' + rotStr },
+          { transform: 'scale(0.9) rotate(' + (r - 4) + 'deg)', offset: 0.15 },
+          { transform: 'scale(1.15) rotate(' + (r + 4) + 'deg)', offset: 0.35 },
+          { transform: 'scale(1.15) rotate(' + (r - 4) + 'deg)', offset: 0.55 },
+          { transform: 'scale(1.15) rotate(' + (r + 3) + 'deg)', offset: 0.75 },
+          { transform: 'scale(1) rotate(' + r + 'deg)' }
+        ],
+        wobble: [
+          { transform: 'translateX(0) rotate(' + r + 'deg)' },
+          { transform: 'translateX(-15px) rotate(' + (r - 5) + 'deg)', offset: 0.2 },
+          { transform: 'translateX(15px) rotate(' + (r + 4) + 'deg)', offset: 0.4 },
+          { transform: 'translateX(-10px) rotate(' + (r - 3) + 'deg)', offset: 0.6 },
+          { transform: 'translateX(8px) rotate(' + (r + 2) + 'deg)', offset: 0.8 },
+          { transform: 'translateX(0) rotate(' + r + 'deg)' }
+        ],
+        rubberBand: [
+          { transform: 'scale3d(1, 1, 1)' + rotStr },
+          { transform: 'scale3d(1.25, 0.75, 1)' + rotStr, offset: 0.3 },
+          { transform: 'scale3d(0.75, 1.25, 1)' + rotStr, offset: 0.4 },
+          { transform: 'scale3d(1.15, 0.85, 1)' + rotStr, offset: 0.6 },
+          { transform: 'scale3d(0.95, 1.05, 1)' + rotStr, offset: 0.8 },
+          { transform: 'scale3d(1, 1, 1)' + rotStr }
+        ],
+        flash: [
+          { opacity: 1 },
+          { opacity: 0.15, offset: 0.25 },
+          { opacity: 1, offset: 0.5 },
+          { opacity: 0.15, offset: 0.75 },
+          { opacity: 1 }
+        ],
+        glitch: [
+          { transform: 'translate(0, 0)' + rotStr },
+          { transform: 'translate(-6px, 3px) skewX(4deg)' + rotStr, offset: 0.2 },
+          { transform: 'translate(6px, -3px) skewX(-4deg)' + rotStr, offset: 0.4 },
+          { transform: 'translate(-4px, -2px) skewX(3deg)' + rotStr, offset: 0.6 },
+          { transform: 'translate(4px, 2px) skewX(-2deg)' + rotStr, offset: 0.8 },
+          { transform: 'translate(0, 0)' + rotStr }
+        ],
+        breath: [
+          { transform: 'scale(1)' + rotStr, filter: 'brightness(1)' },
+          { transform: 'scale(1.06)' + rotStr, filter: 'brightness(1.15)', offset: 0.5 },
+          { transform: 'scale(1)' + rotStr, filter: 'brightness(1)' }
+        ],
+        vibrate: [
+          { transform: 'translate(0, 0)' + rotStr },
+          { transform: 'translate(-3px, 2px)' + rotStr, offset: 0.15 },
+          { transform: 'translate(3px, -2px)' + rotStr, offset: 0.35 },
+          { transform: 'translate(-3px, -2px)' + rotStr, offset: 0.55 },
+          { transform: 'translate(3px, 2px)' + rotStr, offset: 0.75 },
+          { transform: 'translate(0, 0)' + rotStr }
+        ],
+        shimmer: [
+          { filter: 'brightness(1) contrast(1)' },
+          { filter: 'brightness(1.7) contrast(1.25)', offset: 0.5 },
+          { filter: 'brightness(1) contrast(1)' }
+        ],
+
+        // ── Exit Animations ──────────────────────────────
+        fadeOut: [
+          { opacity: 1, transform: 'rotate(' + r + 'deg)' },
+          { opacity: 0, transform: 'rotate(' + r + 'deg)' }
+        ],
+        zoomOut: [
+          { opacity: 1, transform: 'scale(1)' + rotStr },
+          { opacity: 0, transform: 'scale(.2)' + rotStr }
+        ],
+        slideOutRight: [
+          { opacity: 1, transform: 'translateX(0)' + rotStr },
+          { opacity: 0, transform: 'translateX(120px)' + rotStr }
+        ],
+        slideOutLeft: [
+          { opacity: 1, transform: 'translateX(0)' + rotStr },
+          { opacity: 0, transform: 'translateX(-120px)' + rotStr }
+        ],
+        slideOutUp: [
+          { opacity: 1, transform: 'translateY(0)' + rotStr },
+          { opacity: 0, transform: 'translateY(-100px)' + rotStr }
+        ],
+        slideOutDown: [
+          { opacity: 1, transform: 'translateY(0)' + rotStr },
+          { opacity: 0, transform: 'translateY(100px)' + rotStr }
+        ],
+        spinOut: [
+          { opacity: 1, transform: 'scale(1) rotate(' + r + 'deg)' },
+          { opacity: 0, transform: 'scale(0.1) rotate(' + (r + 360) + 'deg)' }
+        ],
+        flipOutX: [
+          { opacity: 1, transform: 'perspective(500px) rotateX(0deg)' + rotStr },
+          { opacity: 0, transform: 'perspective(500px) rotateX(90deg)' + rotStr }
+        ],
+        flipOutY: [
+          { opacity: 1, transform: 'perspective(500px) rotateY(0deg)' + rotStr },
+          { opacity: 0, transform: 'perspective(500px) rotateY(90deg)' + rotStr }
+        ],
+        blurFadeOut: [
+          { opacity: 1, filter: 'blur(0px)', transform: 'scale(1)' + rotStr },
+          { opacity: 0, filter: 'blur(20px)', transform: 'scale(0.85)' + rotStr }
+        ],
+        shrinkPop: [
+          { opacity: 1, transform: 'scale(1)' + rotStr },
+          { opacity: 1, transform: 'scale(1.2)' + rotStr, offset: 0.3 },
+          { opacity: 0, transform: 'scale(0.1)' + rotStr }
+        ],
+        wipeOutLeft: [
+          { opacity: 1, clipPath: 'inset(0 0 0 0)', transform: 'rotate(' + r + 'deg)' },
+          { opacity: 0, clipPath: 'inset(0 100% 0 0)', transform: 'rotate(' + r + 'deg)' }
+        ],
+        wipeOutRight: [
+          { opacity: 1, clipPath: 'inset(0 0 0 0)', transform: 'rotate(' + r + 'deg)' },
+          { opacity: 0, clipPath: 'inset(0 0 0 100%)', transform: 'rotate(' + r + 'deg)' }
+        ]
       };
       return baseMap[name] || baseMap.fade;
     }
@@ -535,17 +882,24 @@
 
           const body = document.createElement('div');
           body.style.cssText = 'position:absolute;inset:0;pointer-events:none;opacity:' + opVal + ';';
-          const svgFn = window.getShapeSvg;
-          if (typeof svgFn === 'function') {
-            let svg = svgFn(el.shape);
-            svg = svg.replace(/var\(--sf[^)]*\)/g, fillVal)
-                     .replace(/var\(--ss[^)]*\)/g, strokeVal)
-                     .replace(/var\(--sl[^)]*\)/g, lineVal + 'px');
-            body.innerHTML = svg;
+          if (el.shapeImage) {
+            const sImg = document.createElement('img');
+            sImg.src = el.shapeImage;
+            sImg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;border-radius:inherit;z-index:2;';
+            node.appendChild(sImg);
+          } else {
+            const svgFn = window.getShapeSvg;
+            if (typeof svgFn === 'function') {
+              let svg = svgFn(el.shape);
+              svg = svg.replace(/var\(--sf[^)]*\)/g, fillVal)
+                       .replace(/var\(--ss[^)]*\)/g, strokeVal)
+                       .replace(/var\(--sl[^)]*\)/g, lineVal + 'px');
+              body.innerHTML = svg;
+            }
+            node.appendChild(body);
           }
-          node.appendChild(body);
 
-          if (el.text) {
+          if (el.text && !el.shapeImage) {
             const label = document.createElement('div');
             const txtColor = el.textColor || el.color || '#ffffff';
             const txtSize = Number(el.textSize || el.size || 18);
@@ -555,7 +909,11 @@
             node.appendChild(label);
           }
         } else if (el.type === 'image') {
-          node.style.cssText = 'position:absolute;left:' + el.x + '%;top:' + el.y + '%;width:' + el.w + '%;height:' + el.h + '%;transform:rotate(' + rot + 'deg);transform-origin:center center;overflow:hidden;';
+          let imgCss = 'position:absolute;left:' + el.x + '%;top:' + el.y + '%;width:' + el.w + '%;height:' + el.h + '%;transform:rotate(' + rot + 'deg);transform-origin:center center;overflow:hidden;';
+          if (el.borderRadius) imgCss += 'border-radius:' + el.borderRadius + 'px;';
+          if (el.opacity !== undefined) imgCss += 'opacity:' + (Number(el.opacity) / 100) + ';';
+          if (el.borderWidth) imgCss += 'border:' + el.borderWidth + 'px solid ' + (el.borderColor || '#ffffff') + ';';
+          node.style.cssText = imgCss;
           const img = new Image();
           img.src = el.src;
           img.style.cssText = 'width:100%;height:100%;object-fit:' + (el.fit || 'contain') + ';display:block;';

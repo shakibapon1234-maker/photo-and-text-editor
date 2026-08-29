@@ -249,7 +249,23 @@
       body.className = 'shape-body';
       n.appendChild(body);
     }
-    body.innerHTML = getShapeSvg(e.shape);
+
+    let imgEl = n.querySelector('.shape-uploaded-image');
+    if (e.shapeImage) {
+      body.innerHTML = '';
+      body.style.display = 'none';
+      if (!imgEl) {
+        imgEl = document.createElement('img');
+        imgEl.className = 'shape-uploaded-image';
+        imgEl.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;z-index:2;border-radius:inherit;';
+        n.appendChild(imgEl);
+      }
+      imgEl.src = e.shapeImage;
+    } else {
+      body.style.display = '';
+      body.innerHTML = getShapeSvg(e.shape);
+      if (imgEl) imgEl.remove();
+    }
 
     let label = n.querySelector('.shape-label');
     if (!label) {
@@ -259,7 +275,7 @@
     }
     label.contentEditable = 'false';
     label.spellcheck = false;
-    label.textContent = e.text || '';
+    label.textContent = e.shapeImage ? '' : (e.text || '');
     label.style.color = e.textColor || '#ffffff';
     label.style.fontSize = (e.textSize || 18) + 'px';
     label.style.fontWeight = e.textWeight || '700';

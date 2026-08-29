@@ -125,19 +125,18 @@
     100% { transform: translate3d(4%, 0, 0); }
   }
 
-  #brollLayer.sunset {
+  #brollLayer.sunset, #brollLayer.cloudSunset {
     background: linear-gradient(175deg, #4c0519, #be123c 35%, #f97316 65%, #fde047 90%);
   }
-  #brollLayer.sunset:before {
+  #brollLayer.sunset:before, #brollLayer.cloudSunset:before {
     background: radial-gradient(ellipse at 15% 70%, #ffc76c 0 10%, transparent 28%),
                 radial-gradient(ellipse at 50% 75%, #ffedd5 0 8%, transparent 22%),
                 radial-gradient(ellipse at 85% 55%, #fed7aa 0 10%, transparent 30%);
     filter: blur(12px);
     animation: broll_sunset_clouds 18s linear infinite alternate !important;
   }
-  @keyframes broll_sunset_clouds {
-    0% { transform: translate3d(-6%, 0, 0) scale(1); }
-    100% { transform: translate3d(6%, -2%, 0) scale(1.05); }
+  #brollLayer.sunset:after, #brollLayer.cloudSunset:after {
+    display: none;
   }
 
   #brollLayer.water {
@@ -170,6 +169,19 @@
   }
   style.textContent = css;
 
+  window.getBrollPresetGradient = function(p) {
+    const map = {
+      sky: 'linear-gradient(165deg, #0762a3, #79cdf3 48%, #d9f4ff)',
+      space: 'radial-gradient(circle at 72% 20%, #ffe18a 0 2%, transparent 5%), radial-gradient(circle at 19% 88%, #5933a0 0 10%, transparent 24%), #020617',
+      aurora: 'linear-gradient(135deg, #051531, #156d89 52%, #663a9c)',
+      night: 'linear-gradient(155deg, #030914, #0d2145 58%, #291529)',
+      sunset: 'linear-gradient(175deg, #642160, #ec6e69 45%, #ffbf62 72%, #72587f)',
+      cloudSunset: 'linear-gradient(175deg, #642160, #ec6e69 45%, #ffbf62 72%, #72587f)',
+      water: 'linear-gradient(#084f71, #078fba 45%, #015278)'
+    };
+    return map[p] || null;
+  };
+
   function draw() {
     const s = active(), p = s.brollPreset || 'none', sp = s.brollSpeed || 'normal';
     let layer = $('brollLayer');
@@ -194,20 +206,94 @@
     draw();
   };
 
+  // ── Inject Animated Background Themes UI into Right Sidebar ──
+  const rightPanel = document.querySelector('.right');
+  if (rightPanel && !$('brollPresetPanel')) {
+    const brollWrap = document.createElement('div');
+    brollWrap.id = 'brollPresetPanel';
+    brollWrap.innerHTML = `
+      <div class="section-title" style="color:#ffd17b;font-weight:800;margin-top:14px;">🎬 ANIMATED BACKGROUND THEMES (অ্যানিমেটেড থিম)</div>
+      <div class="row" style="margin-bottom:8px;">
+        <label class="field" style="margin:0;">
+          Animated Preset
+          <select id="brollPreset">
+            <option value="none">None (সাধারণ স্লাইড)</option>
+            <option value="space">🌌 Space Stars (মহাকাশ তারা)</option>
+            <option value="aurora">✨ Aurora Lights (অরোরা লাইটস)</option>
+            <option value="water">🌊 Water Ripple (পানির ঢেউ)</option>
+            <option value="cloudSunset">🌅 Cloud Sunset (সানসেট মেঘ)</option>
+            <option value="sky">☁️ Sky & Clouds (আকাশ মেঘ)</option>
+            <option value="night">🌃 City Night (রাতের শহর)</option>
+          </select>
+        </label>
+        <label class="field" id="brollSpeedRow" style="margin:0;">
+          Speed
+          <select id="brollSpeed">
+            <option value="slow">Slow (ধীরগতি)</option>
+            <option value="normal" selected>Normal</option>
+            <option value="fast">Fast (দ্রুত)</option>
+          </select>
+        </label>
+      </div>
+      <div id="brollQuickGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;">
+        <button type="button" data-preset="space" style="font-size:10px;padding:7px 4px;background:#0f172a;border-color:#6366f1;">🌌 Space Stars</button>
+        <button type="button" data-preset="aurora" style="font-size:10px;padding:7px 4px;background:#022c22;border-color:#10b981;">✨ Aurora Lights</button>
+        <button type="button" data-preset="water" style="font-size:10px;padding:7px 4px;background:#075985;border-color:#38bdf8;">🌊 Water Ripple</button>
+        <button type="button" data-preset="cloudSunset" style="font-size:10px;padding:7px 4px;background:#4c1d24;border-color:#f43f5e;">🌅 Cloud Sunset</button>
+        <button type="button" data-preset="sky" style="font-size:10px;padding:7px 4px;background:#0c4a6e;border-color:#38bdf8;">☁️ Sky & Clouds</button>
+        <button type="button" data-preset="night" style="font-size:10px;padding:7px 4px;background:#1e1b4b;border-color:#818cf8;">🌃 City Night</button>
+        <button type="button" data-preset="none" style="font-size:10px;padding:7px 4px;background:#1e293b;border-color:#475569;grid-column:1/-1;">✕ Remove Animation (স্বাভাবিক)</button>
+      </div>
+    `;
+
+    // Safely insert after BEAUTIFUL SLIDE THEMES or near top of right sidebar
+    const themePal = $('themePalette')?.closest('.right > div') || $('themePalette')?.parentElement;
+    if (themePal && themePal.parentElement === rightPanel && themePal.nextElementSibling) {
+      rightPanel.insertBefore(brollWrap, themePal.nextElementSibling);
+    } else if (themePal && themePal.parentElement === rightPanel) {
+      themePal.after(brollWrap);
+    } else if (rightPanel.firstElementChild && rightPanel.firstElementChild.nextElementSibling) {
+      rightPanel.insertBefore(brollWrap, rightPanel.firstElementChild.nextElementSibling);
+    } else {
+      rightPanel.appendChild(brollWrap);
+    }
+
+    // Bind Quick Preset Buttons
+    brollWrap.querySelectorAll('#brollQuickGrid button').forEach(b => {
+      b.onclick = () => {
+        const p = b.dataset.preset;
+        active().brollPreset = p;
+        if ($('brollPreset')) $('brollPreset').value = p;
+        if ($('brollSpeedRow')) $('brollSpeedRow').classList.toggle('hidden', p === 'none');
+        render();
+      };
+    });
+  }
+
   const priorInspector = renderInspector;
   renderInspector = function() {
     priorInspector();
     const s = active();
+    if (!s) return;
     s.brollPreset = s.brollPreset || 'none';
     s.brollSpeed = s.brollSpeed || 'normal';
     if ($('brollPreset')) $('brollPreset').value = s.brollPreset;
     if ($('brollSpeed')) $('brollSpeed').value = s.brollSpeed;
     if ($('brollSpeedRow')) $('brollSpeedRow').classList.toggle('hidden', s.brollPreset === 'none');
+
+    // Highlight active quick button
+    const grid = $('brollQuickGrid');
+    if (grid) {
+      grid.querySelectorAll('button').forEach(b => {
+        b.style.outline = (b.dataset.preset === s.brollPreset) ? '2px solid #fbbf24' : '';
+      });
+    }
   };
 
   if ($('brollPreset')) {
     $('brollPreset').onchange = e => {
       active().brollPreset = e.target.value;
+      if ($('brollSpeedRow')) $('brollSpeedRow').classList.toggle('hidden', e.target.value === 'none');
       render();
     };
   }

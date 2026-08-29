@@ -3,11 +3,7 @@
     return { background:'fashion', bgColor:'#17233c', transition:'fade', autoDuration:0, elements:[] };
   };
 
-  const starterTexts = new Set(['আপনার অসাধারণ Presentation','শুরু করুন আপনার গল্প, পণ্য বা আইডিয়া দিয়ে']);
-  slides.forEach(slide => {
-    if (!slide || !Array.isArray(slide.elements)) return;
-    slide.elements = slide.elements.filter(item => !(item.type === 'text' && starterTexts.has(String(item.text || ''))));
-  });
+
 
   const $ = id => document.getElementById(id);
   let navigationToken = 0;

@@ -49,6 +49,8 @@
 
     <!-- SHAPE section (with both Shape styling and Shape Text styling) -->
     <div class="ctx-group ctx-hidden" id="ctx-shape">
+      <button id="ctx-shape-img-replace" title="শেপে নিজের ছবি আপলোড করুন" style="background:#0369a1;border-color:#38bdf8;color:#fff;font-weight:800;padding:4px 10px;white-space:nowrap;">📁 ছবি লোড করুন</button>
+      <div class="ctx-sep"></div>
       <label class="ctx-label">Fill
         <input id="ctx-shape-fill" type="color" value="#4f8df7" title="Shape fill color">
       </label>
@@ -91,6 +93,8 @@
 
     <!-- IMAGE section -->
     <div class="ctx-group ctx-hidden" id="ctx-image">
+      <button id="ctx-img-replace" title="কম্পিউটার থেকে নিজের ছবি/আইকন বাছাই করুন" style="background:#0369a1;border-color:#38bdf8;color:#fff;font-weight:800;padding:4px 12px;">📁 ছবি Replace করুন</button>
+      <div class="ctx-sep"></div>
       <label class="ctx-label">Opacity
         <input id="ctx-img-opacity" type="range" min="0" max="100" value="100" title="Opacity" style="width:64px;accent-color:#ffb11b">
         <span id="ctx-img-opacity-val" style="font-size:10px;color:#ffd166;min-width:28px">100%</span>
@@ -101,7 +105,7 @@
       <div class="ctx-sep"></div>
       <button id="ctx-fit-cover" title="Toggle fit/cover">⊡ Fit/Cover</button>
       <div class="ctx-sep"></div>
-      <span class="ctx-hint">Click image to select</span>
+      <span class="ctx-hint">💡 Double-click image = Replace করুন</span>
     </div>
   `;
   document.body.prepend(bar);
@@ -191,6 +195,13 @@
     } else if (id === 'ctx-shape-duplicate' || id === 'ctx-duplicate') {
       if (typeof window.duplicatePresentationElement === 'function') {
         window.duplicatePresentationElement();
+      }
+    }
+    // Image replace buttons (both from image & shape sections)
+    else if (id === 'ctx-img-replace' || id === 'ctx-shape-img-replace') {
+      const el = (typeof selectedEl === 'function') ? selectedEl() : null;
+      if (typeof window.triggerReplaceImage === 'function') {
+        window.triggerReplaceImage(el);
       }
     }
     // Image buttons
