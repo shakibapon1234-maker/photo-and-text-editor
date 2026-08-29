@@ -195,15 +195,18 @@
       100% { transform: translate3d(4%, 0, 0); }
     }
 
-    #brollLayer.sunset {
+    #brollLayer.sunset, #brollLayer.cloudSunset {
       background: linear-gradient(175deg, #4c0519, #be123c 35%, #f97316 65%, #fde047 90%) !important;
     }
-    #brollLayer.sunset:before {
+    #brollLayer.sunset:before, #brollLayer.cloudSunset:before {
       background: radial-gradient(ellipse at 15% 70%, #ffc76c 0 10%, transparent 28%),
                   radial-gradient(ellipse at 50% 75%, #ffedd5 0 8%, transparent 22%),
                   radial-gradient(ellipse at 85% 55%, #fed7aa 0 10%, transparent 30%) !important;
       filter: blur(12px) !important;
       animation: broll_sunset_clouds 18s linear infinite alternate !important;
+    }
+    #brollLayer.sunset:after, #brollLayer.cloudSunset:after {
+      display: none;
     }
     @keyframes broll_sunset_clouds {
       0% { transform: translate3d(-6%, 0, 0) scale(1); }
@@ -925,7 +928,9 @@
       if (slide.brollPreset && slide.brollPreset !== 'none') {
         const broll = document.createElement('div');
         broll.id = 'brollLayer';
-        broll.className = slide.brollPreset + ' speed-' + (slide.brollSpeed || 'normal');
+        let pClass = slide.brollPreset;
+        if (pClass === 'cloudSunset') pClass = 'sunset cloudSunset';
+        broll.className = pClass + ' ' + slide.brollPreset + ' speed-' + (slide.brollSpeed || 'normal');
         stage.appendChild(broll);
       }
 

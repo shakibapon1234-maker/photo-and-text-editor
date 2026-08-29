@@ -830,7 +830,9 @@
       if (sl.brollPreset && sl.brollPreset !== 'none') {
         const broll = document.createElement('div');
         broll.id = 'brollLayer';
-        broll.className = sl.brollPreset + ' speed-' + (sl.brollSpeed || 'normal');
+        let pClass = sl.brollPreset;
+        if (pClass === 'cloudSunset') pClass = 'sunset cloudSunset';
+        broll.className = pClass + ' ' + sl.brollPreset + ' speed-' + (sl.brollSpeed || 'normal');
         stage.appendChild(broll);
       }
 
