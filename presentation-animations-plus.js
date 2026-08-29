@@ -3,32 +3,38 @@
   const select=$('elementAnimation');
   if(!select)return;
 
-  const frames={
-    fade:[{opacity:0},{opacity:1}],
-    appear:[{opacity:0},{opacity:1}],
-    slideLeft:[{opacity:0,transform:'translateX(-90px)'},{opacity:1,transform:'none'}],
-    slideRight:[{opacity:0,transform:'translateX(90px)'},{opacity:1,transform:'none'}],
-    slideUp:[{opacity:0,transform:'translateY(70px)'},{opacity:1,transform:'none'}],
-    slideDown:[{opacity:0,transform:'translateY(-70px)'},{opacity:1,transform:'none'}],
-    zoom:[{opacity:0,transform:'scale(.2)'},{opacity:1,transform:'scale(1)'}],
-    pop:[{opacity:0,transform:'scale(.2)'},{opacity:1,transform:'scale(1.15)',offset:.7},{opacity:1,transform:'scale(1)'}],
-    flipX:[{opacity:0,transform:'perspective(400px) rotateX(90deg)'},{opacity:1,transform:'perspective(400px) rotateX(0)'}],
-    flipY:[{opacity:0,transform:'perspective(400px) rotateY(90deg)'},{opacity:1,transform:'perspective(400px) rotateY(0)'}],
-    wipeLeft:[{opacity:0,clipPath:'inset(0 100% 0 0)'},{opacity:1,clipPath:'inset(0 0 0 0)'}],
-    pulse:[{transform:'scale(1)'},{transform:'scale(1.12)'},{transform:'scale(1)'}],
-    bounce:[{transform:'translateY(0)'},{transform:'translateY(-28px)'},{transform:'translateY(0)'}],
-    spin:[{transform:'rotate(0)'},{transform:'rotate(360deg)'}],
-    spin3d:[{transform:'perspective(700px) rotateY(0deg)'},{transform:'perspective(700px) rotateY(360deg)'}],
-    swing:[{transform:'rotate(0)'},{transform:'rotate(15deg)'},{transform:'rotate(-10deg)'},{transform:'rotate(0)'}],
-    float:[{transform:'translateY(0)'},{transform:'translateY(-20px)'},{transform:'translateY(0)'}],
-    jello:[{transform:'skew(0)'},{transform:'skew(-12deg,-12deg)'},{transform:'skew(7deg,7deg)'},{transform:'skew(0)'}],
-    shake:[{transform:'translateX(0)'},{transform:'translateX(-18px)'},{transform:'translateX(18px)'},{transform:'translateX(0)'}],
-    fadeOut:[{opacity:1},{opacity:0}],
-    zoomOut:[{opacity:1,transform:'scale(1)'},{opacity:0,transform:'scale(.2)'}],
-    slideOutRight:[{opacity:1,transform:'none'},{opacity:0,transform:'translateX(120px)'}]
-  };
+  function getAnimFrames(name, rot = 0) {
+    const r = Number(rot) || 0;
+    const rotStr = r ? (' rotate(' + r + 'deg)') : '';
+    const baseMap = {
+      fade: [{ opacity: 0, transform: 'rotate(' + r + 'deg)' }, { opacity: 1, transform: 'rotate(' + r + 'deg)' }],
+      appear: [{ opacity: 0, transform: 'rotate(' + r + 'deg)' }, { opacity: 1, transform: 'rotate(' + r + 'deg)' }],
+      slideLeft: [{ opacity: 0, transform: 'translateX(-90px)' + rotStr }, { opacity: 1, transform: 'translateX(0)' + rotStr }],
+      slideRight: [{ opacity: 0, transform: 'translateX(90px)' + rotStr }, { opacity: 1, transform: 'translateX(0)' + rotStr }],
+      slideUp: [{ opacity: 0, transform: 'translateY(70px)' + rotStr }, { opacity: 1, transform: 'translateY(0)' + rotStr }],
+      slideDown: [{ opacity: 0, transform: 'translateY(-70px)' + rotStr }, { opacity: 1, transform: 'translateY(0)' + rotStr }],
+      zoom: [{ opacity: 0, transform: 'scale(.2)' + rotStr }, { opacity: 1, transform: 'scale(1)' + rotStr }],
+      pop: [{ opacity: 0, transform: 'scale(.2)' + rotStr }, { opacity: 1, transform: 'scale(1.15)' + rotStr, offset: 0.7 }, { opacity: 1, transform: 'scale(1)' + rotStr }],
+      flipX: [{ opacity: 0, transform: 'perspective(400px) rotateX(90deg)' + rotStr }, { opacity: 1, transform: 'perspective(400px) rotateX(0)' + rotStr }],
+      flipY: [{ opacity: 0, transform: 'perspective(400px) rotateY(90deg)' + rotStr }, { opacity: 1, transform: 'perspective(400px) rotateY(0)' + rotStr }],
+      wipeLeft: [{ opacity: 0, clipPath: 'inset(0 100% 0 0)', transform: 'rotate(' + r + 'deg)' }, { opacity: 1, clipPath: 'inset(0 0 0 0)', transform: 'rotate(' + r + 'deg)' }],
+      pulse: [{ transform: 'scale(1)' + rotStr }, { transform: 'scale(1.12)' + rotStr }, { transform: 'scale(1)' + rotStr }],
+      bounce: [{ transform: 'translateY(0)' + rotStr }, { transform: 'translateY(-28px)' + rotStr }, { transform: 'translateY(0)' + rotStr }],
+      spin: [{ transform: 'rotate(' + r + 'deg)' }, { transform: 'rotate(' + (r + 360) + 'deg)' }],
+      spin3d: [{ transform: 'perspective(700px) rotateY(0deg)' + rotStr }, { transform: 'perspective(700px) rotateY(360deg)' + rotStr }],
+      swing: [{ transform: 'rotate(' + r + 'deg)' }, { transform: 'rotate(' + (r + 15) + 'deg)' }, { transform: 'rotate(' + (r - 10) + 'deg)' }, { transform: 'rotate(' + r + 'deg)' }],
+      float: [{ transform: 'translateY(0)' + rotStr }, { transform: 'translateY(-20px)' + rotStr }, { transform: 'translateY(0)' + rotStr }],
+      jello: [{ transform: 'skew(0)' + rotStr }, { transform: 'skew(-12deg,-12deg)' + rotStr }, { transform: 'skew(7deg,7deg)' + rotStr }, { transform: 'skew(0)' + rotStr }],
+      shake: [{ transform: 'translateX(0)' + rotStr }, { transform: 'translateX(-18px)' + rotStr }, { transform: 'translateX(18px)' + rotStr }, { transform: 'translateX(0)' + rotStr }],
+      fadeOut: [{ opacity: 1, transform: 'rotate(' + r + 'deg)' }, { opacity: 0, transform: 'rotate(' + r + 'deg)' }],
+      zoomOut: [{ opacity: 1, transform: 'scale(1)' + rotStr }, { opacity: 0, transform: 'scale(.2)' + rotStr }],
+      slideOutRight: [{ opacity: 1, transform: 'translateX(0)' + rotStr }, { opacity: 0, transform: 'translateX(120px)' + rotStr }]
+    };
+    return baseMap[name] || baseMap.fade;
+  }
 
-  window.animFrames = frames;
+  window.getAnimFrames = getAnimFrames;
+  window.animFrames = getAnimFrames('fade', 0);
 
   function previewLiveAnimation(el) {
     const e = el || (typeof selectedEl === 'function' ? selectedEl() : null);
@@ -36,7 +42,7 @@
     const slide = $('slide');
     if (!slide) return;
     const node = slide.querySelector('.element[data-id="' + e.id + '"]') || slide.querySelector('[data-id="' + e.id + '"]');
-    const f = frames[e.animation];
+    const f = getAnimFrames(e.animation, e.rotation);
     if (!node || !f) return;
 
     node.getAnimations().forEach(a => a.cancel());
