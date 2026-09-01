@@ -278,7 +278,7 @@
       border: 1px solid rgba(80, 120, 180, 0.35);
       box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7);
       backdrop-filter: blur(14px);
-      opacity: 0; transition: opacity 0.3s ease;
+      opacity: 0.88; transition: opacity 0.3s ease;
     }
     body:hover #controls, #controls:hover { opacity: 1; }
     .ctrl-btn {
@@ -289,8 +289,32 @@
       transition: all 0.15s ease;
     }
     .ctrl-btn:hover { background: #2d456b; border-color: #79abff; transform: scale(1.08); }
-    .ctrl-btn.voice-on { background: #a85008; border-color: #ffb11b; }
+    .ctrl-btn.voice-on {
+      background: #dc2626 !important;
+      border-color: #f87171 !important;
+      box-shadow: 0 0 14px rgba(220, 38, 38, 0.8) !important;
+      animation: voicePulse 1.2s infinite alternate !important;
+    }
+    @keyframes voicePulse {
+      0% { transform: scale(1); box-shadow: 0 0 8px rgba(220, 38, 38, 0.6); }
+      100% { transform: scale(1.15); box-shadow: 0 0 20px rgba(239, 68, 68, 0.9); }
+    }
     .ctrl-info { font-size: 13px; color: #c4d7f5; font-weight: 700; padding: 0 6px; white-space: nowrap; }
+
+    /* ── Voice Feedback Toast ─────────────────────────────────────────── */
+    .voice-toast {
+      position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 1000; display: flex; align-items: center; gap: 10px;
+      padding: 10px 22px; border-radius: 30px;
+      background: rgba(15, 23, 42, 0.94); border: 1px solid #3b82f6;
+      color: #fff; font-size: 13px; font-weight: 700;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.7); backdrop-filter: blur(12px);
+      transition: opacity 0.3s ease, transform 0.3s ease; pointer-events: auto;
+      max-width: 90vw; text-align: center;
+    }
+    .voice-toast.hidden { opacity: 0; transform: translate(-50%, -20px); pointer-events: none; }
+    .voice-toast.warning { border-color: #f59e0b; background: rgba(36, 22, 10, 0.95); color: #fde68a; }
+    .voice-toast.error { border-color: #ef4444; background: rgba(45, 12, 12, 0.95); color: #fca5a5; }
 
     /* ── Slide Quick Navigator Drawer ─────────────────────────────────── */
     #navDrawer {
@@ -1126,17 +1150,97 @@
     window.addEventListener('resize', resizeStage);
     resizeStage();
 
+    function isSlideObject(obj) {
+      if (!obj || typeof obj !== 'object') return false;
+      return Array.isArray(obj.elements) || typeof obj.background === 'string' || typeof obj.bgColor === 'string' || typeof obj.brollPreset === 'string';
+    }
+
+    function extractSlidesFromData(data) {
+      if (!data) return null;
+
+      // 1. Direct array of slides or snapshots
+      if (Array.isArray(data)) {
+        if (data.length > 0 && isSlideObject(data[0])) {
+          return data;
+        }
+        for (const item of data) {
+          const res = extractSlidesFromData(item);
+          if (res && res.length) return res;
+        }
+        if (data.length > 0 && typeof data[0] === 'object') {
+          return data;
+        }
+      }
+
+      // 2. Object with nested slides property or backup wrappers
+      if (typeof data === 'object') {
+        if (Array.isArray(data.slides) && data.slides.length) return extractSlidesFromData(data.slides);
+        if (Array.isArray(data.deck) && data.deck.length) return extractSlidesFromData(data.deck);
+        if (Array.isArray(data.presentation) && data.presentation.length) return extractSlidesFromData(data.presentation);
+
+        if (data.data) {
+          const res = extractSlidesFromData(data.data);
+          if (res && res.length) return res;
+        }
+        if (data.project) {
+          const res = extractSlidesFromData(data.project);
+          if (res && res.length) return res;
+        }
+        if (data.content) {
+          const res = extractSlidesFromData(data.content);
+          if (res && res.length) return res;
+        }
+        if (data.backup) {
+          const res = extractSlidesFromData(data.backup);
+          if (res && res.length) return res;
+        }
+        if (data.emergency_backup) {
+          const res = extractSlidesFromData(data.emergency_backup);
+          if (res && res.length) return res;
+        }
+        if (data.current) {
+          const res = extractSlidesFromData(data.current);
+          if (res && res.length) return res;
+        }
+
+        for (const key of Object.keys(data)) {
+          if (typeof data[key] === 'object') {
+            const res = extractSlidesFromData(data[key]);
+            if (res && res.length && isSlideObject(res[0])) return res;
+          }
+        }
+      }
+      return null;
+    }
+
     function loadDeck(jsonText) {
       try {
-        const data = JSON.parse(jsonText);
-        slides = Array.isArray(data) ? data : (data.slides || [data]);
-        if (!slides.length) throw new Error('No slides found in project');
+        if (!jsonText || typeof jsonText !== 'string') {
+          throw new Error('ফাইলটি খালি বা পড়া যায়নি।');
+        }
+        const cleanedText = jsonText.trim().replace(/^\uFEFF/, '');
+        const data = JSON.parse(cleanedText);
+
+        let foundSlides = extractSlidesFromData(data);
+
+        if (!foundSlides || !Array.isArray(foundSlides) || !foundSlides.length) {
+          throw new Error('এই JSON ফাইলে কোনো স্লাইড ডেটা পাওয়া যায়নি। দয়া করে সঠিক Presentation JSON/Backup ফাইল নির্বাচন করুন।');
+        }
+
+        slides = foundSlides.map(sl => {
+          if (!sl || typeof sl !== 'object') return { background: 'fashion', elements: [] };
+          return {
+            ...sl,
+            elements: Array.isArray(sl.elements) ? sl.elements : []
+          };
+        });
+
         currentIndex = 0;
         document.getElementById('dropzone').classList.add('hidden');
         renderDrawer();
         drawSlide();
       } catch(err) {
-        alert('Invalid presentation JSON file: ' + err.message);
+        alert('❌ ফাইল খুলতে সমস্যা হয়েছে:\n' + err.message);
       }
     }
 
@@ -1148,7 +1252,10 @@
       const file = e.target.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = ev => loadDeck(ev.target.result);
+      reader.onload = ev => {
+        loadDeck(ev.target.result);
+        fileInput.value = '';
+      };
       reader.readAsText(file);
     });
 
@@ -1256,6 +1363,8 @@
         document.getElementById('fsBtn').click();
       } else if (e.key.toLowerCase() === 'l') {
         document.getElementById('listBtn').click();
+      } else if (e.key.toLowerCase() === 'v' || e.key.toLowerCase() === 'm') {
+        document.getElementById('voiceBtn').click();
       } else if (e.key === 'Escape') {
         document.getElementById('navDrawer').classList.remove('open');
       }
@@ -1266,35 +1375,133 @@
       advance(1);
     });
 
+    let isVoiceActive = false;
+
+    function showVoiceToast(msg, type = 'info', duration = 4000) {
+      let toast = document.getElementById('voiceToast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'voiceToast';
+        toast.className = 'voice-toast';
+        document.body.appendChild(toast);
+      }
+      toast.className = 'voice-toast ' + (type !== 'info' ? type : '');
+      const icon = type === 'warning' || type === 'error' ? '⚠️' : '🎙️';
+      toast.innerHTML = '<span>' + icon + '</span><span>' + msg + '</span>';
+      toast.classList.remove('hidden');
+      if (duration > 0) {
+        clearTimeout(toast._timer);
+        toast._timer = setTimeout(() => toast.classList.add('hidden'), duration);
+      }
+    }
+
+    function hideVoiceToast() {
+      const toast = document.getElementById('voiceToast');
+      if (toast) toast.classList.add('hidden');
+    }
+
     function stopVoice() {
-      if (recognition) { recognition.onend = null; recognition.stop(); recognition = null; }
+      isVoiceActive = false;
+      if (recognition) {
+        try { recognition.onend = null; recognition.stop(); } catch(_) {}
+        recognition = null;
+      }
       const btn = document.getElementById('voiceBtn');
-      btn.classList.remove('voice-on');
+      if (btn) btn.classList.remove('voice-on');
+      hideVoiceToast();
     }
 
     function startVoice() {
       const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!Speech) { alert('Your browser does not support Voice Recognition. Please use Chrome.'); return; }
-      recognition = new Speech();
-      recognition.lang = 'bn-BD';
-      recognition.continuous = true;
-      recognition.interimResults = false;
-      recognition.onresult = e => {
-        for (let n = e.resultIndex; n < e.results.length; n++) {
-          if (!e.results[n].isFinal) continue;
-          const w = e.results[n][0].transcript.toLowerCase();
-          if (/next|forward|সামনে|পরবর্তী|পরেরটা/.test(w)) advance(1);
-          else if (/back|previous|পেছনে|আগেরটা|আগের/.test(w)) advance(-1);
-        }
-      };
-      recognition.onerror = () => stopVoice();
-      recognition.onend = () => { if (recognition) try { recognition.start(); } catch(_) {} };
-      recognition.start();
-      document.getElementById('voiceBtn').classList.add('voice-on');
+      if (!Speech) {
+        showVoiceToast('আপনার ব্রাউজারে Voice Recognition সাপোর্ট নেই। Google Chrome ব্যবহার করুন।', 'error', 6000);
+        return;
+      }
+
+      // Check file:// protocol restriction in Chrome
+      if (window.location.protocol === 'file:') {
+        showVoiceToast('⚠️ Chrome ব্রাউজারে file:// প্রটোকলে ভয়েস কমান্ড ব্লকড থাকে! `start.bat` চালিয়ে http://localhost:8000 দিয়ে প্লে করুন।', 'warning', 8000);
+      }
+
+      try {
+        if (recognition) { stopVoice(); }
+        isVoiceActive = true;
+        recognition = new Speech();
+        recognition.lang = 'bn-BD';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onstart = () => {
+          const btn = document.getElementById('voiceBtn');
+          if (btn) btn.classList.add('voice-on');
+          if (window.location.protocol !== 'file:') {
+            showVoiceToast('🎙️ ভয়েস কন্ট্রোল চালু হয়েছে! বলুন "Next / নেক্সট" বা "Back / আগেরটা"', 'info', 4000);
+          }
+        };
+
+        recognition.onresult = e => {
+          for (let n = e.resultIndex; n < e.results.length; n++) {
+            const transcript = e.results[n][0].transcript.toLowerCase().trim();
+            if (e.results[n].isFinal) {
+              showVoiceToast('শুনেছি: "' + transcript + '"', 'info', 2000);
+              
+              // Next match regex (English & Bangla)
+              if (/next|forward|samne|poroborti|porer|পরবর্তী|পরের|পরেরটা|সামনে|নেক্সট|নেক্সড|আগাও/i.test(transcript)) {
+                advance(1);
+              }
+              // Previous match regex (English & Bangla)
+              else if (/back|previous|prev|peshone|ager|আগের|আগেরটা|পেছনে|পিছনে|প্রিভিয়াস|প্রিভিয়াস|পিছাও|আগে/i.test(transcript)) {
+                advance(-1);
+              }
+            }
+          }
+        };
+
+        recognition.onerror = (e) => {
+          console.warn('SpeechRecognition error:', e.error);
+          if (e.error === 'no-speech') {
+            return; // Non-fatal temporary pause
+          }
+          if (e.error === 'network' && window.location.protocol === 'file:') {
+            showVoiceToast('❌ Chrome-এ file:// প্রটোকলে Speech API চলে না। `start.bat` চালিয়ে http://localhost:8000 ব্যবহার করুন।', 'error', 10000);
+            stopVoice();
+            return;
+          }
+          if (e.error === 'not-allowed') {
+            showVoiceToast('❌ মাইক্রোফোন পারমিশন দেওয়া হয়নি। ব্রাউজার সেটিংসে Mic allow করুন।', 'error', 6000);
+            stopVoice();
+            return;
+          }
+          if (e.error !== 'aborted') {
+            showVoiceToast('ভয়েস কমান্ড মেসেজ: ' + (e.error || 'অজানা সমস্যা'), 'warning', 4000);
+          }
+        };
+
+        recognition.onend = () => {
+          if (isVoiceActive && recognition) {
+            try {
+              recognition.start();
+            } catch (_) {
+              setTimeout(() => {
+                if (isVoiceActive && recognition) try { recognition.start(); } catch(_) {}
+              }, 400);
+            }
+          } else {
+            const btn = document.getElementById('voiceBtn');
+            if (btn) btn.classList.remove('voice-on');
+          }
+        };
+
+        recognition.start();
+      } catch (err) {
+        console.error(err);
+        showVoiceToast('Voice control start error: ' + err.message, 'error', 5000);
+        stopVoice();
+      }
     }
 
     document.getElementById('voiceBtn').addEventListener('click', () => {
-      recognition ? stopVoice() : startVoice();
+      isVoiceActive ? stopVoice() : startVoice();
     });
   </script>
 </body>
