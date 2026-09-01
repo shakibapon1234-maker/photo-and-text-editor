@@ -36,7 +36,11 @@
       #animatedBackgroundLayer {
         position: absolute;
         inset: 0;
-        z-index: 0;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
         overflow: hidden;
         pointer-events: none;
         /* GPU compositing layer — isolated from slide element repaints */
@@ -58,8 +62,8 @@
       #slide.is-dragging #animatedBackgroundLayer video {
         animation-play-state: paused;
       }
-      .slide > .element { z-index: 1; }
-      .slide > .drop-note { z-index: 5; }
+      .slide > .element { z-index: 5 !important; }
+      .slide > .drop-note { z-index: 10 !important; }
     </style>
   `);
 
@@ -87,12 +91,23 @@
       return;
     }
 
+    // When custom video / media is active, clean any conflicting broll layer
+    const broll = $('brollLayer');
+    if (broll) broll.remove();
+
     // Build a cache key from all relevant props
     const cacheKey = [s.bgMedia, s.bgMediaType, s.bgPlaybackRate,
       s.bgOverlayColor, s.bgOverlayOpacity, s.bgMediaOpacity, s.bgMediaBlur].join('|');
 
-    // ⬛ Skip work if nothing changed and not forced
-    if (!force && cacheKey === _layerCache) return;
+    // Skip work if nothing changed and not forced
+    if (!force && cacheKey === _layerCache) {
+      // Ensure existing video is playing
+      const existingVideo = $('animatedBackgroundLayer')?.querySelector('video');
+      if (existingVideo && existingVideo.paused) {
+        existingVideo.play().catch(() => {});
+      }
+      return;
+    }
     _layerCache = cacheKey;
 
     if ($('mediaBackgroundControls')) $('mediaBackgroundControls').classList.remove('hidden');
@@ -105,9 +120,11 @@
     }
 
     const tag = s.bgMediaType === 'video' ? 'video' : 'img';
-    let media = l.firstElementChild;
+    let media = l.querySelector('video, img');
 
     if (!media || media.tagName.toLowerCase() !== tag || media.dataset.src !== s.bgMedia) {
+      // Remove previous media while keeping overlay intact if present
+      const overlayEl = l.querySelector('.animated-editor-overlay');
       l.innerHTML = '';
       media = document.createElement(tag);
       media.src = s.bgMedia;
@@ -118,17 +135,26 @@
         media.muted = true;
         media.playsInline = true;
         media.playbackRate = s.bgPlaybackRate;
-        // Pause video while editor is loading, play once ready
+        media.style.width = '100%';
+        media.style.height = '100%';
+        media.style.objectFit = 'cover';
+        media.style.display = 'block';
         media.addEventListener('canplay', () => {
           media.play().catch(() => {});
         }, { once: true });
         media.play().catch(() => {});
       }
       l.appendChild(media);
+      if (overlayEl) l.appendChild(overlayEl);
     }
 
-    if (tag === 'video' && media.playbackRate !== s.bgPlaybackRate) {
-      media.playbackRate = s.bgPlaybackRate;
+    if (tag === 'video') {
+      if (media.playbackRate !== s.bgPlaybackRate) {
+        media.playbackRate = s.bgPlaybackRate;
+      }
+      if (media.paused) {
+        media.play().catch(() => {});
+      }
     }
 
     // Apply visual properties only (no layout changes)
@@ -179,7 +205,13 @@
   styleSlide = function () {
     baseStyle();
     const s = active();
-    if (s.bgMedia) $('slide').style.background = '#000';
+    if (s && s.bgMedia) {
+      const slide = $('slide');
+      if (slide) {
+        slide.style.backgroundImage = 'none';
+        slide.style.background = '#000';
+      }
+    }
     // Skip video layer update during drags — video is paused anyway
     if (!window.__presentationLiveDrag) {
       layer();
@@ -196,6 +228,8 @@
         s.background = 'media';
         s.bgMedia = r.result;
         s.bgMediaType = f.type.startsWith('video/') ? 'video' : 'image';
+        s.brollPreset = 'none';
+        delete s.bgImage;
         normalize(s);
         _layerCache = ''; // force re-apply
         render();
@@ -208,6 +242,7 @@
     $('clearBackgroundImage').onclick = () => {
       const s = active();
       delete s.bgMedia; delete s.bgMediaType; delete s.bgImage;
+      s.brollPreset = 'none';
       s.background = 'fashion';
       _layerCache = '';
       render();

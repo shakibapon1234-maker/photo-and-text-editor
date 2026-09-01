@@ -185,7 +185,7 @@
   function draw() {
     const s = active(), p = s.brollPreset || 'none', sp = s.brollSpeed || 'normal';
     let layer = $('brollLayer');
-    if (p === 'none') {
+    if (p === 'none' || s.bgMedia) {
       if (layer) layer.remove();
       return;
     }
@@ -212,7 +212,7 @@
     const brollWrap = document.createElement('div');
     brollWrap.id = 'brollPresetPanel';
     brollWrap.innerHTML = `
-      <div class="section-title" style="color:#ffd17b;font-weight:800;margin-top:14px;">🎬 ANIMATED BACKGROUND THEMES (অ্যানিমেটেড থিম)</div>
+      <div class="section-title" style="color:#ffd166;font-weight:800;margin-top:14px;">🎬 ANIMATED BACKGROUND THEMES (অ্যানিমেটেড থিম)</div>
       <div class="row" style="margin-bottom:8px;">
         <label class="field" style="margin:0;">
           Animated Preset
@@ -262,7 +262,12 @@
     brollWrap.querySelectorAll('#brollQuickGrid button').forEach(b => {
       b.onclick = () => {
         const p = b.dataset.preset;
-        active().brollPreset = p;
+        const s = active();
+        s.brollPreset = p;
+        if (p !== 'none') {
+          delete s.bgMedia;
+          delete s.bgMediaType;
+        }
         if ($('brollPreset')) $('brollPreset').value = p;
         if ($('brollSpeedRow')) $('brollSpeedRow').classList.toggle('hidden', p === 'none');
         render();
@@ -275,7 +280,7 @@
     priorInspector();
     const s = active();
     if (!s) return;
-    s.brollPreset = s.brollPreset || 'none';
+    s.brollPreset = s.bgMedia ? 'none' : (s.brollPreset || 'none');
     s.brollSpeed = s.brollSpeed || 'normal';
     if ($('brollPreset')) $('brollPreset').value = s.brollPreset;
     if ($('brollSpeed')) $('brollSpeed').value = s.brollSpeed;
@@ -292,7 +297,12 @@
 
   if ($('brollPreset')) {
     $('brollPreset').onchange = e => {
-      active().brollPreset = e.target.value;
+      const s = active();
+      s.brollPreset = e.target.value;
+      if (e.target.value !== 'none') {
+        delete s.bgMedia;
+        delete s.bgMediaType;
+      }
       if ($('brollSpeedRow')) $('brollSpeedRow').classList.toggle('hidden', e.target.value === 'none');
       render();
     };

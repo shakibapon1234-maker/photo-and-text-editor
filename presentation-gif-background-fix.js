@@ -28,6 +28,8 @@
       slide.background = 'media';
       slide.bgMedia = reader.result;
       slide.bgMediaType = isVideo ? 'video' : (isGif ? 'gif' : 'image');
+      slide.brollPreset = 'none';
+      delete slide.bgImage;
       hint.textContent = isGif
         ? 'GIF selected. Native GIF speed cannot be changed by the browser; use a WebM/MP4 background when you need speed control.'
         : '';
