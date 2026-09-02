@@ -1164,11 +1164,16 @@
       clearTimeout(autoTimer);
       clearChainedTimers();
       stopVoice();
+      if (window.stopPresentationSoundtrack) window.stopPresentationSoundtrack();
       document.removeEventListener('keydown', onKey);
       window.removeEventListener('resize', recalcScale);
       document.body.style.overflow = '';
       $('__pres_fast_style')?.remove();
       overlay.remove();
+    }
+
+    if (window.playPresentationSoundtrack) {
+      window.playPresentationSoundtrack();
     }
 
     renderPresenterSlide(idx);

@@ -17,6 +17,24 @@
     }
   }
 
+  let videoBtn = $('exportVideoBtn');
+  if (!videoBtn) {
+    videoBtn = document.createElement('button');
+    videoBtn.id = 'exportVideoBtn';
+    videoBtn.textContent = '🎥 Export Video (.webm)';
+    videoBtn.onclick = () => {
+      if (window.openVideoExportModal) {
+        window.openVideoExportModal();
+      } else {
+        alert('Video export module is loading...');
+      }
+    };
+    const present = $('presentBtn');
+    if (present && present.parentNode) {
+      present.parentNode.insertBefore(videoBtn, present);
+    }
+  }
+
   function downloadFile(name, data, type) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([data], { type }));
