@@ -14,8 +14,19 @@
   const bar = document.createElement('div');
   bar.id = 'ctx-toolbar';
   bar.innerHTML = `
+    <!-- DEFAULT section (shown when nothing is selected) -->
+    <div class="ctx-group" id="ctx-default">
+      <span style="font-size:11px;font-weight:800;color:#ffb11b;display:flex;align-items:center;gap:6px;">
+        ✦ Presentation Studio
+      </span>
+      <div class="ctx-sep"></div>
+      <span class="ctx-hint" style="color:#98a8c4;font-size:11px;">
+        ক্যানভাসের যেকোনো Text, Shape বা Image-এ ক্লিক করে স্টাইল ও ফরম্যাট কাস্টমাইজ করুন
+      </span>
+    </div>
+
     <!-- TEXT section -->
-    <div class="ctx-group" id="ctx-text">
+    <div class="ctx-group ctx-hidden" id="ctx-text">
       <label class="ctx-label">Size
         <input id="ctx-size" type="number" min="8" max="180" value="38" title="Font size">
       </label>
@@ -304,23 +315,19 @@
       user-select: none;
       padding-left: 4px;
     }
-    /* Push workspace down to make room for the bar */
-    .workspace { margin-top: 40px; height: calc(100vh - 58px - 40px) !important; }
-    .workspace.ctx-empty-workspace { margin-top: 0; height: calc(100vh - 58px) !important; }
+    /* Permanently reserve room for toolbar so workspace never shifts down or up */
+    .workspace { margin-top: 40px !important; height: calc(100vh - 58px - 40px) !important; }
   </style>`);
 
   /* ── Helpers ─────────────────────────────────────────────────────────────── */
   function showGroup(id) {
-    ['ctx-text','ctx-shape','ctx-image'].forEach(g => {
+    ['ctx-default','ctx-text','ctx-shape','ctx-image'].forEach(g => {
       const el = $(g);
       if (el) el.classList.toggle('ctx-hidden', g !== id);
     });
-    bar.classList.remove('ctx-empty');
-    document.querySelector('.workspace')?.classList.remove('ctx-empty-workspace');
   }
   function hideAll() {
-    bar.classList.add('ctx-empty');
-    document.querySelector('.workspace')?.classList.add('ctx-empty-workspace');
+    showGroup('ctx-default');
   }
 
   /* ── Sync the bar to the currently selected element ─────────────────────── */

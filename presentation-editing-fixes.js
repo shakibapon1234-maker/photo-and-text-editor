@@ -671,6 +671,13 @@
   window.addEventListener('keydown', event => {
     if (event.key === 'Escape') {
       hideContextMenu();
+      if (typeof window.drag !== 'undefined') window.drag = null;
+      window.__presentationLiveDrag = false;
+      document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+        el.contentEditable = 'false';
+        el.closest('.element')?.classList.remove('inline-editing');
+        el.blur();
+      });
     }
   }, true);
 

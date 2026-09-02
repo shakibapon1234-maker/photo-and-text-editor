@@ -327,6 +327,9 @@
 
   window.addEventListener('pointerup', event => {
     _pendingDrag = null; // Cancel any pending drag that didn't start
+    if (typeof window.drag !== 'undefined') window.drag = null;
+    window.__presentationLiveDrag = false;
+
     if (!action) return;
     event.preventDefault();
     event.stopPropagation();
@@ -336,6 +339,27 @@
     } catch (_) {}
     action = null;
     render();
+  }, true);
+
+  window.addEventListener('pointercancel', event => {
+    _pendingDrag = null;
+    if (typeof window.drag !== 'undefined') window.drag = null;
+    window.__presentationLiveDrag = false;
+    if (!action) return;
+    action = null;
+    render();
+  }, true);
+
+  window.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      if (action || _pendingDrag || window.drag) {
+        action = null;
+        _pendingDrag = null;
+        if (typeof window.drag !== 'undefined') window.drag = null;
+        window.__presentationLiveDrag = false;
+        render();
+      }
+    }
   }, true);
 
   const priorInspector = renderInspector;
