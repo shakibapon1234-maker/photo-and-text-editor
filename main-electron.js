@@ -19,7 +19,11 @@ const MIME_TYPES = {
     '.jpeg': 'image/jpeg',
     '.gif': 'image/gif',
     '.svg': 'image/svg+xml',
-    '.ico': 'image/x-icon'
+    '.ico': 'image/x-icon',
+    '.ttf': 'font/ttf',
+    '.woff': 'font/woff',
+    '.woff2': 'font/woff2',
+    '.wasm': 'application/wasm'
 };
 
 let lastCommand = { id: 0, action: null, val: null };
@@ -83,10 +87,10 @@ function startInternalServer(callback) {
             }));
         }
 
-        let filePath = path.join(__dirname, pathname === '/' ? 'presentation-player.html' : pathname);
+        let filePath = path.join(__dirname, pathname === '/' ? 'index.html' : pathname);
 
         if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
-            filePath = path.join(filePath, 'presentation-player.html');
+            filePath = path.join(filePath, 'index.html');
         }
 
         const ext = path.extname(filePath).toLowerCase();
@@ -94,8 +98,13 @@ function startInternalServer(callback) {
 
         fs.readFile(filePath, (err, content) => {
             if (err) {
-                res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-                res.end('404 Not Found');
+                if (err.code === 'ENOENT') {
+                    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+                    res.end('404 Not Found');
+                } else {
+                    res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+                    res.end(`500 Internal Server Error: ${err.code}`);
+                }
             } else {
                 res.writeHead(200, { 'Content-Type': contentType });
                 res.end(content);
@@ -119,21 +128,23 @@ function startInternalServer(callback) {
 }
 
 function createWindow() {
+    const iconPath = path.join(__dirname, 'icon.png');
     mainWindow = new BrowserWindow({
+        icon: fs.existsSync(iconPath) ? iconPath : undefined,
         width: 1440,
         height: 900,
         minWidth: 1024,
         minHeight: 700,
-        title: 'Presentation Player Desktop',
+        title: 'Photo & 3D Text Studio',
         autoHideMenuBar: true,
-        backgroundColor: '#0a101e',
+        backgroundColor: '#0f1115',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true
         }
     });
 
-    mainWindow.loadURL(`http://localhost:${SERVER_PORT}/presentation-player.html`);
+    mainWindow.loadURL(`http://localhost:${SERVER_PORT}/index.html`);
     mainWindow.on('closed', () => { mainWindow = null; });
 }
 
