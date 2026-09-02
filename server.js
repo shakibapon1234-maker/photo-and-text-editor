@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const PORT = 8000;
 
@@ -22,13 +23,38 @@ const MIME_TYPES = {
     '.wasm': 'application/wasm'
 };
 
+// In-memory queue for mobile remote control commands
+let lastCommand = { id: 0, action: null, val: null };
+
+function getLocalIp() {
+    const interfaces = os.networkInterfaces();
+    let candidateIp = null;
+
+    for (const name of Object.keys(interfaces)) {
+        const lowerName = name.toLowerCase();
+        if (lowerName.includes('wsl') || lowerName.includes('vbox') || lowerName.includes('virtual') || lowerName.includes('vethernet')) {
+            continue;
+        }
+        for (const iface of interfaces[name]) {
+            if (iface.family === 'IPv4' && !iface.internal) {
+                const ip = iface.address;
+                if (ip.startsWith('192.168.') || ip.startsWith('10.') || /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) {
+                    return ip; // Active local network IP
+                }
+                candidateIp = ip;
+            }
+        }
+    }
+    return candidateIp || '127.0.0.1';
+}
+
 const server = http.createServer((req, res) => {
     // Set No-Cache headers
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
 
-    // Decode URL to handle spaces and special chars
+    // Decode URL
     let decodedUrl = '';
     try {
         decodedUrl = decodeURIComponent(req.url);
@@ -36,11 +62,37 @@ const server = http.createServer((req, res) => {
         decodedUrl = req.url;
     }
 
-    // Remove query parameters
     const parsedUrl = new URL(decodedUrl, `http://${req.headers.host || 'localhost'}`);
-    let filePath = path.join(__dirname, parsedUrl.pathname);
+    const pathname = parsedUrl.pathname;
 
-    // If requested path is a directory, look for index.html
+    // ── API Endpoints for Mobile Remote Control ──────────────────────
+    if (pathname === '/api/remote-send') {
+        const action = parsedUrl.searchParams.get('action');
+        const val = parsedUrl.searchParams.get('val') || '';
+        if (action) {
+            lastCommand = { id: Date.now(), action, val };
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ success: true, command: lastCommand }));
+    }
+
+    if (pathname === '/api/remote-poll') {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({ command: lastCommand }));
+    }
+
+    if (pathname === '/api/ip') {
+        const ip = getLocalIp();
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        return res.end(JSON.stringify({
+            ip,
+            port: PORT,
+            remoteUrl: `http://${ip}:${PORT}/remote.html`
+        }));
+    }
+
+    // Serve static files
+    let filePath = path.join(__dirname, pathname);
     if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
         filePath = path.join(filePath, 'index.html');
     }
@@ -64,6 +116,10 @@ const server = http.createServer((req, res) => {
     });
 });
 
-server.listen(PORT, () => {
-    console.log(`Starting server on http://localhost:${PORT} (No-Cache mode)...`);
+server.listen(PORT, '0.0.0.0', () => {
+    const localIp = getLocalIp();
+    console.log(`=======================================================`);
+    console.log(`Presentation Server running at: http://localhost:${PORT}`);
+    console.log(`Mobile Remote URL: http://${localIp}:${PORT}/remote.html`);
+    console.log(`=======================================================`);
 });

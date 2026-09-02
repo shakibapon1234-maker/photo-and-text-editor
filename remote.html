@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Presentation Remote Control</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    html, body {
+      width: 100%; min-height: 100vh; min-height: 100dvh;
+      background: #060a14; color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      display: flex; flex-direction: column; justify-content: space-between;
+      padding: 10px; overflow-y: auto;
+    }
+
+    .container {
+      max-width: 480px; margin: 0 auto; width: 100%;
+      display: flex; flex-direction: column; height: 100%; min-height: calc(100dvh - 20px);
+      justify-content: space-between; gap: 10px;
+    }
+
+    /* Header & Timer Bar */
+    .remote-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 14px; background: rgba(23, 35, 60, 0.9);
+      border: 1px solid rgba(79, 141, 247, 0.35); border-radius: 14px;
+      backdrop-filter: blur(10px); flex-shrink: 0;
+    }
+    .head-title { font-size: 14px; font-weight: 800; color: #38bdf8; display: flex; align-items: center; gap: 6px; }
+    .timer-badge { font-family: monospace; font-size: 15px; font-weight: 700; color: #f59e0b; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 8px; }
+
+    /* Main Touch Controls Grid */
+    .touch-grid {
+      flex: 1; display: grid; grid-template-rows: 1fr 1.3fr; gap: 10px; min-height: 240px;
+    }
+    .touch-btn {
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+      border-radius: 20px; border: 2px solid rgba(255,255,255,0.15);
+      background: linear-gradient(145deg, #17243e, #0e172a);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      cursor: pointer; transition: transform 0.1s ease, background 0.15s ease;
+      touch-action: manipulation;
+    }
+    .touch-btn:active { transform: scale(0.96); }
+    
+    .touch-btn.prev-btn { border-color: #3b82f6; background: linear-gradient(145deg, #1e3a8a, #0f172a); }
+    .touch-btn.prev-btn:active { background: #2563eb; }
+
+    .touch-btn.next-btn { border-color: #10b981; background: linear-gradient(145deg, #065f46, #064e3b); }
+    .touch-btn.next-btn:active { background: #059669; }
+
+    .btn-icon { font-size: 36px; }
+    .btn-text { font-size: 20px; font-weight: 900; letter-spacing: 1px; }
+
+    /* Voice & Quick Action Toolbar */
+    .quick-bar {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex-shrink: 0;
+    }
+    .action-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 14px 10px; border-radius: 14px; border: 1px solid #334155;
+      background: #1e293b; color: #fff; font-size: 14px; font-weight: 800;
+      cursor: pointer; transition: all 0.15s ease; touch-action: manipulation;
+    }
+    .action-btn:active { transform: scale(0.96); }
+    .action-btn.mic-btn { background: #991b1b; border-color: #ef4444; }
+    .action-btn.mic-btn.listening { background: #dc2626; animation: pulse 1s infinite alternate; }
+    @keyframes pulse { from { box-shadow: 0 0 4px #ef4444; } to { box-shadow: 0 0 16px #ef4444; } }
+
+    /* Toast Notification */
+    #toast {
+      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.95); border: 1px solid #38bdf8;
+      color: #fff; font-size: 13px; font-weight: 700; padding: 8px 18px; border-radius: 20px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6); pointer-events: none; transition: opacity 0.3s;
+      opacity: 0; z-index: 100; white-space: nowrap;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="remote-head">
+      <div class="head-title">📱 Presentation Remote</div>
+      <div class="timer-badge" id="timer">00:00</div>
+    </div>
+
+    <div class="touch-grid">
+      <button class="touch-btn prev-btn" id="prevBtn">
+        <span class="btn-icon">◀</span>
+        <span class="btn-text">PREVIOUS</span>
+      </button>
+      <button class="touch-btn next-btn" id="nextBtn">
+        <span class="btn-icon">▶</span>
+        <span class="btn-text">NEXT SLIDE</span>
+      </button>
+    </div>
+
+    <div class="quick-bar">
+      <button class="action-btn mic-btn" id="micBtn">
+        <span>🎤</span> <span id="micText">Voice Mic</span>
+      </button>
+      <button class="action-btn" id="fullBtn">
+        <span>⛶</span> Fullscreen
+      </button>
+    </div>
+  </div>
+
+  <div id="toast">Command Sent</div>
+
+  <script>
+    // Vibrate phone on tap if supported
+    function haptic() {
+      if (navigator.vibrate) try { navigator.vibrate(40); } catch(_) {}
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(t._tm);
+      t._tm = setTimeout(() => t.classList.remove('show'), 1500);
+    }
+
+    async function sendCmd(action, value = '') {
+      haptic();
+      try {
+        const res = await fetch('/api/remote-send?action=' + encodeURIComponent(action) + '&val=' + encodeURIComponent(value) + '&t=' + Date.now());
+        if (res.ok) {
+          showToast('✓ ' + action.toUpperCase() + ' Sent');
+        } else {
+          showToast('Server HTTP ' + res.status);
+        }
+      } catch (err) {
+        showToast('Connection error: ' + err.message);
+      }
+    }
+
+    document.getElementById('prevBtn').addEventListener('click', () => sendCmd('prev'));
+    document.getElementById('nextBtn').addEventListener('click', () => sendCmd('next'));
+    document.getElementById('fullBtn').addEventListener('click', () => sendCmd('fullscreen'));
+
+    // Stopwatch Timer
+    let seconds = 0;
+    setInterval(() => {
+      seconds++;
+      const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+      const s = String(seconds % 60).padStart(2, '0');
+      document.getElementById('timer').textContent = m + ':' + s;
+    }, 1000);
+
+    // Mobile Voice Control
+    let recognition = null;
+    let isListening = false;
+    const micBtn = document.getElementById('micBtn');
+
+    function toggleMic() {
+      const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!Speech) { alert('Speech Recognition not supported on this mobile browser'); return; }
+
+      if (isListening && recognition) {
+        recognition.stop();
+        isListening = false;
+        micBtn.classList.remove('listening');
+        document.getElementById('micText').textContent = 'Voice Mic';
+        return;
+      }
+
+      recognition = new Speech();
+      recognition.lang = 'bn-BD';
+      recognition.continuous = true;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        isListening = true;
+        micBtn.classList.add('listening');
+        document.getElementById('micText').textContent = 'Listening...';
+        showToast('Say "Next" or "Back"');
+      };
+
+      recognition.onresult = e => {
+        for (let n = e.resultIndex; n < e.results.length; n++) {
+          if (!e.results[n].isFinal) continue;
+          const w = e.results[n][0].transcript.toLowerCase().trim();
+          showToast('Spoken: ' + w);
+          if (/next|forward|samne|poroborti|porer|পরবর্তী|পরের|পরেরটা|সামনে|নেক্সট|নেক্সড|আগাও/i.test(w)) {
+            sendCmd('next');
+          } else if (/back|previous|prev|peshone|ager|আগের|আগেরটা|পেছনে|পিছনে|প্রিভিয়াস|প্রিভিয়াস|পিছাও|আগে/i.test(w)) {
+            sendCmd('prev');
+          }
+        }
+      };
+
+      recognition.onerror = () => {
+        isListening = false;
+        micBtn.classList.remove('listening');
+        document.getElementById('micText').textContent = 'Voice Mic';
+      };
+
+      recognition.onend = () => {
+        if (isListening && recognition) {
+          try { recognition.start(); } catch(_) {}
+        } else {
+          micBtn.classList.remove('listening');
+          document.getElementById('micText').textContent = 'Voice Mic';
+        }
+      };
+
+      recognition.start();
+    }
+
+    micBtn.addEventListener('click', toggleMic);
+  </script>
+</body>
+</html>
