@@ -39,43 +39,214 @@
       if (window.getPresentationSoundtrack) {
         const soundData = await window.getPresentationSoundtrack();
         if (soundData && soundData.blob) {
-          // Convert blob → base64
-          const arrayBuf = await soundData.blob.arrayBuffer();
-          const uint8 = new Uint8Array(arrayBuf);
-          let binary = '';
-          for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
-          const base64 = btoa(binary);
-          const dataUrl = 'data:' + soundData.mimeType + ';base64,' + base64;
+          // Convert blob → base64 data URL using FileReader (handles large MP3/M4A/WAV safely)
+          const dataUrl = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(soundData.blob);
+          });
           const vol = (soundData.volume != null ? Number(soundData.volume) : 60) / 100;
           const loop = soundData.loop !== false;
           audioEmbedScript = `
   <script id="embeddedAudio">
   (function() {
-    var _audioDataUrl = "${dataUrl}";
+    var _audioDataUrl = ${JSON.stringify(dataUrl)};
     var _audioVolume  = ${vol};
     var _audioLoop    = ${loop};
+    var _trackName    = ${JSON.stringify(soundData.name || 'presentation-music')};
     var _aud = null;
-    function _startAudio() {
-      if (_aud) return;
-      _aud = new Audio(_audioDataUrl);
-      _aud.volume  = _audioVolume;
-      _aud.loop    = _audioLoop;
-      _aud.preload = 'auto';
-      _aud.play().catch(function(){});
-      window._presentationAudio = _aud;
+    var _userMuted = false;
+    var _lastNonZeroVol = _audioVolume > 0 ? _audioVolume : 0.6;
+
+    function initAudio() {
+      if (_aud) return _aud;
+      try {
+        _aud = new Audio();
+        _aud.src = _audioDataUrl;
+        _aud.volume = _audioVolume;
+        _aud.loop = _audioLoop;
+        _aud.preload = 'auto';
+        window._presentationAudio = _aud;
+      } catch (e) {
+        console.warn('Audio init error:', e);
+      }
+      return _aud;
     }
-    // Auto-start on first user gesture (browser policy) or immediately if allowed
-    document.addEventListener('click', function _firstClick() {
-      _startAudio();
-      document.removeEventListener('click', _firstClick);
-    }, { once: true });
-    document.addEventListener('keydown', function _firstKey() {
-      _startAudio();
-      document.removeEventListener('keydown', _firstKey);
-    }, { once: true });
-    // Also try immediately (works in some browsers)
+
+    function tryPlay() {
+      if (_userMuted) return;
+      var a = initAudio();
+      if (a && a.paused) {
+        var p = a.play();
+        if (p && typeof p.then === 'function') {
+          p.then(function() {
+            updateAudioUi(true);
+          }).catch(function(err) {
+            updateAudioUi(false);
+          });
+        }
+      }
+    }
+
+    function setVolume(pctValue) {
+      var pct = Math.max(0, Math.min(100, Math.round(pctValue)));
+      var a = initAudio();
+      if (!a) return;
+
+      _audioVolume = pct / 100;
+      a.volume = _audioVolume;
+
+      if (pct > 0) {
+        _lastNonZeroVol = _audioVolume;
+        _userMuted = false;
+        if (a.paused) {
+          a.play().catch(function(){});
+        }
+      } else {
+        _userMuted = true;
+      }
+      syncControlsUi(pct);
+    }
+
+    function toggleMute() {
+      var a = initAudio();
+      if (!a) return;
+      if (_userMuted || a.volume === 0 || a.paused) {
+        _userMuted = false;
+        var restoreVol = _lastNonZeroVol > 0 ? _lastNonZeroVol : 0.6;
+        _audioVolume = restoreVol;
+        a.volume = restoreVol;
+        a.play().catch(function(){});
+        syncControlsUi(Math.round(restoreVol * 100));
+      } else {
+        _userMuted = true;
+        _lastNonZeroVol = a.volume > 0 ? a.volume : _lastNonZeroVol;
+        a.pause();
+        syncControlsUi(0);
+      }
+    }
+
+    function syncControlsUi(pct) {
+      var btn = document.getElementById('soundtrackToggleBtn');
+      var slider = document.getElementById('soundtrackVolumeSlider');
+      var badge = document.getElementById('soundtrackVolBadge');
+      var isPlaying = _aud && !_aud.paused && pct > 0;
+
+      if (slider) slider.value = pct;
+      if (badge) badge.textContent = pct + '%';
+      if (btn) {
+        btn.innerHTML = (pct === 0 || !isPlaying) ? '🔇' : (pct < 45 ? '🔉' : '🔊');
+        btn.title = isPlaying ? ('Soundtrack: ' + _trackName + ' (' + pct + '%) • Click to mute (M)') : 'Click to Play / Unmute (M)';
+        btn.style.background = isPlaying ? '#be185d' : '#334155';
+        btn.style.borderColor = isPlaying ? '#f472b6' : '#64748b';
+      }
+    }
+
+    function updateAudioUi(isPlaying) {
+      var pct = _aud ? Math.round(_aud.volume * 100) : Math.round(_audioVolume * 100);
+      syncControlsUi(isPlaying ? pct : 0);
+    }
+
+    function addAudioButtonToControls() {
+      var controls = document.getElementById('controls');
+      if (!controls || document.getElementById('soundtrackControls')) return;
+
+      var wrap = document.createElement('div');
+      wrap.id = 'soundtrackControls';
+      wrap.style.cssText = 'display:inline-flex;align-items:center;gap:6px;background:rgba(23,35,60,0.85);border:1px solid rgba(244,114,182,0.45);border-radius:24px;padding:2px 10px 2px 3px;margin:0 4px;box-shadow:0 4px 14px rgba(0,0,0,0.4);';
+
+      var btn = document.createElement('button');
+      btn.id = 'soundtrackToggleBtn';
+      btn.className = 'ctrl-btn';
+      btn.innerHTML = _audioVolume > 0 ? '🔊' : '🔇';
+      btn.title = 'Soundtrack: ' + _trackName + ' (Click to mute/play, Shortcut: M)';
+      btn.style.cssText = 'background: #be185d; border-color: #f472b6; font-size: 14px; width: 34px; height: 34px; cursor: pointer;';
+      btn.onclick = function(e) {
+        e.stopPropagation();
+        toggleMute();
+      };
+
+      var slider = document.createElement('input');
+      slider.id = 'soundtrackVolumeSlider';
+      slider.type = 'range';
+      slider.min = '0';
+      slider.max = '100';
+      slider.value = String(Math.round(_audioVolume * 100));
+      slider.style.cssText = 'width: 72px; height: 4px; cursor: pointer; accent-color: #f472b6; vertical-align: middle;';
+      slider.title = 'Volume: ' + slider.value + '% (+ / - keys to adjust)';
+      
+      slider.oninput = function(e) {
+        e.stopPropagation();
+        setVolume(Number(e.target.value));
+      };
+      slider.onclick = function(e) { e.stopPropagation(); };
+      slider.onpointerdown = function(e) { e.stopPropagation(); };
+
+      var badge = document.createElement('span');
+      badge.id = 'soundtrackVolBadge';
+      badge.style.cssText = 'font-size: 11px; font-weight: 700; color: #fbcfe8; min-width: 28px; text-align: center; user-select: none;';
+      badge.textContent = Math.round(_audioVolume * 100) + '%';
+
+      wrap.appendChild(btn);
+      wrap.appendChild(slider);
+      wrap.appendChild(badge);
+
+      var voiceBtn = document.getElementById('voiceBtn');
+      if (voiceBtn && voiceBtn.parentNode) {
+        voiceBtn.parentNode.insertBefore(wrap, voiceBtn);
+      } else {
+        var fsBtn = document.getElementById('fsBtn');
+        if (fsBtn && fsBtn.parentNode) {
+          fsBtn.parentNode.insertBefore(wrap, fsBtn);
+        } else {
+          controls.appendChild(wrap);
+        }
+      }
+    }
+
+    // Attempt play on any user interaction (clicks, keys, slide changes, touches)
+    function onInteraction() {
+      tryPlay();
+    }
+
+    window.addEventListener('pointerdown', onInteraction, { passive: true });
+    window.addEventListener('click', onInteraction, { passive: true });
+    window.addEventListener('touchstart', onInteraction, { passive: true });
+
+    // Keyboard shortcuts for Volume & Mute in Presentation Player
+    window.addEventListener('keydown', function(e) {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        toggleMute();
+      } else if (e.key === '+' || e.key === '=' || e.key === ']') {
+        e.preventDefault();
+        var cur = _aud ? Math.round(_aud.volume * 100) : Math.round(_audioVolume * 100);
+        setVolume(Math.min(100, cur + 5));
+      } else if (e.key === '-' || e.key === '_' || e.key === '[') {
+        e.preventDefault();
+        var cur = _aud ? Math.round(_aud.volume * 100) : Math.round(_audioVolume * 100);
+        setVolume(Math.max(0, cur - 5));
+      } else {
+        tryPlay();
+      }
+    });
+
+    // Also attempt immediately on load
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        addAudioButtonToControls();
+        tryPlay();
+      });
+    } else {
+      addAudioButtonToControls();
+      tryPlay();
+    }
+
     window.addEventListener('load', function() {
-      setTimeout(function() { _startAudio(); }, 400);
+      addAudioButtonToControls();
+      setTimeout(tryPlay, 300);
     });
   })();
   <\\/script>`;
@@ -85,6 +256,22 @@
       console.warn('Could not embed audio:', e);
     }
 
+    // Check if soundtrack was expected but missing
+    if (!audioEmbedScript) {
+      const stNameEl = document.getElementById('soundtrackName');
+      const hasTrackHint = stNameEl && stNameEl.textContent && !stNameEl.textContent.includes('No soundtrack selected');
+      if (hasTrackHint) {
+        const proceed = confirm(
+          '⚠️ সাউন্ডট্র্যাক অডিও ফাইলটি ব্রাউজার মেমোরিতে পাওয়া যায়নি!\n\n' +
+          'সাউন্ড এবং ভলিউম কন্ট্রোলসহ স্লাইডশো পাওয়ার জন্য:\n' +
+          '১. প্রথমে "Soundtrack" প্যানেল থেকে আপনার MP3/M4A ফাইলটি আবার "Upload" করুন।\n' +
+          '২. তারপর "Download Slideshow" করুন।\n\n' +
+          'আপনি কি এখন সাউন্ড ছাড়াই ডাউনলোড করতে চান?'
+        );
+        if (!proceed) return;
+      }
+    }
+
     // ── Build final HTML ──────────────────────────────────────────────────
     let finalHtml = masterPlayerHtml.replace('let slides = [];', 'let slides = ' + currentSlidesJson + ';');
     // Hide dropzone since slides are preloaded
@@ -92,18 +279,26 @@
     // Inject audio script just before </body>
     if (audioEmbedScript) {
       finalHtml = finalHtml.replace('</body>', audioEmbedScript + '\n</body>');
+      console.log('✅ Presentation soundtrack successfully embedded with interactive volume controls.');
+    } else {
+      console.log('ℹ️ Exporting standalone slideshow without soundtrack.');
     }
     downloadFile('presentation-slideshow-' + Date.now() + '.html', finalHtml, 'text/html');
   }
 
   if (htmlBtn) {
-    htmlBtn.onclick = () => {
+    htmlBtn.onclick = async () => {
       htmlBtn.disabled = true;
-      htmlBtn.textContent = '⏳ Preparing...';
-      exportStandaloneSlideshow().finally(() => {
+      htmlBtn.textContent = '⏳ Preparing Slideshow...';
+      try {
+        await exportStandaloneSlideshow();
+      } catch (err) {
+        console.error('Export slideshow error:', err);
+        alert('Could not export slideshow: ' + err.message);
+      } finally {
         htmlBtn.disabled = false;
         htmlBtn.textContent = 'Download Slideshow (.html)';
-      });
+      }
     };
   }
 

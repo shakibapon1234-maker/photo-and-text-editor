@@ -2,7 +2,7 @@
   const $ = id => document.getElementById(id);
   const KEY_META = 'presentation-soundtrack-meta-v1';
   const DB_NAME = 'PresentationSoundtrackDB';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const STORE_NAME = 'soundtracks';
 
   function getCorrectAudioMime(filename, origType) {
@@ -22,8 +22,14 @@
     }
   }
 
+  // ── In-Memory Cache for Instant Zero-Latency Retrieval ───────────────────
+  window._activeSoundtrack = null;
+
   // ── IndexedDB Engine for Fast Asynchronous Audio Storage ──────────────────
+  let cachedDbInstance = null;
+
   function openDB() {
+    if (cachedDbInstance) return Promise.resolve(cachedDbInstance);
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = e => {
@@ -32,23 +38,57 @@
           db.createObjectStore(STORE_NAME);
         }
       };
-      req.onsuccess = e => resolve(e.target.result);
+      req.onsuccess = e => {
+        cachedDbInstance = e.target.result;
+        cachedDbInstance.onclose = () => { cachedDbInstance = null; };
+        resolve(cachedDbInstance);
+      };
       req.onerror = e => reject(e.target.error);
     });
   }
 
-  async function saveAudioBlobToIDB(blob) {
+  async function saveAudioBlobToIDB(blob, meta, arrayBuffer) {
     try {
       const db = await openDB();
       return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
+
+        // Store both Blob and ArrayBuffer record for 100% cross-browser reliability
         store.put(blob, 'currentAudio');
+        if (arrayBuffer) {
+          store.put({
+            buffer: arrayBuffer,
+            name: meta?.name || '',
+            mime: meta?.mimeType || 'audio/mp4',
+            volume: meta?.volume !== undefined ? meta.volume : 60,
+            loop: meta?.loop !== false,
+            savedAt: Date.now()
+          }, 'audioRecord');
+        }
+        if (meta) {
+          store.put(meta, 'currentMeta');
+        }
         tx.oncomplete = () => resolve(true);
         tx.onerror = () => reject(tx.error);
       });
     } catch (err) {
       console.warn('IDB Save Error:', err);
+      return false;
+    }
+  }
+
+  async function saveMetaToIDB(meta) {
+    try {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.put(meta, 'currentMeta');
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+      });
+    } catch (_) {
       return false;
     }
   }
@@ -59,8 +99,44 @@
       return new Promise((resolve) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
         const store = tx.objectStore(STORE_NAME);
+
+        // Try direct blob first
         const req = store.get('currentAudio');
-        req.onsuccess = () => resolve(req.result || null);
+        req.onsuccess = () => {
+          if (req.result) return resolve(req.result);
+          // Fallback to arrayBuffer record
+          const reqRec = store.get('audioRecord');
+          reqRec.onsuccess = () => {
+            if (reqRec.result && reqRec.result.buffer) {
+              const b = new Blob([reqRec.result.buffer], { type: reqRec.result.mime || 'audio/mp4' });
+              resolve(b);
+            } else {
+              resolve(null);
+            }
+          };
+          reqRec.onerror = () => resolve(null);
+        };
+        req.onerror = () => resolve(null);
+      });
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function getMetaFromIDB() {
+    try {
+      const db = await openDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.get('currentMeta');
+        req.onsuccess = () => {
+          if (req.result) return resolve(req.result);
+          // Fallback to audioRecord meta
+          const reqRec = store.get('audioRecord');
+          reqRec.onsuccess = () => resolve(reqRec.result || null);
+          reqRec.onerror = () => resolve(null);
+        };
         req.onerror = () => resolve(null);
       });
     } catch (_) {
@@ -75,6 +151,8 @@
         const tx = db.transaction(STORE_NAME, 'readwrite');
         const store = tx.objectStore(STORE_NAME);
         store.delete('currentAudio');
+        store.delete('audioRecord');
+        store.delete('currentMeta');
         tx.oncomplete = () => resolve(true);
         tx.onerror = () => resolve(false);
       });
@@ -101,6 +179,7 @@
     try {
       localStorage.setItem(KEY_META, JSON.stringify(musicMeta));
     } catch (_) {}
+    saveMetaToIDB(musicMeta);
   }
 
   // Active playing audio resources
@@ -111,12 +190,28 @@
   let webAudioGain = null;
 
   async function getSoundtrackData() {
-    const rawBlob = await getAudioBlobFromIDB();
-    if (!rawBlob) return null;
+    let blob = null;
+    let mime = musicMeta.mimeType || 'audio/mp4';
 
-    // Ensure Blob has proper MIME type
-    const mime = musicMeta.mimeType || getCorrectAudioMime(musicMeta.name, rawBlob.type);
-    const blob = new Blob([rawBlob], { type: mime });
+    if (window._activeSoundtrack && window._activeSoundtrack.blob) {
+      blob = window._activeSoundtrack.blob;
+      mime = window._activeSoundtrack.mime || mime;
+    } else {
+      let rawBlob = await getAudioBlobFromIDB();
+      if (rawBlob) {
+        mime = musicMeta.mimeType || getCorrectAudioMime(musicMeta.name, rawBlob.type);
+        blob = new Blob([rawBlob], { type: mime });
+        window._activeSoundtrack = {
+          blob,
+          mime,
+          name: musicMeta.name,
+          volume: musicMeta.volume,
+          loop: musicMeta.loop
+        };
+      }
+    }
+
+    if (!blob) return null;
 
     if (!cachedObjectUrl) {
       cachedObjectUrl = URL.createObjectURL(blob);
@@ -125,8 +220,8 @@
       blob,
       src: cachedObjectUrl,
       name: musicMeta.name,
-      volume: musicMeta.volume,
-      loop: musicMeta.loop,
+      volume: musicMeta.volume !== undefined ? musicMeta.volume : 60,
+      loop: musicMeta.loop !== false,
       mimeType: mime
     };
   }
@@ -278,6 +373,59 @@
       $('soundtrackName').textContent = musicMeta.hasAudio
         ? `Selected: ${musicMeta.name || 'Audio File'} • ${musicMeta.volume || 60}% volume`
         : 'No soundtrack selected.';
+      $('soundtrackName').style.color = musicMeta.hasAudio ? '#34d399' : '#a0aec0';
+    }
+  }
+
+  // Restore soundtrack from persistent storage on startup
+  async function restoreSoundtrackOnBoot() {
+    try {
+      const blob = await getAudioBlobFromIDB();
+      if (blob) {
+        const meta = await getMetaFromIDB();
+        musicMeta.hasAudio = true;
+        if (meta) {
+          musicMeta.name = meta.name || musicMeta.name || 'presentation-music';
+          musicMeta.volume = meta.volume !== undefined ? meta.volume : musicMeta.volume;
+          musicMeta.loop = meta.loop !== false;
+          musicMeta.mimeType = meta.mimeType || musicMeta.mimeType;
+        }
+        window._activeSoundtrack = {
+          blob,
+          mime: musicMeta.mimeType,
+          name: musicMeta.name,
+          volume: musicMeta.volume,
+          loop: musicMeta.loop
+        };
+        try {
+          localStorage.setItem(KEY_META, JSON.stringify(musicMeta));
+        } catch (_) {}
+        syncUI();
+      } else {
+        // Blob NOT in storage - do not lie to user
+        musicMeta.hasAudio = false;
+        try {
+          const saved = localStorage.getItem(KEY_META);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && parsed.name) {
+              musicMeta.name = parsed.name;
+              musicMeta.volume = parsed.volume !== undefined ? parsed.volume : 60;
+            }
+          }
+        } catch (_) {}
+        if ($('soundtrackName')) {
+          if (musicMeta.name) {
+            $('soundtrackName').textContent = `Track "${musicMeta.name}" needs re-upload. Please re-select the file.`;
+            $('soundtrackName').style.color = '#f87171';
+          } else {
+            $('soundtrackName').textContent = 'No soundtrack selected.';
+            $('soundtrackName').style.color = '#a0aec0';
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Soundtrack boot restore notice:', e);
     }
   }
 
@@ -313,15 +461,25 @@
     const arrBuf = await file.arrayBuffer();
     const typedBlob = new Blob([arrBuf], { type: mime });
 
-    const saved = await saveAudioBlobToIDB(typedBlob);
+    musicMeta.name = file.name;
+    musicMeta.mimeType = mime;
+    musicMeta.hasAudio = true;
+
+    // Cache in RAM for zero-latency export/play
+    window._activeSoundtrack = {
+      blob: typedBlob,
+      buffer: arrBuf,
+      mime: mime,
+      name: file.name,
+      volume: musicMeta.volume,
+      loop: musicMeta.loop
+    };
+
+    const saved = await saveAudioBlobToIDB(typedBlob, musicMeta, arrBuf);
 
     if (saved) {
-      musicMeta.name = file.name;
-      musicMeta.mimeType = mime;
-      musicMeta.hasAudio = true;
       saveMeta();
       syncUI();
-      if ($('soundtrackName')) $('soundtrackName').style.color = '#34d399';
 
       // Auto test play to confirm to user
       const aud = await window.playPresentationSoundtrack();
@@ -329,7 +487,10 @@
         if ($('testPlaySoundtrack')) $('testPlaySoundtrack').textContent = '⏸ Pause Test Sound';
       }
     } else {
-      alert('Failed to save audio file to browser storage.');
+      // Even if IDB save had issue, RAM cache works for this session
+      saveMeta();
+      syncUI();
+      console.warn('IDB storage had issue, active in RAM');
     }
   };
 
@@ -385,4 +546,5 @@
   };
 
   syncUI();
+  restoreSoundtrackOnBoot();
 })();
