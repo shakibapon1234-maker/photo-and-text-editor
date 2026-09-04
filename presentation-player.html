@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Presentation Player — Projector & Display</title>
+  <!-- PeerJS for Zero-Config Cloud WebRTC Mobile Remote Control -->
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
@@ -1704,8 +1706,33 @@
       isVoiceActive ? stopVoice() : startVoice();
     });
 
-    // ── Persistent Remote Server Host Configuration ──────────────────
+    // ── Universal Cloud P2P & Local Remote System ────────────────────
+    const GITHUB_REMOTE_URL = 'https://shakibapon1234-maker.github.io/photo-and-text-editor/remote.html';
+    const CLOUD_ROOM_KEY = 'wf_pres_cloud_room_code';
     const REMOTE_SERVER_KEY = 'presentation_remote_server_host';
+
+    function getRoomCode() {
+      let code = '';
+      try { code = sessionStorage.getItem(CLOUD_ROOM_KEY); } catch (_) {}
+      if (!code || !code.trim()) {
+        code = 'WF-' + Math.floor(1000 + Math.random() * 9000);
+        try { sessionStorage.setItem(CLOUD_ROOM_KEY, code); } catch (_) {}
+      }
+      return code.trim().toUpperCase();
+    }
+
+    function generateNewRoomCode() {
+      const code = 'WF-' + Math.floor(1000 + Math.random() * 9000);
+      try { sessionStorage.setItem(CLOUD_ROOM_KEY, code); } catch (_) {}
+      if (cloudPeer) {
+        try { cloudPeer.destroy(); } catch (_) {}
+        cloudPeer = null;
+      }
+      initCloudRemote();
+      updateRemoteModalUI();
+      return code;
+    }
+
     function getRemoteServerHost() {
       try {
         const stored = localStorage.getItem(REMOTE_SERVER_KEY);
@@ -1727,7 +1754,65 @@
       return clean;
     }
 
-    // ── Mobile Remote Command Receiver ─────────────────────────────────
+    // ── WebRTC Cloud Remote Host (PeerJS) ─────────────────────────────
+    let cloudPeer = null;
+    let activePeerConns = [];
+    let isCloudReady = false;
+
+    function initCloudRemote() {
+      if (typeof Peer === 'undefined') {
+        console.warn('PeerJS library not loaded.');
+        return;
+      }
+      if (cloudPeer && !cloudPeer.destroyed) return;
+
+      const room = getRoomCode();
+      const hostPeerId = 'wf-pres-' + room.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      try {
+        cloudPeer = new Peer(hostPeerId, { debug: 0 });
+
+        cloudPeer.on('open', (id) => {
+          isCloudReady = true;
+          console.log('✅ Cloud Remote Host ready. Room:', room, 'PeerID:', id);
+          updateRemoteModalUI();
+        });
+
+        cloudPeer.on('connection', (conn) => {
+          activePeerConns.push(conn);
+          showVoiceToast('📱 Mobile Remote Connected! (' + room + ')', 'success', 3000);
+          updateRemoteModalUI();
+
+          conn.on('data', (data) => {
+            if (data && data.action) {
+              if (data.action === 'next') advance(1);
+              else if (data.action === 'prev') advance(-1);
+              else if (data.action === 'fullscreen') document.getElementById('fsBtn').click();
+              showVoiceToast('Remote: ' + String(data.action).toUpperCase(), 'info', 2000);
+            }
+          });
+
+          conn.on('close', () => {
+            activePeerConns = activePeerConns.filter(c => c !== conn);
+            updateRemoteModalUI();
+          });
+        });
+
+        cloudPeer.on('error', (err) => {
+          console.warn('Cloud Peer error:', err);
+          if (err.type === 'unavailable-id') {
+            generateNewRoomCode();
+          }
+        });
+      } catch (e) {
+        console.warn('Cloud Peer init exception:', e);
+      }
+    }
+
+    // Initialize cloud remote listener on page load
+    setTimeout(initCloudRemote, 300);
+
+    // ── Local Server Poll Fallback ────────────────────────────────────
     let lastExecutedCmdId = 0;
     setInterval(async () => {
       try {
@@ -1748,135 +1833,169 @@
           showVoiceToast('Remote: ' + String(cmd.action).toUpperCase(), 'info', 2000);
         }
       } catch (_) {}
-    }, 150);
+    }, 200);
 
+    // ── Mobile Remote Modal UI Helper ─────────────────────────────────
+    function getCloudRemoteUrl() {
+      const room = getRoomCode();
+      return GITHUB_REMOTE_URL + '?room=' + encodeURIComponent(room);
+    }
 
-    // ── Mobile Remote Modal ───────────────────────────────────────────
-    document.getElementById('remoteBtn').addEventListener('click', async () => {
+    function updateRemoteModalUI() {
+      const modal = document.getElementById('remoteModal');
+      if (!modal) return;
+
+      const room = getRoomCode();
+      const cloudUrl = getCloudRemoteUrl();
+
+      const badge = document.getElementById('cloudStatusBadge');
+      if (badge) {
+        if (activePeerConns.length > 0) {
+          badge.innerHTML = '🟢 <strong>' + activePeerConns.length + ' Mobile Connected</strong> (Room: ' + room + ')';
+          badge.style.background = '#065f46';
+          badge.style.color = '#34d399';
+        } else if (isCloudReady) {
+          badge.innerHTML = '🟢 <strong>Cloud Remote Active</strong> (Room: ' + room + ')';
+          badge.style.background = '#064e3b';
+          badge.style.color = '#34d399';
+        } else {
+          badge.innerHTML = '🟡 <strong>Connecting to Cloud...</strong> (Room: ' + room + ')';
+          badge.style.background = '#78350f';
+          badge.style.color = '#fde68a';
+        }
+      }
+
+      const linkEl = document.getElementById('remoteUrlLink');
+      if (linkEl) {
+        linkEl.href = cloudUrl;
+        linkEl.textContent = cloudUrl;
+      }
+
+      const directBtn = document.getElementById('openRemoteDirectBtn');
+      if (directBtn) {
+        directBtn.onclick = () => window.open(cloudUrl, '_blank');
+      }
+
+      const qrEl = document.getElementById('qrImg');
+      if (qrEl) {
+        qrEl.onerror = function() {
+          this.parentElement.innerHTML = '<div style="padding:15px;color:#dc2626;font-size:12px;text-align:center">QR load failed.<br>Click the direct link below.</div>';
+        };
+        qrEl.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=M&data=' + encodeURIComponent(cloudUrl);
+      }
+    }
+
+    // ── Mobile Remote Modal Trigger ───────────────────────────────────
+    document.getElementById('remoteBtn').addEventListener('click', () => {
       const oldModal = document.getElementById('remoteModal');
-      if (oldModal) oldModal.remove();
+      if (oldModal) { oldModal.remove(); return; }
+
+      if (!isCloudReady) initCloudRemote();
 
       const modal = document.createElement('div');
       modal.id = 'remoteModal';
       modal.className = 'remote-modal-backdrop';
       modal.innerHTML = [
-        '<div class="remote-modal-card">',
+        '<div class="remote-modal-card" style="max-width:440px;width:92%;">',
           '<div class="remote-modal-head">',
-            '<span>📱 Mobile Remote Control</span>',
+            '<span style="font-size:16px;font-weight:800;color:#fff;">📱 Universal Mobile Remote</span>',
             '<button class="remote-modal-close" id="rmClose">&#x2715;</button>',
           '</div>',
-          '<p style="font-size:13px;color:#94a3b8;margin:8px 0;line-height:1.5;">',
-            'Laptop and mobile must be on the <strong style="color:#fff;">same Wi-Fi or hotspot</strong>.',
+
+          '<div id="cloudStatusBadge" style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;padding:6px 14px;border-radius:20px;background:#064e3b;color:#34d399;margin:8px 0 10px;">',
+            '🟢 Cloud Remote Active (Room: ' + getRoomCode() + ')',
+          '</div>',
+
+          '<p style="font-size:12px;color:#94a3b8;margin:0 0 12px;line-height:1.4;">',
+            '✨ কোনো আইপি বা সার্ভার লাগবে না! মোবাইল যে কোনো ওয়াইফাই বা ৪জি/৫জি দিয়ে স্ক্যান করলেই কাজ করবে।',
           '</p>',
-          '<div id="serverStatusBadge" style="font-size:11px;font-weight:800;padding:4px 10px;border-radius:6px;background:#1e293b;margin-bottom:8px;display:inline-block;">Checking server...</div>',
-          '<div style="background:#fff;padding:10px;border-radius:14px;display:inline-block;margin:2px 0 10px;">',
+
+          '<!-- One-Click Direct Open Button -->',
+          '<div style="margin-bottom:12px;">',
+            '<button id="openRemoteDirectBtn" style="width:100%;padding:13px;border-radius:12px;background:linear-gradient(135deg, #10b981, #059669);border:none;color:#fff;font-size:14px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 6px 18px rgba(16,185,129,0.35);transition:transform 0.15s;">',
+              '<span>🌐</span> Open Online Remote in Browser',
+            '</button>',
+          '</div>',
+
+          '<!-- QR Code -->',
+          '<div style="background:#fff;padding:12px;border-radius:14px;display:inline-block;margin:0 0 12px;box-shadow:0 8px 24px rgba(0,0,0,0.5);">',
             '<img id="qrImg" src="" alt="QR" width="180" height="180" style="display:block;">',
           '</div>',
-          '<div style="background:#0f172a;border:1.5px solid #38bdf8;border-radius:10px;padding:10px 12px;margin-bottom:10px;text-align:left;">',
+
+          '<!-- Clickable Direct Link -->',
+          '<div style="background:#0f172a;border:1.5px solid #10b981;border-radius:12px;padding:10px 12px;margin-bottom:12px;text-align:left;">',
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">',
-              '<span style="font-size:11px;color:#64748b;font-weight:700;">Mobile Remote Link:</span>',
-              '<button id="editIpBtn" style="background:none;border:none;color:#38bdf8;font-size:11px;font-weight:800;cursor:pointer;">✏️ Set Server IP</button>',
+              '<span style="font-size:11px;color:#94a3b8;font-weight:700;">Direct Online Remote Link:</span>',
+              '<span style="font-size:11px;color:#34d399;font-weight:800;">Click to Open ↗</span>',
             '</div>',
-            '<div id="remoteUrlText" style="color:#38bdf8;font-weight:900;font-size:15px;word-break:break-all;user-select:all;-webkit-user-select:all;">Loading...</div>',
+            '<a id="remoteUrlLink" href="#" target="_blank" style="color:#38bdf8;font-weight:800;font-size:12px;word-break:break-all;text-decoration:none;display:block;">Loading...</a>',
           '</div>',
-          '<div style="display:flex;gap:8px;">',
-            '<button id="copyBtn" style="flex:1;padding:11px;border-radius:10px;background:#1d4ed8;border:none;color:#fff;font-size:13px;font-weight:800;cursor:pointer;">Copy Link</button>',
-            '<button id="refreshIpBtn" style="padding:11px 14px;border-radius:10px;background:#334155;border:none;color:#fff;font-size:13px;font-weight:800;cursor:pointer;" title="Re-detect Server IP">🔄</button>',
+
+          '<!-- Action Buttons -->',
+          '<div style="display:flex;gap:8px;margin-bottom:8px;">',
+            '<button id="copyBtn" style="flex:1;padding:10px;border-radius:10px;background:#1d4ed8;border:none;color:#fff;font-size:13px;font-weight:800;cursor:pointer;">📋 Copy Link</button>',
+            '<button id="newRoomBtn" style="padding:10px 14px;border-radius:10px;background:#334155;border:none;color:#fff;font-size:13px;font-weight:800;cursor:pointer;" title="Generate New Room Code">🔄 New Room</button>',
+            '<button id="toggleLocalBtn" style="padding:10px 12px;border-radius:10px;background:#1e293b;border:1px solid #334155;color:#94a3b8;font-size:12px;font-weight:700;cursor:pointer;" title="Toggle Local IP fallback">⚙️ Local IP</button>',
           '</div>',
-          '<p style="font-size:11px;color:#64748b;margin-top:10px;line-height:1.4;">',
-            '💡 টিপ: যদি অন্য ল্যাপটপ থেকে ওপেন করেন, <strong>"Set Server IP"</strong>-তে ক্লিক করে মূল সার্ভার পিসির আইপি (যেমন <code>192.168.68.103:8000</code>) দিন।',
-          '</p>',
+
+          '<!-- Collapsible Offline Local Server Fallback -->',
+          '<div id="localServerSection" style="display:none;background:#1e293b;border-radius:10px;padding:10px;margin-top:10px;text-align:left;border:1px solid #334155;">',
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">',
+              '<span style="font-size:11px;color:#cbd5e1;font-weight:700;">Offline Local IP (Optional):</span>',
+              '<button id="editIpBtn" style="background:none;border:none;color:#38bdf8;font-size:11px;font-weight:800;cursor:pointer;">✏️ Edit</button>',
+            '</div>',
+            '<div id="localIpText" style="font-size:12px;color:#94a3b8;font-family:monospace;word-break:break-all;">Loading...</div>',
+          '</div>',
         '</div>'
       ].join('');
       document.body.appendChild(modal);
 
-      // Wire up close button
+      // Wire close
       document.getElementById('rmClose').onclick = () => modal.remove();
 
-      // Function to set and render QR code & check server health
-      function updateRemoteDisplay() {
-        const sHost = getRemoteServerHost();
-        const fullRemoteUrl = 'http://' + sHost + '/remote.html';
-        const urlEl = document.getElementById('remoteUrlText');
-        if (urlEl) urlEl.textContent = fullRemoteUrl;
-        
-        const qrEl = document.getElementById('qrImg');
-        if (qrEl) {
-          qrEl.onerror = function() {
-            this.parentElement.innerHTML = '<div style="padding:15px;color:#dc2626;font-size:12px;text-align:center">QR load failed.<br>Use the link below.</div>';
-          };
-          qrEl.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=M&data='
-            + encodeURIComponent(fullRemoteUrl);
-        }
-
-        const badge = document.getElementById('serverStatusBadge');
-        if (badge) {
-          badge.textContent = 'Testing connection to ' + sHost + '...';
-          badge.style.color = '#94a3b8';
-          fetch('http://' + sHost + '/api/ip?t=' + Date.now(), { signal: AbortSignal.timeout(1800) })
-            .then(r => r.ok ? r.json() : null)
-            .then(d => {
-              if (d) {
-                badge.innerHTML = '<span style="color:#10b981;">● Server Active</span> (' + sHost + ')';
-              } else {
-                badge.innerHTML = '<span style="color:#f59e0b;">● Reaching ' + sHost + '...</span>';
-              }
-            })
-            .catch(() => {
-              badge.innerHTML = '<span style="color:#ef4444;">● Server Not Responding</span> (' + sHost + ')';
-            });
-        }
-      }
-
-      // Wire up copy button
+      // Wire Copy button
       document.getElementById('copyBtn').onclick = () => {
-        const txt = document.getElementById('remoteUrlText').textContent;
-        if (!navigator.clipboard) return;
-        navigator.clipboard.writeText(txt).then(() => {
-          const b = document.getElementById('copyBtn');
-          if (!b) return;
-          b.textContent = 'Copied!';
-          b.style.background = '#059669';
-          setTimeout(() => { b.textContent = 'Copy Link'; b.style.background = '#1d4ed8'; }, 2000);
-        });
+        const link = getCloudRemoteUrl();
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(link).then(() => {
+            const b = document.getElementById('copyBtn');
+            if (b) {
+              b.textContent = 'Copied!';
+              b.style.background = '#059669';
+              setTimeout(() => { b.textContent = '📋 Copy Link'; b.style.background = '#1d4ed8'; }, 2000);
+            }
+          });
+        }
       };
 
-      // Wire up manual IP edit
+      // Wire New Room button
+      document.getElementById('newRoomBtn').onclick = () => {
+        generateNewRoomCode();
+        showVoiceToast('New Room Generated: ' + getRoomCode(), 'info', 2000);
+      };
+
+      // Wire Local IP Toggle
+      document.getElementById('toggleLocalBtn').onclick = () => {
+        const sec = document.getElementById('localServerSection');
+        if (sec) sec.style.display = (sec.style.display === 'none' ? 'block' : 'none');
+        const sHost = getRemoteServerHost();
+        const lText = document.getElementById('localIpText');
+        if (lText) lText.textContent = 'http://' + sHost + '/remote.html';
+      };
+
+      // Wire Edit Local IP
       document.getElementById('editIpBtn').onclick = () => {
         const currentHost = getRemoteServerHost();
         const entered = prompt('Enter the Server PC IP address (e.g. 192.168.68.103:8000):', currentHost);
         if (entered && entered.trim()) {
           setRemoteServerHost(entered.trim());
-          updateRemoteDisplay();
-          showVoiceToast('Server host updated: ' + getRemoteServerHost(), 'info', 2000);
+          const lText = document.getElementById('localIpText');
+          if (lText) lText.textContent = 'http://' + getRemoteServerHost() + '/remote.html';
+          showVoiceToast('Local IP updated: ' + getRemoteServerHost(), 'info', 2000);
         }
       };
 
-      // Detect real LAN IP from server
-      async function detectLanIp() {
-        const testEndpoints = [
-          'http://127.0.0.1:8000/api/ip',
-          'http://localhost:8000/api/ip',
-          '/api/ip'
-        ];
-        for (const ep of testEndpoints) {
-          try {
-            const r = await fetch(ep + '?t=' + Date.now(), { signal: AbortSignal.timeout(1200) });
-            if (r.ok) {
-              const d = await r.json();
-              if (d && d.ip && !d.ip.includes('127.0.0.1') && !d.ip.includes('localhost')) {
-                setRemoteServerHost(d.ip + ':' + (d.port || 8000));
-                updateRemoteDisplay();
-                return;
-              }
-            }
-          } catch (_) {}
-        }
-        updateRemoteDisplay();
-      }
-
-      document.getElementById('refreshIpBtn').onclick = () => detectLanIp();
-      detectLanIp();
+      updateRemoteModalUI();
     });
 
     // ── Player Keyboard Shortcuts Modal ────────────────────────────────

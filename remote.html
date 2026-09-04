@@ -78,6 +78,7 @@
     }
     #toast.show { opacity: 1; }
   </style>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 </head>
 <body>
 
@@ -85,6 +86,12 @@
     <div class="remote-head">
       <div class="head-title">📱 Presentation Remote</div>
       <div class="timer-badge" id="timer">00:00</div>
+    </div>
+
+    <!-- Live Connection Status Badge -->
+    <div id="connStatus" style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.3);border-radius:12px;font-size:12px;font-weight:700;">
+      <span id="connBadge" style="color:#f59e0b;">⏳ Initializing Cloud Remote...</span>
+      <button id="roomChangeBtn" style="background:#1e293b;border:1px solid #334155;color:#38bdf8;padding:4px 10px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;">Change Room</button>
     </div>
 
     <div class="touch-grid">
@@ -124,17 +131,130 @@
       t._tm = setTimeout(() => t.classList.remove('show'), 1500);
     }
 
+    // ── WebRTC PeerJS Cloud Remote Logic ─────────────────────────────────
+    const urlParams = new URLSearchParams(window.location.search);
+    let targetRoom = urlParams.get('room') || (window.location.hash ? window.location.hash.replace('#', '') : '') || localStorage.getItem('wf_remote_last_room') || '';
+
+    let peer = null;
+    let peerConn = null;
+    let isConnected = false;
+
+    function updateConnStatus(text, color) {
+      const b = document.getElementById('connBadge');
+      if (b) {
+        b.textContent = text;
+        b.style.color = color;
+      }
+    }
+
+    function initPeerConnection(room) {
+      if (!room) {
+        updateConnStatus('📱 Scan QR on Presentation Screen', '#38bdf8');
+        return;
+      }
+      targetRoom = room.trim().toUpperCase();
+      try { localStorage.setItem('wf_remote_last_room', targetRoom); } catch(_) {}
+      updateConnStatus('🔄 Connecting to ' + targetRoom + '...', '#f59e0b');
+
+      if (peerConn) {
+        try { peerConn.close(); } catch(_) {}
+        peerConn = null;
+      }
+
+      if (!peer || peer.destroyed) {
+        try {
+          peer = new Peer(null, { debug: 0 });
+          peer.on('open', () => {
+            connectToHost(targetRoom);
+          });
+          peer.on('error', (err) => {
+            console.warn('Peer error:', err);
+            updateConnStatus('⚠️ ' + (err.type || 'Retrying connection...'), '#ef4444');
+            setTimeout(() => {
+              if (!isConnected && targetRoom) initPeerConnection(targetRoom);
+            }, 3000);
+          });
+        } catch (e) {
+          updateConnStatus('⚠️ Cloud library loading...', '#ef4444');
+        }
+      } else if (peer.open) {
+        connectToHost(targetRoom);
+      }
+    }
+
+    function connectToHost(room) {
+      const hostPeerId = 'wf-pres-' + room.toLowerCase().replace(/[^a-z0-9]/g, '');
+      try {
+        peerConn = peer.connect(hostPeerId, { reliable: true });
+
+        peerConn.on('open', () => {
+          isConnected = true;
+          updateConnStatus('🟢 Connected to ' + room, '#10b981');
+          showToast('✓ Connected to Presentation!');
+        });
+
+        peerConn.on('data', (data) => {
+          if (data && data.type === 'slide') {
+            showToast('Slide: ' + data.current);
+          }
+        });
+
+        peerConn.on('close', () => {
+          isConnected = false;
+          updateConnStatus('🔴 Disconnected. Reconnecting...', '#ef4444');
+          setTimeout(() => {
+            if (!isConnected && targetRoom) connectToHost(targetRoom);
+          }, 2500);
+        });
+
+        peerConn.on('error', (err) => {
+          console.warn('Peer conn error:', err);
+          updateConnStatus('⚠️ Retrying ' + room + '...', '#f59e0b');
+          setTimeout(() => {
+            if (!isConnected && targetRoom) connectToHost(targetRoom);
+          }, 3000);
+        });
+      } catch (e) {
+        updateConnStatus('⚠️ Connection failed', '#ef4444');
+      }
+    }
+
+    document.getElementById('roomChangeBtn').onclick = () => {
+      const entered = prompt('Enter Presentation Room Code (e.g. WF-4589):', targetRoom);
+      if (entered && entered.trim()) {
+        initPeerConnection(entered.trim());
+      }
+    };
+
+    if (targetRoom) {
+      initPeerConnection(targetRoom);
+    } else {
+      updateConnStatus('📱 Scan QR on Presentation Screen', '#38bdf8');
+    }
+
+    // ── Send Command to Presentation ──────────────────────────────────────
     async function sendCmd(action, value = '') {
       haptic();
-      try {
-        const res = await fetch('/api/remote-send?action=' + encodeURIComponent(action) + '&val=' + encodeURIComponent(value) + '&t=' + Date.now());
-        if (res.ok) {
+      let sentViaWebRTC = false;
+      if (peerConn && peerConn.open) {
+        try {
+          peerConn.send({ action, val: value, t: Date.now() });
+          sentViaWebRTC = true;
           showToast('✓ ' + action.toUpperCase() + ' Sent');
-        } else {
-          showToast('Server HTTP ' + res.status);
-        }
-      } catch (err) {
-        showToast('Connection error: ' + err.message);
+        } catch (_) {}
+      }
+
+      // Also fire to local server if on same machine/wifi (dual transport fallback)
+      try {
+        fetch('/api/remote-send?action=' + encodeURIComponent(action) + '&val=' + encodeURIComponent(value) + '&t=' + Date.now(), { signal: AbortSignal.timeout(800) })
+          .then(r => {
+            if (r.ok && !sentViaWebRTC) showToast('✓ ' + action.toUpperCase() + ' Sent (Local)');
+          }).catch(() => {});
+      } catch(_) {}
+
+      if (!sentViaWebRTC && (!peerConn || !peerConn.open)) {
+        showToast('🔄 Connecting to ' + (targetRoom || 'Presentation') + '...');
+        if (targetRoom) connectToHost(targetRoom);
       }
     }
 
@@ -159,7 +279,7 @@
     function toggleMic() {
       const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (!Speech) {
-        alert('⚠️ Speech Recognition not supported or blocked on this mobile browser.\n\nNote: Google Chrome blocks microphone on unencrypted HTTP (192.168.x.x). Please use the touch buttons (PREVIOUS / NEXT SLIDE).');
+        alert('⚠️ Speech Recognition not supported on this browser.\nPlease use the touch buttons (PREVIOUS / NEXT SLIDE).');
         return;
       }
 
@@ -201,7 +321,7 @@
           micBtn.classList.remove('listening');
           document.getElementById('micText').textContent = 'Voice Mic';
           if (e.error === 'not-allowed') {
-            alert('⚠️ মোবাইল ক্রোম মাইক্রোফোন ব্লক করেছে!\n\nকারণ: অ্যান্ড্রয়েড গুগল ক্রোম নিরাপত্তার স্বার্থে সাধারণ HTTP (192.168.x.x)-তে মাইক্রোফোন বন্ধ রাখে (ল্যাপটপে localhost হওয়ায় সেখানে কাজ করে, কিন্তু মোবাইলে HTTP হওয়ায় ব্লক হয়)।\n\nউপদেশ: মোবাইল স্ক্রিনের বড় PREVIOUS ও NEXT বাটন দুটি ব্যবহার করে নিশ্চিন্তে ও দ্রুত প্রেজেন্টেশন পরিচালনা করুন।');
+            alert('⚠️ মাইক্রোফোন পারমিশন প্রয়োজন!\nব্রাউজার সেটিংসে গিয়ে Microphone Allow করে দিন।');
           } else {
             showToast('Voice error: ' + (e.error || 'unknown'));
           }

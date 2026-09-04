@@ -135,6 +135,20 @@
       }
     } catch (_) {}
 
+    // Bundle PeerJS WebRTC directly inline so standalone export works instantly
+    try {
+      const peerResp = await fetch('/peerjs.min.js?t=' + Date.now());
+      if (peerResp.ok) {
+        const peerCode = await peerResp.text();
+        if (peerCode && peerCode.length > 1000) {
+          finalHtml = finalHtml.replace(
+            '<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>',
+            `<script>\n/* Embedded PeerJS WebRTC */\n${peerCode}\n<\/script>`
+          );
+        }
+      }
+    } catch (_) {}
+
     // Inject audio init script just before </body>
     if (audioEmbedScript) {
       finalHtml = finalHtml.replace('</body>', audioEmbedScript + '\n</body>');
