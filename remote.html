@@ -188,10 +188,9 @@
           for (let n = e.resultIndex; n < e.results.length; n++) {
             if (!e.results[n].isFinal) continue;
             const w = e.results[n][0].transcript.toLowerCase().trim();
-            showToast('🗣️ ' + w);
-            if (/next|forward|samne|poroborti|porer|পরবর্তী|পরের|পরেরটা|সামনে|নেক্সট|নেক্সড|আগাও/i.test(w)) {
+            if (/\b(next|forward|samne|poroborti|porer|advance)\b|নেক্সট|নেক্সড|সামনে|পরবর্তী|পরের|পরেরটা|আগাও|এগিয়ে/i.test(w)) {
               sendCmd('next');
-            } else if (/back|previous|prev|peshone|ager|আগের|আগেরটা|পেছনে|পিছনে|প্রিভিয়াস|প্রিভিয়াস|পিছাও|আগে/i.test(w)) {
+            } else if (/\b(back|previous|prev|peshone|ager|reverse|return)\b|ব্যাক|ব্যাকে|বেক|বেগ|পিছে|পিছনে|পেছনে|আগের|আগেরটা|আগে|পূর্বে|পূর্ববর্তী|প্রিভিয়াস|প্রিভিয়াস|পিছাও/i.test(w)) {
               sendCmd('prev');
             }
           }

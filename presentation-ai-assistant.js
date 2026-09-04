@@ -23,10 +23,12 @@
   
   let isListening = false;
   let isSpeaking = false;
+  let shouldKeepListening = false;
+  let isRestarting = false;
   let recognition = null;
   let synth = typeof window.speechSynthesis !== 'undefined' ? window.speechSynthesis : null;
   let selectedVoice = null;
-  let currentLang = 'en-US'; // auto-adapts to speech input
+  let currentLang = 'bn-BD'; // Support both English and Bengali seamlessly
   
   let container = null;
   let dollEl = null;
@@ -447,20 +449,21 @@
         isSpeaking = true;
         container?.classList.add('talking');
       };
-      utterance.onend = () => {
+      const finishSpeaking = () => {
         isSpeaking = false;
         container?.classList.remove('talking');
+        if (shouldKeepListening && isListening && recognition) {
+          try { recognition.start(); } catch (_) {}
+        }
         if (onComplete) onComplete();
       };
-      utterance.onerror = () => {
-        isSpeaking = false;
-        container?.classList.remove('talking');
-        if (onComplete) onComplete();
-      };
+      utterance.onend = finishSpeaking;
+      utterance.onerror = finishSpeaking;
 
       synth.speak(utterance);
     } catch (e) {
       console.warn('[AI Doll TTS] Error:', e);
+      isSpeaking = false;
       container?.classList.remove('talking');
       if (onComplete) onComplete();
     }
@@ -563,17 +566,18 @@
 
     try {
       recognition = new SR();
-      recognition.continuous = false;
+      recognition.continuous = true;
       recognition.interimResults = false;
-      recognition.lang = 'en-US'; // English fallback, will match Bengali phonetics too
+      recognition.lang = 'bn-BD'; // Seamless Bengali & English recognition
 
       recognition.onstart = () => {
         isListening = true;
         container?.classList.add('listening');
-        showBubble('✨ <b>Listening...</b><br>Say "Next", "Previous", or "Read slide"', 0);
+        showBubble('✨ <b>Listening...</b><br>Say "Next", "Back", or "Read slide"', 0);
       };
 
       recognition.onresult = (e) => {
+        if (isSpeaking) return; // Don't trigger on doll's own voice
         let transcript = '';
         for (let i = e.results.length - 1; i >= 0; i--) {
           if (e.results[i].isFinal) {
@@ -583,23 +587,38 @@
         }
         if (transcript) {
           console.log('[AI Doll] Recognized:', transcript);
-          showBubble(`🗣️ "<b>${escapeHtml(transcript)}</b>"`, 3000);
+          showBubble(`🗣️ "<b>${escapeHtml(transcript)}</b>"`, 2500);
           handleVoiceCommand(transcript);
         }
       };
 
       recognition.onerror = (e) => {
         console.warn('[AI Doll Recognition Error]:', e.error);
-        stopListeningUI();
         if (e.error === 'not-allowed') {
+          shouldKeepListening = false;
+          stopListeningUI();
           showBubble('🔒 Mic access blocked. Please allow microphone in browser.', 4000);
-        } else if (e.error === 'no-speech') {
-          showBubble('🤫 No voice heard. Tap doll to try again.', 3000);
         }
+        // Transient errors like 'no-speech' or 'audio-capture' are ignored in continuous mode
       };
 
       recognition.onend = () => {
-        stopListeningUI();
+        // Continuous mode: keep listening without asking for permission again!
+        if (shouldKeepListening && isListening && !isSpeaking) {
+          if (isRestarting) return;
+          isRestarting = true;
+          setTimeout(() => {
+            isRestarting = false;
+            if (shouldKeepListening && isListening && !isSpeaking) {
+              try {
+                recognition.start();
+                container?.classList.add('listening');
+              } catch (_) {}
+            }
+          }, 300);
+        } else if (!shouldKeepListening) {
+          stopListeningUI();
+        }
       };
     } catch (e) {
       console.error('[AI Doll] Setup recognition failed:', e);
@@ -611,16 +630,20 @@
       showBubble('⚠️ Voice recognition not supported on this browser/protocol.', 4000);
       return;
     }
+    shouldKeepListening = true;
     if (isListening) return;
     try {
       recognition.start();
+      isListening = true;
     } catch (e) {
       console.warn('[AI Doll] Start failed:', e);
     }
   }
 
   function stopListening() {
-    if (recognition && isListening) {
+    shouldKeepListening = false;
+    isListening = false;
+    if (recognition) {
       try { recognition.stop(); } catch (_) {}
     }
     stopListeningUI();
@@ -632,7 +655,7 @@
   }
 
   function toggleListening() {
-    if (isListening) {
+    if (shouldKeepListening && isListening) {
       stopListening();
       showBubble('💤 Stopped listening', 2000);
     } else {
@@ -647,15 +670,15 @@
   function handleVoiceCommand(raw) {
     const text = raw.toLowerCase().trim();
 
-    // 1. Next Slide
-    if (/\b(next|next slide|forward|right|পরের|পরবর্তী|পরের স্লাইড|পরবর্তী স্লাইড|সামনে|নেক্সট|পরেরটা)\b/i.test(text)) {
+    // 1. Next Slide (English & Bengali)
+    if (/\b(next|forward|right|samne|porer|poroborti|advance)\b|পরের|পরবর্তী|পরের স্লাইড|পরবর্তী স্লাইড|সামনে|নেক্সট|নেক্সড|পরেরটা|আগাও|এগিয়ে/i.test(text)) {
       triggerSlideNext();
       speak('Moving to next slide!');
       return;
     }
 
-    // 2. Previous Slide
-    if (/\b(prev|previous|previous slide|back|left|আগের|আগের স্লাইড|পেছনে|প্রিভিয়াস|পিছনে যাও|আগেরটা)\b/i.test(text)) {
+    // 2. Previous Slide (English & Bengali including ব্যাক, ব্যাকে, বেক, পিছে, ইত্যাদি)
+    if (/\b(prev|previous|back|left|peshone|ager|reverse|return)\b|আগের|আগের স্লাইড|পেছনে|পিছনে|প্রিভিয়াস|প্রিভিয়াস|পিছনে যাও|আগেরটা|ব্যাক|ব্যাকে|বেক|বেগ|পিছে|পূর্বে|পূর্ববর্তী|পিছাও/i.test(text)) {
       triggerSlidePrev();
       speak('Going back to previous slide!');
       return;

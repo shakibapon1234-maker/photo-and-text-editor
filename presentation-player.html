@@ -1237,6 +1237,15 @@
       clearTimeout(autoTimer);
       clearChainedTimers();
       if (!slides.length) return;
+      if (currentStepIdx > 0) {
+        currentStepIdx--;
+        drawSlide();
+        for (let i = 0; i < currentStepIdx; i++) {
+          if (slideSteps[i]) executeStepGroup(slideSteps[i]);
+        }
+        updateInfoDisplay();
+        return;
+      }
       currentIndex = (currentIndex - 1 + slides.length) % slides.length;
       drawSlide();
     }
