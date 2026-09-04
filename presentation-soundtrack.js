@@ -230,13 +230,24 @@
 
   window.stopPresentationSoundtrack = function() {
     if (activeAudio) {
-      activeAudio.pause();
-      activeAudio.currentTime = 0;
+      try {
+        activeAudio.pause();
+        activeAudio.currentTime = 0;
+      } catch (_) {}
     }
     if (webAudioSource) {
-      try { webAudioSource.stop(); } catch (_) {}
+      try {
+        webAudioSource.stop();
+        webAudioSource.disconnect();
+      } catch (_) {}
       webAudioSource = null;
     }
+    if (webAudioCtx && webAudioCtx.state === 'running') {
+      try { webAudioCtx.suspend(); } catch (_) {}
+    }
+    isTestPlaying = false;
+    const testBtn = $('testPlaySoundtrack');
+    if (testBtn) testBtn.textContent = '▶ Test Listen Sound';
   };
 
   window.playPresentationSoundtrack = async function() {
@@ -484,6 +495,7 @@
       // Auto test play to confirm to user
       const aud = await window.playPresentationSoundtrack();
       if (aud) {
+        isTestPlaying = true;
         if ($('testPlaySoundtrack')) $('testPlaySoundtrack').textContent = '⏸ Pause Test Sound';
       }
     } else {
@@ -513,19 +525,11 @@
   $('testPlaySoundtrack').onclick = async () => {
     if (isTestPlaying) {
       window.stopPresentationSoundtrack();
-      isTestPlaying = false;
-      $('testPlaySoundtrack').textContent = '▶ Test Listen Sound';
     } else {
       const aud = await window.playPresentationSoundtrack();
       if (aud) {
         isTestPlaying = true;
         $('testPlaySoundtrack').textContent = '⏸ Pause Test Sound';
-        if (aud.onended !== undefined) {
-          aud.onended = () => {
-            isTestPlaying = false;
-            if ($('testPlaySoundtrack')) $('testPlaySoundtrack').textContent = '▶ Test Listen Sound';
-          };
-        }
       } else {
         alert('Please upload an MP3 / WAV / M4A file first.');
       }

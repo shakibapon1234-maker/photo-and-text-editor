@@ -301,46 +301,119 @@
     }
     .ctrl-info { font-size: 13px; color: #c4d7f5; font-weight: 700; padding: 0 6px; white-space: nowrap; }
 
-    /* ── Voice Feedback Toast ─────────────────────────────────────────── */
-    .voice-toast {
-      position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
-      z-index: 1000; display: flex; align-items: center; gap: 10px;
-      padding: 10px 22px; border-radius: 30px;
-      background: rgba(15, 23, 42, 0.94); border: 1px solid #3b82f6;
-      color: #fff; font-size: 13px; font-weight: 700;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.7); backdrop-filter: blur(12px);
-      transition: opacity 0.3s ease, transform 0.3s ease; pointer-events: auto;
-      max-width: 90vw; text-align: center;
+    /* ── Soundtrack Controls in Player Toolbar ── */
+    .soundtrack-ctrl-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 3px 12px 3px 4px;
+      border-radius: 30px;
+      background: rgba(23, 37, 84, 0.7);
+      border: 1px solid rgba(244, 114, 182, 0.45);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+      transition: all 0.2s ease;
     }
-    .voice-toast.hidden { opacity: 0; transform: translate(-50%, -20px); pointer-events: none; }
-    .voice-toast.warning { border-color: #f59e0b; background: rgba(36, 22, 10, 0.95); color: #fde68a; }
-    .voice-toast.error { border-color: #ef4444; background: rgba(45, 12, 12, 0.95); color: #fca5a5; }
+    .soundtrack-ctrl-group:hover {
+      border-color: #f472b6;
+      background: rgba(30, 48, 100, 0.85);
+    }
+    .soundtrack-ctrl-group.no-audio {
+      opacity: 0.5;
+      filter: grayscale(0.8);
+    }
+    #soundtrackToggleBtn {
+      width: 32px;
+      height: 32px;
+      background: #be185d;
+      border-color: #f472b6;
+      font-size: 14px;
+    }
+    #soundtrackToggleBtn:hover {
+      background: #db2777;
+      border-color: #fbcfe8;
+    }
+    #soundtrackVolumeSlider {
+      width: 75px;
+      height: 5px;
+      appearance: none;
+      -webkit-appearance: none;
+      background: #334155;
+      border-radius: 5px;
+      outline: none;
+      cursor: pointer;
+    }
+    #soundtrackVolumeSlider::-webkit-slider-thumb {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #f472b6;
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(244, 114, 182, 0.9);
+      transition: transform 0.15s;
+    }
+    #soundtrackVolumeSlider::-webkit-slider-thumb:hover {
+      transform: scale(1.25);
+    }
+    .vol-badge {
+      font-size: 11px;
+      font-weight: 800;
+      color: #f9a8d4;
+      min-width: 32px;
+      text-align: right;
+    }
 
     /* ── Slide Quick Navigator Drawer ─────────────────────────────────── */
     #navDrawer {
       position: fixed; z-index: 300;
-      top: 0; bottom: 0; right: -320px; width: 300px;
-      background: rgba(12, 18, 34, 0.95);
+      top: 0; bottom: 0; right: -360px; width: 340px;
+      background: rgba(10, 16, 30, 0.96);
       border-left: 1px solid #2d4063;
-      box-shadow: -10px 0 40px rgba(0,0,0,0.8);
-      backdrop-filter: blur(16px);
+      box-shadow: -10px 0 40px rgba(0,0,0,0.85);
+      backdrop-filter: blur(18px);
       transition: right 0.25s ease;
-      display: flex; flex-direction: column; padding: 16px;
+      display: flex; flex-direction: column; padding: 18px 16px;
     }
     #navDrawer.open { right: 0; }
-    .drawer-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-    .drawer-title { font-size: 14px; font-weight: 700; color: #ffd166; letter-spacing: 0.5px; }
-    .drawer-close { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; }
-    .thumb-grid { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-    .thumb-item {
-      display: flex; align-items: center; gap: 10px; padding: 8px 12px;
-      background: #17243c; border: 1px solid #2d4063; border-radius: 8px;
-      cursor: pointer; transition: all 0.15s;
+    .drawer-head {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid rgba(80, 120, 180, 0.25);
     }
-    .thumb-item:hover { background: #23375a; border-color: #4f8df7; }
-    .thumb-item.active { border-color: #ffd166; background: #243a60; }
-    .thumb-num { font-weight: 700; font-size: 14px; color: #79abff; }
-    .thumb-label { font-size: 12px; color: #cbd9f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .drawer-title { font-size: 14px; font-weight: 800; color: #ffd166; letter-spacing: 0.8px; }
+    .drawer-close { background: none; border: none; color: #fff; font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: background 0.15s; }
+    .drawer-close:hover { background: rgba(255,255,255,0.1); }
+    .thumb-grid {
+      flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px;
+    }
+    .thumb-grid::-webkit-scrollbar { width: 6px; }
+    .thumb-grid::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 4px; }
+    .thumb-grid::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    .thumb-grid::-webkit-scrollbar-thumb:hover { background: #4f8df7; }
+    .thumb-item {
+      display: flex; align-items: center; gap: 12px; padding: 8px 10px;
+      background: #141f35; border: 1.5px solid #223454; border-radius: 10px;
+      cursor: pointer; transition: all 0.2s ease;
+    }
+    .thumb-item:hover { background: #1c2e50; border-color: #4f8df7; transform: translateX(-3px); }
+    .thumb-item.active { border-color: #ffd166; background: #233b66; box-shadow: 0 0 16px rgba(255, 209, 102, 0.35); }
+    .thumb-preview-box {
+      width: 76px; height: 44px; border-radius: 6px; overflow: hidden;
+      flex-shrink: 0; position: relative; background: #0f172a;
+      border: 1px solid rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.6);
+    }
+    .thumb-preview-text {
+      font-size: 8px; color: rgba(255,255,255,0.9); font-weight: 700; text-align: center;
+      padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+      -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.15; pointer-events: none;
+    }
+    .thumb-details { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .thumb-num-row { display: flex; align-items: center; justify-content: space-between; }
+    .thumb-num { font-weight: 800; font-size: 13px; color: #79abff; }
+    .thumb-item.active .thumb-num { color: #ffd166; }
+    .thumb-step-badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: rgba(79, 141, 247, 0.2); color: #93c5fd; font-weight: 600; }
+    .thumb-label { font-size: 12px; color: #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 
     /* ── Mobile Remote Modal ─────────────────────────────────────────── */
     .remote-modal-backdrop {
@@ -387,6 +460,11 @@
     <button class="ctrl-btn" id="prevBtn" title="Previous Slide (←)">◀</button>
     <span class="ctrl-info" id="slideInfo">1 / 1</span>
     <button class="ctrl-btn" id="nextBtn" title="Next Slide (→ / Space)">▶</button>
+    <div id="soundtrackControls" class="soundtrack-ctrl-group" title="Presentation Soundtrack">
+      <button class="ctrl-btn" id="soundtrackToggleBtn" title="Soundtrack: Play / Mute (M)">🔊</button>
+      <input type="range" id="soundtrackVolumeSlider" min="0" max="100" value="60" title="Soundtrack Volume (+ / -)">
+      <span id="soundtrackVolBadge" class="vol-badge">60%</span>
+    </div>
     <button class="ctrl-btn" id="voiceBtn" title="Voice Control (Bengali / English)">🎤</button>
     <button class="ctrl-btn" id="remoteBtn" title="Mobile Remote Control (QR Code)">📱</button>
     <button class="ctrl-btn" id="fsBtn" title="Fullscreen (F / F11)">⛶</button>
@@ -1325,33 +1403,80 @@
       loadDeck(JSON.stringify(demoData));
     });
 
+    function getSlidePreviewBg(sl) {
+      if (!sl) return '#17233c';
+      if (sl.background === 'custom') return sl.bgColor || '#17233c';
+      if (sl.background === 'image' && sl.bgImage) return 'url("' + sl.bgImage + '") center/cover no-repeat';
+      if (sl.background && (sl.background.startsWith('linear-gradient') || sl.background.startsWith('radial-gradient') || sl.background.startsWith('#') || sl.background.startsWith('rgb'))) return sl.background;
+      if (themes && themes[sl.background]) return themes[sl.background];
+      if (sl.bgColor && sl.bgColor !== 'transparent') return sl.bgColor;
+      return '#17233c';
+    }
+
     function renderDrawer() {
       const grid = document.getElementById('thumbGrid');
+      if (!grid) return;
       grid.replaceChildren();
+      if (!slides || !slides.length) {
+        grid.innerHTML = '<div style="padding:24px 10px;text-align:center;color:#94a3b8;font-size:13px;">কোনো স্লাইড নেই</div>';
+        return;
+      }
       slides.forEach((sl, i) => {
         const item = document.createElement('div');
         item.className = 'thumb-item' + (i === currentIndex ? ' active' : '');
-        const firstText = (sl.elements || []).find(e => e.type === 'text' || e.text);
-        const title = firstText ? (firstText.text || '').slice(0, 30) : ('Slide ' + (i + 1));
-        item.innerHTML = '<span class="thumb-num">' + (i + 1) + '</span><span class="thumb-label">' + title + '</span>';
-        item.addEventListener('click', () => {
+        item.id = 'thumbItem-' + i;
+        
+        const firstTextEl = (sl.elements || []).find(e => e.type === 'text' || (e.text && e.text.trim()));
+        const rawTitle = firstTextEl ? (firstTextEl.text || '').replace(/\s+/g, ' ').trim() : ('Slide ' + (i + 1));
+        const title = rawTitle.length > 36 ? rawTitle.slice(0, 36) + '…' : rawTitle;
+        const bgStyle = getSlidePreviewBg(sl);
+        const stepCount = (sl.elements || []).filter(e => e.animStep && Number(e.animStep) > 1).length;
+
+        item.innerHTML = `
+          <div class="thumb-preview-box" style="background: ${bgStyle};">
+            <span class="thumb-preview-text">${title.slice(0, 22)}</span>
+          </div>
+          <div class="thumb-details">
+            <div class="thumb-num-row">
+              <span class="thumb-num">Slide ${i + 1}</span>
+              ${stepCount > 0 ? `<span class="thumb-step-badge">${stepCount + 1} steps</span>` : ''}
+            </div>
+            <div class="thumb-label" title="${rawTitle}">${title}</div>
+          </div>
+        `;
+
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
           currentIndex = i;
+          currentStepIdx = 0;
           drawSlide();
+          updateDrawerActive();
           document.getElementById('navDrawer').classList.remove('open');
         });
         grid.appendChild(item);
       });
+      updateDrawerActive();
     }
 
     function updateDrawerActive() {
       const items = document.querySelectorAll('.thumb-item');
-      items.forEach((it, i) => it.classList.toggle('active', i === currentIndex));
+      items.forEach((it, i) => {
+        const isActive = i === currentIndex;
+        it.classList.toggle('active', isActive);
+        if (isActive && document.getElementById('navDrawer')?.classList.contains('open')) {
+          it.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
+      });
     }
 
     document.getElementById('prevBtn').addEventListener('click', () => advance(-1));
     document.getElementById('nextBtn').addEventListener('click', () => advance(1));
     document.getElementById('listBtn').addEventListener('click', () => {
-      document.getElementById('navDrawer').classList.toggle('open');
+      const drawer = document.getElementById('navDrawer');
+      drawer.classList.toggle('open');
+      if (drawer.classList.contains('open')) {
+        renderDrawer();
+      }
     });
     document.getElementById('closeDrawer').addEventListener('click', () => {
       document.getElementById('navDrawer').classList.remove('open');
@@ -1609,6 +1734,137 @@
           + encodeURIComponent(remoteUrl);
       }
     });
+
+    // ── Built-in Soundtrack Engine ─────────────────────────────────────
+    let presentationAudio = null;
+    let soundtrackVolume = 0.6;
+    let soundtrackLoop = true;
+    let isSoundtrackMuted = false;
+    let lastNonZeroSoundtrackVol = 0.6;
+
+    function initSoundtrackEngine(audioSrc, volume = 60, loop = true, name = '') {
+      const ctrl = document.getElementById('soundtrackControls');
+      if (!audioSrc) {
+        if (ctrl) {
+          ctrl.classList.add('no-audio');
+          ctrl.title = 'No soundtrack embedded in this presentation';
+        }
+        return;
+      }
+      if (ctrl) {
+        ctrl.classList.remove('no-audio');
+        ctrl.style.display = 'inline-flex';
+      }
+      soundtrackVolume = (volume != null ? Number(volume) : 60) / 100;
+      soundtrackLoop = loop !== false;
+      lastNonZeroSoundtrackVol = soundtrackVolume > 0 ? soundtrackVolume : 0.6;
+
+      try {
+        if (!presentationAudio) {
+          presentationAudio = new Audio();
+          window._presentationAudio = presentationAudio;
+        }
+        presentationAudio.src = audioSrc;
+        presentationAudio.volume = soundtrackVolume;
+        presentationAudio.loop = soundtrackLoop;
+        presentationAudio.preload = 'auto';
+      } catch (e) {
+        console.warn('Soundtrack init error:', e);
+      }
+
+      updateSoundtrackUi();
+    }
+
+    function setSoundtrackVolume(pct) {
+      const val = Math.max(0, Math.min(100, Math.round(pct)));
+      soundtrackVolume = val / 100;
+      if (presentationAudio) {
+        presentationAudio.volume = soundtrackVolume;
+        if (val > 0) {
+          lastNonZeroSoundtrackVol = soundtrackVolume;
+          isSoundtrackMuted = false;
+          if (presentationAudio.paused) presentationAudio.play().catch(() => {});
+        } else {
+          isSoundtrackMuted = true;
+        }
+      }
+      updateSoundtrackUi();
+    }
+
+    function toggleSoundtrackMute() {
+      if (!presentationAudio) return;
+      if (isSoundtrackMuted || soundtrackVolume === 0 || presentationAudio.paused) {
+        isSoundtrackMuted = false;
+        soundtrackVolume = lastNonZeroSoundtrackVol > 0 ? lastNonZeroSoundtrackVol : 0.6;
+        presentationAudio.volume = soundtrackVolume;
+        presentationAudio.play().catch(() => {});
+      } else {
+        isSoundtrackMuted = true;
+        lastNonZeroSoundtrackVol = soundtrackVolume > 0 ? soundtrackVolume : 0.6;
+        presentationAudio.pause();
+      }
+      updateSoundtrackUi();
+    }
+
+    function updateSoundtrackUi() {
+      const btn = document.getElementById('soundtrackToggleBtn');
+      const slider = document.getElementById('soundtrackVolumeSlider');
+      const badge = document.getElementById('soundtrackVolBadge');
+      const isPlaying = presentationAudio && !presentationAudio.paused && soundtrackVolume > 0 && !isSoundtrackMuted;
+      const pct = Math.round((isSoundtrackMuted ? 0 : soundtrackVolume) * 100);
+
+      if (slider) slider.value = pct;
+      if (badge) badge.textContent = pct + '%';
+      if (btn) {
+        btn.innerHTML = (pct === 0 || !isPlaying) ? '🔇' : (pct < 45 ? '🔉' : '🔊');
+        btn.title = isPlaying ? ('Soundtrack Playing (' + pct + '%) • Click to mute (M)') : 'Click to Play / Unmute (M)';
+        btn.style.background = isPlaying ? '#be185d' : '#334155';
+        btn.style.borderColor = isPlaying ? '#f472b6' : '#64748b';
+      }
+    }
+
+    function unlockSoundtrackOnGesture() {
+      if (presentationAudio && presentationAudio.paused && !isSoundtrackMuted && soundtrackVolume > 0) {
+        presentationAudio.play().then(() => {
+          updateSoundtrackUi();
+        }).catch(() => {});
+      }
+    }
+    window.addEventListener('pointerdown', unlockSoundtrackOnGesture, { passive: true });
+    window.addEventListener('click', unlockSoundtrackOnGesture, { passive: true });
+    window.addEventListener('keydown', (e) => {
+      unlockSoundtrackOnGesture();
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        toggleSoundtrackMute();
+      } else if (e.key === '+' || e.key === '=' || e.key === ']') {
+        e.preventDefault();
+        setSoundtrackVolume(Math.round(soundtrackVolume * 100) + 5);
+      } else if (e.key === '-' || e.key === '_' || e.key === '[') {
+        e.preventDefault();
+        setSoundtrackVolume(Math.round(soundtrackVolume * 100) - 5);
+      }
+    });
+
+    document.getElementById('soundtrackToggleBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleSoundtrackMute();
+    });
+    document.getElementById('soundtrackVolumeSlider')?.addEventListener('input', (e) => {
+      e.stopPropagation();
+      setSoundtrackVolume(e.target.value);
+    });
+
+    // ── Auto Initialization if Slides Preloaded ─────────────────────────────
+    if (Array.isArray(slides) && slides.length > 0) {
+      currentIndex = 0;
+      currentStepIdx = 0;
+      const dropzone = document.getElementById('dropzone');
+      if (dropzone) dropzone.classList.add('hidden');
+      renderDrawer();
+      drawSlide();
+    }
   </script>
 </body>
 </html>
