@@ -60,6 +60,14 @@
       <button id="ctx-layer-backward" title="Send Backward (এক ধাপ পেছনে পাঠান - Ctrl+[)" style="font-size:11px;font-weight:700">↓ Backwd</button>
       <button id="ctx-layer-back" title="Send to Back (সবার নিচে পাঠান - Ctrl+Shift+[)" style="font-size:11px;font-weight:700">⤓ Back</button>
       <div class="ctx-sep"></div>
+      <button id="ctx-align-left" title="Align Left (বামে সমান)">⇤</button>
+      <button id="ctx-align-center-h" title="Center Horizontally (মাঝখানে)">⯀</button>
+      <button id="ctx-align-right" title="Align Right (ডানে সমান)">⇥</button>
+      <button id="ctx-align-top" title="Align Top (উপরে সমান)">⤒</button>
+      <button id="ctx-align-center-v" title="Center Vertically (উল্লম্বভাবে মাঝখানে)">⯁</button>
+      <button id="ctx-align-bottom" title="Align Bottom (নিচে সমান)">⤓</button>
+      <button id="ctx-align-center-both" title="Center on Slide (একদম স্লাইডের কেন্দ্রে)" style="font-weight:bold;color:#ffd166">🎯</button>
+      <div class="ctx-sep"></div>
       <button id="ctx-duplicate" title="Duplicate (Ctrl+D)">⧉ Duplicate</button>
       <div class="ctx-sep"></div>
       <span class="ctx-hint">Click text on slide to edit</span>
@@ -109,6 +117,14 @@
       <button id="ctx-shape-layer-backward" title="Send Backward (এক ধাপ পেছনে পাঠান - Ctrl+[)" style="font-size:11px;font-weight:700">↓ Backwd</button>
       <button id="ctx-shape-layer-back" title="Send to Back (সবার নিচে পাঠান - Ctrl+Shift+[)" style="font-size:11px;font-weight:700">⤓ Back</button>
       <div class="ctx-sep"></div>
+      <button id="ctx-shape-align-left" title="Align Left (বামে সমান)">⇤</button>
+      <button id="ctx-shape-align-center-h" title="Center Horizontally (মাঝখানে)">⯀</button>
+      <button id="ctx-shape-align-right" title="Align Right (ডানে সমান)">⇥</button>
+      <button id="ctx-shape-align-top" title="Align Top (উপরে সমান)">⤒</button>
+      <button id="ctx-shape-align-center-v" title="Center Vertically (উল্লম্বভাবে মাঝখানে)">⯁</button>
+      <button id="ctx-shape-align-bottom" title="Align Bottom (নিচে সমান)">⤓</button>
+      <button id="ctx-shape-align-center-both" title="Center on Slide (একদম স্লাইডের কেন্দ্রে)" style="font-weight:bold;color:#ffd166">🎯</button>
+      <div class="ctx-sep"></div>
       <button id="ctx-shape-duplicate" title="Duplicate Shape (Ctrl+D)">⧉ Duplicate</button>
       <div class="ctx-sep"></div>
       <span class="ctx-hint">Click shape to type</span>
@@ -132,6 +148,14 @@
       <button id="ctx-img-layer-forward" title="Bring Forward (এক ধাপ সামনে আনুন - Ctrl+])" style="font-size:11px;font-weight:700">↑ Forward</button>
       <button id="ctx-img-layer-backward" title="Send Backward (এক ধাপ পেছনে পাঠান - Ctrl+[)" style="font-size:11px;font-weight:700">↓ Backwd</button>
       <button id="ctx-img-layer-back" title="Send to Back (সবার নিচে পাঠান - Ctrl+Shift+[)" style="font-size:11px;font-weight:700">⤓ Back</button>
+      <div class="ctx-sep"></div>
+      <button id="ctx-img-align-left" title="Align Left (বামে সমান)">⇤</button>
+      <button id="ctx-img-align-center-h" title="Center Horizontally (মাঝখানে)">⯀</button>
+      <button id="ctx-img-align-right" title="Align Right (ডানে সমান)">⇥</button>
+      <button id="ctx-img-align-top" title="Align Top (উপরে সমান)">⤒</button>
+      <button id="ctx-img-align-center-v" title="Center Vertically (উল্লম্বভাবে মাঝখানে)">⯁</button>
+      <button id="ctx-img-align-bottom" title="Align Bottom (নিচে সমান)">⤓</button>
+      <button id="ctx-img-align-center-both" title="Center on Slide (একদম স্লাইডের কেন্দ্রে)" style="font-weight:bold;color:#ffd166">🎯</button>
       <div class="ctx-sep"></div>
       <span class="ctx-hint">💡 Double-click image = Replace করুন</span>
     </div>
@@ -234,6 +258,22 @@
       if (typeof window.sendElementBackward === 'function') window.sendElementBackward();
     } else if (id.includes('layer-back')) {
       if (typeof window.sendElementToBack === 'function') window.sendElementToBack();
+    }
+    // Smart Alignment buttons
+    else if (id.includes('align-center-both')) {
+      if (typeof window.alignElement === 'function') window.alignElement('center-both');
+    } else if (id.includes('align-left')) {
+      if (typeof window.alignElement === 'function') window.alignElement('left');
+    } else if (id.includes('align-center-h')) {
+      if (typeof window.alignElement === 'function') window.alignElement('center-h');
+    } else if (id.includes('align-right')) {
+      if (typeof window.alignElement === 'function') window.alignElement('right');
+    } else if (id.includes('align-top')) {
+      if (typeof window.alignElement === 'function') window.alignElement('top');
+    } else if (id.includes('align-center-v')) {
+      if (typeof window.alignElement === 'function') window.alignElement('center-v');
+    } else if (id.includes('align-bottom')) {
+      if (typeof window.alignElement === 'function') window.alignElement('bottom');
     }
     // Direct Edit Text button
     else if (id === 'ctx-edit-text-btn') {

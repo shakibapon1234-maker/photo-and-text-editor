@@ -511,6 +511,46 @@
     }
   };
 
+  // ── Smart Alignment Tool (এক ক্লিকে স্লাইডে সমান ও কেন্দ্রে সাজানো) ──
+  window.alignElement = function(mode, item) {
+    if (!item) item = typeof selectedEl === 'function' ? selectedEl() : null;
+    if (!item) return;
+
+    const w = Number(item.w) || 20;
+    const h = Number(item.h) || 15;
+
+    if (mode === 'left') {
+      item.x = 6;
+    } else if (mode === 'center-h') {
+      item.x = Math.max(0, Math.round(((100 - w) / 2) * 10) / 10);
+    } else if (mode === 'right') {
+      item.x = Math.max(0, Math.round((94 - w) * 10) / 10);
+    } else if (mode === 'top') {
+      item.y = 6;
+    } else if (mode === 'center-v') {
+      item.y = Math.max(0, Math.round(((100 - h) / 2) * 10) / 10);
+    } else if (mode === 'bottom') {
+      item.y = Math.max(0, Math.round((94 - h) * 10) / 10);
+    } else if (mode === 'center-both') {
+      item.x = Math.max(0, Math.round(((100 - w) / 2) * 10) / 10);
+      item.y = Math.max(0, Math.round(((100 - h) / 2) * 10) / 10);
+    }
+
+    if (typeof render === 'function') render();
+    if (typeof updateHandles === 'function') updateHandles();
+    const modeNames = {
+      'left': 'বামে সমান (Left)',
+      'center-h': 'মাঝখানে (Center H)',
+      'right': 'ডানে সমান (Right)',
+      'top': 'উপরে সমান (Top)',
+      'center-v': 'উল্লম্বভাবে মাঝখানে (Middle V)',
+      'bottom': 'নিচে সমান (Bottom)',
+      'center-both': 'একদম কেন্দ্রে (Center Both)'
+    };
+    showToast(`✓ অ্যালাইনমেন্ট: ${modeNames[mode] || mode}`);
+    window.dispatchEvent(new CustomEvent('presentation:change'));
+  };
+
   // Keyboard shortcut listener
   window.addEventListener('keydown', event => {
     const isEditing = event.target && (event.target.isContentEditable || ['input','textarea','select'].includes((event.target.tagName||'').toLowerCase()));
@@ -579,7 +619,17 @@
       }
     }
 
-    // Ctrl+D: Immediate single duplicate
+    // Ctrl+Shift+D: Duplicate current slide
+    if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === 'd') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (typeof window.duplicateCurrentSlide === 'function') {
+        window.duplicateCurrentSlide();
+      }
+      return;
+    }
+
+    // Ctrl+D: Immediate single duplicate of selected element
     if ((event.ctrlKey || event.metaKey) && !event.shiftKey && key === 'd') {
       if (item && !isEditing) {
         event.preventDefault();

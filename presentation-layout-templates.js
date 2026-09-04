@@ -457,6 +457,76 @@
         { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'প্রফেশনাল কোর্স\n\n• ফুল হ্যান্ডস-অন\n• জিডিএস সাব আইডি\n• রিফান্ড/রিইস্যু ল্যাব\n• লাইভ সাপোর্ট\n\n৳ ১২,০০০', textColor: '#ffffff', textSize: 14, textWeight: '800', textAlign: 'center', x: 38, y: 19, w: 24, h: 68, fill: '#854d0e', stroke: '#ffd166', line: 3, opacity: 100 },
         { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'মাস্টার কোর্স\n\n• এভিয়েশন ফুল ট্রেনিং\n• ট্রাভেল এজেন্সি সেটআপ\n• লাইফটাইম মেন্টরশিপ\n• পোর্টফোলিও বিল্ডিং\n\n৳ ২০,০০০', textColor: '#ffffff', textSize: 14, textWeight: '700', textAlign: 'center', x: 66, y: 22, w: 24, h: 62, fill: '#1e293b', stroke: '#475569', line: 2, opacity: 100 }
       ]
+    },
+    {
+      id: 'fashion-lookbook',
+      name: 'Fashion Lookbook (প্রোডাক্ট শোকেস)',
+      category: 'Infographics',
+      desc: 'Modern luxury product showcase with price badge, details & CTA',
+      badge: '★ Hot',
+      bg: 'fashion',
+      bgColor: '#0b1120',
+      elements: [
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '📸\n\n[ Double-click or upload\nproduct image here ]', textColor: '#94a3b8', textSize: 16, textWeight: '700', textAlign: 'center', x: 7, y: 12, w: 42, h: 76, fill: '#1e293b', stroke: '#38bdf8', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '🔥 NEW ARRIVAL', textColor: '#ffffff', textSize: 13, textWeight: '900', textAlign: 'center', x: 10, y: 16, w: 22, h: 7, fill: '#ef4444', stroke: '#fca5a5', line: 1.5, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '৳ ১,৯৫০ /-', textColor: '#0f172a', textSize: 20, textWeight: '900', textAlign: 'center', x: 19, y: 72, w: 18, h: 10, fill: '#facc15', stroke: '#ffffff', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'text', text: 'EXCLUSIVELY CRAFTED', color: '#38bdf8', size: 15, weight: '900', textAlign: 'left', x: 53, y: 14, w: 42, h: 5 },
+        { id: crypto.randomUUID(), type: 'text', text: 'প্রিমিয়াম লাক্সারি কালেকশন', color: '#ffffff', size: 36, weight: '900', textAlign: 'left', x: 53, y: 20, w: 42, h: 10 },
+        { id: crypto.randomUUID(), type: 'text', text: '১০০% পিওর কটন ফেব্রিক এবং আধুনিক ট্রেন্ডি ডিজাইনের নিখুঁত সমন্বয়। ক্যাজুয়াল ও পার্টি ওয়্যার হিসেবে অত্যন্ত আরামদায়ক।', color: '#cbd5e1', size: 16, weight: '500', textAlign: 'left', x: 53, y: 32, w: 42, h: 14 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '✓ প্রিমিয়াম কোয়ালিটি ফেব্রিক', textColor: '#ffffff', textSize: 13, textWeight: '700', textAlign: 'left', x: 53, y: 48, w: 40, h: 7, fill: '#1e293b', stroke: '#475569', line: 1, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '✓ কালার গ্যারান্টি ও প্রি-শ্রাঙ্ক', textColor: '#ffffff', textSize: 13, textWeight: '700', textAlign: 'left', x: 53, y: 57, w: 40, h: 7, fill: '#1e293b', stroke: '#475569', line: 1, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '✓ ক্যাশ অন ডেলিভারি সুবিধা', textColor: '#ffffff', textSize: 13, textWeight: '700', textAlign: 'left', x: 53, y: 66, w: 40, h: 7, fill: '#1e293b', stroke: '#475569', line: 1, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'অর্ডার করতে ইনবক্স করুন 🛍️', textColor: '#ffffff', textSize: 17, textWeight: '900', textAlign: 'center', x: 53, y: 76, w: 32, h: 11, fill: '#059669', stroke: '#34d399', line: 2, opacity: 100 }
+      ]
+    },
+    {
+      id: 'two-column-split',
+      name: '2-Column Feature Split (দ্বিমুখী ফিচার)',
+      category: 'Infographics',
+      desc: 'Bold hero statement on left with structured feature points on right',
+      badge: 'Modern',
+      bg: 'custom',
+      bgColor: '#0f172a',
+      elements: [
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'কেন আমাদের\nপছন্দ করবেন?\n\nআমরা প্রদান করি সর্বোচ্চ মানসম্পন্ন সার্ভিস ও দীর্ঘমেয়াদী নির্ভরযোগ্য সাপোর্ট।', textColor: '#ffffff', textSize: 22, textWeight: '900', textAlign: 'center', x: 6, y: 12, w: 40, h: 76, fill: '#1e3a8a', stroke: '#60a5fa', line: 2.5, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '⭐ ১০০% বিশ্বস্ত', textColor: '#ffffff', textSize: 13, textWeight: '800', textAlign: 'center', x: 15, y: 76, w: 22, h: 8, fill: '#f59e0b', stroke: '#fde68a', line: 1.5, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '১. দ্রুততম প্রসেসিং ও ডেলিভারি\nঅর্ডার কনফার্মেশনের ২৪-৪৮ ঘণ্টার মধ্যে নিরাপদে ডেলিভারি সম্পন্ন।', textColor: '#ffffff', textSize: 14, textWeight: '700', textAlign: 'left', x: 50, y: 12, w: 44, h: 22, fill: '#1e293b', stroke: '#334155', line: 1.5, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '২. দক্ষ এক্সপার্টদের সার্বক্ষণিক গাইড\nযেকোনো প্রয়োজনে আমাদের ডেডিকেটেড টিম আপনার পাশে আছে।', textColor: '#ffffff', textSize: 14, textWeight: '700', textAlign: 'left', x: 50, y: 39, w: 44, h: 22, fill: '#1e293b', stroke: '#334155', line: 1.5, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '৩. সহজ পেমেন্ট ও রিটার্ন পলিসি\nসব ধরনের ডিজিটাল পেমেন্ট এবং সহজ রিটার্ন সুবিধা।', textColor: '#ffffff', textSize: 14, textWeight: '700', textAlign: 'left', x: 50, y: 66, w: 44, h: 22, fill: '#1e293b', stroke: '#334155', line: 1.5, opacity: 100 }
+      ]
+    },
+    {
+      id: 'three-card-services',
+      name: '3-Card Service Grid (সার্ভিস গ্রিড)',
+      category: 'Infographics',
+      desc: '3 elevated service cards with titles, feature points & callouts',
+      badge: 'Popular',
+      bg: 'ocean',
+      bgColor: '#0b192c',
+      elements: [
+        { id: crypto.randomUUID(), type: 'text', text: 'আমাদের প্রধান সেবাসমূহ', color: '#38bdf8', size: 36, weight: '900', textAlign: 'center', x: 10, y: 6, w: 80, h: 9 },
+        { id: crypto.randomUUID(), type: 'text', text: 'আপনার ব্যবসার প্রসারে সম্পূর্ণ সমাধান এক ঠিকানায়', color: '#94a3b8', size: 16, weight: '600', textAlign: 'center', x: 10, y: 15, w: 80, h: 6 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '💎 কোয়ালিটি ডিজাইন\n\n• আধুনিক লেআউট\n• প্রফেশনাল ব্রান্ডিং\n• ইউনিক স্টাইল গাইড\n\nপ্যাকেজ শুরু ৳ ৩,০০০', textColor: '#ffffff', textSize: 14, textWeight: '700', textAlign: 'center', x: 7, y: 24, w: 26, h: 64, fill: '#1e293b', stroke: '#38bdf8', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '🚀 ডিজিটাল মার্কেটিং\n\n• টার্গেটেড ফেসবুক বুস্ট\n• কনটেন্ট স্ট্র্যাটেজি\n• সেলস ফানেল অপ্টিমাইজ\n\nপ্যাকেজ শুরু ৳ ৫,০০০', textColor: '#ffffff', textSize: 14, textWeight: '800', textAlign: 'center', x: 37, y: 22, w: 26, h: 68, fill: '#1e3a8a', stroke: '#ffd166', line: 3, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '🛡️ ২৪/৭ সাপোর্ট\n\n• ডেডিকেটেড ম্যানেজার\n• ইনস্ট্যান্ট চ্যাট হেল্প\n• উইকলি পারফর্মেন্স রিপোর্ট\n\nপ্যাকেজ শুরু ৳ ৪,০০০', textColor: '#ffffff', textSize: 14, textWeight: '700', textAlign: 'center', x: 67, y: 24, w: 26, h: 64, fill: '#1e293b', stroke: '#34d399', line: 2, opacity: 100 }
+      ]
+    },
+    {
+      id: 'stats-trust-grid',
+      name: 'Stats & Trust Metrics (সাফল্যের পরিসংখ্যান)',
+      category: 'Infographics',
+      desc: '4 bold achievement metric cards with trust indicator statement',
+      badge: '★ Trust',
+      bg: 'custom',
+      bgColor: '#060d17',
+      elements: [
+        { id: crypto.randomUUID(), type: 'text', text: 'আমাদের অর্জিত সাফল্য ও কাস্টমার ট্রাস্ট', color: '#facc15', size: 34, weight: '900', textAlign: 'center', x: 10, y: 8, w: 80, h: 9 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '৫০,০০০+\nসন্তুষ্ট কাস্টমার', textColor: '#ffffff', textSize: 18, textWeight: '900', textAlign: 'center', x: 6, y: 24, w: 20, h: 36, fill: '#0f2942', stroke: '#38bdf8', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '১০০%\nঅরিজিনাল গ্যারান্টি', textColor: '#ffffff', textSize: 18, textWeight: '900', textAlign: 'center', x: 29, y: 24, w: 20, h: 36, fill: '#133527', stroke: '#34d399', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '২৪ ঘণ্টা\nসুপারফাস্ট ডেলিভারি', textColor: '#ffffff', textSize: 18, textWeight: '900', textAlign: 'center', x: 52, y: 24, w: 20, h: 36, fill: '#3d2514', stroke: '#fb923c', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '৪.৯ ★\n৫-স্টার রিভিউ রেটিং', textColor: '#ffffff', textSize: 18, textWeight: '900', textAlign: 'center', x: 74, y: 24, w: 20, h: 36, fill: '#311b42', stroke: '#c084fc', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '🔒 মানসম্মত পণ্য ও নির্ভরযোগ্য সেবার প্রতিশ্রুতি সহ আমরা আছি আপনার পাশে। যোগাযোগ করুন: 01XXXXXXXXX', textColor: '#e2e8f0', textSize: 15, textWeight: '700', textAlign: 'center', x: 12, y: 68, w: 76, h: 14, fill: '#1e293b', stroke: '#475569', line: 1.5, opacity: 100 }
+      ]
     }
   ];
 

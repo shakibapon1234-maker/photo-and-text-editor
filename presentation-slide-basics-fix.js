@@ -98,6 +98,19 @@
       numBadge.style.zIndex = '10';
       thumb.appendChild(numBadge);
 
+      // Quick Duplicate button on hover
+      const dupBtn = document.createElement('button');
+      dupBtn.className = 'slide-thumb-quick-dup';
+      dupBtn.innerHTML = '⧉';
+      dupBtn.title = 'Duplicate this slide (স্লাইড ডুপ্লিকেট করুন)';
+      dupBtn.onclick = (ev) => {
+        ev.stopPropagation();
+        if (typeof window.duplicateCurrentSlide === 'function') {
+          window.duplicateCurrentSlide(i);
+        }
+      };
+      thumb.appendChild(dupBtn);
+
       // Background Media (Video or Image)
       if (s.bgMedia) {
         const mediaWrap = document.createElement('div');
