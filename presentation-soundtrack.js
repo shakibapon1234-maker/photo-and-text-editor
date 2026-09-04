@@ -458,6 +458,10 @@
     const file = e.target.files[0];
     if (!file) return;
 
+    if (file.size > 80 * 1024 * 1024) {
+      alert(`⚠️ Attention: "${file.name}" is very large (${(file.size / (1024 * 1024)).toFixed(1)} MB)!\n\nUncompressed audio files (like large WAV) cannot be safely embedded into a standalone HTML presentation file.\n\nPlease use MP3 or M4A format (usually 5–30 MB) for standalone slideshow export.`);
+    }
+
     if ($('soundtrackName')) {
       $('soundtrackName').textContent = 'Processing & saving audio file... Please wait.';
       $('soundtrackName').style.color = '#ffd166';

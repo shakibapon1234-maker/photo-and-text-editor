@@ -1953,16 +1953,32 @@
       soundtrackVolume = (volume != null ? Number(volume) : 60) / 100;
       soundtrackLoop = loop !== false;
       lastNonZeroSoundtrackVol = soundtrackVolume > 0 ? soundtrackVolume : 0.6;
+      isSoundtrackMuted = false;
 
       try {
         if (!presentationAudio) {
           presentationAudio = new Audio();
           window._presentationAudio = presentationAudio;
+
+          presentationAudio.addEventListener('play', updateSoundtrackUi);
+          presentationAudio.addEventListener('playing', updateSoundtrackUi);
+          presentationAudio.addEventListener('pause', updateSoundtrackUi);
+          presentationAudio.addEventListener('volumechange', updateSoundtrackUi);
+          presentationAudio.addEventListener('canplaythrough', () => {
+            if (!isSoundtrackMuted && soundtrackVolume > 0 && presentationAudio.paused) {
+              presentationAudio.play().catch(() => {});
+            }
+          });
         }
         presentationAudio.src = audioSrc;
         presentationAudio.volume = soundtrackVolume;
         presentationAudio.loop = soundtrackLoop;
         presentationAudio.preload = 'auto';
+
+        // Attempt playback immediately
+        presentationAudio.play().catch(() => {
+          console.log('[Soundtrack] Autoplay blocked by browser policy. Will start on first user interaction.');
+        });
       } catch (e) {
         console.warn('Soundtrack init error:', e);
       }
@@ -1972,15 +1988,18 @@
 
     function setSoundtrackVolume(pct) {
       const val = Math.max(0, Math.min(100, Math.round(pct)));
-      soundtrackVolume = val / 100;
+      if (val === 0) {
+        isSoundtrackMuted = true;
+      } else {
+        isSoundtrackMuted = false;
+        soundtrackVolume = val / 100;
+        lastNonZeroSoundtrackVol = soundtrackVolume;
+      }
+
       if (presentationAudio) {
-        presentationAudio.volume = soundtrackVolume;
-        if (val > 0) {
-          lastNonZeroSoundtrackVol = soundtrackVolume;
-          isSoundtrackMuted = false;
-          if (presentationAudio.paused) presentationAudio.play().catch(() => {});
-        } else {
-          isSoundtrackMuted = true;
+        presentationAudio.volume = isSoundtrackMuted ? 0 : soundtrackVolume;
+        if (!isSoundtrackMuted && presentationAudio.paused) {
+          presentationAudio.play().catch(() => {});
         }
       }
       updateSoundtrackUi();
@@ -1988,15 +2007,20 @@
 
     function toggleSoundtrackMute() {
       if (!presentationAudio) return;
-      if (isSoundtrackMuted || soundtrackVolume === 0 || presentationAudio.paused) {
+      if (isSoundtrackMuted || soundtrackVolume === 0) {
+        // UNMUTE
         isSoundtrackMuted = false;
-        soundtrackVolume = lastNonZeroSoundtrackVol > 0 ? lastNonZeroSoundtrackVol : 0.6;
+        if (soundtrackVolume === 0) {
+          soundtrackVolume = lastNonZeroSoundtrackVol > 0 ? lastNonZeroSoundtrackVol : 0.6;
+        }
         presentationAudio.volume = soundtrackVolume;
-        presentationAudio.play().catch(() => {});
+        if (presentationAudio.paused) {
+          presentationAudio.play().catch(() => {});
+        }
       } else {
+        // MUTE
         isSoundtrackMuted = true;
-        lastNonZeroSoundtrackVol = soundtrackVolume > 0 ? soundtrackVolume : 0.6;
-        presentationAudio.pause();
+        presentationAudio.volume = 0;
       }
       updateSoundtrackUi();
     }
@@ -2005,28 +2029,45 @@
       const btn = document.getElementById('soundtrackToggleBtn');
       const slider = document.getElementById('soundtrackVolumeSlider');
       const badge = document.getElementById('soundtrackVolBadge');
-      const isPlaying = presentationAudio && !presentationAudio.paused && soundtrackVolume > 0 && !isSoundtrackMuted;
-      const pct = Math.round((isSoundtrackMuted ? 0 : soundtrackVolume) * 100);
 
-      if (slider) slider.value = pct;
-      if (badge) badge.textContent = pct + '%';
+      const isMuted = isSoundtrackMuted || soundtrackVolume === 0;
+      const displayPct = isMuted ? 0 : Math.round(soundtrackVolume * 100);
+
+      if (slider) slider.value = displayPct;
+      if (badge) badge.textContent = displayPct + '%';
+
       if (btn) {
-        btn.innerHTML = (pct === 0 || !isPlaying) ? '🔇' : (pct < 45 ? '🔉' : '🔊');
-        btn.title = isPlaying ? ('Soundtrack Playing (' + pct + '%) • Click to mute (M)') : 'Click to Play / Unmute (M)';
-        btn.style.background = isPlaying ? '#be185d' : '#334155';
-        btn.style.borderColor = isPlaying ? '#f472b6' : '#64748b';
+        if (isMuted) {
+          btn.innerHTML = '🔇';
+          btn.title = 'Unmute Soundtrack (Click or press M)';
+          btn.style.background = '#334155';
+          btn.style.borderColor = '#64748b';
+        } else if (soundtrackVolume < 0.45) {
+          btn.innerHTML = '🔉';
+          btn.title = 'Soundtrack (' + displayPct + '%) • Click to mute (M)';
+          btn.style.background = '#be185d';
+          btn.style.borderColor = '#f472b6';
+        } else {
+          btn.innerHTML = '🔊';
+          btn.title = 'Soundtrack (' + displayPct + '%) • Click to mute (M)';
+          btn.style.background = '#be185d';
+          btn.style.borderColor = '#f472b6';
+        }
       }
     }
 
     function unlockSoundtrackOnGesture() {
-      if (presentationAudio && presentationAudio.paused && !isSoundtrackMuted && soundtrackVolume > 0) {
+      if (!presentationAudio) return;
+      if (!isSoundtrackMuted && soundtrackVolume > 0 && presentationAudio.paused) {
         presentationAudio.play().then(() => {
           updateSoundtrackUi();
         }).catch(() => {});
       }
     }
-    window.addEventListener('pointerdown', unlockSoundtrackOnGesture, { passive: true });
-    window.addEventListener('click', unlockSoundtrackOnGesture, { passive: true });
+    ['pointerdown', 'click', 'touchstart', 'keydown'].forEach(evt => {
+      window.addEventListener(evt, unlockSoundtrackOnGesture, { passive: true });
+    });
+
     window.addEventListener('keydown', (e) => {
       unlockSoundtrackOnGesture();
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
@@ -2046,10 +2087,17 @@
       e.stopPropagation();
       toggleSoundtrackMute();
     });
-    document.getElementById('soundtrackVolumeSlider')?.addEventListener('input', (e) => {
-      e.stopPropagation();
-      setSoundtrackVolume(e.target.value);
-    });
+
+    const vSlider = document.getElementById('soundtrackVolumeSlider');
+    if (vSlider) {
+      vSlider.addEventListener('input', (e) => {
+        setSoundtrackVolume(e.target.value);
+      });
+      vSlider.addEventListener('change', (e) => {
+        setSoundtrackVolume(e.target.value);
+        unlockSoundtrackOnGesture();
+      });
+    }
 
     // ── Auto Initialization if Slides Preloaded ─────────────────────────────
     if (Array.isArray(slides) && slides.length > 0) {
@@ -2061,5 +2109,6 @@
       drawSlide();
     }
   </script>
+  <script src="presentation-ai-assistant.js"></script>
 </body>
 </html>

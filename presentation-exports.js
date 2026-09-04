@@ -70,6 +70,11 @@
             reader.onerror = reject;
             reader.readAsDataURL(soundData.blob);
           });
+          if (!dataUrl || dataUrl.length < 50) {
+            console.error('Audio file is too large for browser memory to encode into base64:', soundData);
+            alert('⚠️ Audio file is too large to embed in a single HTML file (WAV file > 100MB). Please use an MP3 or M4A file.');
+            throw new Error('Soundtrack file is too large for standalone export');
+          }
           const vol = soundData.volume != null ? Number(soundData.volume) : 60;
           const loop = soundData.loop !== false;
           const trackName = soundData.name || 'presentation-music';
@@ -115,6 +120,20 @@
     if (!hasAudio) {
       finalHtml = finalHtml.replace('id="soundtrackControls" class="soundtrack-ctrl-group"', 'id="soundtrackControls" class="soundtrack-ctrl-group no-audio" style="display:none;"');
     }
+
+    // Bundle AI Assistant doll directly inline so standalone export works on any computer offline
+    try {
+      const aiResp = await fetch('/presentation-ai-assistant.js?t=' + Date.now());
+      if (aiResp.ok) {
+        const aiCode = await aiResp.text();
+        if (aiCode) {
+          finalHtml = finalHtml.replace(
+            '<script src="presentation-ai-assistant.js"></script>',
+            `<script>\n/* Embedded AI Assistant Doll */\n${aiCode}\n<\/script>`
+          );
+        }
+      }
+    } catch (_) {}
 
     // Inject audio init script just before </body>
     if (audioEmbedScript) {
