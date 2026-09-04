@@ -551,23 +551,159 @@
     window.dispatchEvent(new CustomEvent('presentation:change'));
   };
 
-  // Keyboard shortcut listener
+  // ──────────────────────────────────────────────────────────────────────────
+  // Master Keyboard Productivity Controller
+  // ──────────────────────────────────────────────────────────────────────────
   window.addEventListener('keydown', event => {
-    const isEditing = event.target && (event.target.isContentEditable || ['input','textarea','select'].includes((event.target.tagName||'').toLowerCase()));
+    const targetTag = (event.target && event.target.tagName ? event.target.tagName.toLowerCase() : '');
+    const activeTag = (document.activeElement && document.activeElement.tagName ? document.activeElement.tagName.toLowerCase() : '');
+    const isEditing = (event.target && (event.target.isContentEditable || ['input','textarea','select'].includes(targetTag))) ||
+                      (document.activeElement && (document.activeElement.isContentEditable || ['input','textarea','select'].includes(activeTag)));
     const item = typeof selectedEl === 'function' ? selectedEl() : null;
-    const key = (event.key || '').toLowerCase();
+    const key = event.key;
+    const lowerKey = (key || '').toLowerCase();
 
-    // Enter or F2: edit selected text directly on canvas
-    if ((key === 'enter' || key === 'f2') && !isEditing && item && item.type === 'text') {
+    // 1. ESCAPE KEY (Cancel drag, exit inline editing, close modals, deselect)
+    if (key === 'Escape') {
+      let somethingHappened = false;
+
+      // 1a. Cancel live drag or transform
+      if (typeof window.__cancelTransformAction === 'function') {
+        if (window.__cancelTransformAction()) somethingHappened = true;
+      }
+      if (typeof window.drag !== 'undefined' && window.drag) {
+        window.drag = null;
+        window.__presentationLiveDrag = false;
+        somethingHappened = true;
+      }
+
+      // 1b. Cancel inline text editing
+      const editingNodes = document.querySelectorAll('[contenteditable="true"], .inline-editing');
+      if (editingNodes.length > 0) {
+        editingNodes.forEach(node => {
+          node.contentEditable = 'false';
+          node.classList.remove('inline-editing');
+          node.blur();
+        });
+        somethingHappened = true;
+      }
+
+      // 1c. Blur active input/textarea
+      if (document.activeElement && ['input', 'textarea', 'select'].includes(activeTag)) {
+        document.activeElement.blur();
+        somethingHappened = true;
+      }
+
+      // 1d. Close popups, context menus, galleries, modals
+      if (typeof hideContextMenu === 'function') hideContextMenu();
+      $('presentationContextMenu')?.classList.remove('open');
+      if ($('layoutGallery') && !$('layoutGallery').classList.contains('hidden')) {
+        $('layoutGallery').classList.add('hidden');
+        somethingHappened = true;
+      }
+      if ($('iconPickerModal') && $('iconPickerModal').classList.contains('open')) {
+        $('iconPickerModal').classList.remove('open');
+        somethingHappened = true;
+      }
+      if ($('textToolsMenu') && !$('textToolsMenu').classList.contains('hidden')) {
+        $('textToolsMenu').classList.add('hidden');
+        somethingHappened = true;
+      }
+      if ($('colorPop') && !$('colorPop').classList.contains('hidden')) {
+        $('colorPop').classList.add('hidden');
+        somethingHappened = true;
+      }
+      if ($('shortcutsModal') && !$('shortcutsModal').classList.contains('hidden')) {
+        toggleShortcutsModal(false);
+        somethingHappened = true;
+      }
+      if ($('assetDrawer') && !$('assetDrawer').classList.contains('hidden')) {
+        $('assetDrawer').classList.add('hidden');
+        somethingHappened = true;
+      }
+      $('ctx-toolbar')?.classList.add('hidden');
+
+      // 1e. Deselect element if selected
+      if (typeof selected !== 'undefined' && selected !== null) {
+        selected = null;
+        render();
+        somethingHappened = true;
+      }
+
+      if (somethingHappened) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
+    }
+
+    // Toggle Shortcuts Modal on ? or F1
+    if ((key === '?' || key === 'F1') && !isEditing) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      toggleShortcutsModal();
+      return;
+    }
+
+    // When actively typing inside input, textarea, or contenteditable, do NOT intercept arrow keys or delete!
+    if (isEditing) {
+      return;
+    }
+
+    // 2. ARROW KEYS (Gentle nudge 0.5% or fast nudge 2.5% with Shift)
+    if (item && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
+      if (event.altKey) return; // Allow Alt+Arrow for rotation
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      const step = event.shiftKey ? 2.5 : 0.5; // Normal = 0.5% (gentle nudge), Shift = 2.5% (faster move)
+      const curX = Number(item.x) || 0;
+      const curY = Number(item.y) || 0;
+      const w = Number(item.w) || 4;
+      const h = Number(item.h) || 4;
+
+      if (key === 'ArrowLeft') {
+        item.x = Math.max(0, Math.round((curX - step) * 100) / 100);
+      } else if (key === 'ArrowRight') {
+        item.x = Math.min(100 - w, Math.round((curX + step) * 100) / 100);
+      } else if (key === 'ArrowUp') {
+        item.y = Math.max(0, Math.round((curY - step) * 100) / 100);
+      } else if (key === 'ArrowDown') {
+        item.y = Math.min(100 - h, Math.round((curY + step) * 100) / 100);
+      }
+
+      render();
+      window.dispatchEvent(new CustomEvent('presentation:change'));
+      return;
+    }
+
+    // 3. DELETE & BACKSPACE (Delete selected element)
+    if (item && (key === 'Delete' || key === 'Backspace')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const curList = active()?.elements;
+      if (curList) {
+        active().elements = curList.filter(x => x.id !== item.id);
+        selected = null;
+        render();
+        showToast('🗑️ ডিলিট করা হয়েছে');
+        window.dispatchEvent(new CustomEvent('presentation:change'));
+      }
+      return;
+    }
+
+    // 4. ENTER or F2: Edit selected text directly on canvas
+    if ((lowerKey === 'enter' || lowerKey === 'f2') && item && item.type === 'text') {
       event.preventDefault();
       event.stopImmediatePropagation();
       window.activateInlineTextEdit(item);
       return;
     }
 
-    // Ctrl+] / Ctrl+Shift+]: Bring Forward / Bring to Front
-    if ((event.ctrlKey || event.metaKey) && (event.key === ']' || event.key === '}')) {
-      if (item && !isEditing) {
+    // 5. Ctrl+] / Ctrl+Shift+]: Bring Forward / Bring to Front
+    if ((event.ctrlKey || event.metaKey) && (key === ']' || key === '}')) {
+      if (item) {
         event.preventDefault();
         event.stopImmediatePropagation();
         if (event.shiftKey) {
@@ -579,9 +715,9 @@
       }
     }
 
-    // Ctrl+[ / Ctrl+Shift+[: Send Backward / Send to Back
-    if ((event.ctrlKey || event.metaKey) && (event.key === '[' || event.key === '{')) {
-      if (item && !isEditing) {
+    // 6. Ctrl+[ / Ctrl+Shift+[: Send Backward / Send to Back
+    if ((event.ctrlKey || event.metaKey) && (key === '[' || key === '{')) {
+      if (item) {
         event.preventDefault();
         event.stopImmediatePropagation();
         if (event.shiftKey) {
@@ -593,34 +729,28 @@
       }
     }
 
-    // Ctrl+C: Copy shape or element
-    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && key === 'c') {
-      const sel = window.getSelection();
-      const hasTextSelection = sel && sel.toString().length > 0;
-      if (isEditing && hasTextSelection) {
-        return;
-      }
+    // 7. Ctrl+C: Copy element
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && lowerKey === 'c') {
       if (item) {
         event.preventDefault();
         event.stopImmediatePropagation();
         window.copyPresentationElement(item);
+        return;
       }
     }
 
-    // Ctrl+V: Paste copied shape or element
-    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && key === 'v') {
-      if (isEditing) {
-        return;
-      }
+    // 8. Ctrl+V: Paste copied element
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && lowerKey === 'v') {
       if (window.__presentationCopy) {
         event.preventDefault();
         event.stopImmediatePropagation();
         window.pastePresentationElement();
+        return;
       }
     }
 
-    // Ctrl+Shift+D: Duplicate current slide
-    if ((event.ctrlKey || event.metaKey) && event.shiftKey && key === 'd') {
+    // 9. Ctrl+Shift+D: Duplicate current slide
+    if ((event.ctrlKey || event.metaKey) && event.shiftKey && lowerKey === 'd') {
       event.preventDefault();
       event.stopImmediatePropagation();
       if (typeof window.duplicateCurrentSlide === 'function') {
@@ -629,12 +759,13 @@
       return;
     }
 
-    // Ctrl+D: Immediate single duplicate of selected element
-    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && key === 'd') {
-      if (item && !isEditing) {
+    // 10. Ctrl+D: Immediate duplicate of selected element
+    if ((event.ctrlKey || event.metaKey) && !event.shiftKey && lowerKey === 'd') {
+      if (item) {
         event.preventDefault();
         event.stopImmediatePropagation();
         window.duplicatePresentationElement(item);
+        return;
       }
     }
   }, true);
@@ -869,18 +1000,7 @@
     }
   }, true);
 
-  window.addEventListener('keydown', event => {
-    if (event.key === 'Escape') {
-      hideContextMenu();
-      if (typeof window.drag !== 'undefined') window.drag = null;
-      window.__presentationLiveDrag = false;
-      document.querySelectorAll('[contenteditable="true"]').forEach(el => {
-        el.contentEditable = 'false';
-        el.closest('.element')?.classList.remove('inline-editing');
-        el.blur();
-      });
-    }
-  }, true);
+
 
   // ──────────────────────────────────────────────────────────────────────────
   // 7. Attach direct double-click and click listeners to all elements
@@ -1169,6 +1289,281 @@
     </style>
   `);
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // Keyboard Shortcuts Menu Modal
+  // ──────────────────────────────────────────────────────────────────────────
+  function setupShortcutsModal() {
+    const top = document.querySelector('.top');
+    if (!top) return;
+
+    if (!$('presentationShortcutsBtn')) {
+      const btn = document.createElement('button');
+      btn.id = 'presentationShortcutsBtn';
+      btn.innerHTML = '⌨️ Shortcuts';
+      btn.title = 'Keyboard Shortcuts Guide (কীবোর্ড শর্টকাট তালিকা - ? / F1)';
+      btn.style.cssText = 'background:#1e293b;border:1px solid #475569;color:#ffd166;font-weight:700;cursor:pointer;margin-left:4px;white-space:nowrap;';
+      
+      const presentBtn = $('presentBtn');
+      if (presentBtn && presentBtn.parentNode) {
+        presentBtn.parentNode.insertBefore(btn, presentBtn.nextSibling);
+      } else {
+        top.appendChild(btn);
+      }
+
+      btn.onclick = () => toggleShortcutsModal();
+    }
+
+    if (!$('shortcutsModal')) {
+      document.body.insertAdjacentHTML('beforeend', `
+        <div id="shortcutsModal" class="shortcuts-modal-backdrop hidden">
+          <div class="shortcuts-modal-card">
+            <div class="shortcuts-modal-head">
+              <div class="shortcuts-head-title">
+                <span>⌨️</span> KEYBOARD SHORTCUTS (কীবোর্ড শর্টকাট গাইড)
+              </div>
+              <button class="shortcuts-close-btn" id="closeShortcutsBtn" title="Close (Esc)">✕</button>
+            </div>
+            <div class="shortcuts-modal-body">
+              
+              <div class="shortcuts-col">
+                <div class="shortcuts-group-title">🎯 মুভমেন্ট ও অ্যালাইনমেন্ট (Movement)</div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">সূক্ষ্ম মুভমেন্ট (Fine Nudge 0.5%)</span>
+                  <span class="shortcut-keys"><kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd></span>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">দ্রুত বেশি দূরে মুভ (Fast Move 2.5%)</span>
+                  <span class="shortcut-keys"><kbd>Shift</kbd> + <kbd>Arrow</kbd></span>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">অবজেক্ট ঘোরানো / রোটেট (Rotate 5°)</span>
+                  <span class="shortcut-keys"><kbd>Alt</kbd> + <kbd>←</kbd> / <kbd>→</kbd></span>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">১-ক্লিক স্লাইড সেন্টারিং</span>
+                  <span class="shortcut-keys"><kbd>🎯 Center</kbd> টুলবার বাটন</span>
+                </div>
+
+                <div class="shortcuts-group-title" style="margin-top:16px;">⚡ অবজেক্ট অপারেশন (Objects)</div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">শেপ/টেক্সট/ছবির ডুপ্লিকেট (Clone)</span>
+                  <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>D</kbd></span>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">সিলেক্টেড অবজেক্ট ডিলিট</span>
+                  <span class="shortcut-keys"><kbd>Delete</kbd> বা <kbd>Backspace</kbd></span>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">অবজেক্ট কপি / পেস্ট</span>
+                  <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>C</kbd> / <kbd>V</kbd></span>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">ক্যানভাসে সরাসরি টেক্সট এডিট</span>
+                  <span class="shortcut-keys"><kbd>Enter</kbd> বা <kbd>F2</kbd> / Double-Click</span>
+                </div>
+              </div>
+
+              <div class="shortcuts-col">
+                <div class="shortcuts-group-title">📑 স্লাইড কন্ট্রোল (Slide Controls)</div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">অ্যাক্টিভ পুরো স্লাইড ডুপ্লিকেট</span>
+                  <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>D</kbd></span>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">ড্র্যাগ ক্যান্সেল / মোডাল বন্ধ / আন-সিলেক্ট</span>
+                  <span class="shortcut-keys"><kbd>Esc</kbd></span>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">আনডু (Undo পূর্বাবস্থায় ফেরা)</span>
+                  <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Z</kbd></span>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">রিডু (Redo পুনরায় করা)</span>
+                  <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Y</kbd></span>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">টেক্সট বক্সের সব লেখা সিলেক্ট</span>
+                  <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>A</kbd></span>
+                </div>
+
+                <div class="shortcuts-group-title" style="margin-top:16px;">🥞 লেয়ার সাজানো (Layer Order)</div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">এক ধাপ সামনে আনা (Forward)</span>
+                  <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>]</kbd></span>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">সবার উপরে আনা (Bring to Front)</span>
+                  <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>]</kbd></span>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">এক ধাপ পেছনে পাঠানো (Backward)</span>
+                  <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>[</kbd></span>
+                </div>
+                <div class="shortcut-row">
+                  <span class="shortcut-desc">সবার নিচে পাঠানো (Send to Back)</span>
+                  <span class="shortcut-keys"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>[</kbd></span>
+                </div>
+              </div>
+
+            </div>
+            <div class="shortcuts-modal-foot">
+              <span>💡 টিপস: আপনি যেকোনো সময় কীবোর্ডে <kbd>?</kbd> বা <kbd>F1</kbd> চেপে এই শর্টকাট গাইডটি দেখতে পারেন।</span>
+            </div>
+          </div>
+        </div>
+      `);
+
+      document.head.insertAdjacentHTML('beforeend', `
+        <style>
+          .shortcuts-modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 100000;
+            background: rgba(4, 9, 20, 0.85);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+          }
+          .shortcuts-modal-backdrop.hidden {
+            display: none !important;
+          }
+          .shortcuts-modal-card {
+            width: 100%;
+            max-width: 720px;
+            background: #0f172a;
+            border: 1.5px solid #334155;
+            border-radius: 16px;
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.08);
+            color: #edf2f7;
+            font-family: inherit;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            animation: scModalPop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+          }
+          @keyframes scModalPop {
+            from { transform: scale(0.94); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+          }
+          .shortcuts-modal-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px;
+            background: #17233c;
+            border-bottom: 1px solid #334155;
+          }
+          .shortcuts-head-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: #ffd166;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: 0.5px;
+          }
+          .shortcuts-close-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #cbd5e1;
+            font-size: 14px;
+            font-weight: 700;
+            border-radius: 6px;
+            padding: 4px 9px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          }
+          .shortcuts-close-btn:hover {
+            background: #dc2626;
+            border-color: #ef4444;
+            color: #fff;
+          }
+          .shortcuts-modal-body {
+            padding: 16px 18px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            max-height: calc(85vh - 120px);
+            overflow-y: auto;
+          }
+          @media (max-width: 640px) {
+            .shortcuts-modal-body {
+              grid-template-columns: 1fr;
+              gap: 14px;
+            }
+          }
+          .shortcuts-group-title {
+            font-size: 12px;
+            font-weight: 800;
+            color: #38bdf8;
+            margin-bottom: 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid rgba(56, 189, 248, 0.25);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .shortcut-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            gap: 10px;
+          }
+          .shortcut-desc {
+            font-size: 12px;
+            color: #cbd5e1;
+            font-weight: 500;
+          }
+          .shortcut-keys {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+          }
+          .shortcut-keys kbd, .shortcuts-modal-foot kbd {
+            display: inline-block;
+            padding: 2px 7px;
+            font-size: 11px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-weight: 700;
+            color: #f1f5f9;
+            background: #1e293b;
+            border: 1px solid #475569;
+            border-bottom-width: 2px;
+            border-radius: 5px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            white-space: nowrap;
+          }
+          .shortcuts-modal-foot {
+            padding: 10px 18px;
+            background: #090d16;
+            border-top: 1px solid #1e293b;
+            font-size: 11px;
+            color: #94a3b8;
+            font-weight: 500;
+          }
+        </style>
+      `);
+
+      $('closeShortcutsBtn').onclick = () => toggleShortcutsModal(false);
+      $('shortcutsModal').onclick = e => {
+        if (e.target === $('shortcutsModal')) toggleShortcutsModal(false);
+      };
+    }
+  }
+
+  function toggleShortcutsModal(forceState) {
+    const modal = $('shortcutsModal');
+    if (!modal) return;
+    const shouldOpen = forceState !== undefined ? forceState : modal.classList.contains('hidden');
+    modal.classList.toggle('hidden', !shouldOpen);
+  }
+  window.toggleShortcutsModal = toggleShortcutsModal;
+
   bindInlineEditing();
   setupZoomControls();
+  setupShortcutsModal();
 })();

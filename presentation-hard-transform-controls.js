@@ -363,13 +363,18 @@
     render();
   }, true);
 
+  window.__cancelTransformAction = function() {
+    const wasBusy = !!(action || _pendingDrag || (typeof window.drag !== 'undefined' && window.drag));
+    action = null;
+    _pendingDrag = null;
+    if (typeof window.drag !== 'undefined') window.drag = null;
+    window.__presentationLiveDrag = false;
+    return wasBusy;
+  };
+
   window.addEventListener('keydown', event => {
     if (event.key === 'Escape') {
-      if (action || _pendingDrag || window.drag) {
-        action = null;
-        _pendingDrag = null;
-        if (typeof window.drag !== 'undefined') window.drag = null;
-        window.__presentationLiveDrag = false;
+      if (window.__cancelTransformAction()) {
         render();
       }
     }

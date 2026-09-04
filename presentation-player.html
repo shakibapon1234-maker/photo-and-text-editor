@@ -475,6 +475,7 @@
     <button class="ctrl-btn" id="voiceBtn" title="Voice Control (Bengali / English)">🎤</button>
     <button class="ctrl-btn" id="remoteBtn" title="Mobile Remote Control (QR Code)">📱</button>
     <button class="ctrl-btn" id="fsBtn" title="Fullscreen (F / F11)">⛶</button>
+    <button class="ctrl-btn" id="shortcutsBtn" title="Keyboard Shortcuts (⌨️ / ?)">⌨️</button>
     <button class="ctrl-btn" id="listBtn" title="Slide List (L)">☰</button>
     <button class="ctrl-btn" id="loadNewBtn" title="Load another project">📁</button>
   </div>
@@ -1694,14 +1695,39 @@
       isVoiceActive ? stopVoice() : startVoice();
     });
 
-    // Mobile Remote Command Receiver
+    // ── Persistent Remote Server Host Configuration ──────────────────
+    const REMOTE_SERVER_KEY = 'presentation_remote_server_host';
+    function getRemoteServerHost() {
+      try {
+        const stored = localStorage.getItem(REMOTE_SERVER_KEY);
+        if (stored && stored.trim()) return stored.trim();
+      } catch (_) {}
+      if (window.location.protocol !== 'file:' && window.location.host) {
+        return window.location.host;
+      }
+      return (typeof window.__EMBEDDED_SERVER_HOST !== 'undefined' && window.__EMBEDDED_SERVER_HOST)
+        ? window.__EMBEDDED_SERVER_HOST
+        : '192.168.68.103:8000';
+    }
+
+    function setRemoteServerHost(newHost) {
+      if (!newHost) return;
+      let clean = newHost.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim();
+      if (!clean.includes(':')) clean += ':8000';
+      try { localStorage.setItem(REMOTE_SERVER_KEY, clean); } catch (_) {}
+      return clean;
+    }
+
+    // ── Mobile Remote Command Receiver ─────────────────────────────────
     let lastExecutedCmdId = 0;
     setInterval(async () => {
       try {
+        const sHost = getRemoteServerHost();
         const pollUrl = (window.location.protocol === 'file:')
-          ? 'http://127.0.0.1:8000/api/remote-poll?t=' + Date.now()
+          ? 'http://' + sHost + '/api/remote-poll?t=' + Date.now()
           : '/api/remote-poll?t=' + Date.now();
-        const res = await fetch(pollUrl);
+        const res = await fetch(pollUrl, { signal: AbortSignal.timeout(1200) });
+        if (!res.ok) return;
         const data = await res.json();
         if (data && data.command && data.command.id && String(data.command.id) !== String(lastExecutedCmdId)) {
           if (lastExecutedCmdId === 0) { lastExecutedCmdId = data.command.id; return; }
@@ -1716,7 +1742,7 @@
     }, 150);
 
 
-    // Mobile Remote Modal
+    // ── Mobile Remote Modal ───────────────────────────────────────────
     document.getElementById('remoteBtn').addEventListener('click', async () => {
       const oldModal = document.getElementById('remoteModal');
       if (oldModal) oldModal.remove();
@@ -1727,19 +1753,20 @@
       modal.innerHTML = [
         '<div class="remote-modal-card">',
           '<div class="remote-modal-head">',
-            '<span>Mobile Remote Control</span>',
+            '<span>📱 Mobile Remote Control</span>',
             '<button class="remote-modal-close" id="rmClose">&#x2715;</button>',
           '</div>',
-          '<p style="font-size:13px;color:#94a3b8;margin:8px 0;line-height:1.6;">',
-            'Laptop and mobile must be on the <strong style="color:#fff;">same Wi-Fi or hotspot</strong>. Scan QR:',
+          '<p style="font-size:13px;color:#94a3b8;margin:8px 0;line-height:1.5;">',
+            'Laptop and mobile must be on the <strong style="color:#fff;">same Wi-Fi or hotspot</strong>.',
           '</p>',
-          '<div style="background:#fff;padding:10px;border-radius:14px;display:inline-block;margin:4px 0 10px;">',
+          '<div id="serverStatusBadge" style="font-size:11px;font-weight:800;padding:4px 10px;border-radius:6px;background:#1e293b;margin-bottom:8px;display:inline-block;">Checking server...</div>',
+          '<div style="background:#fff;padding:10px;border-radius:14px;display:inline-block;margin:2px 0 10px;">',
             '<img id="qrImg" src="" alt="QR" width="180" height="180" style="display:block;">',
           '</div>',
           '<div style="background:#0f172a;border:1.5px solid #38bdf8;border-radius:10px;padding:10px 12px;margin-bottom:10px;text-align:left;">',
             '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">',
-              '<span style="font-size:11px;color:#64748b;font-weight:700;">Type in mobile browser:</span>',
-              '<button id="editIpBtn" style="background:none;border:none;color:#38bdf8;font-size:11px;font-weight:700;cursor:pointer;">✏️ Edit IP</button>',
+              '<span style="font-size:11px;color:#64748b;font-weight:700;">Mobile Remote Link:</span>',
+              '<button id="editIpBtn" style="background:none;border:none;color:#38bdf8;font-size:11px;font-weight:800;cursor:pointer;">✏️ Set Server IP</button>',
             '</div>',
             '<div id="remoteUrlText" style="color:#38bdf8;font-weight:900;font-size:15px;word-break:break-all;user-select:all;-webkit-user-select:all;">Loading...</div>',
           '</div>',
@@ -1747,6 +1774,9 @@
             '<button id="copyBtn" style="flex:1;padding:11px;border-radius:10px;background:#1d4ed8;border:none;color:#fff;font-size:13px;font-weight:800;cursor:pointer;">Copy Link</button>',
             '<button id="refreshIpBtn" style="padding:11px 14px;border-radius:10px;background:#334155;border:none;color:#fff;font-size:13px;font-weight:800;cursor:pointer;" title="Re-detect Server IP">🔄</button>',
           '</div>',
+          '<p style="font-size:11px;color:#64748b;margin-top:10px;line-height:1.4;">',
+            '💡 টিপ: যদি অন্য ল্যাপটপ থেকে ওপেন করেন, <strong>"Set Server IP"</strong>-তে ক্লিক করে মূল সার্ভার পিসির আইপি (যেমন <code>192.168.68.103:8000</code>) দিন।',
+          '</p>',
         '</div>'
       ].join('');
       document.body.appendChild(modal);
@@ -1754,18 +1784,38 @@
       // Wire up close button
       document.getElementById('rmClose').onclick = () => modal.remove();
 
-      // Function to set and render QR code
-      function setRemoteUrl(url) {
-        remoteUrl = url;
+      // Function to set and render QR code & check server health
+      function updateRemoteDisplay() {
+        const sHost = getRemoteServerHost();
+        const fullRemoteUrl = 'http://' + sHost + '/remote.html';
         const urlEl = document.getElementById('remoteUrlText');
-        if (urlEl) urlEl.textContent = remoteUrl;
+        if (urlEl) urlEl.textContent = fullRemoteUrl;
+        
         const qrEl = document.getElementById('qrImg');
         if (qrEl) {
           qrEl.onerror = function() {
             this.parentElement.innerHTML = '<div style="padding:15px;color:#dc2626;font-size:12px;text-align:center">QR load failed.<br>Use the link below.</div>';
           };
           qrEl.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=M&data='
-            + encodeURIComponent(remoteUrl);
+            + encodeURIComponent(fullRemoteUrl);
+        }
+
+        const badge = document.getElementById('serverStatusBadge');
+        if (badge) {
+          badge.textContent = 'Testing connection to ' + sHost + '...';
+          badge.style.color = '#94a3b8';
+          fetch('http://' + sHost + '/api/ip?t=' + Date.now(), { signal: AbortSignal.timeout(1800) })
+            .then(r => r.ok ? r.json() : null)
+            .then(d => {
+              if (d) {
+                badge.innerHTML = '<span style="color:#10b981;">● Server Active</span> (' + sHost + ')';
+              } else {
+                badge.innerHTML = '<span style="color:#f59e0b;">● Reaching ' + sHost + '...</span>';
+              }
+            })
+            .catch(() => {
+              badge.innerHTML = '<span style="color:#ef4444;">● Server Not Responding</span> (' + sHost + ')';
+            });
         }
       }
 
@@ -1784,16 +1834,16 @@
 
       // Wire up manual IP edit
       document.getElementById('editIpBtn').onclick = () => {
-        const currentClean = remoteUrl.replace(/^https?:\/\//, '').split(/[:/]/)[0];
-        const entered = prompt('Enter your laptop Wi-Fi IPv4 address (e.g. 192.168.68.103):', currentClean);
+        const currentHost = getRemoteServerHost();
+        const entered = prompt('Enter the Server PC IP address (e.g. 192.168.68.103:8000):', currentHost);
         if (entered && entered.trim()) {
-          const cleanIp = entered.trim().replace(/^https?:\/\//, '').split(/[:/]/)[0];
-          setRemoteUrl('http://' + cleanIp + ':8000/remote.html');
+          setRemoteServerHost(entered.trim());
+          updateRemoteDisplay();
+          showVoiceToast('Server host updated: ' + getRemoteServerHost(), 'info', 2000);
         }
       };
 
       // Detect real LAN IP from server
-      let remoteUrl = 'http://192.168.68.103:8000/remote.html';
       async function detectLanIp() {
         const testEndpoints = [
           'http://127.0.0.1:8000/api/ip',
@@ -1802,21 +1852,82 @@
         ];
         for (const ep of testEndpoints) {
           try {
-            const r = await fetch(ep + '?t=' + Date.now());
+            const r = await fetch(ep + '?t=' + Date.now(), { signal: AbortSignal.timeout(1200) });
             if (r.ok) {
               const d = await r.json();
-              if (d && d.remoteUrl && !d.remoteUrl.includes('127.0.0.1') && !d.remoteUrl.includes('localhost')) {
-                setRemoteUrl(d.remoteUrl);
+              if (d && d.ip && !d.ip.includes('127.0.0.1') && !d.ip.includes('localhost')) {
+                setRemoteServerHost(d.ip + ':' + (d.port || 8000));
+                updateRemoteDisplay();
                 return;
               }
             }
           } catch (_) {}
         }
-        setRemoteUrl(remoteUrl);
+        updateRemoteDisplay();
       }
 
       document.getElementById('refreshIpBtn').onclick = () => detectLanIp();
       detectLanIp();
+    });
+
+    // ── Player Keyboard Shortcuts Modal ────────────────────────────────
+    function togglePlayerShortcuts(forceOpen) {
+      let modal = document.getElementById('playerShortcutsModal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'playerShortcutsModal';
+        modal.className = 'remote-modal-backdrop';
+        modal.innerHTML = [
+          '<div class="remote-modal-card" style="max-width:540px;text-align:left;">',
+            '<div class="remote-modal-head" style="margin-bottom:12px;">',
+              '<span>⌨️ Presentation Player Shortcuts</span>',
+              '<button class="remote-modal-close" id="scClose">&#x2715;</button>',
+            '</div>',
+            '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;max-height:70vh;overflow-y:auto;padding-right:4px;">',
+              '<div>',
+                '<strong style="color:#38bdf8;display:block;margin-bottom:6px;">NAVIGATION (স্লাইড কন্ট্রোল)</strong>',
+                '<div style="padding:4px 0;">Next Slide: <strong style="color:#ffd166;">→ / Space / Enter</strong></div>',
+                '<div style="padding:4px 0;">Prev Slide: <strong style="color:#ffd166;">← / Backspace</strong></div>',
+                '<div style="padding:4px 0;">First Slide: <strong style="color:#ffd166;">Home</strong></div>',
+                '<div style="padding:4px 0;">Last Slide: <strong style="color:#ffd166;">End</strong></div>',
+                '<div style="padding:4px 0;">Fullscreen: <strong style="color:#ffd166;">F / F11</strong></div>',
+              '</div>',
+              '<div>',
+                '<strong style="color:#38bdf8;display:block;margin-bottom:6px;">FEATURES & AUDIO (ফিচার)</strong>',
+                '<div style="padding:4px 0;">Mute / Unmute: <strong style="color:#ffd166;">M</strong></div>',
+                '<div style="padding:4px 0;">Volume Up / Down: <strong style="color:#ffd166;">+ / -</strong></div>',
+                '<div style="padding:4px 0;">Voice Mic: <strong style="color:#ffd166;">V</strong></div>',
+                '<div style="padding:4px 0;">Slide List Drawer: <strong style="color:#ffd166;">L</strong></div>',
+                '<div style="padding:4px 0;">Close / Exit: <strong style="color:#ffd166;">Esc</strong></div>',
+              '</div>',
+            '</div>',
+            '<div style="margin-top:14px;text-align:center;">',
+              '<button id="scOkBtn" style="padding:8px 24px;border-radius:8px;background:#1d4ed8;border:none;color:#fff;font-weight:700;cursor:pointer;">ঠিক আছে (OK)</button>',
+            '</div>',
+          '</div>'
+        ].join('');
+        document.body.appendChild(modal);
+        document.getElementById('scClose').onclick = () => modal.remove();
+        document.getElementById('scOkBtn').onclick = () => modal.remove();
+        modal.onclick = e => { if (e.target === modal) modal.remove(); };
+        return;
+      }
+      if (forceOpen === false) modal.remove();
+      else modal.remove();
+    }
+
+    const scBtn = document.getElementById('shortcutsBtn');
+    if (scBtn) scBtn.onclick = () => togglePlayerShortcuts();
+
+    window.addEventListener('keydown', e => {
+      if (e.key === '?' || e.key === 'F1') {
+        e.preventDefault();
+        togglePlayerShortcuts();
+      }
+      if (e.key === 'Escape') {
+        document.getElementById('playerShortcutsModal')?.remove();
+        document.getElementById('remoteModal')?.remove();
+      }
     });
 
     // ── Built-in Soundtrack Engine ─────────────────────────────────────

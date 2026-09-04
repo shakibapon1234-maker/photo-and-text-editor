@@ -158,57 +158,71 @@
 
     function toggleMic() {
       const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!Speech) { alert('Speech Recognition not supported on this mobile browser'); return; }
+      if (!Speech) {
+        alert('⚠️ Speech Recognition not supported or blocked on this mobile browser.\n\nNote: Google Chrome blocks microphone on unencrypted HTTP (192.168.x.x). Please use the touch buttons (PREVIOUS / NEXT SLIDE).');
+        return;
+      }
 
       if (isListening && recognition) {
-        recognition.stop();
+        try { recognition.stop(); } catch(_) {}
         isListening = false;
         micBtn.classList.remove('listening');
         document.getElementById('micText').textContent = 'Voice Mic';
         return;
       }
 
-      recognition = new Speech();
-      recognition.lang = 'bn-BD';
-      recognition.continuous = true;
-      recognition.interimResults = false;
+      try {
+        recognition = new Speech();
+        recognition.lang = 'bn-BD';
+        recognition.continuous = true;
+        recognition.interimResults = false;
 
-      recognition.onstart = () => {
-        isListening = true;
-        micBtn.classList.add('listening');
-        document.getElementById('micText').textContent = 'Listening...';
-        showToast('Say "Next" or "Back"');
-      };
+        recognition.onstart = () => {
+          isListening = true;
+          micBtn.classList.add('listening');
+          document.getElementById('micText').textContent = 'Listening...';
+          showToast('🎤 Say "Next" or "Back" (বাংলা বা ইংরেজি)');
+        };
 
-      recognition.onresult = e => {
-        for (let n = e.resultIndex; n < e.results.length; n++) {
-          if (!e.results[n].isFinal) continue;
-          const w = e.results[n][0].transcript.toLowerCase().trim();
-          showToast('Spoken: ' + w);
-          if (/next|forward|samne|poroborti|porer|পরবর্তী|পরের|পরেরটা|সামনে|নেক্সট|নেক্সড|আগাও/i.test(w)) {
-            sendCmd('next');
-          } else if (/back|previous|prev|peshone|ager|আগের|আগেরটা|পেছনে|পিছনে|প্রিভিয়াস|প্রিভিয়াস|পিছাও|আগে/i.test(w)) {
-            sendCmd('prev');
+        recognition.onresult = e => {
+          for (let n = e.resultIndex; n < e.results.length; n++) {
+            if (!e.results[n].isFinal) continue;
+            const w = e.results[n][0].transcript.toLowerCase().trim();
+            showToast('🗣️ ' + w);
+            if (/next|forward|samne|poroborti|porer|পরবর্তী|পরের|পরেরটা|সামনে|নেক্সট|নেক্সড|আগাও/i.test(w)) {
+              sendCmd('next');
+            } else if (/back|previous|prev|peshone|ager|আগের|আগেরটা|পেছনে|পিছনে|প্রিভিয়াস|প্রিভিয়াস|পিছাও|আগে/i.test(w)) {
+              sendCmd('prev');
+            }
           }
-        }
-      };
+        };
 
-      recognition.onerror = () => {
-        isListening = false;
-        micBtn.classList.remove('listening');
-        document.getElementById('micText').textContent = 'Voice Mic';
-      };
-
-      recognition.onend = () => {
-        if (isListening && recognition) {
-          try { recognition.start(); } catch(_) {}
-        } else {
+        recognition.onerror = e => {
+          isListening = false;
           micBtn.classList.remove('listening');
           document.getElementById('micText').textContent = 'Voice Mic';
-        }
-      };
+          if (e.error === 'not-allowed') {
+            alert('⚠️ মোবাইল ক্রোম মাইক্রোফোন ব্লক করেছে!\n\nকারণ: অ্যান্ড্রয়েড গুগল ক্রোম নিরাপত্তার স্বার্থে সাধারণ HTTP (192.168.x.x)-তে মাইক্রোফোন বন্ধ রাখে (ল্যাপটপে localhost হওয়ায় সেখানে কাজ করে, কিন্তু মোবাইলে HTTP হওয়ায় ব্লক হয়)।\n\nউপদেশ: মোবাইল স্ক্রিনের বড় PREVIOUS ও NEXT বাটন দুটি ব্যবহার করে নিশ্চিন্তে ও দ্রুত প্রেজেন্টেশন পরিচালনা করুন।');
+          } else {
+            showToast('Voice error: ' + (e.error || 'unknown'));
+          }
+        };
 
-      recognition.start();
+        recognition.onend = () => {
+          if (isListening && recognition) {
+            try { recognition.start(); } catch(_) {}
+          } else {
+            micBtn.classList.remove('listening');
+            document.getElementById('micText').textContent = 'Voice Mic';
+          }
+        };
+
+        recognition.start();
+      } catch (err) {
+        micBtn.classList.remove('listening');
+        document.getElementById('micText').textContent = 'Voice Mic';
+        alert('⚠️ Voice Error: ' + err.message + '\nPlease use the touch buttons.');
+      }
     }
 
     micBtn.addEventListener('click', toggleMic);

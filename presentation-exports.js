@@ -33,6 +33,30 @@
   async function exportStandaloneSlideshow() {
     const currentSlidesJson = JSON.stringify(slides, null, 2);
 
+    // ── Try to fetch the latest presentation-player.html template dynamically ──
+    let baseTemplate = masterPlayerHtml;
+    try {
+      const resp = await fetch('/presentation-player.html?t=' + Date.now());
+      if (resp.ok) {
+        const text = await resp.text();
+        if (text && text.includes('presentationAudio')) {
+          baseTemplate = text;
+        }
+      }
+    } catch (_) {}
+
+    // ── Detect LAN Server IP to embed in the standalone presentation ──
+    let serverHost = '192.168.68.103:8000';
+    try {
+      const ipResp = await fetch('/api/ip?t=' + Date.now());
+      if (ipResp.ok) {
+        const ipData = await ipResp.json();
+        if (ipData && ipData.ip) {
+          serverHost = ipData.ip + ':' + (ipData.port || 8000);
+        }
+      }
+    } catch (_) {}
+
     // ── Try to embed the soundtrack as base64 ────────────────────────────
     let audioEmbedScript = '';
     let hasAudio = false;
@@ -81,7 +105,9 @@
     }
 
     // ── Build final HTML ──────────────────────────────────────────────────
-    let finalHtml = masterPlayerHtml.replace('let slides = [];', 'let slides = ' + currentSlidesJson + ';');
+    let finalHtml = baseTemplate.replace('let slides = [];', 'let slides = ' + currentSlidesJson + ';');
+    // Inject embedded server host
+    finalHtml = finalHtml.replace('</head>', `<script>window.__EMBEDDED_SERVER_HOST = ${JSON.stringify(serverHost)};<\/script>\n</head>`);
     // Hide dropzone since slides are preloaded
     finalHtml = finalHtml.replace('<div id="dropzone">', '<div id="dropzone" class="hidden">');
 

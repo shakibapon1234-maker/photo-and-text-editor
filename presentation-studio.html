@@ -119,7 +119,7 @@ $('layerFront').onclick=()=>{if(typeof window.bringElementToFront==='function')w
 $('layerForward').onclick=()=>{if(typeof window.bringElementForward==='function')window.bringElementForward();else{const es=active().elements,i=es.findIndex(e=>e.id===selected);if(i>=0&&i<es.length-1){[es[i],es[i+1]]=[es[i+1],es[i]];render()}}};
 $('layerBackward').onclick=()=>{if(typeof window.sendElementBackward==='function')window.sendElementBackward();else{const es=active().elements,i=es.findIndex(e=>e.id===selected);if(i>0){[es[i],es[i-1]]=[es[i-1],es[i]];render()}}};
 $('layerBack').onclick=()=>{if(typeof window.sendElementToBack==='function')window.sendElementToBack();else{const es=active().elements,i=es.findIndex(e=>e.id===selected);if(i>0){const [el]=es.splice(i,1);es.unshift(el);render()}}};
-window.addEventListener('keydown',e=>{const el=selectedEl();if(!el||['input','textarea','select'].includes((e.target.tagName||'').toLowerCase()))return;const step=e.shiftKey?2:1;let changed=false;if(e.key==='ArrowLeft'){e.preventDefault();if(e.shiftKey)el.w=Math.max(4,el.w-step);else el.x=Math.max(0,el.x-step);changed=true}if(e.key==='ArrowRight'){e.preventDefault();if(e.shiftKey)el.w=Math.min(100-el.x,el.w+step);else el.x=Math.min(100-el.w,el.x+step);changed=true}if(e.key==='ArrowUp'){e.preventDefault();if(e.shiftKey)el.h=Math.max(4,el.h-step);else el.y=Math.max(0,el.y-step);changed=true}if(e.key==='ArrowDown'){e.preventDefault();if(e.shiftKey)el.h=Math.min(100-el.y,el.h+step);else el.y=Math.min(100-el.h,el.y+step);changed=true}if(changed)render()});
+// Keyboard navigation & element manipulation is delegated to presentation-editing-fixes.js
 </script>
 <script>
 // Beautiful one-click slide colours. The custom picker remains available for
