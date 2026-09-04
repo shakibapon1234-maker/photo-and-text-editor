@@ -187,6 +187,7 @@
     // 5. Double-click detection: activate on-canvas inline text editing
     const now = Date.now();
     const isDbl = (event.detail >= 2 || (now - _lastDownTime < 380 && _lastDownId === item.id));
+    const wasAlreadySelected = (selected === item.id);
     _lastDownTime = now;
     _lastDownId = item.id;
 
@@ -197,7 +198,7 @@
       selected = item.id;
       _pendingDrag = null;
       if (item.type === 'text' && typeof window.activateInlineTextEdit === 'function') {
-        window.activateInlineTextEdit(item);
+        window.activateInlineTextEdit(item, { x: event.clientX, y: event.clientY });
       } else if (item.type === 'shape' && typeof window.activateInlineShapeEdit === 'function') {
         window.activateInlineShapeEdit(item);
       }
@@ -210,7 +211,7 @@
     updateHandles();
     if (typeof renderInspector === 'function') renderInspector();
 
-    _pendingDrag = { event, item };
+    _pendingDrag = { event, item, wasAlreadySelected };
   }, true);
 
   const DRAG_THRESHOLD = 5; // pixels
@@ -326,9 +327,21 @@
   }, true);
 
   window.addEventListener('pointerup', event => {
+    const pending = _pendingDrag;
     _pendingDrag = null; // Cancel any pending drag that didn't start
     if (typeof window.drag !== 'undefined') window.drag = null;
     window.__presentationLiveDrag = false;
+
+    // If a text element was clicked (not dragged) and it was already selected, activate inline text editing
+    if (!action && pending && pending.wasAlreadySelected && pending.item.type === 'text') {
+      const node = nodeFor(pending.item);
+      const isContent = event.target.closest?.('.text-content');
+      if (node && (event.target === node || isContent || node.contains(event.target))) {
+        if (typeof window.activateInlineTextEdit === 'function') {
+          window.activateInlineTextEdit(pending.item, { x: event.clientX, y: event.clientY });
+        }
+      }
+    }
 
     if (!action) return;
     event.preventDefault();

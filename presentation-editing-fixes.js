@@ -27,53 +27,108 @@
   // ──────────────────────────────────────────────────────────────────────────
   // 1. Activate Direct On-Screen Inline Text Editing
   // ──────────────────────────────────────────────────────────────────────────
-  window.activateInlineTextEdit = function(item) {
-    if (!item) return;
+  window.activateInlineTextEdit = function(item, clickPoint) {
+    if (!item) item = typeof selectedEl === 'function' ? selectedEl() : null;
+    if (!item || item.type !== 'text') return;
     selected = item.id;
     
     const node = $('slide')?.querySelector('.text-el[data-id="' + item.id + '"]');
     if (!node) return;
 
-    node.classList.add('inline-editing');
-    node.contentEditable = 'true';
-    node.spellcheck = false;
-    node.style.setProperty('user-select', 'text', 'important');
-    node.style.setProperty('-webkit-user-select', 'text', 'important');
-    node.style.setProperty('cursor', 'text', 'important');
-    node.style.setProperty('outline', '2px dashed #4f8df7', 'important');
-    node.style.setProperty('outline-offset', '3px', 'important');
-    node.style.setProperty('caret-color', '#ffd166', 'important');
+    let content = node.querySelector('.text-content');
+    if (!content) {
+      const existingText = item.text || node.textContent || '';
+      node.textContent = '';
+      content = document.createElement('div');
+      content.className = 'text-content';
+      content.textContent = existingText;
+      content.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:' + (item.textAlign==='left'?'flex-start':item.textAlign==='right'?'flex-end':'center') + ';word-break:break-word;white-space:pre-wrap;cursor:text;outline:none;line-height:1.2;';
+      node.appendChild(content);
+    }
 
-    // Remove transform handles while editing
-    node.querySelectorAll('.hard-resize, .hard-rotate').forEach(h => h.remove());
+    node.classList.add('inline-editing');
+    content.contentEditable = 'true';
+    content.spellcheck = false;
+    content.style.setProperty('user-select', 'text', 'important');
+    content.style.setProperty('-webkit-user-select', 'text', 'important');
+    content.style.setProperty('cursor', 'text', 'important');
+    content.style.setProperty('outline', '2px solid #38bdf8', 'important');
+    content.style.setProperty('outline-offset', '2px', 'important');
+    content.style.setProperty('caret-color', '#ffd166', 'important');
+    content.style.setProperty('background', 'rgba(56, 189, 248, 0.08)', 'important');
+    content.style.setProperty('touch-action', 'auto', 'important');
+
+    // Hide handles while editing text
+    node.querySelectorAll('.hard-resize, .hard-rotate, .text-move-handle, .text-rotate-handle, .text-resize-handle').forEach(h => {
+      h.style.display = 'none';
+    });
 
     setTimeout(() => {
-      node.focus();
+      content.focus();
       try {
+        if (clickPoint && document.caretRangeFromPoint) {
+          const r = document.caretRangeFromPoint(clickPoint.x, clickPoint.y);
+          if (r) {
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(r);
+            return;
+          }
+        }
         const range = document.createRange();
-        range.selectNodeContents(node);
+        range.selectNodeContents(content);
+        range.collapse(false);
         const sel = window.getSelection();
         sel.removeAllRanges();
         sel.addRange(range);
       } catch (_) {}
-    }, 10);
+    }, 15);
 
-    node.oninput = e => {
+    content.oninput = e => {
       e.stopPropagation();
-      item.text = (node.innerText || node.textContent || '').replace(/\r/g, '');
+      item.text = (content.innerText || content.textContent || '').replace(/\r/g, '');
       if ($('textValue')) $('textValue').value = item.text;
+
+      // Auto-fit height if required
+      const stage = $('slide')?.getBoundingClientRect();
+      if (stage && node.scrollHeight > 0) {
+        const reqH = (node.scrollHeight / stage.height) * 100;
+        if (reqH > item.h) {
+          item.h = Math.min(100 - item.y, Math.round(reqH + 1));
+          node.style.height = item.h + '%';
+        }
+      }
+
       if (typeof window.renderSlideThumbnailsMaster === 'function') window.renderSlideThumbnailsMaster();
+      else if (typeof renderSlides === 'function') renderSlides();
       window.dispatchEvent(new CustomEvent('presentation:change'));
     };
 
-    node.onblur = () => {
-      node.contentEditable = 'false';
+    content.onkeydown = e => {
+      if (['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(e.code) || e.key === ' ' || e.key === 'Enter') {
+        e.stopPropagation();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        content.blur();
+      }
+    };
+
+    content.onblur = () => {
+      content.contentEditable = 'false';
       node.classList.remove('inline-editing');
-      node.style.outline = '';
-      node.style.outlineOffset = '';
-      item.text = (node.innerText || node.textContent || '').replace(/\r/g, '');
+      content.style.outline = '';
+      content.style.outlineOffset = '';
+      content.style.background = '';
+      item.text = (content.innerText || content.textContent || '').replace(/\r/g, '');
       if ($('textValue')) $('textValue').value = item.text;
-      if (typeof render === 'function') render();
+      
+      // Restore handles
+      node.querySelectorAll('.hard-resize, .hard-rotate').forEach(h => {
+        h.style.display = '';
+      });
+      if (typeof updateHandles === 'function') updateHandles();
+      if (typeof renderInspector === 'function') renderInspector();
       window.dispatchEvent(new CustomEvent('presentation:change'));
     };
 
@@ -390,14 +445,36 @@
     showToast('✓ Element deleted');
   };
 
+  window.bringElementToFront = function(item) {
+    if (!item) item = typeof selectedEl === 'function' ? selectedEl() : null;
+    if (!item || !active() || !Array.isArray(active().elements)) return;
+    const es = active().elements, i = es.findIndex(e => e.id === item.id);
+    if (i >= 0 && i < es.length - 1) {
+      const [el] = es.splice(i, 1);
+      es.push(el);
+      selected = el.id;
+      if (typeof render === 'function') render();
+      if (typeof updateHandles === 'function') updateHandles();
+      showToast('⤒ Brought to front (সবার উপরে)');
+      window.dispatchEvent(new CustomEvent('presentation:change'));
+    } else if (i === es.length - 1) {
+      showToast('ℹ️ Already at front (ইতিমধ্যেই সবার উপরে আছে)');
+    }
+  };
+
   window.bringElementForward = function(item) {
     if (!item) item = typeof selectedEl === 'function' ? selectedEl() : null;
     if (!item || !active() || !Array.isArray(active().elements)) return;
     const es = active().elements, i = es.findIndex(e => e.id === item.id);
     if (i >= 0 && i < es.length - 1) {
       [es[i], es[i + 1]] = [es[i + 1], es[i]];
+      selected = item.id;
       if (typeof render === 'function') render();
-      showToast('✓ Brought forward');
+      if (typeof updateHandles === 'function') updateHandles();
+      showToast('↑ Brought forward (এক ধাপ সামনে)');
+      window.dispatchEvent(new CustomEvent('presentation:change'));
+    } else if (i === es.length - 1) {
+      showToast('ℹ️ Already at front (ইতিমধ্যেই সবার উপরে আছে)');
     }
   };
 
@@ -407,8 +484,30 @@
     const es = active().elements, i = es.findIndex(e => e.id === item.id);
     if (i > 0) {
       [es[i], es[i - 1]] = [es[i - 1], es[i]];
+      selected = item.id;
       if (typeof render === 'function') render();
-      showToast('✓ Sent backward');
+      if (typeof updateHandles === 'function') updateHandles();
+      showToast('↓ Sent backward (এক ধাপ পেছনে)');
+      window.dispatchEvent(new CustomEvent('presentation:change'));
+    } else if (i === 0) {
+      showToast('ℹ️ Already at back (ইতিমধ্যেই সবার নিচে আছে)');
+    }
+  };
+
+  window.sendElementToBack = function(item) {
+    if (!item) item = typeof selectedEl === 'function' ? selectedEl() : null;
+    if (!item || !active() || !Array.isArray(active().elements)) return;
+    const es = active().elements, i = es.findIndex(e => e.id === item.id);
+    if (i > 0) {
+      const [el] = es.splice(i, 1);
+      es.unshift(el);
+      selected = item.id;
+      if (typeof render === 'function') render();
+      if (typeof updateHandles === 'function') updateHandles();
+      showToast('⤓ Sent to back (সবার নিচে)');
+      window.dispatchEvent(new CustomEvent('presentation:change'));
+    } else if (i === 0) {
+      showToast('ℹ️ Already at back (ইতিমধ্যেই সবার নিচে আছে)');
     }
   };
 
@@ -417,6 +516,42 @@
     const isEditing = event.target && (event.target.isContentEditable || ['input','textarea','select'].includes((event.target.tagName||'').toLowerCase()));
     const item = typeof selectedEl === 'function' ? selectedEl() : null;
     const key = (event.key || '').toLowerCase();
+
+    // Enter or F2: edit selected text directly on canvas
+    if ((key === 'enter' || key === 'f2') && !isEditing && item && item.type === 'text') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      window.activateInlineTextEdit(item);
+      return;
+    }
+
+    // Ctrl+] / Ctrl+Shift+]: Bring Forward / Bring to Front
+    if ((event.ctrlKey || event.metaKey) && (event.key === ']' || event.key === '}')) {
+      if (item && !isEditing) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (event.shiftKey) {
+          window.bringElementToFront(item);
+        } else {
+          window.bringElementForward(item);
+        }
+        return;
+      }
+    }
+
+    // Ctrl+[ / Ctrl+Shift+[: Send Backward / Send to Back
+    if ((event.ctrlKey || event.metaKey) && (event.key === '[' || event.key === '{')) {
+      if (item && !isEditing) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (event.shiftKey) {
+          window.sendElementToBack(item);
+        } else {
+          window.sendElementBackward(item);
+        }
+        return;
+      }
+    }
 
     // Ctrl+C: Copy shape or element
     if ((event.ctrlKey || event.metaKey) && !event.shiftKey && key === 'c') {
@@ -593,15 +728,31 @@
       menuItems.push({ divider: true });
 
       menuItems.push({
+        icon: '⤒',
+        label: 'Bring to Front (সবার উপরে)',
+        shortcut: 'Ctrl+Shift+]',
+        action: () => window.bringElementToFront(item)
+      });
+
+      menuItems.push({
         icon: '⬆️',
-        label: 'Bring Forward',
+        label: 'Bring Forward (এক ধাপ সামনে)',
+        shortcut: 'Ctrl+]',
         action: () => window.bringElementForward(item)
       });
 
       menuItems.push({
         icon: '⬇️',
-        label: 'Send Backward',
+        label: 'Send Backward (এক ধাপ পেছনে)',
+        shortcut: 'Ctrl+[',
         action: () => window.sendElementBackward(item)
+      });
+
+      menuItems.push({
+        icon: '⤓',
+        label: 'Send to Back (সবার নিচে)',
+        shortcut: 'Ctrl+Shift+[',
+        action: () => window.sendElementToBack(item)
       });
 
       menuItems.push({ divider: true });
@@ -698,6 +849,33 @@
         e.stopPropagation();
         if (typeof window.uploadOrReplaceImage === 'function') window.uploadOrReplaceImage(item);
       };
+    });
+
+    // Handle Text elements: double-click to edit directly on canvas
+    slide.querySelectorAll('.text-el').forEach(node => {
+      const id = node.dataset.id;
+      const item = active()?.elements?.find(el => el.id === id);
+      if (!item) return;
+
+      node.ondblclick = e => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.activateInlineTextEdit(item, { x: e.clientX, y: e.clientY });
+      };
+
+      const content = node.querySelector('.text-content');
+      if (content) {
+        content.ondblclick = e => {
+          e.preventDefault();
+          e.stopPropagation();
+          window.activateInlineTextEdit(item, { x: e.clientX, y: e.clientY });
+        };
+        content.onpointerdown = e => {
+          if (content.contentEditable === 'true') {
+            e.stopPropagation();
+          }
+        };
+      }
     });
 
     // Handle Shape elements with text

@@ -64,15 +64,14 @@ function addImageTransformHandles(){
 const $=id=>document.getElementById(id);const themes={fashion:'linear-gradient(135deg,#170b32,#192d58)',luxury:'linear-gradient(135deg,#1d1307,#76500a)',ocean:'linear-gradient(135deg,#06203d,#0c5d86)',royal:'linear-gradient(135deg,#2b1055,#7597de)',blush:'linear-gradient(135deg,#5e1938,#f06292)',emerald:'linear-gradient(135deg,#063b36,#16a085)',sunset:'linear-gradient(135deg,#5b1a13,#f59e0b)',clean:'#f8fafc'};let slides=[makeSlide()],current=0,selected=null,drag=null;window.slides=slides;window.getSlides=()=>slides;
 function makeSlide(){return{background:'fashion',bgColor:'#17233c',elements:[{id:crypto.randomUUID(),type:'text',text:'আপনার অসাধারণ Presentation',x:9,y:16,w:82,h:14,size:52,color:'#ffffff',weight:'900'},{id:crypto.randomUUID(),type:'text',text:'শুরু করুন আপনার গল্প, পণ্য বা আইডিয়া দিয়ে',x:10,y:35,w:65,h:8,size:24,color:'#ffd166',weight:'700'}]}}
 function active(){return slides[current]}function styleSlide(){const s=active();$('slide').style.background=s.background==='custom'?s.bgColor:themes[s.background];}
-function render(){styleSlide();const box=$('slide');box.querySelectorAll('.element').forEach(e=>e.remove());active().elements.forEach(el=>{const node=document.createElement('div');node.className='element '+el.type+(selected===el.id?' selected':'');node.dataset.id=el.id;node.style.cssText=`left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;`;if(el.type==='text'){node.classList.add('text-el');node.textContent=el.text;node.style.color=el.color;node.style.fontSize=el.size+'px';node.style.fontWeight=el.weight;node.style.fontFamily=el.fontFamily||'';node.style.textAlign=el.textAlign||'center';node.style.transform='rotate('+(Number(el.rotation)||0)+'deg)';node.style.transformOrigin='center center';const _bv=el.boxBg||el.backgroundColor||el.bgColor||(el.background&&el.background.startsWith('#')?el.background:null);if(_bv&&_bv!=='transparent'){const _bo=el.boxOpacity!==undefined?(Number(el.boxOpacity)>1?Number(el.boxOpacity)/100:Number(el.boxOpacity)):1;if(_bv.startsWith('#')&&_bo<1){const _hx=_bv.replace('#','');node.style.backgroundColor='rgba('+parseInt(_hx.slice(0,2),16)+','+parseInt(_hx.slice(2,4),16)+','+parseInt(_hx.slice(4,6),16)+','+_bo+')';}else{node.style.backgroundColor=_bv;}node.style.borderRadius='6px';node.style.display='flex';node.style.alignItems='center';node.style.justifyContent=el.textAlign==='left'?'flex-start':el.textAlign==='right'?'flex-end':'center';}node.ondblclick=()=>{selected=el.id;render();$('textValue').focus()}}else{node.classList.add('image-el');node.innerHTML=`<img src="${el.src}" draggable="false">`;const image=node.querySelector('img');image.style.pointerEvents='none';image.draggable=false;node.addEventListener('click',event=>{event.stopPropagation();selected=el.id;node.classList.add('selected');renderInspector();addImageTransformHandles()})}node.addEventListener('pointerdown',startDrag);box.appendChild(node)});renderSlides();renderInspector()}
+function render(){styleSlide();const box=$('slide');box.querySelectorAll('.element').forEach(e=>e.remove());active().elements.forEach(el=>{const node=document.createElement('div');node.className='element '+el.type+(selected===el.id?' selected':'');node.dataset.id=el.id;node.style.cssText=`left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;`;if(el.type==='text'){node.classList.add('text-el');let content=document.createElement('div');content.className='text-content';content.textContent=el.text;content.style.cssText='width:100%;height:100%;display:flex;align-items:center;justify-content:'+(el.textAlign==='left'?'flex-start':el.textAlign==='right'?'flex-end':'center')+';word-break:break-word;white-space:pre-wrap;cursor:text;outline:none;line-height:1.2;';node.appendChild(content);node.style.color=el.color;node.style.fontSize=el.size+'px';node.style.fontWeight=el.weight;node.style.fontFamily=el.fontFamily||'';node.style.textAlign=el.textAlign||'center';node.style.transform='rotate('+(Number(el.rotation)||0)+'deg)';node.style.transformOrigin='center center';const _bv=el.boxBg||el.backgroundColor||el.bgColor||(el.background&&el.background.startsWith('#')?el.background:null);if(_bv&&_bv!=='transparent'){const _bo=el.boxOpacity!==undefined?(Number(el.boxOpacity)>1?Number(el.boxOpacity)/100:Number(el.boxOpacity)):1;if(_bv.startsWith('#')&&_bo<1){const _hx=_bv.replace('#','');node.style.backgroundColor='rgba('+parseInt(_hx.slice(0,2),16)+','+parseInt(_hx.slice(2,4),16)+','+parseInt(_hx.slice(4,6),16)+','+_bo+')';}else{node.style.backgroundColor=_bv;}node.style.borderRadius='6px';}node.ondblclick=(e)=>{e.preventDefault();e.stopPropagation();selected=el.id;if(typeof window.activateInlineTextEdit==='function'){window.activateInlineTextEdit(el,{x:e.clientX,y:e.clientY});}}}else{node.classList.add('image-el');node.innerHTML=`<img src="${el.src}" draggable="false">`;const image=node.querySelector('img');image.style.pointerEvents='none';image.draggable=false;node.addEventListener('click',event=>{event.stopPropagation();selected=el.id;node.classList.add('selected');renderInspector();addImageTransformHandles()})}node.addEventListener('pointerdown',startDrag);box.appendChild(node)});renderSlides();renderInspector()}
 function renderSlides(){const list=$('slideList');list.innerHTML='';slides.forEach((s,i)=>{const n=document.createElement('div');n.className='slide-thumb '+(i===current?'active':'');n.style.background=s.background==='custom'?s.bgColor:themes[s.background];n.innerHTML=`<span class="num">${i+1}</span>`;s.elements.forEach(el=>{const mini=document.createElement('div');mini.style.cssText=`position:absolute;left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;overflow:hidden;white-space:pre-wrap;word-break:break-word;line-height:1.12;${el.type==='text'?`color:${el.color};font-size:${Math.max(4,el.size*.115)}px;font-weight:${el.weight};padding:1px`:'background:#ffffff12'}`;if(el.type==='image'){const img=document.createElement('img');img.src=el.src;img.style.cssText='width:100%;height:100%;display:block;object-fit:cover';mini.appendChild(img)}else mini.textContent=el.text;n.appendChild(mini)});n.onclick=()=>{current=i;selected=null;render()};list.appendChild(n)})}
 function selectedEl(){return active().elements.find(e=>e.id===selected)}function renderInspector(){const el=selectedEl();$('emptyInspector').classList.toggle('hidden',!!el);$('textInspector').classList.toggle('hidden',!el||el.type!=='text');$('imageInspector').classList.toggle('hidden',!el||el.type!=='image');if(el?.type==='text'){$('textValue').value=el.text;$('textColor').value=el.color;$('textSize').value=el.size;$('textWeight').value=el.weight}const s=active();$('background').value=s.background;$('bgColor').value=s.bgColor;$('bgCustomWrap').classList.toggle('hidden',s.background!=='custom')}
 function startDrag(e){
-  // Do NOT drag while text is being edited inline
+  // Do NOT drag while text is being edited inline or target is contenteditable
   const tgt = e.currentTarget;
   if(tgt && (tgt.classList.contains('inline-editing') || tgt.contentEditable==='true' || tgt.getAttribute('data-editing')==='true')){return;}
-  // Also bail if the event target itself is contentEditable (e.g. text node inside)
-  if(e.target && (e.target.isContentEditable || e.target.contentEditable==='true')){return;}
+  if(e.target && (e.target.isContentEditable || e.target.contentEditable==='true' || e.target.closest?.('.text-content[contenteditable="true"], .inline-editing'))){return;}
   selected=e.currentTarget.dataset.id;const r=$('slide').getBoundingClientRect(),el=selectedEl();drag={el,r,dx:e.clientX-r.left-el.x*r.width/100,dy:e.clientY-r.top-el.y*r.height/100};window.__presentationLiveDrag=true;e.currentTarget.classList.add('selected');e.currentTarget.setPointerCapture(e.pointerId);renderInspector();renderSlides()
 }
 window.addEventListener('pointermove',e=>{
@@ -114,8 +113,12 @@ function openMotionPresentation(){const w=window.open('','presentation','popup,w
 <script>
 // Compact layer/order controls plus keyboard sizing keep slide layout fast
 // without forcing a separate modal or a second canvas editor.
-const layerPanel=document.createElement('div');layerPanel.id='layerInspector';layerPanel.className='hidden';layerPanel.innerHTML='<div class="section-title">LAYER & SIZE</div><div class="row"><button id="layerForward">Bring forward</button><button id="layerBack">Send back</button></div><p class="hint">Select object → Shift + Arrow keys to resize. Arrow keys move it. Delete removes it.</p>';document.querySelector('.right').insertBefore(layerPanel,document.querySelector('.right').lastElementChild);
-const inspectorBeforeLayer=renderInspector;renderInspector=function(){inspectorBeforeLayer();layerPanel.classList.toggle('hidden',!selectedEl())};$('layerForward').onclick=()=>{const es=active().elements,i=es.findIndex(e=>e.id===selected);if(i>=0&&i<es.length-1){[es[i],es[i+1]]=[es[i+1],es[i]];render()}};$('layerBack').onclick=()=>{const es=active().elements,i=es.findIndex(e=>e.id===selected);if(i>0){[es[i],es[i-1]]=[es[i-1],es[i]];render()}};
+const layerPanel=document.createElement('div');layerPanel.id='layerInspector';layerPanel.className='hidden';layerPanel.innerHTML='<div class="section-title">LAYER ORDER (লেয়ার সাজান)</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px"><button id="layerFront" title="Bring to Front (সবার উপরে - Ctrl+Shift+])" style="font-size:11px;font-weight:700">⤒ Front</button><button id="layerForward" title="Bring Forward (এক ধাপ সামনে - Ctrl+])" style="font-size:11px;font-weight:700">↑ Forward</button><button id="layerBackward" title="Send Backward (এক ধাপ পেছনে - Ctrl+[)" style="font-size:11px;font-weight:700">↓ Backward</button><button id="layerBack" title="Send to Back (সবার নিচে - Ctrl+Shift+[)" style="font-size:11px;font-weight:700">⤓ Back</button></div><p class="hint">Select object → Shift + Arrow keys to resize. Arrow keys move it. Delete removes it.</p>';document.querySelector('.right').insertBefore(layerPanel,document.querySelector('.right').lastElementChild);
+const inspectorBeforeLayer=renderInspector;renderInspector=function(){inspectorBeforeLayer();layerPanel.classList.toggle('hidden',!selectedEl())};
+$('layerFront').onclick=()=>{if(typeof window.bringElementToFront==='function')window.bringElementToFront();else{const es=active().elements,i=es.findIndex(e=>e.id===selected);if(i>=0&&i<es.length-1){const [el]=es.splice(i,1);es.push(el);render()}}};
+$('layerForward').onclick=()=>{if(typeof window.bringElementForward==='function')window.bringElementForward();else{const es=active().elements,i=es.findIndex(e=>e.id===selected);if(i>=0&&i<es.length-1){[es[i],es[i+1]]=[es[i+1],es[i]];render()}}};
+$('layerBackward').onclick=()=>{if(typeof window.sendElementBackward==='function')window.sendElementBackward();else{const es=active().elements,i=es.findIndex(e=>e.id===selected);if(i>0){[es[i],es[i-1]]=[es[i-1],es[i]];render()}}};
+$('layerBack').onclick=()=>{if(typeof window.sendElementToBack==='function')window.sendElementToBack();else{const es=active().elements,i=es.findIndex(e=>e.id===selected);if(i>0){const [el]=es.splice(i,1);es.unshift(el);render()}}};
 window.addEventListener('keydown',e=>{const el=selectedEl();if(!el||['input','textarea','select'].includes((e.target.tagName||'').toLowerCase()))return;const step=e.shiftKey?2:1;let changed=false;if(e.key==='ArrowLeft'){e.preventDefault();if(e.shiftKey)el.w=Math.max(4,el.w-step);else el.x=Math.max(0,el.x-step);changed=true}if(e.key==='ArrowRight'){e.preventDefault();if(e.shiftKey)el.w=Math.min(100-el.x,el.w+step);else el.x=Math.min(100-el.w,el.x+step);changed=true}if(e.key==='ArrowUp'){e.preventDefault();if(e.shiftKey)el.h=Math.max(4,el.h-step);else el.y=Math.max(0,el.y-step);changed=true}if(e.key==='ArrowDown'){e.preventDefault();if(e.shiftKey)el.h=Math.min(100-el.y,el.h+step);else el.y=Math.min(100-el.h,el.y+step);changed=true}if(changed)render()});
 </script>
 <script>
@@ -190,31 +193,27 @@ function addTextTransformHandle(){
   const node=$('slide').querySelector('.text-el[data-id="'+el.id+'"]');
   if(!node)return;
   node.querySelectorAll('.text-move-handle,.text-rotate-handle,.text-resize-handle').forEach(handle=>handle.remove());
-  node.contentEditable='false';
+  if(node.classList.contains('inline-editing'))return;
   let content=node.querySelector('.text-content');
   if(!content){
     el.text=String(el.text||'').replace(/(?:\r?\n)(?:Move\r?\nRotate)+\s*$/,'');
-    node.textContent='';content=document.createElement('span');content.className='text-content';
-    // contentEditable starts as false — double-click will set it true via activateInlineTextEdit
+    node.textContent='';content=document.createElement('div');content.className='text-content';
     content.contentEditable='false';content.spellcheck=false;content.textContent=el.text;
+    content.style.cssText='width:100%;height:100%;display:flex;align-items:center;justify-content:'+(el.textAlign==='left'?'flex-start':el.textAlign==='right'?'flex-end':'center')+';word-break:break-word;white-space:pre-wrap;cursor:text;outline:none;';
     content.addEventListener('input',event=>{event.stopImmediatePropagation();el.text=content.innerText.replace(/\r/g,'');if(typeof fitSelectedTextBox==='function'){fitSelectedTextBox();node.style.height=el.h+'%';}renderSlides();});
     node.appendChild(content);
-    // Do NOT auto-focus — user must double-click to enter edit mode.
   }
-  [['text-move-handle','Move text box','Move'],['text-rotate-handle','Rotate text','Rotate'],['text-resize-handle','Resize text','Resize']].forEach(([className,title,label])=>{
-    const handle=document.createElement('div');
-    handle.className=className;handle.title=title;handle.setAttribute('aria-label',title);handle.contentEditable='false';handle.textContent=label;
-    node.appendChild(handle);
-  });
 }
-
 
 document.head.insertAdjacentHTML('beforeend','<style>.text-el{overflow:visible}.text-content{display:block;min-height:100%;cursor:text;user-select:text}.text-move-handle,.text-rotate-handle,.text-resize-handle{position:absolute;left:50%;width:40px;height:18px;transform:translateX(-50%);border:1px solid #1769e8;border-radius:4px;background:#fff;color:#1769e8;font:700 9px Arial;text-align:center;line-height:16px;cursor:grab;z-index:6;user-select:none}.text-move-handle{top:-25px}.text-rotate-handle{top:-50px}.text-resize-handle{top:6px}.text-rotate-handle:after{content:"";position:absolute;left:19px;top:16px;height:13px;border-left:2px solid #ffb11b}.slide{overflow:visible}</style>');
 startDrag=function(event){
+  const target=event.target;
+  if(target && (target.isContentEditable || target.closest?.('[contenteditable="true"], .inline-editing'))) return;
   const node=event.currentTarget?.dataset?.id?event.currentTarget:event.target.closest('.element');
-  if(!node)return;
+  if(!node || node.classList.contains('inline-editing'))return;
   selected=node.dataset.id;
   const rect=$('slide').getBoundingClientRect(),item=selectedEl();
+  if(!item)return;
   drag={el:item,r:rect,dx:event.clientX-rect.left-item.x*rect.width/100,dy:event.clientY-rect.top-item.y*rect.height/100,moved:false};
   window.__presentationLiveDrag=true;
   node.setPointerCapture?.(event.pointerId);
@@ -222,6 +221,7 @@ startDrag=function(event){
 };
 document.addEventListener('pointerdown',event=>{
   const target=event.target;
+  if(target && (target.isContentEditable || target.closest?.('[contenteditable="true"], .inline-editing'))) return;
   const node=target.closest&&target.closest('.text-el');
   if(!node)return;
   const item=target.closest('.text-move-handle,.text-rotate-handle,.text-resize-handle');

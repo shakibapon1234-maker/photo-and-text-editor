@@ -53,9 +53,16 @@
       <button id="ctx-center" title="Align center">☰</button>
       <button id="ctx-right"  title="Align right">➡</button>
       <div class="ctx-sep"></div>
+      <button id="ctx-edit-text-btn" title="Edit Text directly on slide (ক্যানভাসে সরাসরি টেক্সট লিখুন)" style="background:#0284c7;border-color:#38bdf8;color:#fff;font-weight:800;font-size:11px;padding:3px 8px;">✏️ Edit Text</button>
+      <div class="ctx-sep"></div>
+      <button id="ctx-layer-front" title="Bring to Front (সবার উপরে আনুন - Ctrl+Shift+])" style="font-size:11px;font-weight:700">⤒ Front</button>
+      <button id="ctx-layer-forward" title="Bring Forward (এক ধাপ সামনে আনুন - Ctrl+])" style="font-size:11px;font-weight:700">↑ Forward</button>
+      <button id="ctx-layer-backward" title="Send Backward (এক ধাপ পেছনে পাঠান - Ctrl+[)" style="font-size:11px;font-weight:700">↓ Backwd</button>
+      <button id="ctx-layer-back" title="Send to Back (সবার নিচে পাঠান - Ctrl+Shift+[)" style="font-size:11px;font-weight:700">⤓ Back</button>
+      <div class="ctx-sep"></div>
       <button id="ctx-duplicate" title="Duplicate (Ctrl+D)">⧉ Duplicate</button>
       <div class="ctx-sep"></div>
-      <span class="ctx-hint">Double-click text to edit</span>
+      <span class="ctx-hint">Click text on slide to edit</span>
     </div>
 
     <!-- SHAPE section (with both Shape styling and Shape Text styling) -->
@@ -97,9 +104,14 @@
       <button id="ctx-shape-rot-90" title="Snap Vertical (90°)">90°</button>
       <button id="ctx-shape-flip" title="Flip 180°">↔ Flip</button>
       <div class="ctx-sep"></div>
+      <button id="ctx-shape-layer-front" title="Bring to Front (সবার উপরে আনুন - Ctrl+Shift+])" style="font-size:11px;font-weight:700">⤒ Front</button>
+      <button id="ctx-shape-layer-forward" title="Bring Forward (এক ধাপ সামনে আনুন - Ctrl+])" style="font-size:11px;font-weight:700">↑ Forward</button>
+      <button id="ctx-shape-layer-backward" title="Send Backward (এক ধাপ পেছনে পাঠান - Ctrl+[)" style="font-size:11px;font-weight:700">↓ Backwd</button>
+      <button id="ctx-shape-layer-back" title="Send to Back (সবার নিচে পাঠান - Ctrl+Shift+[)" style="font-size:11px;font-weight:700">⤓ Back</button>
+      <div class="ctx-sep"></div>
       <button id="ctx-shape-duplicate" title="Duplicate Shape (Ctrl+D)">⧉ Duplicate</button>
       <div class="ctx-sep"></div>
-      <span class="ctx-hint">Double-click shape to type</span>
+      <span class="ctx-hint">Click shape to type</span>
     </div>
 
     <!-- IMAGE section -->
@@ -115,6 +127,11 @@
       <button id="ctx-flip-v" title="Flip vertical">↕ Flip V</button>
       <div class="ctx-sep"></div>
       <button id="ctx-fit-cover" title="Toggle fit/cover">⊡ Fit/Cover</button>
+      <div class="ctx-sep"></div>
+      <button id="ctx-img-layer-front" title="Bring to Front (সবার উপরে আনুন - Ctrl+Shift+])" style="font-size:11px;font-weight:700">⤒ Front</button>
+      <button id="ctx-img-layer-forward" title="Bring Forward (এক ধাপ সামনে আনুন - Ctrl+])" style="font-size:11px;font-weight:700">↑ Forward</button>
+      <button id="ctx-img-layer-backward" title="Send Backward (এক ধাপ পেছনে পাঠান - Ctrl+[)" style="font-size:11px;font-weight:700">↓ Backwd</button>
+      <button id="ctx-img-layer-back" title="Send to Back (সবার নিচে পাঠান - Ctrl+Shift+[)" style="font-size:11px;font-weight:700">⤓ Back</button>
       <div class="ctx-sep"></div>
       <span class="ctx-hint">💡 Double-click image = Replace করুন</span>
     </div>
@@ -206,6 +223,23 @@
     } else if (id === 'ctx-shape-duplicate' || id === 'ctx-duplicate') {
       if (typeof window.duplicatePresentationElement === 'function') {
         window.duplicatePresentationElement();
+      }
+    }
+    // Layer ordering buttons
+    else if (id.includes('layer-front')) {
+      if (typeof window.bringElementToFront === 'function') window.bringElementToFront();
+    } else if (id.includes('layer-forward')) {
+      if (typeof window.bringElementForward === 'function') window.bringElementForward();
+    } else if (id.includes('layer-backward')) {
+      if (typeof window.sendElementBackward === 'function') window.sendElementBackward();
+    } else if (id.includes('layer-back')) {
+      if (typeof window.sendElementToBack === 'function') window.sendElementToBack();
+    }
+    // Direct Edit Text button
+    else if (id === 'ctx-edit-text-btn') {
+      const el = (typeof selectedEl === 'function') ? selectedEl() : null;
+      if (el && typeof window.activateInlineTextEdit === 'function') {
+        window.activateInlineTextEdit(el);
       }
     }
     // Image replace buttons (both from image & shape sections)
