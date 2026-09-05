@@ -281,6 +281,99 @@
       .ai-doll-pill button:hover {
         background: rgba(255, 255, 255, 0.2);
       }
+
+      /* ── FLIGHT NAVIGATION MODE (CINEMATIC GLIDE) ── */
+      #ai-avatar-container.navigating {
+        transition: left 0.82s cubic-bezier(0.34, 1.56, 0.64, 1),
+                    top 0.82s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+        pointer-events: none;
+      }
+      #ai-avatar-container.navigating #ai-doll {
+        animation: doll-fly-zoom 0.5s ease-in-out infinite alternate !important;
+      }
+      @keyframes doll-fly-zoom {
+        from { transform: translateY(-8px) scale(1.02) rotate(-6deg); }
+        to   { transform: translateY(-22px) scale(1.12) rotate(6deg); }
+      }
+      #ai-avatar-container.navigating #ai-wing-left {
+        animation: wing-fly-fast 0.2s ease-in-out infinite alternate !important;
+      }
+      #ai-avatar-container.navigating #ai-wing-right {
+        animation: wing-fly-fast-r 0.2s ease-in-out infinite alternate-reverse !important;
+      }
+      @keyframes wing-fly-fast {
+        from { transform: rotate(-16deg) scaleX(1.1); }
+        to   { transform: rotate(28deg) scaleX(1.35); }
+      }
+      @keyframes wing-fly-fast-r {
+        from { transform: rotate(16deg) scaleX(1.1); }
+        to   { transform: rotate(-28deg) scaleX(1.35); }
+      }
+
+      /* ── Arrival Bounce ── */
+      @keyframes doll-arrive {
+        0%   { transform: translateY(-36px) scale(1.18); }
+        55%  { transform: translateY(12px) scale(0.93); }
+        80%  { transform: translateY(-6px) scale(1.04); }
+        100% { transform: translateY(0px) scale(1); }
+      }
+      #ai-avatar-container.arriving #ai-doll {
+        animation: doll-arrive 0.7s ease-out forwards !important;
+      }
+
+      /* ── Magical Sparkle Trail Dots ── */
+      .ai-trail-dot {
+        position: fixed;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #ffd700, #ec4899 55%, #a855f7 100%);
+        pointer-events: none;
+        z-index: 99998;
+        animation: trail-fade 1.1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        box-shadow: 0 0 8px #f472e8, 0 0 16px #a855f7;
+      }
+      @keyframes trail-fade {
+        0%   { opacity: 1; transform: scale(1.25); }
+        100% { opacity: 0; transform: scale(0.1) translateY(14px); }
+      }
+
+      /* ── Target Highlight Magic Aura ── */
+      .ai-target-highlight {
+        outline: 3px solid rgba(236, 72, 153, 0.95) !important;
+        box-shadow: 0 0 0 5px rgba(168, 85, 247, 0.4), 0 0 32px rgba(236, 72, 153, 0.8) !important;
+        border-radius: 12px;
+        transition: outline 0.3s, box-shadow 0.3s;
+        animation: target-pulse 0.7s ease-in-out 2 alternate;
+      }
+      @keyframes target-pulse {
+        from { transform: scale(1); }
+        to   { transform: scale(1.1); }
+      }
+
+      /* ── Floating Action Tag above doll's head ── */
+      #ai-action-tag {
+        position: fixed;
+        z-index: 100002;
+        background: linear-gradient(90deg, #9333ea, #ec4899);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 800;
+        padding: 5px 14px;
+        border-radius: 20px;
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(6px);
+        transition: opacity 0.25s, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        white-space: nowrap;
+        box-shadow: 0 4px 16px rgba(168, 85, 247, 0.6), 0 0 8px rgba(236, 72, 153, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      #ai-action-tag.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
     `;
     document.head.appendChild(style);
   }
@@ -666,84 +759,337 @@
     }
   }
 
+  // ── CINEMATIC FLYING & DYNAMIC MOVEMENT ENGINE ────────────────────────────
+  let isNavigating = false;
+  let tagTimer = null;
+  let homePosition = null;
+
+  function showActionTag(text) {
+    let tag = document.getElementById('ai-action-tag');
+    if (!tag) {
+      tag = document.createElement('div');
+      tag.id = 'ai-action-tag';
+      document.body.appendChild(tag);
+    }
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    tag.style.left = (rect.left + rect.width / 2) + 'px';
+    tag.style.top  = (rect.top - 28) + 'px';
+    tag.style.transform = 'translateX(-50%)';
+    tag.textContent = text;
+    tag.classList.add('visible');
+    clearTimeout(tagTimer);
+    tagTimer = setTimeout(() => tag.classList.remove('visible'), 2600);
+  }
+
+  function dropTrailDot() {
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const dot = document.createElement('div');
+    dot.className = 'ai-trail-dot';
+    dot.style.left = (rect.left + rect.width / 2 - 5 + (Math.random() - 0.5) * 18) + 'px';
+    dot.style.top  = (rect.top + rect.height - 25 + (Math.random() - 0.5) * 16) + 'px';
+    document.body.appendChild(dot);
+    setTimeout(() => dot.remove(), 1100);
+  }
+
+  function animatedFlyToAction(targetSelectorOrPoint, actionLabel, speechText, callback) {
+    if (!container) {
+      if (callback) callback();
+      return;
+    }
+    if (isNavigating) {
+      if (callback) callback();
+      return;
+    }
+    isNavigating = true;
+
+    if (container.classList.contains('minimized')) {
+      container.classList.remove('minimized');
+    }
+
+    showActionTag(actionLabel);
+    if (speechText) speak(speechText);
+    showBubble(actionLabel, 2200);
+
+    const startRect = container.getBoundingClientRect();
+    if (!homePosition) {
+      homePosition = { left: startRect.left, top: startRect.top };
+    }
+
+    let endX, endY, targetEl = null;
+    if (typeof targetSelectorOrPoint === 'string') {
+      targetEl = document.querySelector(targetSelectorOrPoint);
+    }
+
+    if (targetEl) {
+      const tRect = targetEl.getBoundingClientRect();
+      endX = Math.max(15, Math.min(window.innerWidth - 150, tRect.left + tRect.width / 2 - 70));
+      endY = Math.max(15, Math.min(window.innerHeight - 200, tRect.top - 130));
+    } else if (targetSelectorOrPoint && typeof targetSelectorOrPoint === 'object') {
+      endX = targetSelectorOrPoint.x;
+      endY = targetSelectorOrPoint.y;
+    } else {
+      endX = window.innerWidth / 2 - 70;
+      endY = window.innerHeight / 2 - 100;
+    }
+
+    container.style.transition = 'none';
+    container.style.position = 'fixed';
+    container.style.right = 'auto';
+    container.style.bottom = 'auto';
+    container.style.left = startRect.left + 'px';
+    container.style.top = startRect.top + 'px';
+
+    const trailInterval = setInterval(dropTrailDot, 65);
+
+    setTimeout(() => {
+      container.classList.add('navigating');
+      container.style.left = endX + 'px';
+      container.style.top = endY + 'px';
+    }, 40);
+
+    setTimeout(() => {
+      clearInterval(trailInterval);
+      container.classList.remove('navigating');
+      container.classList.add('arriving');
+
+      if (targetEl) {
+        targetEl.classList.add('ai-target-highlight');
+        setTimeout(() => targetEl.classList.remove('ai-target-highlight'), 1800);
+      }
+
+      if (callback) {
+        try { callback(); } catch (err) { console.warn(err); }
+      }
+
+      setTimeout(() => {
+        container.classList.remove('arriving');
+        flyReturnHome();
+      }, 700);
+
+    }, 850);
+  }
+
+  function flyReturnHome() {
+    if (!container) return;
+    container.classList.add('navigating');
+    const trailInterval = setInterval(dropTrailDot, 70);
+
+    const destX = homePosition ? homePosition.left : (window.innerWidth - 170);
+    const destY = homePosition ? homePosition.top : (window.innerHeight - 220);
+
+    container.style.left = destX + 'px';
+    container.style.top = destY + 'px';
+
+    setTimeout(() => {
+      clearInterval(trailInterval);
+      container.classList.remove('navigating');
+      isNavigating = false;
+    }, 850);
+  }
+
+  function flyMoveAvatar(direction) {
+    if (!container) return;
+    isNavigating = true;
+    container.classList.add('navigating');
+    const trailInterval = setInterval(dropTrailDot, 70);
+
+    let endX = window.innerWidth - 170;
+    let endY = window.innerHeight - 220;
+
+    if (direction === 'left') {
+      endX = 24; endY = window.innerHeight / 2 - 100;
+    } else if (direction === 'right') {
+      endX = window.innerWidth - 165; endY = window.innerHeight / 2 - 100;
+    } else if (direction === 'top' || direction === 'up') {
+      endX = window.innerWidth / 2 - 70; endY = 30;
+    } else if (direction === 'bottom' || direction === 'down') {
+      endX = window.innerWidth / 2 - 70; endY = window.innerHeight - 215;
+    } else if (direction === 'home') {
+      endX = window.innerWidth - 170; endY = window.innerHeight - 220;
+    }
+
+    container.style.left = endX + 'px';
+    container.style.top = endY + 'px';
+
+    showActionTag('Flying to ' + direction + ' ✨');
+    speak('Moving now!');
+
+    setTimeout(() => {
+      clearInterval(trailInterval);
+      container.classList.remove('navigating');
+      container.classList.add('arriving');
+      homePosition = { left: endX, top: endY };
+      try {
+        localStorage.setItem(STORAGE_KEY_POS, JSON.stringify({ x: endX, y: endY }));
+      } catch(_) {}
+      setTimeout(() => {
+        container.classList.remove('arriving');
+        isNavigating = false;
+      }, 600);
+    }, 850);
+  }
+
+  function adjustSoundtrackVolume(delta) {
+    const slider = document.getElementById('soundtrackVolumeSlider');
+    if (slider) {
+      let current = parseInt(slider.value, 10);
+      if (isNaN(current)) current = 60;
+      let target = Math.max(0, Math.min(100, current + delta));
+      slider.value = target;
+      slider.dispatchEvent(new Event('input', { bubbles: true }));
+      slider.dispatchEvent(new Event('change', { bubbles: true }));
+      showActionTag((target > current ? '🔊 ' : '🔉 ') + 'Volume: ' + target + '%');
+    }
+  }
+
+  function toggleSoundtrack() {
+    const btn = document.getElementById('soundtrackToggleBtn');
+    if (btn) btn.click();
+  }
+
   // ── Presentation Command Processor ────────────────────────────────────────
   function handleVoiceCommand(raw) {
     const text = raw.toLowerCase().trim();
 
     // 1. Next Slide (English & Bengali)
     if (/\b(next|forward|right|samne|porer|poroborti|advance)\b|পরের|পরবর্তী|পরের স্লাইড|পরবর্তী স্লাইড|সামনে|নেক্সট|নেক্সড|পরেরটা|আগাও|এগিয়ে/i.test(text)) {
-      triggerSlideNext();
-      speak('Moving to next slide!');
+      animatedFlyToAction('#nextBtn, .next-btn, #stage', '✨ Next Slide ▶', 'Moving to next slide!', () => {
+        triggerSlideNext();
+      });
       return;
     }
 
     // 2. Previous Slide (English & Bengali including ব্যাক, ব্যাকে, বেক, পিছে, ইত্যাদি)
     if (/\b(prev|previous|back|left|peshone|ager|reverse|return)\b|আগের|আগের স্লাইড|পেছনে|পিছনে|প্রিভিয়াস|প্রিভিয়াস|পিছনে যাও|আগেরটা|ব্যাক|ব্যাকে|বেক|বেগ|পিছে|পূর্বে|পূর্ববর্তী|পিছাও/i.test(text)) {
-      triggerSlidePrev();
-      speak('Going back to previous slide!');
+      animatedFlyToAction('#prevBtn, .prev-btn', '◀ Previous Slide', 'Going back to previous slide!', () => {
+        triggerSlidePrev();
+      });
       return;
     }
 
-    // 3. First Slide
+    // 3. Volume Down / Reduce Volume
+    if (/\b(reduce volume|decrease volume|volume down|sound down|lower volume|quieter)\b|ভলিউম কমাও|সাউন্ড কমাও|ভলিউম কমিয়ে দাও|সাউন্ড কম|শব্দ কমাও/i.test(text)) {
+      animatedFlyToAction('#soundtrackControls, #soundtrackVolumeSlider', '🔉 Reducing Volume', 'Reducing volume now!', () => {
+        adjustSoundtrackVolume(-20);
+      });
+      return;
+    }
+
+    // 4. Volume Up / Increase Volume
+    if (/\b(increase volume|raise volume|volume up|sound up|louder|higher volume)\b|ভলিউম বাড়াও|সাউন্ড বাড়াও|ভলিউম বাড়িয়ে দাও|সাউন্ড বেশি|শব্দ বাড়াও/i.test(text)) {
+      animatedFlyToAction('#soundtrackControls, #soundtrackVolumeSlider', '🔊 Increasing Volume', 'Turning up the volume!', () => {
+        adjustSoundtrackVolume(+20);
+      });
+      return;
+    }
+
+    // 5. Mute / Unmute Soundtrack
+    if (/\b(mute|unmute|sound off|sound on)\b|মিউট|আনমিউট|সাউন্ড বন্ধ|সাউন্ড চালু|গান বন্ধ|গান চালাও/i.test(text)) {
+      animatedFlyToAction('#soundtrackToggleBtn', '🔇 Mute / Unmute', 'Toggling soundtrack!', () => {
+        toggleSoundtrack();
+      });
+      return;
+    }
+
+    // 6. Manual Flying / Directional Movement
+    if (/\b(move left|go left|fly left)\b|বামে যাও|বামে চল|বামে আসো/i.test(text)) {
+      flyMoveAvatar('left');
+      return;
+    }
+    if (/\b(move right|go right|fly right)\b|ডানে যাও|ডানে চল|ডানে আসো/i.test(text)) {
+      flyMoveAvatar('right');
+      return;
+    }
+    if (/\b(move up|go up|fly up|move top)\b|উপরে যাও|উপরে চল|উপরে উঠো/i.test(text)) {
+      flyMoveAvatar('top');
+      return;
+    }
+    if (/\b(move down|go down|fly down|move bottom)\b|নিচে যাও|নিচে চল|নিচে নামো/i.test(text)) {
+      flyMoveAvatar('bottom');
+      return;
+    }
+    if (/\b(go home|return home|reset position|come back)\b|হোমে যাও|আগের জায়গায় যাও|ফিরে আসো/i.test(text)) {
+      flyMoveAvatar('home');
+      return;
+    }
+
+    // 7. First Slide
     if (/\b(first|first slide|beginning|start|প্রথম|শুরু|প্রথম স্লাইড|শুরুতে যাও)\b/i.test(text)) {
-      triggerGoToSlide(0);
-      speak('Going to the first slide!');
+      animatedFlyToAction('#prevBtn, #stage', '⏮ First Slide', 'Going to the first slide!', () => {
+        triggerGoToSlide(0);
+      });
       return;
     }
 
-    // 4. Last Slide
+    // 8. Last Slide
     if (/\b(last|last slide|end|finish|শেষ|শেষ স্লাইড|ফাইনালে যাও)\b/i.test(text)) {
-      triggerGoToSlide(-1);
-      speak('Going to the last slide!');
+      animatedFlyToAction('#nextBtn, #stage', '⏭ Last Slide', 'Going to the last slide!', () => {
+        triggerGoToSlide(-1);
+      });
       return;
     }
 
-    // 5. Specific Slide number (e.g. "slide 3", "৩ নম্বর স্লাইড")
+    // 9. Specific Slide number (e.g. "slide 3", "৩ নম্বর স্লাইড")
     const slideMatch = text.match(/\b(?:slide|number|স্লাইড|নম্বর)\s*(\d+)/i) || text.match(/(\d+)\s*(?:st|nd|rd|th)?\s*slide/i);
     if (slideMatch) {
       const num = parseInt(slideMatch[1], 10);
       if (num > 0) {
-        triggerGoToSlide(num - 1);
-        speak(`Going to slide ${num}!`);
+        animatedFlyToAction('#stage', `🎯 Slide ${num}`, `Going to slide ${num}!`, () => {
+          triggerGoToSlide(num - 1);
+        });
         return;
       }
     }
 
-    // 6. Read / Explain Current Slide
+    // 10. Read / Explain Current Slide
     if (/\b(read|read slide|explain|tell me|speak|পড়|পড়ো|পড়ে শোনাও|বল|কি আছে|কী লেখা আছে)\b/i.test(text)) {
-      readCurrentSlide();
+      animatedFlyToAction('#stage', '📖 Reading Slide', 'Let me read this slide for you!', () => {
+        readCurrentSlide();
+      });
       return;
     }
 
-    // 7. Fullscreen Toggle
+    // 11. Fullscreen Toggle
     if (/\b(fullscreen|full screen|ফুলস্ক্রিন|বড় পর্দা|বড় কর|maximize)\b/i.test(text)) {
-      triggerFullscreen();
-      speak('Toggling fullscreen mode!');
+      animatedFlyToAction('#fsBtn', '⛶ Fullscreen Mode', 'Toggling fullscreen mode!', () => {
+        triggerFullscreen();
+      });
       return;
     }
 
-    // 8. Laser Pointer
+    // 12. Slide List
+    if (/\b(slide list|list|all slides|তালিকা|স্লাইড লিস্ট)\b/i.test(text)) {
+      animatedFlyToAction('#listBtn', '☰ Slide List', 'Opening slide list!', () => {
+        document.getElementById('listBtn')?.click();
+      });
+      return;
+    }
+
+    // 13. Laser Pointer
     if (/\b(laser|pointer|লেজার|পয়েন্টার)\b/i.test(text)) {
-      triggerLaserPointer();
-      speak('Toggling laser pointer!');
+      animatedFlyToAction('#stage', '🔴 Laser Pointer', 'Toggling laser pointer!', () => {
+        triggerLaserPointer();
+      });
       return;
     }
 
-    // 9. Black / Blank screen
+    // 14. Black / Blank screen
     if (/\b(black|blank|dark|dark screen|কালো পর্দা|ফ্রিজ|অন্ধকার)\b/i.test(text)) {
       triggerBlackout();
       speak('Blanking presentation screen.');
       return;
     }
 
-    // 10. Start Presentation / Present mode (in Studio)
+    // 15. Start Presentation / Present mode (in Studio)
     if (/\b(present|presentation|slideshow|start slideshow|প্লে|স্লাইড শো শুরু)\b/i.test(text)) {
       triggerStartPresentation();
       speak('Starting presentation!');
       return;
     }
 
-    // 11. Sleep / Minimize / Hide
+    // 16. Sleep / Minimize / Hide
     if (/\b(sleep|hide|vanish|bye|goodbye|ঘুমাও|যাও|লুকিয়ে যাও|বন্ধ হও|মিনিমাইজ)\b/i.test(text)) {
       container?.classList.add('minimized');
       speak('Going to sleep. Tap me whenever you need me!');
@@ -751,7 +1097,7 @@
       return;
     }
 
-    // 12. Stop Talking / Quiet
+    // 17. Stop Talking / Quiet
     if (/\b(stop|quiet|silence|shh|shut up|চুপ|থামো|বন্ধ করো)\b/i.test(text)) {
       if (synth) synth.cancel();
       container?.classList.remove('talking');
@@ -759,17 +1105,17 @@
       return;
     }
 
-    // 13. Identity / Hello
+    // 18. Identity / Hello
     if (/\b(who are you|hello|hi|hey|কে তুমি|তোমার পরিচয়|হ্যালো|হাই)\b/i.test(text)) {
-      const msg = 'Hello! I am your AI Presentation Assistant doll. Say "next slide", "previous slide", or "read slide" to control your show!';
+      const msg = 'Hello! I am your AI Presentation Assistant doll. Say "next slide", "previous slide", "reduce volume", or "read slide" to control your show!';
       showBubble('🧚 ' + msg, 6000);
       speak(msg);
       return;
     }
 
     // Default: Couldn't understand
-    showBubble(`❓ Command not recognized: "${escapeHtml(raw)}"<br><small>Try: "Next slide", "Previous slide", "Read slide"</small>`, 4000);
-    speak('Sorry, I did not catch that. Say next slide, or read slide.');
+    showBubble(`❓ Command not recognized: "${escapeHtml(raw)}"<br><small>Try: "Next slide", "Previous slide", "Reduce volume", "Read slide"</small>`, 4000);
+    speak('Sorry, I did not catch that. Say next slide, or reduce volume.');
   }
 
   // ── Presentation Action Handlers ──────────────────────────────────────────
@@ -1038,6 +1384,10 @@
     speak,
     showBubble,
     hideBubble,
-    readCurrentSlide
+    readCurrentSlide,
+    animatedFlyToAction,
+    handleVoiceCommand,
+    flyMoveAvatar
   };
+  window.__triggerAIVoiceCommand = handleVoiceCommand;
 })();

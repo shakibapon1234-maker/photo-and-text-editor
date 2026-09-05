@@ -24,12 +24,28 @@
     }
     #dropzone.hidden { display: none; }
     .drop-card {
+      position: relative;
       max-width: 520px; width: 100%; padding: 36px 28px;
       background: rgba(23, 35, 60, 0.75);
       border: 2px dashed #4f8df7; border-radius: 18px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.6);
       backdrop-filter: blur(14px);
       transition: transform 0.2s, border-color 0.2s;
+    }
+    .drop-card-close {
+      position: absolute; top: 14px; right: 14px;
+      width: 34px; height: 34px; border-radius: 50%;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #fff; font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s ease;
+      z-index: 10;
+    }
+    .drop-card-close:hover {
+      background: rgba(239, 68, 68, 0.85);
+      border-color: #ef4444;
+      transform: scale(1.1);
     }
     .drop-card.drag-over { transform: scale(1.02); border-color: #ffd166; background: rgba(35, 55, 90, 0.85); }
     .drop-icon { font-size: 48px; margin-bottom: 12px; }
@@ -446,6 +462,7 @@
 
   <div id="dropzone">
     <div class="drop-card" id="dropCard">
+      <button id="closeDropzoneBtn" class="drop-card-close" title="Close (Esc)">✕</button>
       <div class="drop-icon">📽️</div>
       <h1 class="drop-title">Presentation Player</h1>
       <p class="drop-desc">
@@ -1544,6 +1561,17 @@
     document.getElementById('loadNewBtn').addEventListener('click', () => {
       document.getElementById('dropzone').classList.remove('hidden');
     });
+    const closeDropzoneBtn = document.getElementById('closeDropzoneBtn');
+    if (closeDropzoneBtn) {
+      closeDropzoneBtn.addEventListener('click', () => {
+        document.getElementById('dropzone').classList.add('hidden');
+      });
+    }
+    document.getElementById('dropzone').addEventListener('click', (e) => {
+      if (e.target.id === 'dropzone') {
+        document.getElementById('dropzone').classList.add('hidden');
+      }
+    });
 
     document.getElementById('fsBtn').addEventListener('click', () => {
       if (!document.fullscreenElement) {
@@ -1570,6 +1598,7 @@
         document.getElementById('voiceBtn').click();
       } else if (e.key === 'Escape') {
         document.getElementById('navDrawer').classList.remove('open');
+        document.getElementById('dropzone').classList.add('hidden');
       }
     });
 
@@ -1783,12 +1812,28 @@
           showVoiceToast('📱 Mobile Remote Connected! (' + room + ')', 'success', 3000);
           updateRemoteModalUI();
 
+          function executeRemoteAction(action) {
+            if (action === 'next') {
+              if (window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
+                window.PresentationAIAssistant.animatedFlyToAction('#nextBtn, .next-btn, #stage', '✨ Next Slide ▶', 'Next slide!', () => advance(1));
+              } else {
+                advance(1);
+              }
+            } else if (action === 'prev') {
+              if (window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
+                window.PresentationAIAssistant.animatedFlyToAction('#prevBtn, .prev-btn', '◀ Previous Slide', 'Previous slide!', () => advance(-1));
+              } else {
+                advance(-1);
+              }
+            } else if (action === 'fullscreen') {
+              document.getElementById('fsBtn').click();
+            }
+            showVoiceToast('Remote: ' + String(action).toUpperCase(), 'info', 2000);
+          }
+
           conn.on('data', (data) => {
             if (data && data.action) {
-              if (data.action === 'next') advance(1);
-              else if (data.action === 'prev') advance(-1);
-              else if (data.action === 'fullscreen') document.getElementById('fsBtn').click();
-              showVoiceToast('Remote: ' + String(data.action).toUpperCase(), 'info', 2000);
+              executeRemoteAction(data.action);
             }
           });
 
@@ -1827,10 +1872,24 @@
           if (lastExecutedCmdId === 0) { lastExecutedCmdId = data.command.id; return; }
           lastExecutedCmdId = data.command.id;
           const cmd = data.command;
-          if (cmd.action === 'next') advance(1);
-          else if (cmd.action === 'prev') advance(-1);
-          else if (cmd.action === 'fullscreen') document.getElementById('fsBtn').click();
-          showVoiceToast('Remote: ' + String(cmd.action).toUpperCase(), 'info', 2000);
+          if (cmd && cmd.action) {
+            if (cmd.action === 'next') {
+              if (window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
+                window.PresentationAIAssistant.animatedFlyToAction('#nextBtn, .next-btn, #stage', '✨ Next Slide ▶', 'Next slide!', () => advance(1));
+              } else {
+                advance(1);
+              }
+            } else if (cmd.action === 'prev') {
+              if (window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
+                window.PresentationAIAssistant.animatedFlyToAction('#prevBtn, .prev-btn', '◀ Previous Slide', 'Previous slide!', () => advance(-1));
+              } else {
+                advance(-1);
+              }
+            } else if (cmd.action === 'fullscreen') {
+              document.getElementById('fsBtn').click();
+            }
+            showVoiceToast('Remote: ' + String(cmd.action).toUpperCase(), 'info', 2000);
+          }
         }
       } catch (_) {}
     }, 200);
