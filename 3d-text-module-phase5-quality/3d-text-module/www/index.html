@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="bn">
 <head>
 <meta charset="UTF-8" />
@@ -608,6 +608,7 @@
           <button type="button" class="preset-btn" data-material="metallic">Metallic</button>
           <button type="button" class="preset-btn" data-material="glass">Glass</button>
           <button type="button" class="preset-btn" data-material="neon">Neon</button>
+          <button type="button" class="preset-btn" data-material="holographic">Holo / Chrome ✨</button>
         </div>
 
         <label class="field" style="margin-top:10px;">
@@ -809,7 +810,34 @@
         </p>
       </section>
 
-      <section class="panel-section">
+            <section class="panel-section">
+        <h3>✨ Bloom / Cinematic Glow (সিনেমাটিক আভা)</h3>
+        <label class="field checkbox-field">
+          <input type="checkbox" id="bloomToggle" />
+          <span>Bloom / Cinematic Glow চালু করুন</span>
+        </label>
+        <div id="bloomControlsGroup" hidden>
+          <label class="field">
+            <span>Bloom Strength (তীব্রতা)</span>
+            <input type="range" id="bloomStrengthRange" min="0" max="3" step="0.05" value="0.8" />
+            <span class="field-value" id="bloomStrengthValue">0.8</span>
+          </label>
+          <label class="field">
+            <span>Bloom Radius (আভার বিস্তৃতি)</span>
+            <input type="range" id="bloomRadiusRange" min="0" max="1" step="0.05" value="0.4" />
+            <span class="field-value" id="bloomRadiusValue">0.4</span>
+          </label>
+          <label class="field">
+            <span>Bloom Threshold (গ্লো থ্রেশহোল্ড)</span>
+            <input type="range" id="bloomThresholdRange" min="0" max="1" step="0.05" value="0.2" />
+            <span class="field-value" id="bloomThresholdValue">0.2</span>
+          </label>
+          <p class="field-note">
+            উজ্জ্বল ও নিয়ন টেক্সটে আকর্ষণীয় থিয়েট্রিক্যাল আলো ও সফট আভা তৈরি করবে।
+          </p>
+        </div>
+      </section>
+<section class="panel-section">
         <h3>কোয়ালিটি (পারফরম্যান্স)</h3>
         <div class="preset-grid preset-grid-3" id="qualityPresetGrid">
           <button type="button" class="preset-btn" data-quality="low">Low</button>
@@ -822,7 +850,15 @@
       <section class="panel-section">
         <h3>ক্যামেরা</h3>
         <p class="field-note">মাউস দিয়ে ড্র্যাগ করে ক্যামেরা ঘোরানো যায় (drag = orbit, scroll = zoom)।</p>
-        <button id="resetCameraBtn" class="btn-secondary">ক্যামেরা রিসেট</button>
+        <p class="field-note" style="margin-top: 6px;">সিনেমাটিক ক্যামেরা অ্যানিমেশন প্রিসেট:</p>
+        <div class="preset-grid" id="cameraAnimGrid" style="margin-bottom: 10px;">
+          <button type="button" class="preset-btn active" data-cam-anim="none">None (স্থির)</button>
+          <button type="button" class="preset-btn" data-cam-anim="dollyIn">Dolly In 🔍</button>
+          <button type="button" class="preset-btn" data-cam-anim="orbitSlow">Orbit Slow 🔄</button>
+          <button type="button" class="preset-btn" data-cam-anim="craneUp">Crane Up 🏗️</button>
+          <button type="button" class="preset-btn" data-cam-anim="breathe">Breathe 💨</button>
+        </div>
+        <button id="resetCameraBtn" class="btn-secondary">ক্যামেরা পজিশন রিসেট</button>
       </section>
 
       <section class="panel-section">
@@ -1005,6 +1041,6 @@
     </aside>
   </div>
 
-  <script type="module" src="main.bundle.js?v=1788259719191"></script>
+  <script type="module" src="main.bundle.js?v=1788610027364"></script>
 </body>
 </html>

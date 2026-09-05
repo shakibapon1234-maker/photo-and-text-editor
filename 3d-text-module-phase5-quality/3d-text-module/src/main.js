@@ -1,4 +1,4 @@
-// 3D Text Module — Phase 3: Animation System
+﻿// 3D Text Module — Phase 3: Animation System
 // Scope (per PLAN_2 Phase 3 checklist):
 //   - Preset animation library (16 effects + "none" — finalized in the
 //     animation-list-finalization pass, see PLAN_2 §6 Open Decisions)
@@ -15,6 +15,9 @@ import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
 import JSZip from 'jszip';
 
@@ -130,6 +133,15 @@ const quickAlignGrid = document.getElementById('quickAlignGrid');
 const dragModeSelect = document.getElementById('dragModeSelect');
 const dragEnabledToggle = document.getElementById('dragEnabledToggle');
 const resetCameraBtn = document.getElementById('resetCameraBtn');
+const bloomToggle = document.getElementById('bloomToggle');
+const bloomControlsGroup = document.getElementById('bloomControlsGroup');
+const bloomStrengthRange = document.getElementById('bloomStrengthRange');
+const bloomStrengthValue = document.getElementById('bloomStrengthValue');
+const bloomRadiusRange = document.getElementById('bloomRadiusRange');
+const bloomRadiusValue = document.getElementById('bloomRadiusValue');
+const bloomThresholdRange = document.getElementById('bloomThresholdRange');
+const bloomThresholdValue = document.getElementById('bloomThresholdValue');
+const cameraAnimGrid = document.getElementById('cameraAnimGrid');
 
 const qualityPresetGrid = document.getElementById('qualityPresetGrid');
 const qualityNote = document.getElementById('qualityNote');
@@ -267,6 +279,78 @@ controls.target.set(0, 0, 0);
 // vendored font below.
 const pmremGenerator = new THREE.PMREMGenerator(renderer);
 const envTexture = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+
+// ---------- Post-processing: Unreal Bloom Pass & EffectComposer ----------
+const renderScene = new RenderPass(scene, camera);
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(viewportEl ? viewportEl.clientWidth : 800, viewportEl ? viewportEl.clientHeight : 600),
+  0.8,
+  0.4,
+  0.2
+);
+const composer = new EffectComposer(renderer);
+composer.renderToScreen = true;
+composer.addPass(renderScene);
+composer.addPass(bloomPass);
+
+function applyBloomSettings() {
+  bloomPass.strength = state.bloomStrength;
+  bloomPass.radius = state.bloomRadius;
+  bloomPass.threshold = state.bloomThreshold;
+  if (bloomControlsGroup) bloomControlsGroup.hidden = !state.bloomEnabled;
+}
+
+// ---------- Camera Animation System ----------
+const cameraAnimBasePos = new THREE.Vector3().copy(DEFAULT_CAMERA_POS);
+const cameraAnimBaseTarget = new THREE.Vector3(0, 0, 0);
+
+function applyCameraAnimation(now) {
+  if (!state.cameraAnim || state.cameraAnim === 'none') return;
+  const t = (now || performance.now()) * 0.001;
+  const target = controls.target;
+
+  switch (state.cameraAnim) {
+    case 'dollyIn': {
+      const factor = 1 - 0.25 * (0.5 + 0.5 * Math.sin(t * 0.85));
+      camera.position.set(
+        cameraAnimBasePos.x * factor,
+        cameraAnimBasePos.y * factor,
+        cameraAnimBasePos.z * factor
+      );
+      camera.lookAt(target);
+      break;
+    }
+    case 'orbitSlow': {
+      const angle = t * 0.28;
+      const r = Math.sqrt(cameraAnimBasePos.x * cameraAnimBasePos.x + cameraAnimBasePos.z * cameraAnimBasePos.z) || 220;
+      camera.position.x = Math.sin(angle) * r;
+      camera.position.z = Math.cos(angle) * r;
+      camera.position.y = cameraAnimBasePos.y + Math.sin(t * 0.5) * 12;
+      camera.lookAt(target);
+      break;
+    }
+    case 'craneUp': {
+      const craneLift = Math.sin(t * 0.75) * 52;
+      camera.position.set(
+        cameraAnimBasePos.x,
+        cameraAnimBasePos.y + craneLift,
+        cameraAnimBasePos.z - Math.abs(craneLift * 0.22)
+      );
+      camera.lookAt(target);
+      break;
+    }
+    case 'breathe': {
+      const breathe = 1 + Math.sin(t * 1.3) * 0.06;
+      camera.position.set(
+        cameraAnimBasePos.x * breathe,
+        cameraAnimBasePos.y * breathe,
+        cameraAnimBasePos.z * breathe
+      );
+      camera.lookAt(target);
+      break;
+    }
+  }
+}
 
 // ---------- Bug fix: shadow camera frustum was hardcoded-tiny ----------
 // DirectionalLight's shadow camera defaults to an orthographic frustum of
@@ -553,6 +637,11 @@ function syncStudioText(newText) {
 }
 
 const state = {
+  bloomEnabled: false,
+  bloomStrength: 0.8,
+  bloomRadius: 0.4,
+  bloomThreshold: 0.2,
+  cameraAnim: 'none',
   contentMode: 'text', // PLAN_3 §1: 'text' | 'image' | 'sticker' — mutually exclusive, one active object at a time
   safeArea: safeAreaSelect?.value || 'none',
   fontFamily: fontSelect?.value || 'helvetiker',
@@ -710,6 +799,19 @@ function buildMaterial(type, colorHex) {
       });
       return mat;
     }
+    case 'holographic':
+      return new THREE.MeshPhysicalMaterial({
+        color: color,
+        roughness: 0.08,
+        metalness: 0.9,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.08,
+        reflectivity: 1.0,
+        envMapIntensity: Math.max(1.5, refIntensity * 2.2),
+        iridescence: 0.95,
+        iridescenceIOR: 1.6,
+        iridescenceThicknessRange: [100, 400],
+      });
 
     default:
       return new THREE.MeshStandardMaterial({ color });
@@ -4700,6 +4802,12 @@ function handleResize() {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h, false);
+  if (typeof composer !== 'undefined' && composer) {
+    composer.setSize(w, h);
+    if (typeof bloomPass !== 'undefined' && bloomPass && bloomPass.resolution) {
+      bloomPass.resolution.set(w, h);
+    }
+  }
   renderSafeAreaGuide();
 }
 
@@ -5138,6 +5246,11 @@ function saveStudioState() {
       shadowIntensity: state.shadowIntensity,
       reflectionsOn: state.reflectionsOn,
       reflectionIntensity: state.reflectionIntensity,
+      bloomEnabled: state.bloomEnabled,
+      bloomStrength: state.bloomStrength,
+      bloomRadius: state.bloomRadius,
+      bloomThreshold: state.bloomThreshold,
+      cameraAnim: state.cameraAnim,
       quality: state.quality,
       neonIntensity: state.neonIntensity,
       autoRotate: state.autoRotate,
@@ -5381,6 +5494,30 @@ function loadStudioState() {
       state.neonIntensity = saved.neonIntensity;
       neonIntensityRange.value = saved.neonIntensity;
       if (neonIntensityValue) neonIntensityValue.textContent = saved.neonIntensity;
+    }
+    if (saved.bloomEnabled !== undefined && bloomToggle) {
+      state.bloomEnabled = saved.bloomEnabled;
+      bloomToggle.checked = saved.bloomEnabled;
+    }
+    if (saved.bloomStrength !== undefined && bloomStrengthRange) {
+      state.bloomStrength = saved.bloomStrength;
+      bloomStrengthRange.value = saved.bloomStrength;
+      if (bloomStrengthValue) bloomStrengthValue.textContent = Number(saved.bloomStrength).toFixed(2);
+    }
+    if (saved.bloomRadius !== undefined && bloomRadiusRange) {
+      state.bloomRadius = saved.bloomRadius;
+      bloomRadiusRange.value = saved.bloomRadius;
+      if (bloomRadiusValue) bloomRadiusValue.textContent = Number(saved.bloomRadius).toFixed(2);
+    }
+    if (saved.bloomThreshold !== undefined && bloomThresholdRange) {
+      state.bloomThreshold = saved.bloomThreshold;
+      bloomThresholdRange.value = saved.bloomThreshold;
+      if (bloomThresholdValue) bloomThresholdValue.textContent = Number(saved.bloomThreshold).toFixed(2);
+    }
+    applyBloomSettings();
+    if (saved.cameraAnim && cameraAnimGrid) {
+      state.cameraAnim = saved.cameraAnim;
+      setActivePreset(cameraAnimGrid, 'camAnim', saved.cameraAnim);
     }
     if (saved.posZ !== undefined) state.posZ = saved.posZ;
     if (saved.autoRotate !== undefined && autoRotateToggle) {
@@ -5901,7 +6038,64 @@ reflectionIntensityRange.addEventListener('input', () => {
   saveStudioStateDebounced();
 });
 
+// ---------- Bloom & Camera Motion Listeners ----------
+if (bloomToggle) {
+  bloomToggle.addEventListener('change', () => {
+    state.bloomEnabled = bloomToggle.checked;
+    applyBloomSettings();
+    saveStudioStateDebounced();
+  });
+}
+
+if (bloomStrengthRange) {
+  bloomStrengthRange.addEventListener('input', () => {
+    state.bloomStrength = Number(bloomStrengthRange.value);
+    if (bloomStrengthValue) bloomStrengthValue.textContent = state.bloomStrength.toFixed(2);
+    applyBloomSettings();
+    saveStudioStateDebounced();
+  });
+}
+
+if (bloomRadiusRange) {
+  bloomRadiusRange.addEventListener('input', () => {
+    state.bloomRadius = Number(bloomRadiusRange.value);
+    if (bloomRadiusValue) bloomRadiusValue.textContent = state.bloomRadius.toFixed(2);
+    applyBloomSettings();
+    saveStudioStateDebounced();
+  });
+}
+
+if (bloomThresholdRange) {
+  bloomThresholdRange.addEventListener('input', () => {
+    state.bloomThreshold = Number(bloomThresholdRange.value);
+    if (bloomThresholdValue) bloomThresholdValue.textContent = state.bloomThreshold.toFixed(2);
+    applyBloomSettings();
+    saveStudioStateDebounced();
+  });
+}
+
+if (cameraAnimGrid) {
+  cameraAnimGrid.addEventListener('click', (e) => {
+    const btn = e.target.closest('.preset-btn');
+    if (!btn) return;
+    state.cameraAnim = btn.dataset.camAnim || 'none';
+    setActivePreset(cameraAnimGrid, 'camAnim', state.cameraAnim);
+    cameraAnimBasePos.copy(camera.position);
+    cameraAnimBaseTarget.copy(controls.target);
+    saveStudioStateDebounced();
+  });
+}
+
+controls.addEventListener('start', () => {
+  if (state.cameraAnim && state.cameraAnim !== 'none') {
+    state.cameraAnim = 'none';
+    if (cameraAnimGrid) setActivePreset(cameraAnimGrid, 'camAnim', 'none');
+  }
+});
+
 resetCameraBtn.addEventListener('click', () => {
+  state.cameraAnim = 'none';
+  if (cameraAnimGrid) setActivePreset(cameraAnimGrid, 'camAnim', 'none');
   const activeObject = state.contentMode === 'shape' ? shapeStudio?.getSelectedGroup() : textMesh;
   if (!activeObject) {
     camera.position.copy(DEFAULT_CAMERA_POS);
