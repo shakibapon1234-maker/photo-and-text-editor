@@ -1697,108 +1697,27 @@
       if (toast) toast.classList.add('hidden');
     }
 
-    function stopVoice() {
-      isVoiceActive = false;
-      if (recognition) {
-        try { recognition.onend = null; recognition.stop(); } catch(_) {}
-        recognition = null;
-      }
+    // ── Unified Voice Control Sync ─────────────────────────────────────
+    let isVoiceActive = false;
+
+    function updateVoiceBtnState(active) {
+      isVoiceActive = !!active;
       const btn = document.getElementById('voiceBtn');
-      if (btn) btn.classList.remove('voice-on');
-      hideVoiceToast();
-    }
-
-    function startVoice() {
-      const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!Speech) {
-        showVoiceToast('আপনার ব্রাউজারে Voice Recognition সাপোর্ট নেই। Google Chrome ব্যবহার করুন।', 'error', 6000);
-        return;
-      }
-
-      // Check file:// protocol restriction in Chrome
-      if (window.location.protocol === 'file:') {
-        showVoiceToast('⚠️ Chrome ব্রাউজারে file:// প্রটোকলে ভয়েস কমান্ড ব্লকড থাকে! `start.bat` চালিয়ে http://localhost:8000 দিয়ে প্লে করুন।', 'warning', 8000);
-      }
-
-      try {
-        if (recognition) { stopVoice(); }
-        isVoiceActive = true;
-        recognition = new Speech();
-        recognition.lang = 'bn-BD';
-        recognition.continuous = true;
-        recognition.interimResults = true;
-
-        recognition.onstart = () => {
-          const btn = document.getElementById('voiceBtn');
-          if (btn) btn.classList.add('voice-on');
-          if (window.location.protocol !== 'file:') {
-            showVoiceToast('🎙️ ভয়েস কন্ট্রোল চালু হয়েছে! বলুন "Next / নেক্সট" বা "Back / আগেরটা"', 'info', 4000);
-          }
-        };
-
-        recognition.onresult = e => {
-          for (let n = e.resultIndex; n < e.results.length; n++) {
-            const transcript = e.results[n][0].transcript.toLowerCase().trim();
-            if (e.results[n].isFinal) {
-              showVoiceToast('শুনেছি: "' + transcript + '"', 'info', 2000);
-              
-              if (/next|forward|samne|poroborti|porer|পরবর্তী|পরের|পরেরটা|সামনে|নেক্সট|নেক্সড|আগাও/i.test(transcript)) {
-                advance(1);
-              }
-              // Previous match regex (English & Bangla)
-              else if (/back|previous|prev|peshone|ager|আগের|আগেরটা|পেছনে|পিছনে|প্রিভিয়াস|প্রিভিয়াস|পিছাও|আগে/i.test(transcript)) {
-                advance(-1);
-              }
-            }
-          }
-        };
-
-        recognition.onerror = (e) => {
-          console.warn('SpeechRecognition error:', e.error);
-          if (e.error === 'no-speech') {
-            return; // Non-fatal temporary pause
-          }
-          if (e.error === 'network' && window.location.protocol === 'file:') {
-            showVoiceToast('❌ Chrome-এ file:// প্রটোকলে Speech API চলে না। `start.bat` চালিয়ে http://localhost:8000 ব্যবহার করুন।', 'error', 10000);
-            stopVoice();
-            return;
-          }
-          if (e.error === 'not-allowed') {
-            showVoiceToast('❌ মাইক্রোফোন পারমিশন দেওয়া হয়নি। ব্রাউজার সেটিংসে Mic allow করুন।', 'error', 6000);
-            stopVoice();
-            return;
-          }
-          if (e.error !== 'aborted') {
-            showVoiceToast('Voice error: ' + (e.error || 'unknown'), 'warning', 4000);
-          }
-        };
-
-        recognition.onend = () => {
-          if (isVoiceActive && recognition) {
-            try {
-              recognition.start();
-            } catch (_) {
-              setTimeout(() => {
-                if (isVoiceActive && recognition) try { recognition.start(); } catch(_) {}
-              }, 400);
-            }
-          } else {
-            const btn = document.getElementById('voiceBtn');
-            if (btn) btn.classList.remove('voice-on');
-          }
-        };
-
-        recognition.start();
-      } catch (err) {
-        console.error(err);
-        showVoiceToast('Voice control error: ' + err.message, 'error', 5000);
-        stopVoice();
+      if (btn) {
+        if (active) btn.classList.add('voice-on');
+        else btn.classList.remove('voice-on');
       }
     }
+    window.updateVoiceBtnState = updateVoiceBtnState;
 
-    document.getElementById('voiceBtn').addEventListener('click', () => {
-      isVoiceActive ? stopVoice() : startVoice();
-    });
+    const voiceBtn = document.getElementById('voiceBtn');
+    if (voiceBtn) {
+      voiceBtn.addEventListener('click', () => {
+        if (window.PresentationAIAssistant && window.PresentationAIAssistant.toggleListening) {
+          window.PresentationAIAssistant.toggleListening();
+        }
+      });
+    }
 
     // ── Universal Cloud P2P & Local Remote System ────────────────────
     const GITHUB_REMOTE_URL = 'https://shakibapon1234-maker.github.io/photo-and-text-editor/remote.html';

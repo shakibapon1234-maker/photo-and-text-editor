@@ -737,6 +737,46 @@
   }
 
   // ── Speech Recognition Engine ─────────────────────────────────────────────
+  let activeMicStream = null;
+  let activeAudioCtx = null;
+
+  async function ensureMicPermission() {
+    if (activeMicStream && activeMicStream.active) {
+      const tracks = activeMicStream.getAudioTracks();
+      if (tracks.length > 0 && tracks[0].readyState === 'live') {
+        return true;
+      }
+    }
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        activeMicStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Keep an active silent source in AudioContext so Chrome knows the tab has an active audio capture session
+        try {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            if (!activeAudioCtx || activeAudioCtx.state === 'closed') {
+              activeAudioCtx = new AudioContextClass();
+            }
+            if (activeAudioCtx.state === 'suspended') {
+              activeAudioCtx.resume();
+            }
+            const source = activeAudioCtx.createMediaStreamSource(activeMicStream);
+            const gain = activeAudioCtx.createGain();
+            gain.gain.value = 0; // completely silent, no speaker loopback
+            source.connect(gain);
+            gain.connect(activeAudioCtx.destination);
+          }
+        } catch (ctxErr) {
+          console.warn('[AI Doll Mic] AudioContext connect:', ctxErr);
+        }
+        return true;
+      } catch (err) {
+        console.warn('[AI Doll Mic] getUserMedia permission:', err);
+      }
+    }
+    return false;
+  }
+
   function setupSpeechRecognition() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) {
@@ -753,6 +793,9 @@
       recognition.onstart = () => {
         isListening = true;
         container?.classList.add('listening');
+        if (typeof window.updateVoiceBtnState === 'function') {
+          window.updateVoiceBtnState(true);
+        }
         showBubble('✨ <b>Listening...</b><br>Say "Next", "Back", or "Read slide"', 0);
       };
 
@@ -793,6 +836,9 @@
               try {
                 recognition.start();
                 container?.classList.add('listening');
+                if (typeof window.updateVoiceBtnState === 'function') {
+                  window.updateVoiceBtnState(true);
+                }
               } catch (_) {}
             }
           }, 300);
@@ -805,18 +851,25 @@
     }
   }
 
-  function startListening() {
+  async function startListening() {
     if (!recognition) {
       showBubble('⚠️ Voice recognition not supported on this browser/protocol.', 4000);
       return;
     }
     shouldKeepListening = true;
     if (isListening) return;
+
+    // Hold active audio stream in session so Chrome does NOT ask for permission on every single command/restart!
+    await ensureMicPermission();
+
     try {
       recognition.start();
       isListening = true;
     } catch (e) {
       console.warn('[AI Doll] Start failed:', e);
+    }
+    if (typeof window.updateVoiceBtnState === 'function') {
+      window.updateVoiceBtnState(true);
     }
   }
 
@@ -832,6 +885,9 @@
   function stopListeningUI() {
     isListening = false;
     container?.classList.remove('listening');
+    if (typeof window.updateVoiceBtnState === 'function') {
+      window.updateVoiceBtnState(false);
+    }
   }
 
   function toggleListening() {
@@ -1036,61 +1092,73 @@
     if (btn) btn.click();
   }
 
-  // ── Presentation Command Processor ────────────────────────────────────────
+  // ── Bengali & English Speech Text Normalizer ──────────────────────────────
+  function normalizeSpeechText(str) {
+    if (!str) return '';
+    return str
+      .normalize('NFC')
+      .replace(/\u09A1\u09BC/g, 'ড়') // decomposed ড + nukta -> ড়
+      .replace(/\u09A2\u09BC/g, 'ঢ়') // decomposed ঢ + nukta -> ঢ়
+      .replace(/\u09AF\u09BC/g, 'য়') // decomposed য + nukta -> য়
+      .replace(/[\u200B-\u200D\uFEFF]/g, '') // zero-width characters
+      .toLowerCase()
+      .trim();
+  }
+
   // ── Presentation Command Processor ────────────────────────────────────────
   function handleVoiceCommand(raw) {
-    const text = raw.toLowerCase().trim();
+    const text = normalizeSpeechText(raw);
 
     // 1. Direct Next Slide (English & Bengali)
-    if (/\b(next slide|forward slide)\b|পরের স্লাইড|পরবর্তী স্লাইড|নেক্সট স্লাইড/i.test(text)) {
-      animatedFlyToAction('#nextBtn, #stage', '⏭ Next Slide', 'Moving to next slide!', () => {
+    if (/পরের স্লাইড|পরবর্তী স্লাইড|নেক্সট স্লাইড|সামনের স্লাইড|\b(next slide|forward slide|next presentation)\b/i.test(text)) {
+      animatedFlyToAction('#nextBtn, #stage', '⏭ Next Slide', null, () => {
         triggerSlideJump(1);
       });
       return;
     }
 
     // 2. Direct Previous Slide (English & Bengali)
-    if (/\b(prev slide|previous slide|back slide)\b|আগের স্লাইড|পূর্বের স্লাইড|প্রিভিয়াস স্লাইড|পেছনের স্লাইড/i.test(text)) {
-      animatedFlyToAction('#prevBtn, #stage', '⏮ Previous Slide', 'Going to previous slide!', () => {
+    if (/আগের স্লাইড|পূর্বের স্লাইড|প্রিভিয়াস স্লাইড|প্রিভিয়াস স্লাইড|পেছনের স্লাইড|পিছনের স্লাইড|\b(prev slide|previous slide|back slide)\b/i.test(text)) {
+      animatedFlyToAction('#prevBtn, #stage', '⏮ Previous Slide', null, () => {
         triggerSlideJump(-1);
       });
       return;
     }
 
     // 3. Step Next (Next Animation step or advance)
-    if (/\b(next|forward|advance|step)\b|পরের|পরবর্তী|সামনে|নেক্সট|নেক্সড|পরেরটা|আগাও|এগিয়ে/i.test(text)) {
-      animatedFlyToAction('#nextBtn, .next-btn, #stage', '✨ Next ▶', 'Next step!', () => {
+    if (/পরের|পরবর্তী|সামনে|নেক্সট|নেক্সড|পরেরটা|সামনেরটা|আগাও|এগিয়ে|এগিয়ে|\b(next|forward|advance|step|step next|go ahead)\b/i.test(text)) {
+      animatedFlyToAction('#nextBtn, .next-btn, #stage', '✨ Next ▶', null, () => {
         triggerSlideNext();
       });
       return;
     }
 
     // 4. Step Previous (Previous Animation step or step back)
-    if (/\b(prev|previous|back|reverse|return|step back)\b|আগের|পেছনে|পিছনে|প্রিভিয়াস|পিছনে যাও|আগেরটা|ব্যাক|ব্যাকে|বেক|বেগ|পিছে|পূর্বে|পূর্ববর্তী|পিছাও/i.test(text)) {
-      animatedFlyToAction('#prevBtn, .prev-btn', '◀ Previous', 'Previous step!', () => {
+    if (/আগের|পেছনে|পিছনে|প্রিভিয়াস|প্রিভিয়াস|পিছনে যাও|পিছে যাও|আগেরটা|ব্যাক|ব্যাকে|বেক|বেগ|পিছে|পূর্বে|পূর্ববর্তী|পিছাও|\b(prev|previous|back|reverse|return|step back)\b/i.test(text)) {
+      animatedFlyToAction('#prevBtn, .prev-btn', '◀ Previous', null, () => {
         triggerSlidePrev();
       });
       return;
     }
 
     // 5. Read / Explain Current Slide (বাংলা ও ইংরেজি উভয় ভাষায় পড়ে শোনাবে)
-    if (/\b(read|read slide|read this|explain|tell me|speak|narrate)\b|পড়|পড়ো|পড়ে শোনাও|পড়ে শুনান|পড়ে দাও|কি আছে|কী লেখা আছে|লেখা পড়ো|লেখা পড়ে শোনাও|স্লাইড পড়ো|স্লাইডটা পড়ো/i.test(text)) {
-      animatedFlyToAction('#stage', '📖 স্লাইড পড়ে শোনাচ্ছি...', 'Let me read this slide for you!', () => {
+    if (/হিট স্লাইড|রিড স্লাইড|রিড|পড়ে শোনাও|পড়ে শোনাও|পরে শোনাও|পড়|পড়ো|পড়ে শুনান|পড়ে দাও|স্লাইড পড়|স্লাইডটা পড়|কি আছে|কী আছে|কী লেখা আছে|কি লেখা আছে|লেখা পড়|লেখা পড়ো|লেখা পড়ে শোনাও|\b(read|read slide|read this|read aloud|speak slide|explain slide|narrate|hit slide)\b/i.test(text)) {
+      animatedFlyToAction('#stage', '📖 স্লাইড পড়ে শোনাচ্ছি...', null, () => {
         readCurrentSlide();
       });
       return;
     }
 
     // 6. Voice Commands Guide List / Modal
-    if (/\b(command|commands|help|guide|cheat sheet|list commands)\b|কমান্ড|কমান্ডের তালিকা|কমান্ড লিস্ট|সাহায্য|লিস্ট দেখাও|কী কী কমান্ড/i.test(text)) {
+    if (/কমান্ড|কমান্ডের তালিকা|কমান্ড লিস্ট|কমান্ড তালিকা|সাহায্য|লিস্ট দেখাও|কী কী কমান্ড|কি কি কমান্ড|\b(command|commands|help|guide|cheat sheet|list commands)\b/i.test(text)) {
       showVoiceCommandsModal();
       showBubble('📋 Opening voice commands guide!', 3000);
       speak('Here are all the voice commands you can use.');
       return;
     }
 
-    // 7. Disable AI Assistant
-    if (/\b(disable|turn off|shut down|goodbye|deactivate|stop assistant)\b|ডিসেবল|ডিসেবল করো|বন্ধ হও|বিদায়|চলে যাও/i.test(text)) {
+    // 7. Disable AI Assistant / Hide Doll (লুকিয়ে যাও, disable, ডিসেবল)
+    if (/লুকিয়ে যাও|লুকিয়ে যাও|লুকিয়ে থাকো|লুকিয়ে থাকো|লুকাও|ডিজেবল|ডিসেবল|ডিজিবল|ডিজেবেল|অ্যাসিস্ট্যান্ট বন্ধ|বন্ধ হও|বন্ধ করো|বিদায়|বিদায়|চলে যাও|\b(disable|turn off|shut down|deactivate|stop assistant|hide assistant|sleep|hide|vanish)\b/i.test(text)) {
       showBubble('👋 Goodbye! You can re-enable me with key A or from the toolbar.', 3500);
       speak('Goodbye! Disabling assistant now.', () => {
         disableAssistant();
@@ -1099,62 +1167,62 @@
     }
 
     // 8. Volume Down / Reduce Volume
-    if (/\b(reduce volume|decrease volume|volume down|sound down|lower volume|quieter)\b|ভলিউম কমাও|সাউন্ড কমাও|ভলিউম কমিয়ে দাও|সাউন্ড কম|শব্দ কমাও/i.test(text)) {
-      animatedFlyToAction('#soundtrackControls, #soundtrackVolumeSlider', '🔉 Reducing Volume', 'Reducing volume now!', () => {
+    if (/ভলিউম কমাও|সাউন্ড কমাও|ভলিউম কমিয়ে দাও|ভলিউম কমিয়ে দাও|সাউন্ড কম|শব্দ কমাও|\b(reduce volume|decrease volume|volume down|sound down|lower volume|quieter)\b/i.test(text)) {
+      animatedFlyToAction('#soundtrackControls, #soundtrackVolumeSlider', '🔉 Reducing Volume', null, () => {
         adjustSoundtrackVolume(-20);
       });
       return;
     }
 
     // 9. Volume Up / Increase Volume
-    if (/\b(increase volume|raise volume|volume up|sound up|louder|higher volume)\b|ভলিউম বাড়াও|সাউন্ড বাড়াও|ভলিউম বাড়িয়ে দাও|সাউন্ড বেশি|শব্দ বাড়াও/i.test(text)) {
-      animatedFlyToAction('#soundtrackControls, #soundtrackVolumeSlider', '🔊 Increasing Volume', 'Turning up the volume!', () => {
+    if (/ভলিউম বাড়াও|সাউন্ড বাড়াও|ভলিউম বাড়িয়ে দাও|ভলিউম বাড়িয়ে দাও|সাউন্ড বেশি|শব্দ বাড়াও|\b(increase volume|raise volume|volume up|sound up|louder|higher volume)\b/i.test(text)) {
+      animatedFlyToAction('#soundtrackControls, #soundtrackVolumeSlider', '🔊 Increasing Volume', null, () => {
         adjustSoundtrackVolume(+20);
       });
       return;
     }
 
     // 10. Mute / Unmute Soundtrack
-    if (/\b(mute|unmute|sound off|sound on)\b|মিউট|আনমিউট|সাউন্ড বন্ধ|সাউন্ড চালু|গান বন্ধ|গান চালাও/i.test(text)) {
-      animatedFlyToAction('#soundtrackToggleBtn', '🔇 Mute / Unmute', 'Toggling soundtrack!', () => {
+    if (/মিউট|আনমিউট|সাউন্ড বন্ধ|সাউন্ড চালু|গান বন্ধ|গান চালাও|\b(mute|unmute|sound off|sound on)\b/i.test(text)) {
+      animatedFlyToAction('#soundtrackToggleBtn', '🔇 Mute / Unmute', null, () => {
         toggleSoundtrack();
       });
       return;
     }
 
     // 11. Manual Flying / Directional Movement
-    if (/\b(move left|go left|fly left)\b|বামে যাও|বামে চল|বামে আসো/i.test(text)) {
+    if (/বামে যাও|বামে চল|বামে আসো|\b(move left|go left|fly left)\b/i.test(text)) {
       flyMoveAvatar('left');
       return;
     }
-    if (/\b(move right|go right|fly right)\b|ডানে যাও|ডানে চল|ডানে আসো/i.test(text)) {
+    if (/ডানে যাও|ডানে চল|ডানে আসো|\b(move right|go right|fly right)\b/i.test(text)) {
       flyMoveAvatar('right');
       return;
     }
-    if (/\b(move up|go up|fly up|move top)\b|উপরে যাও|উপরে চল|উপরে উঠো/i.test(text)) {
+    if (/উপরে যাও|উপরে চল|উপরে উঠো|\b(move up|go up|fly up|move top)\b/i.test(text)) {
       flyMoveAvatar('top');
       return;
     }
-    if (/\b(move down|go down|fly down|move bottom)\b|নিচে যাও|নিচে চল|নিচে নামো/i.test(text)) {
+    if (/নিচে যাও|নিচে চল|নিচে নামো|\b(move down|go down|fly down|move bottom)\b/i.test(text)) {
       flyMoveAvatar('bottom');
       return;
     }
-    if (/\b(go home|return home|reset position|come back)\b|হোমে যাও|আগের জায়গায় যাও|ফিরে আসো/i.test(text)) {
+    if (/হোমে যাও|আগের জায়গায় যাও|আগের জায়গায় যাও|ফিরে আসো|\b(go home|return home|reset position|come back)\b/i.test(text)) {
       flyMoveAvatar('home');
       return;
     }
 
     // 12. First Slide
-    if (/\b(first|first slide|beginning|start|প্রথম|শুরু|প্রথম স্লাইড|শুরুতে যাও)\b/i.test(text)) {
-      animatedFlyToAction('#prevBtn, #stage', '⏮ First Slide', 'Going to the first slide!', () => {
+    if (/প্রথম|শুরু|প্রথম স্লাইড|শুরুতে যাও|শুরু কর|\b(first|first slide|beginning|start)\b/i.test(text)) {
+      animatedFlyToAction('#prevBtn, #stage', '⏮ First Slide', null, () => {
         triggerGoToSlide(0);
       });
       return;
     }
 
     // 13. Last Slide
-    if (/\b(last|last slide|end|finish|শেষ|শেষ স্লাইড|ফাইনালে যাও)\b/i.test(text)) {
-      animatedFlyToAction('#nextBtn, #stage', '⏭ Last Slide', 'Going to the last slide!', () => {
+    if (/শেষ|শেষ স্লাইড|ফাইনালে যাও|শেষে যাও|\b(last|last slide|end|finish)\b/i.test(text)) {
+      animatedFlyToAction('#nextBtn, #stage', '⏭ Last Slide', null, () => {
         triggerGoToSlide(-1);
       });
       return;
@@ -1165,7 +1233,7 @@
     if (slideMatch) {
       const num = parseInt(slideMatch[1], 10);
       if (num > 0) {
-        animatedFlyToAction('#stage', `🎯 Slide ${num}`, `Going to slide ${num}!`, () => {
+        animatedFlyToAction('#stage', `🎯 Slide ${num}`, null, () => {
           triggerGoToSlide(num - 1);
         });
         return;
@@ -1173,61 +1241,53 @@
     }
 
     // 15. Fullscreen Toggle
-    if (/\b(fullscreen|full screen|ফুলস্ক্রিন|বড় পর্দা|বড় কর|maximize)\b/i.test(text)) {
-      animatedFlyToAction('#fsBtn', '⛶ Fullscreen Mode', 'Toggling fullscreen mode!', () => {
+    if (/ফুলস্ক্রিন|বড় পর্দা|বড় পর্দা|বড় কর|বড় কর|\b(fullscreen|full screen|maximize)\b/i.test(text)) {
+      animatedFlyToAction('#fsBtn', '⛶ Fullscreen Mode', null, () => {
         triggerFullscreen();
       });
       return;
     }
 
     // 16. Slide List
-    if (/\b(slide list|list|all slides|তালিকা|স্লাইড লিস্ট)\b/i.test(text)) {
-      animatedFlyToAction('#listBtn', '☰ Slide List', 'Opening slide list!', () => {
+    if (/তালিকা|স্লাইড লিস্ট|লিস্ট দেখাও|\b(slide list|list|all slides)\b/i.test(text)) {
+      animatedFlyToAction('#listBtn', '☰ Slide List', null, () => {
         document.getElementById('listBtn')?.click();
       });
       return;
     }
 
     // 17. Laser Pointer
-    if (/\b(laser|pointer|লেজার|পয়েন্টার)\b/i.test(text)) {
-      animatedFlyToAction('#stage', '🔴 Laser Pointer', 'Toggling laser pointer!', () => {
+    if (/লেজার|পয়েন্টার|পয়েন্টার|\b(laser|pointer)\b/i.test(text)) {
+      animatedFlyToAction('#stage', '🔴 Laser Pointer', null, () => {
         triggerLaserPointer();
       });
       return;
     }
 
     // 18. Black / Blank screen
-    if (/\b(black|blank|dark|dark screen|কালো পর্দা|ফ্রিজ|অন্ধকার)\b/i.test(text)) {
+    if (/কালো পর্দা|ফ্রিজ|অন্ধকার|\b(black|blank|dark|dark screen)\b/i.test(text)) {
       triggerBlackout();
       speak('Blanking presentation screen.');
       return;
     }
 
     // 19. Start Presentation / Present mode (in Studio)
-    if (/\b(present|presentation|slideshow|start slideshow|প্লে|স্লাইড শো শুরু)\b/i.test(text)) {
+    if (/প্লে|স্লাইড শো শুরু|\b(present|presentation|slideshow|start slideshow)\b/i.test(text)) {
       triggerStartPresentation();
       speak('Starting presentation!');
       return;
     }
 
-    // 20. Sleep / Minimize / Hide
-    if (/\b(sleep|hide|vanish|bye|goodbye|ঘুমাও|যাও|মিনিমাইজ)\b/i.test(text)) {
-      container?.classList.add('minimized');
-      speak('Going to sleep. Tap me whenever you need me!');
-      showBubble('💤 Fairy is asleep. Tap to wake up.', 3000);
-      return;
-    }
-
-    // 21. Stop Talking / Quiet
-    if (/\b(stop|quiet|silence|shh|shut up|চুপ|থামো|বন্ধ করো)\b/i.test(text)) {
+    // 20. Stop Talking / Quiet
+    if (/চুপ|থামো|বন্ধ করো|কথা বন্ধ|\b(stop|quiet|silence|shh|shut up)\b/i.test(text)) {
       if (synth) synth.cancel();
       container?.classList.remove('talking');
       hideBubble();
       return;
     }
 
-    // 22. Identity / Hello
-    if (/\b(who are you|hello|hi|hey|কে তুমি|তোমার পরিচয়|হ্যালো|হাই)\b/i.test(text)) {
+    // 21. Identity / Hello
+    if (/কে তুমি|তোমার পরিচয়|তোমার পরিচয়|হ্যালো|হাই|\b(who are you|hello|hi|hey)\b/i.test(text)) {
       const msg = 'Hello! I am your AI Presentation Assistant doll. Say "next", "previous", "next slide", "read slide", or click the question mark for all commands!';
       showBubble('🧚 ' + msg, 6000);
       speak(msg);
