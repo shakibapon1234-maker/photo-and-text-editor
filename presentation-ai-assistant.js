@@ -383,7 +383,9 @@
     return `
       <div class="ai-doll-pill" id="ai-doll-pill">
         <button id="aiDollMicBtn" title="Click to speak (English/বাংলা)">🎙️ Talk</button>
-        <button id="aiDollMinBtn" title="Minimize / Sleep">💤</button>
+        <button id="aiDollHelpBtn" title="Voice Commands Guide (ভয়েস কমান্ড গাইড)">❓</button>
+        <button id="aiDollMinBtn" title="Minimize / Sleep (মিনিমাইজ)">💤</button>
+        <button id="aiDollCloseBtn" title="Disable AI Assistant (ডিসেবল করুন)">❌</button>
       </div>
       <div id="ai-doll">
         <span class="ai-float-sparkle">✦</span>
@@ -511,14 +513,20 @@
   }
 
   // ── Speech Synthesis (TTS) ────────────────────────────────────────────────
+  let selectedVoiceBn = null;
+
   function initTTS() {
     if (!synth) return;
     function pickVoice() {
       const voices = synth.getVoices() || [];
-      // Prefer friendly female English or Bengali voice
+      // Prefer friendly female English voice
       selectedVoice = voices.find(v => (v.name.includes('Natural') || v.name.includes('Female') || v.name.includes('Zira') || v.name.includes('Samantha') || v.name.includes('Google UK English Female')) && v.lang.startsWith('en'))
         || voices.find(v => v.lang.startsWith('en'))
         || voices[0] || null;
+
+      // Prefer Bengali voice if installed
+      selectedVoiceBn = voices.find(v => v.lang.startsWith('bn') || v.name.toLowerCase().includes('bengali') || v.name.toLowerCase().includes('bangla'))
+        || null;
     }
     if (synth.onvoiceschanged !== undefined) {
       synth.onvoiceschanged = pickVoice;
@@ -533,10 +541,19 @@
     }
     try {
       synth.cancel();
+      const isBn = /[\u0980-\u09FF]/.test(text);
       const utterance = new SpeechSynthesisUtterance(text);
-      if (selectedVoice) utterance.voice = selectedVoice;
-      utterance.rate = 1.05;
-      utterance.pitch = 1.18; // Sweet, cheerful fairy pitch
+      if (isBn) {
+        utterance.lang = 'bn-BD';
+        if (selectedVoiceBn) utterance.voice = selectedVoiceBn;
+        utterance.rate = 0.95;
+        utterance.pitch = 1.05;
+      } else {
+        utterance.lang = 'en-US';
+        if (selectedVoice) utterance.voice = selectedVoice;
+        utterance.rate = 1.05;
+        utterance.pitch = 1.18; // Sweet, cheerful fairy pitch
+      }
 
       utterance.onstart = () => {
         isSpeaking = true;
@@ -556,6 +573,76 @@
       synth.speak(utterance);
     } catch (e) {
       console.warn('[AI Doll TTS] Error:', e);
+      isSpeaking = false;
+      container?.classList.remove('talking');
+      if (onComplete) onComplete();
+    }
+  }
+
+  function speakSlideSequence(chunks, onComplete) {
+    if (!synth || !chunks || !chunks.length) {
+      if (onComplete) onComplete();
+      return;
+    }
+    try {
+      synth.cancel();
+      let index = 0;
+
+      function speakNext() {
+        if (index >= chunks.length) {
+          isSpeaking = false;
+          container?.classList.remove('talking');
+          if (onComplete) onComplete();
+          return;
+        }
+
+        const chunk = String(chunks[index++]).trim();
+        if (!chunk) {
+          speakNext();
+          return;
+        }
+
+        const isBn = /[\u0980-\u09FF]/.test(chunk);
+        const utterance = new SpeechSynthesisUtterance(chunk);
+        if (isBn) {
+          utterance.lang = 'bn-BD';
+          if (selectedVoiceBn) utterance.voice = selectedVoiceBn;
+          utterance.rate = 0.95;
+          utterance.pitch = 1.05;
+        } else {
+          utterance.lang = 'en-US';
+          if (selectedVoice) utterance.voice = selectedVoice;
+          utterance.rate = 1.0;
+          utterance.pitch = 1.15;
+        }
+
+        utterance.onstart = () => {
+          isSpeaking = true;
+          container?.classList.add('talking');
+        };
+
+        utterance.onend = () => {
+          if (index < chunks.length) {
+            setTimeout(speakNext, 280);
+          } else {
+            isSpeaking = false;
+            container?.classList.remove('talking');
+            if (onComplete) onComplete();
+          }
+        };
+
+        utterance.onerror = () => {
+          isSpeaking = false;
+          container?.classList.remove('talking');
+          if (onComplete) onComplete();
+        };
+
+        synth.speak(utterance);
+      }
+
+      speakNext();
+    } catch (e) {
+      console.warn('[AI TTS Sequence] Error:', e);
       isSpeaking = false;
       container?.classList.remove('talking');
       if (onComplete) onComplete();
@@ -950,26 +1037,68 @@
   }
 
   // ── Presentation Command Processor ────────────────────────────────────────
+  // ── Presentation Command Processor ────────────────────────────────────────
   function handleVoiceCommand(raw) {
     const text = raw.toLowerCase().trim();
 
-    // 1. Next Slide (English & Bengali)
-    if (/\b(next|forward|right|samne|porer|poroborti|advance)\b|পরের|পরবর্তী|পরের স্লাইড|পরবর্তী স্লাইড|সামনে|নেক্সট|নেক্সড|পরেরটা|আগাও|এগিয়ে/i.test(text)) {
-      animatedFlyToAction('#nextBtn, .next-btn, #stage', '✨ Next Slide ▶', 'Moving to next slide!', () => {
+    // 1. Direct Next Slide (English & Bengali)
+    if (/\b(next slide|forward slide)\b|পরের স্লাইড|পরবর্তী স্লাইড|নেক্সট স্লাইড/i.test(text)) {
+      animatedFlyToAction('#nextBtn, #stage', '⏭ Next Slide', 'Moving to next slide!', () => {
+        triggerSlideJump(1);
+      });
+      return;
+    }
+
+    // 2. Direct Previous Slide (English & Bengali)
+    if (/\b(prev slide|previous slide|back slide)\b|আগের স্লাইড|পূর্বের স্লাইড|প্রিভিয়াস স্লাইড|পেছনের স্লাইড/i.test(text)) {
+      animatedFlyToAction('#prevBtn, #stage', '⏮ Previous Slide', 'Going to previous slide!', () => {
+        triggerSlideJump(-1);
+      });
+      return;
+    }
+
+    // 3. Step Next (Next Animation step or advance)
+    if (/\b(next|forward|advance|step)\b|পরের|পরবর্তী|সামনে|নেক্সট|নেক্সড|পরেরটা|আগাও|এগিয়ে/i.test(text)) {
+      animatedFlyToAction('#nextBtn, .next-btn, #stage', '✨ Next ▶', 'Next step!', () => {
         triggerSlideNext();
       });
       return;
     }
 
-    // 2. Previous Slide (English & Bengali including ব্যাক, ব্যাকে, বেক, পিছে, ইত্যাদি)
-    if (/\b(prev|previous|back|left|peshone|ager|reverse|return)\b|আগের|আগের স্লাইড|পেছনে|পিছনে|প্রিভিয়াস|প্রিভিয়াস|পিছনে যাও|আগেরটা|ব্যাক|ব্যাকে|বেক|বেগ|পিছে|পূর্বে|পূর্ববর্তী|পিছাও/i.test(text)) {
-      animatedFlyToAction('#prevBtn, .prev-btn', '◀ Previous Slide', 'Going back to previous slide!', () => {
+    // 4. Step Previous (Previous Animation step or step back)
+    if (/\b(prev|previous|back|reverse|return|step back)\b|আগের|পেছনে|পিছনে|প্রিভিয়াস|পিছনে যাও|আগেরটা|ব্যাক|ব্যাকে|বেক|বেগ|পিছে|পূর্বে|পূর্ববর্তী|পিছাও/i.test(text)) {
+      animatedFlyToAction('#prevBtn, .prev-btn', '◀ Previous', 'Previous step!', () => {
         triggerSlidePrev();
       });
       return;
     }
 
-    // 3. Volume Down / Reduce Volume
+    // 5. Read / Explain Current Slide (বাংলা ও ইংরেজি উভয় ভাষায় পড়ে শোনাবে)
+    if (/\b(read|read slide|read this|explain|tell me|speak|narrate)\b|পড়|পড়ো|পড়ে শোনাও|পড়ে শুনান|পড়ে দাও|কি আছে|কী লেখা আছে|লেখা পড়ো|লেখা পড়ে শোনাও|স্লাইড পড়ো|স্লাইডটা পড়ো/i.test(text)) {
+      animatedFlyToAction('#stage', '📖 স্লাইড পড়ে শোনাচ্ছি...', 'Let me read this slide for you!', () => {
+        readCurrentSlide();
+      });
+      return;
+    }
+
+    // 6. Voice Commands Guide List / Modal
+    if (/\b(command|commands|help|guide|cheat sheet|list commands)\b|কমান্ড|কমান্ডের তালিকা|কমান্ড লিস্ট|সাহায্য|লিস্ট দেখাও|কী কী কমান্ড/i.test(text)) {
+      showVoiceCommandsModal();
+      showBubble('📋 Opening voice commands guide!', 3000);
+      speak('Here are all the voice commands you can use.');
+      return;
+    }
+
+    // 7. Disable AI Assistant
+    if (/\b(disable|turn off|shut down|goodbye|deactivate|stop assistant)\b|ডিসেবল|ডিসেবল করো|বন্ধ হও|বিদায়|চলে যাও/i.test(text)) {
+      showBubble('👋 Goodbye! You can re-enable me with key A or from the toolbar.', 3500);
+      speak('Goodbye! Disabling assistant now.', () => {
+        disableAssistant();
+      });
+      return;
+    }
+
+    // 8. Volume Down / Reduce Volume
     if (/\b(reduce volume|decrease volume|volume down|sound down|lower volume|quieter)\b|ভলিউম কমাও|সাউন্ড কমাও|ভলিউম কমিয়ে দাও|সাউন্ড কম|শব্দ কমাও/i.test(text)) {
       animatedFlyToAction('#soundtrackControls, #soundtrackVolumeSlider', '🔉 Reducing Volume', 'Reducing volume now!', () => {
         adjustSoundtrackVolume(-20);
@@ -977,7 +1106,7 @@
       return;
     }
 
-    // 4. Volume Up / Increase Volume
+    // 9. Volume Up / Increase Volume
     if (/\b(increase volume|raise volume|volume up|sound up|louder|higher volume)\b|ভলিউম বাড়াও|সাউন্ড বাড়াও|ভলিউম বাড়িয়ে দাও|সাউন্ড বেশি|শব্দ বাড়াও/i.test(text)) {
       animatedFlyToAction('#soundtrackControls, #soundtrackVolumeSlider', '🔊 Increasing Volume', 'Turning up the volume!', () => {
         adjustSoundtrackVolume(+20);
@@ -985,7 +1114,7 @@
       return;
     }
 
-    // 5. Mute / Unmute Soundtrack
+    // 10. Mute / Unmute Soundtrack
     if (/\b(mute|unmute|sound off|sound on)\b|মিউট|আনমিউট|সাউন্ড বন্ধ|সাউন্ড চালু|গান বন্ধ|গান চালাও/i.test(text)) {
       animatedFlyToAction('#soundtrackToggleBtn', '🔇 Mute / Unmute', 'Toggling soundtrack!', () => {
         toggleSoundtrack();
@@ -993,7 +1122,7 @@
       return;
     }
 
-    // 6. Manual Flying / Directional Movement
+    // 11. Manual Flying / Directional Movement
     if (/\b(move left|go left|fly left)\b|বামে যাও|বামে চল|বামে আসো/i.test(text)) {
       flyMoveAvatar('left');
       return;
@@ -1015,7 +1144,7 @@
       return;
     }
 
-    // 7. First Slide
+    // 12. First Slide
     if (/\b(first|first slide|beginning|start|প্রথম|শুরু|প্রথম স্লাইড|শুরুতে যাও)\b/i.test(text)) {
       animatedFlyToAction('#prevBtn, #stage', '⏮ First Slide', 'Going to the first slide!', () => {
         triggerGoToSlide(0);
@@ -1023,7 +1152,7 @@
       return;
     }
 
-    // 8. Last Slide
+    // 13. Last Slide
     if (/\b(last|last slide|end|finish|শেষ|শেষ স্লাইড|ফাইনালে যাও)\b/i.test(text)) {
       animatedFlyToAction('#nextBtn, #stage', '⏭ Last Slide', 'Going to the last slide!', () => {
         triggerGoToSlide(-1);
@@ -1031,7 +1160,7 @@
       return;
     }
 
-    // 9. Specific Slide number (e.g. "slide 3", "৩ নম্বর স্লাইড")
+    // 14. Specific Slide number (e.g. "slide 3", "৩ নম্বর স্লাইড")
     const slideMatch = text.match(/\b(?:slide|number|স্লাইড|নম্বর)\s*(\d+)/i) || text.match(/(\d+)\s*(?:st|nd|rd|th)?\s*slide/i);
     if (slideMatch) {
       const num = parseInt(slideMatch[1], 10);
@@ -1043,15 +1172,7 @@
       }
     }
 
-    // 10. Read / Explain Current Slide
-    if (/\b(read|read slide|explain|tell me|speak|পড়|পড়ো|পড়ে শোনাও|বল|কি আছে|কী লেখা আছে)\b/i.test(text)) {
-      animatedFlyToAction('#stage', '📖 Reading Slide', 'Let me read this slide for you!', () => {
-        readCurrentSlide();
-      });
-      return;
-    }
-
-    // 11. Fullscreen Toggle
+    // 15. Fullscreen Toggle
     if (/\b(fullscreen|full screen|ফুলস্ক্রিন|বড় পর্দা|বড় কর|maximize)\b/i.test(text)) {
       animatedFlyToAction('#fsBtn', '⛶ Fullscreen Mode', 'Toggling fullscreen mode!', () => {
         triggerFullscreen();
@@ -1059,7 +1180,7 @@
       return;
     }
 
-    // 12. Slide List
+    // 16. Slide List
     if (/\b(slide list|list|all slides|তালিকা|স্লাইড লিস্ট)\b/i.test(text)) {
       animatedFlyToAction('#listBtn', '☰ Slide List', 'Opening slide list!', () => {
         document.getElementById('listBtn')?.click();
@@ -1067,7 +1188,7 @@
       return;
     }
 
-    // 13. Laser Pointer
+    // 17. Laser Pointer
     if (/\b(laser|pointer|লেজার|পয়েন্টার)\b/i.test(text)) {
       animatedFlyToAction('#stage', '🔴 Laser Pointer', 'Toggling laser pointer!', () => {
         triggerLaserPointer();
@@ -1075,29 +1196,29 @@
       return;
     }
 
-    // 14. Black / Blank screen
+    // 18. Black / Blank screen
     if (/\b(black|blank|dark|dark screen|কালো পর্দা|ফ্রিজ|অন্ধকার)\b/i.test(text)) {
       triggerBlackout();
       speak('Blanking presentation screen.');
       return;
     }
 
-    // 15. Start Presentation / Present mode (in Studio)
+    // 19. Start Presentation / Present mode (in Studio)
     if (/\b(present|presentation|slideshow|start slideshow|প্লে|স্লাইড শো শুরু)\b/i.test(text)) {
       triggerStartPresentation();
       speak('Starting presentation!');
       return;
     }
 
-    // 16. Sleep / Minimize / Hide
-    if (/\b(sleep|hide|vanish|bye|goodbye|ঘুমাও|যাও|লুকিয়ে যাও|বন্ধ হও|মিনিমাইজ)\b/i.test(text)) {
+    // 20. Sleep / Minimize / Hide
+    if (/\b(sleep|hide|vanish|bye|goodbye|ঘুমাও|যাও|মিনিমাইজ)\b/i.test(text)) {
       container?.classList.add('minimized');
       speak('Going to sleep. Tap me whenever you need me!');
       showBubble('💤 Fairy is asleep. Tap to wake up.', 3000);
       return;
     }
 
-    // 17. Stop Talking / Quiet
+    // 21. Stop Talking / Quiet
     if (/\b(stop|quiet|silence|shh|shut up|চুপ|থামো|বন্ধ করো)\b/i.test(text)) {
       if (synth) synth.cancel();
       container?.classList.remove('talking');
@@ -1105,20 +1226,29 @@
       return;
     }
 
-    // 18. Identity / Hello
+    // 22. Identity / Hello
     if (/\b(who are you|hello|hi|hey|কে তুমি|তোমার পরিচয়|হ্যালো|হাই)\b/i.test(text)) {
-      const msg = 'Hello! I am your AI Presentation Assistant doll. Say "next slide", "previous slide", "reduce volume", or "read slide" to control your show!';
+      const msg = 'Hello! I am your AI Presentation Assistant doll. Say "next", "previous", "next slide", "read slide", or click the question mark for all commands!';
       showBubble('🧚 ' + msg, 6000);
       speak(msg);
       return;
     }
 
     // Default: Couldn't understand
-    showBubble(`❓ Command not recognized: "${escapeHtml(raw)}"<br><small>Try: "Next slide", "Previous slide", "Reduce volume", "Read slide"</small>`, 4000);
-    speak('Sorry, I did not catch that. Say next slide, or reduce volume.');
+    showBubble(`❓ Command not recognized: "${escapeHtml(raw)}"<br><small>Click <b>❓</b> on the doll to see all voice commands!</small>`, 4500);
+    speak('Sorry, I did not catch that. Say next, back, read slide, or click the question mark button for commands.');
   }
 
   // ── Presentation Action Handlers ──────────────────────────────────────────
+  function triggerSlideJump(delta) {
+    if (typeof window.advanceSlide === 'function') {
+      window.advanceSlide(delta);
+      return;
+    }
+    if (delta > 0) triggerSlideNext();
+    else triggerSlidePrev();
+  }
+
   function triggerSlideNext() {
     // 1. Check Player mode
     if (typeof window.advanceNext === 'function') {
@@ -1222,45 +1352,251 @@
     }
   }
 
+  function disableAssistant() {
+    if (typeof window.toggleAIAssistant === 'function') {
+      window.toggleAIAssistant(false);
+      return;
+    }
+    try {
+      localStorage.setItem('presentation_ai_doll_enabled', 'false');
+    } catch (_) {}
+    if (container) {
+      container.classList.add('hidden-doll');
+      container.style.display = 'none';
+    }
+    stopListening();
+    if (synth) synth.cancel();
+  }
+
   function readCurrentSlide() {
     // Extract text from current slide in Player or Studio
     let texts = [];
 
-    // Player mode
+    // 1. Player mode data structures
     if (typeof window.slides !== 'undefined' && Array.isArray(window.slides)) {
       let curIdx = typeof window.currentIndex === 'number' ? window.currentIndex : (typeof window.current === 'number' ? window.current : 0);
       const curSlide = window.slides[curIdx];
       if (curSlide && Array.isArray(curSlide.elements)) {
         curSlide.elements.forEach(el => {
-          if (el && el.type === 'text' && el.text) {
-            const clean = el.text.trim();
-            if (clean) texts.push(clean);
+          if (!el) return;
+          if (el.type === 'text' && el.text) {
+            const clean = String(el.text).trim();
+            if (clean && !texts.includes(clean)) texts.push(clean);
+          } else if (el.type === 'shape' && (el.text || el.shapeText)) {
+            const clean = String(el.text || el.shapeText).trim();
+            if (clean && !texts.includes(clean)) texts.push(clean);
+          } else if (el.type === 'table' && Array.isArray(el.data)) {
+            el.data.forEach(row => {
+              if (Array.isArray(row)) {
+                row.forEach(cell => {
+                  const clean = String(cell || '').trim();
+                  if (clean && !texts.includes(clean)) texts.push(clean);
+                });
+              }
+            });
           }
         });
       }
     }
 
-    // Also look in DOM stage/slide if empty
+    // 2. DOM fallback
     if (!texts.length) {
       const stage = document.getElementById('stage') || document.getElementById('slide');
       if (stage) {
-        stage.querySelectorAll('.text-content, .text-el').forEach(el => {
+        stage.querySelectorAll('.shape-label, .text-content, .text-el, p, h1, h2, h3').forEach(el => {
+          if (el.closest('defs') || el.closest('#controls') || el.closest('.ctrl-btn')) return;
           const t = el.textContent?.trim();
-          if (t) texts.push(t);
+          if (t && !texts.includes(t) && t.length > 1) texts.push(t);
         });
       }
     }
 
     if (!texts.length) {
-      const msg = 'This slide does not contain any readable text elements.';
-      showBubble(msg, 3000);
+      const msg = 'এই স্লাইডে পড়ার মতো কোনো টেক্সট পাওয়া যায়নি।';
+      showBubble('ℹ️ ' + msg, 3500);
       speak(msg);
       return;
     }
 
-    const fullNarration = texts.join('. ');
-    showBubble('📖 <b>Reading slide:</b><br>' + escapeHtml(fullNarration.slice(0, 90)) + (fullNarration.length > 90 ? '...' : ''), 8000);
-    speak(fullNarration);
+    const preview = texts.join('. ');
+    showBubble('📖 <b>পড়ে শোনাচ্ছি:</b><br>' + escapeHtml(preview.slice(0, 110)) + (preview.length > 110 ? '...' : ''), 8000);
+    speakSlideSequence(texts);
+  }
+
+  // ── Voice Commands Cheat Sheet Modal ──────────────────────────────────────
+  function showVoiceCommandsModal() {
+    let modal = document.getElementById('aiVoiceCommandsModal');
+    if (modal) { modal.remove(); return; }
+
+    modal = document.createElement('div');
+    modal.id = 'aiVoiceCommandsModal';
+    modal.style.cssText = `
+      position: fixed; inset: 0; z-index: 100010;
+      background: rgba(10, 5, 25, 0.88); backdrop-filter: blur(12px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px; font-family: system-ui, -apple-system, sans-serif;
+    `;
+
+    modal.innerHTML = `
+      <div style="
+        background: linear-gradient(135deg, #150d2a 0%, #1f1238 100%);
+        border: 1.5px solid rgba(216, 180, 254, 0.35);
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.8), 0 0 30px rgba(168, 85, 247, 0.25);
+        max-width: 640px; width: 100%; max-height: 85vh;
+        display: flex; flex-direction: column; overflow: hidden; color: #fff;
+      ">
+        <div style="
+          padding: 16px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          display: flex; align-items: center; justify-content: space-between;
+          background: rgba(255, 255, 255, 0.03);
+        ">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:24px;">🧚</span>
+            <div>
+              <div style="font-size:16px;font-weight:800;color:#f3e8ff;">AI Assistant Voice Commands</div>
+              <div style="font-size:12px;color:#c084fc;">বাংলা ও ইংরেজি উভয় ভাষায় সাপোর্ট করে</div>
+            </div>
+          </div>
+          <button id="aiModalCloseBtn" style="
+            background: rgba(255,255,255,0.1); border: none; color: #fff;
+            width: 32px; height: 32px; border-radius: 50%; font-size: 16px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+          ">✕</button>
+        </div>
+
+        <div style="padding: 18px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; font-size: 13px;">
+          
+          <!-- Section 1 -->
+          <div style="background: rgba(255,255,255,0.04); border-radius: 12px; padding: 12px 14px; border: 1px solid rgba(255,255,255,0.08);">
+            <div style="font-weight:800;color:#38bdf8;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+              <span>🎬</span> <span>অ্যানিমেশন স্টেপ ও স্লাইড নেভিগেশন</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#ffd166;font-weight:700;">"নেক্সট" / "Next" / "সামনে"</div>
+                <div style="color:#94a3b8;font-size:11px;">পরবর্তী অ্যানিমেশন স্টেপ চালু হবে</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#ffd166;font-weight:700;">"ব্যাক" / "Back" / "পিছে"</div>
+                <div style="color:#94a3b8;font-size:11px;">পূর্ববর্তী অ্যানিমেশন স্টেপে ফিরে যাবে</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#34d399;font-weight:700;">"নেক্সট স্লাইড" / "Next Slide"</div>
+                <div style="color:#94a3b8;font-size:11px;">সরাসরি পরের স্লাইডে চলে যাবে</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#34d399;font-weight:700;">"আগের স্লাইড" / "Previous Slide"</div>
+                <div style="color:#94a3b8;font-size:11px;">সরাসরি আগের স্লাইডে চলে যাবে</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#f472b6;font-weight:700;">"প্রথম স্লাইড" / "First Slide"</div>
+                <div style="color:#94a3b8;font-size:11px;">একদম শুরু বা প্রথম স্লাইডে যাবে</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#f472b6;font-weight:700;">"শেষ স্লাইড" / "Last Slide"</div>
+                <div style="color:#94a3b8;font-size:11px;">প্রেজেন্টেশনের শেষ স্লাইডে যাবে</div>
+              </div>
+            </div>
+            <div style="margin-top:8px;font-size:11px;color:#cbd5e1;">
+              💡 <em>যেকোনো নির্দিষ্ট স্লাইড: "স্লাইড ৩" বা "Slide 5" বললেই সেখানে চলে যাবে।</em>
+            </div>
+          </div>
+
+          <!-- Section 2 -->
+          <div style="background: rgba(255,255,255,0.04); border-radius: 12px; padding: 12px 14px; border: 1px solid rgba(255,255,255,0.08);">
+            <div style="font-weight:800;color:#e879f9;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+              <span>📖</span> <span>স্লাইড পড়ে শোনানো (বাংলা ও ইংরেজি)</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#ffd166;font-weight:700;">"এই স্লাইডটা পড়ো" / "পড়ে শোনাও"</div>
+                <div style="color:#94a3b8;font-size:11px;">বর্তমান স্লাইডের সমস্ত লেখা পড়ে শোনাবে</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#ffd166;font-weight:700;">"Read slide" / "Read this slide"</div>
+                <div style="color:#94a3b8;font-size:11px;">Reads aloud current slide in English</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#f87171;font-weight:700;">"থামো" / "চুপ" / "Stop"</div>
+                <div style="color:#94a3b8;font-size:11px;">পড়া বন্ধ করতে যে কোনো সময় বলুন</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#38bdf8;font-weight:700;">"কী লেখা আছে" / "Explain"</div>
+                <div style="color:#94a3b8;font-size:11px;">স্লাইডের মূল তথ্যগুলো বলে দিবে</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3 -->
+          <div style="background: rgba(255,255,255,0.04); border-radius: 12px; padding: 12px 14px; border: 1px solid rgba(255,255,255,0.08);">
+            <div style="font-weight:800;color:#f59e0b;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+              <span>🔊</span> <span>সাউন্ডট্র্যাক ও ভলিউম নিয়ন্ত্রণ</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#ffd166;font-weight:700;">"ভলিউম বাড়াও" / "Volume up"</div>
+                <div style="color:#94a3b8;font-size:11px;">সাউন্ড ২০% বৃদ্ধি পাবে</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#ffd166;font-weight:700;">"ভলিউম কমাও" / "Volume down"</div>
+                <div style="color:#94a3b8;font-size:11px;">সাউন্ড ২০% কমে যাবে</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#38bdf8;font-weight:700;">"মিউট" / "সাউন্ড বন্ধ" / "গান বন্ধ"</div>
+                <div style="color:#94a3b8;font-size:11px;">সাউন্ড সাময়িক মিউট হবে</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#38bdf8;font-weight:700;">"আনমিউট" / "গান চালাও"</div>
+                <div style="color:#94a3b8;font-size:11px;">মিউজিক পুনরায় চালু হবে</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 4 -->
+          <div style="background: rgba(255,255,255,0.04); border-radius: 12px; padding: 12px 14px; border: 1px solid rgba(255,255,255,0.08);">
+            <div style="font-weight:800;color:#a78bfa;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+              <span>🛠️</span> <span>প্রেজেন্টেশন টুলস ও সহকারী নিয়ন্ত্রণ</span>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#ffd166;font-weight:700;">"ফুলস্ক্রিন" / "Fullscreen"</div>
+                <div style="color:#94a3b8;font-size:11px;">বড় পর্দায় টগল করবে</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#ffd166;font-weight:700;">"লেজার" / "Laser"</div>
+                <div style="color:#94a3b8;font-size:11px;">লেজার পয়েন্টার অন/অফ হবে</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#ffd166;font-weight:700;">"কালো পর্দা" / "Blank screen"</div>
+                <div style="color:#94a3b8;font-size:11px;">স্ক্রিন সাময়িক অন্ধকার করবে</div>
+              </div>
+              <div style="background:rgba(0,0,0,0.25);padding:8px;border-radius:8px;">
+                <div style="color:#f87171;font-weight:700;">"ডিসেবল" / "লুকিয়ে যাও"</div>
+                <div style="color:#94a3b8;font-size:11px;">অ্যাসিস্ট্যান্ট বন্ধ থাকবে (টুলবার বা 'A' দিয়ে চালু)</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div style="
+          padding: 12px 20px; border-top: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(0, 0, 0, 0.25); text-align: right;
+        ">
+          <button id="aiModalGotItBtn" style="
+            padding: 8px 20px; border-radius: 8px;
+            background: linear-gradient(135deg, #a855f7, #ec4899);
+            border: none; color: #fff; font-weight: 700; cursor: pointer;
+          ">বুঝেছি (Got It)</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById('aiModalCloseBtn').onclick = () => modal.remove();
+    document.getElementById('aiModalGotItBtn').onclick = () => modal.remove();
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
   }
 
   function dispatchKey(key) {
@@ -1345,6 +1681,24 @@
       }
     });
 
+    document.getElementById('aiDollHelpBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      showVoiceCommandsModal();
+    });
+
+    document.getElementById('aiDollCloseBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      disableAssistant();
+    });
+
+    // Check saved enabled state
+    try {
+      if (localStorage.getItem('presentation_ai_doll_enabled') === 'false') {
+        container.classList.add('hidden-doll');
+        container.style.display = 'none';
+      }
+    } catch (_) {}
+
     // Keyboard shortcut 'V' for quick mic activation (when not inside inputs)
     window.addEventListener('keydown', (e) => {
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
@@ -1355,6 +1709,7 @@
       if (e.key === 'Escape') {
         if (isListening) stopListening();
         hideBubble();
+        document.getElementById('aiVoiceCommandsModal')?.remove();
       }
     });
 
@@ -1382,12 +1737,15 @@
     stopListening,
     toggleListening,
     speak,
+    speakSlideSequence,
     showBubble,
     hideBubble,
     readCurrentSlide,
     animatedFlyToAction,
     handleVoiceCommand,
-    flyMoveAvatar
+    flyMoveAvatar,
+    showVoiceCommandsModal,
+    disableAssistant
   };
   window.__triggerAIVoiceCommand = handleVoiceCommand;
 })();

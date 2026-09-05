@@ -319,6 +319,27 @@
     }
     .ctrl-info { font-size: 13px; color: #c4d7f5; font-weight: 700; padding: 0 6px; white-space: nowrap; }
 
+    /* ── AI Doll Toggle Button ── */
+    #aiToggleBtn {
+      background: linear-gradient(135deg, #a855f7, #ec4899);
+      border-color: #f472e8;
+      box-shadow: 0 0 10px rgba(236, 72, 153, 0.45);
+      position: relative;
+    }
+    #aiToggleBtn:hover {
+      background: linear-gradient(135deg, #c084fc, #f472b6);
+      border-color: #fff;
+      transform: scale(1.1);
+      box-shadow: 0 0 18px rgba(236, 72, 153, 0.8);
+    }
+    #aiToggleBtn.disabled {
+      background: #1c2b42 !important;
+      border-color: #4a6288 !important;
+      opacity: 0.42 !important;
+      filter: grayscale(1) !important;
+      box-shadow: none !important;
+    }
+
     /* ── Soundtrack Controls in Player Toolbar ── */
     .soundtrack-ctrl-group {
       display: inline-flex;
@@ -491,6 +512,7 @@
       <input type="range" id="soundtrackVolumeSlider" min="0" max="100" value="60" title="Soundtrack Volume (+ / -)">
       <span id="soundtrackVolBadge" class="vol-badge">60%</span>
     </div>
+    <button class="ctrl-btn" id="aiToggleBtn" title="AI Assistant Doll: Active (Press 'A' to Disable)">🧚</button>
     <button class="ctrl-btn" id="voiceBtn" title="Voice Control (Bengali / English)">🎤</button>
     <button class="ctrl-btn" id="remoteBtn" title="Mobile Remote Control (QR Code)">📱</button>
     <button class="ctrl-btn" id="fsBtn" title="Fullscreen (F / F11)">⛶</button>
@@ -1042,7 +1064,7 @@
       return node;
     }
 
-    function drawSlide() {
+    function drawSlide(targetStep) {
       const stage = document.getElementById('stage');
       if (!slides.length || !stage) return;
       const slide = slides[currentIndex];
@@ -1134,13 +1156,12 @@
 
       // Group into sequential steps
       slideSteps = [];
-      currentStepIdx = 0;
 
       if (animList.length > 0) {
         animList.sort((a, b) => (a.order - b.order) || (a.index - b.index));
 
         let currentGroup = [];
-        animList.forEach((item, itIdx) => {
+        animList.forEach((item) => {
           if (item.start === 'after') {
             item.isAfter = true;
             if (currentGroup.length > 0) {
@@ -1171,11 +1192,39 @@
           slideSteps.push(currentGroup);
         }
 
-        // Auto trigger first group if 'with'
-        if (slideSteps.length > 0 && slideSteps[0].length > 0 && slideSteps[0][0].start === 'with') {
-          executeStepGroup(slideSteps[0]);
-          currentStepIdx = 1;
+        // Apply target step state
+        if (targetStep === 'all') {
+          // Reveal all steps fully
+          slideSteps.forEach(group => {
+            group.forEach(item => {
+              item.node.style.visibility = 'visible';
+            });
+          });
+          currentStepIdx = slideSteps.length;
+        } else if (typeof targetStep === 'number') {
+          currentStepIdx = Math.max(0, Math.min(targetStep, slideSteps.length));
+          slideSteps.forEach((group, gIdx) => {
+            const isVisible = gIdx < currentStepIdx;
+            group.forEach(item => {
+              item.node.style.visibility = isVisible ? 'visible' : 'hidden';
+            });
+          });
+        } else {
+          // Default start of slide
+          currentStepIdx = 0;
+          slideSteps.forEach(group => {
+            group.forEach(item => {
+              item.node.style.visibility = 'hidden';
+            });
+          });
+          // Auto trigger first group if 'with'
+          if (slideSteps.length > 0 && slideSteps[0].length > 0 && slideSteps[0][0].start === 'with') {
+            executeStepGroup(slideSteps[0]);
+            currentStepIdx = 1;
+          }
         }
+      } else {
+        currentStepIdx = 0;
       }
 
       updateInfoDisplay();
@@ -1256,16 +1305,27 @@
       clearTimeout(autoTimer);
       clearChainedTimers();
       if (!slides.length) return;
-      if (currentStepIdx > 0) {
-        currentStepIdx--;
-        drawSlide();
-        for (let i = 0; i < currentStepIdx; i++) {
-          if (slideSteps[i]) executeStepGroup(slideSteps[i]);
+
+      // 1. If currently inside animation steps on this slide, step back!
+      if (slideSteps.length > 0 && currentStepIdx > 0) {
+        const hasAutoWith = slideSteps[0] && slideSteps[0][0] && slideSteps[0][0].start === 'with';
+        const minStep = hasAutoWith ? 1 : 0;
+        if (currentStepIdx > minStep) {
+          drawSlide(currentStepIdx - 1);
+          return;
         }
-        updateInfoDisplay();
-        return;
       }
+
+      // 2. Otherwise, jump to previous slide with all steps revealed!
       currentIndex = (currentIndex - 1 + slides.length) % slides.length;
+      drawSlide('all');
+    }
+
+    function advanceSlide(delta) {
+      clearTimeout(autoTimer);
+      clearChainedTimers();
+      if (!slides.length) return;
+      currentIndex = (currentIndex + delta + slides.length) % slides.length;
       drawSlide();
     }
 
@@ -1273,6 +1333,11 @@
       if (step > 0) advanceNext();
       else advancePrev();
     }
+
+    window.advanceNext = advanceNext;
+    window.advancePrev = advancePrev;
+    window.advanceSlide = advanceSlide;
+    window.drawSlide = drawSlide;
 
     function resizeStage() {
       const vw = window.innerWidth, vh = window.innerHeight;
@@ -1813,17 +1878,30 @@
           updateRemoteModalUI();
 
           function executeRemoteAction(action) {
+            const aiActive = isAIAssistantEnabled();
             if (action === 'next') {
-              if (window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
-                window.PresentationAIAssistant.animatedFlyToAction('#nextBtn, .next-btn, #stage', '✨ Next Slide ▶', 'Next slide!', () => advance(1));
+              if (aiActive && window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
+                window.PresentationAIAssistant.animatedFlyToAction('#nextBtn, .next-btn, #stage', '✨ Next ▶', 'Next!', () => advanceNext());
               } else {
-                advance(1);
+                advanceNext();
               }
             } else if (action === 'prev') {
-              if (window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
-                window.PresentationAIAssistant.animatedFlyToAction('#prevBtn, .prev-btn', '◀ Previous Slide', 'Previous slide!', () => advance(-1));
+              if (aiActive && window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
+                window.PresentationAIAssistant.animatedFlyToAction('#prevBtn, .prev-btn', '◀ Previous', 'Back!', () => advancePrev());
               } else {
-                advance(-1);
+                advancePrev();
+              }
+            } else if (action === 'nextSlide') {
+              if (aiActive && window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
+                window.PresentationAIAssistant.animatedFlyToAction('#stage', '⏭ Next Slide', 'Next slide!', () => advanceSlide(1));
+              } else {
+                advanceSlide(1);
+              }
+            } else if (action === 'prevSlide') {
+              if (aiActive && window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
+                window.PresentationAIAssistant.animatedFlyToAction('#stage', '⏮ Previous Slide', 'Previous slide!', () => advanceSlide(-1));
+              } else {
+                advanceSlide(-1);
               }
             } else if (action === 'fullscreen') {
               document.getElementById('fsBtn').click();
@@ -1873,17 +1951,30 @@
           lastExecutedCmdId = data.command.id;
           const cmd = data.command;
           if (cmd && cmd.action) {
+            const aiActive = isAIAssistantEnabled();
             if (cmd.action === 'next') {
-              if (window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
-                window.PresentationAIAssistant.animatedFlyToAction('#nextBtn, .next-btn, #stage', '✨ Next Slide ▶', 'Next slide!', () => advance(1));
+              if (aiActive && window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
+                window.PresentationAIAssistant.animatedFlyToAction('#nextBtn, .next-btn, #stage', '✨ Next ▶', 'Next!', () => advanceNext());
               } else {
-                advance(1);
+                advanceNext();
               }
             } else if (cmd.action === 'prev') {
-              if (window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
-                window.PresentationAIAssistant.animatedFlyToAction('#prevBtn, .prev-btn', '◀ Previous Slide', 'Previous slide!', () => advance(-1));
+              if (aiActive && window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
+                window.PresentationAIAssistant.animatedFlyToAction('#prevBtn, .prev-btn', '◀ Previous', 'Back!', () => advancePrev());
               } else {
-                advance(-1);
+                advancePrev();
+              }
+            } else if (cmd.action === 'nextSlide') {
+              if (aiActive && window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
+                window.PresentationAIAssistant.animatedFlyToAction('#stage', '⏭ Next Slide', 'Next slide!', () => advanceSlide(1));
+              } else {
+                advanceSlide(1);
+              }
+            } else if (cmd.action === 'prevSlide') {
+              if (aiActive && window.PresentationAIAssistant && window.PresentationAIAssistant.animatedFlyToAction) {
+                window.PresentationAIAssistant.animatedFlyToAction('#stage', '⏮ Previous Slide', 'Previous slide!', () => advanceSlide(-1));
+              } else {
+                advanceSlide(-1);
               }
             } else if (cmd.action === 'fullscreen') {
               document.getElementById('fsBtn').click();
@@ -1893,6 +1984,68 @@
         }
       } catch (_) {}
     }, 200);
+
+    // ── AI Assistant Management (Enable / Disable) ────────────────────
+    function isAIAssistantEnabled() {
+      try {
+        const val = localStorage.getItem('presentation_ai_doll_enabled');
+        if (val !== null) return val === 'true';
+      } catch (_) {}
+      return true;
+    }
+
+    function syncAIAssistantUI() {
+      const enabled = isAIAssistantEnabled();
+      const container = document.getElementById('ai-avatar-container');
+      const toggleBtn = document.getElementById('aiToggleBtn');
+      if (container) {
+        if (enabled) {
+          container.classList.remove('hidden-doll');
+          container.style.display = 'flex';
+        } else {
+          container.classList.add('hidden-doll');
+          container.style.display = 'none';
+        }
+      }
+      if (toggleBtn) {
+        if (enabled) {
+          toggleBtn.classList.remove('disabled');
+          toggleBtn.title = "AI Assistant Doll: Active (Click or press 'A' to Disable)";
+        } else {
+          toggleBtn.classList.add('disabled');
+          toggleBtn.title = "AI Assistant Doll: Disabled (Click or press 'A' to Enable)";
+        }
+      }
+    }
+
+    function toggleAIAssistant(forceState) {
+      const current = isAIAssistantEnabled();
+      const next = typeof forceState === 'boolean' ? forceState : !current;
+      try {
+        localStorage.setItem('presentation_ai_doll_enabled', next ? 'true' : 'false');
+      } catch (_) {}
+
+      syncAIAssistantUI();
+
+      if (next) {
+        showVoiceToast('🧚 AI Assistant Enabled', 'success', 2200);
+        if (window.PresentationAIAssistant && window.PresentationAIAssistant.showBubble) {
+          window.PresentationAIAssistant.showBubble('✨ Hello! AI Assistant is active.', 2500);
+        }
+      } else {
+        if (window.PresentationAIAssistant && window.PresentationAIAssistant.stopListening) {
+          window.PresentationAIAssistant.stopListening();
+        }
+        if (typeof window.speechSynthesis !== 'undefined') {
+          window.speechSynthesis.cancel();
+        }
+        showVoiceToast('🧚 AI Assistant Disabled', 'info', 2200);
+      }
+      return next;
+    }
+    window.isAIAssistantEnabled = isAIAssistantEnabled;
+    window.toggleAIAssistant = toggleAIAssistant;
+    setTimeout(syncAIAssistantUI, 500);
 
     // ── Mobile Remote Modal UI Helper ─────────────────────────────────
     function getCloudRemoteUrl() {
@@ -2073,17 +2226,20 @@
             '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;max-height:70vh;overflow-y:auto;padding-right:4px;">',
               '<div>',
                 '<strong style="color:#38bdf8;display:block;margin-bottom:6px;">NAVIGATION (স্লাইড কন্ট্রোল)</strong>',
-                '<div style="padding:4px 0;">Next Slide: <strong style="color:#ffd166;">→ / Space / Enter</strong></div>',
-                '<div style="padding:4px 0;">Prev Slide: <strong style="color:#ffd166;">← / Backspace</strong></div>',
+                '<div style="padding:4px 0;">Next Step / Slide: <strong style="color:#ffd166;">→ / Space / Enter</strong></div>',
+                '<div style="padding:4px 0;">Prev Step / Slide: <strong style="color:#ffd166;">← / Backspace</strong></div>',
+                '<div style="padding:4px 0;">Next Slide (Direct): <strong style="color:#ffd166;">PageDown / N</strong></div>',
+                '<div style="padding:4px 0;">Prev Slide (Direct): <strong style="color:#ffd166;">PageUp / P</strong></div>',
                 '<div style="padding:4px 0;">First Slide: <strong style="color:#ffd166;">Home</strong></div>',
                 '<div style="padding:4px 0;">Last Slide: <strong style="color:#ffd166;">End</strong></div>',
                 '<div style="padding:4px 0;">Fullscreen: <strong style="color:#ffd166;">F / F11</strong></div>',
               '</div>',
               '<div>',
                 '<strong style="color:#38bdf8;display:block;margin-bottom:6px;">FEATURES & AUDIO (ফিচার)</strong>',
+                '<div style="padding:4px 0;">AI Assistant (Doll On/Off): <strong style="color:#ffd166;">A</strong></div>',
+                '<div style="padding:4px 0;">Voice Mic: <strong style="color:#ffd166;">V</strong></div>',
                 '<div style="padding:4px 0;">Mute / Unmute: <strong style="color:#ffd166;">M</strong></div>',
                 '<div style="padding:4px 0;">Volume Up / Down: <strong style="color:#ffd166;">+ / -</strong></div>',
-                '<div style="padding:4px 0;">Voice Mic: <strong style="color:#ffd166;">V</strong></div>',
                 '<div style="padding:4px 0;">Slide List Drawer: <strong style="color:#ffd166;">L</strong></div>',
                 '<div style="padding:4px 0;">Close / Exit: <strong style="color:#ffd166;">Esc</strong></div>',
               '</div>',
@@ -2106,10 +2262,23 @@
     const scBtn = document.getElementById('shortcutsBtn');
     if (scBtn) scBtn.onclick = () => togglePlayerShortcuts();
 
+    const aiToggleBtn = document.getElementById('aiToggleBtn');
+    if (aiToggleBtn) aiToggleBtn.onclick = () => toggleAIAssistant();
+
     window.addEventListener('keydown', e => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
       if (e.key === '?' || e.key === 'F1') {
         e.preventDefault();
         togglePlayerShortcuts();
+      }
+      if (e.key === 'a' || e.key === 'A') {
+        toggleAIAssistant();
+      }
+      if (e.key === 'PageDown' || e.key === 'n' || e.key === 'N') {
+        advanceSlide(1);
+      }
+      if (e.key === 'PageUp' || e.key === 'p' || e.key === 'P') {
+        advanceSlide(-1);
       }
       if (e.key === 'Escape') {
         document.getElementById('playerShortcutsModal')?.remove();
