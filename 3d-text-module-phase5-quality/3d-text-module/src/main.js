@@ -36,6 +36,16 @@ import { initShapeStudio } from './shapeStudio.js';
 
 const statusNote = document.getElementById('statusNote');
 const colorTemplateBtn = document.getElementById('colorTemplateBtn');
+const promoTemplateBtn = document.getElementById('promoTemplateBtn');
+const promoTemplateMenu = document.getElementById('promoTemplateMenu');
+const bevelStyleGrid = document.getElementById('bevelStyleGrid');
+const dualColorToggle = document.getElementById('dualColorToggle');
+const dualColorGroup = document.getElementById('dualColorGroup');
+const sideColorPicker = document.getElementById('sideColorPicker');
+const metalnessRange = document.getElementById('metalnessRange');
+const metalnessValue = document.getElementById('metalnessValue');
+const roughnessRange = document.getElementById('roughnessRange');
+const roughnessValue = document.getElementById('roughnessValue');
 const colorTemplateMenu = document.getElementById('colorTemplateMenu');
 const saveProjectBtn = document.getElementById('saveProjectBtn');
 const loadProjectBtn = document.getElementById('loadProjectBtn');
@@ -642,6 +652,11 @@ function syncStudioText(newText) {
 
 const state = {
   bloomEnabled: false,
+  dualColorEnabled: false,
+  sideColor: '#0a192f',
+  bevelStyle: 'round',
+  customRoughness: null,
+  customMetalness: null,
   bloomStrength: 0.8,
   bloomRadius: 0.4,
   bloomThreshold: 0.2,
@@ -738,11 +753,42 @@ const CUBE_THEME_PRESETS = {
   premium: { color: '#f5f5f4', text: '#111827', border: '#d6d3d1', animation: 'spinY', speed: 1, boxSize: 140, textScale: 105 },
 };
 
+
+function getBevelParams(depth, q) {
+  const style = state.bevelStyle || 'round';
+  if (style === 'flat') {
+    return {
+      bevelEnabled: false,
+    };
+  }
+  if (style === 'chiseled') {
+    return {
+      bevelEnabled: true,
+      bevelThickness: Math.max(1.2, depth * 0.12),
+      bevelSize: Math.max(0.8, depth * 0.07),
+      bevelSegments: 1,
+    };
+  }
+  return {
+    bevelEnabled: true,
+    bevelThickness: Math.max(1, depth * 0.07),
+    bevelSize: Math.max(0.5, depth * 0.035),
+    bevelSegments: q.bevelSegments || 3,
+  };
+}
+
+function getActiveMaterials(primaryMat) {
+  if (!state.dualColorEnabled) return primaryMat;
+  const sideColor = state.sideColor || '#0a192f';
+  const sideMat = buildMaterial(state.materialType, sideColor, true);
+  return [primaryMat, sideMat];
+}
+
 function getBaseOpacity() {
   return state.materialType === 'glass' ? 0.55 : 1;
 }
 
-function buildMaterial(type, colorHex) {
+function buildMaterial(type, colorHex, isSide = false) {
   const color = new THREE.Color(colorHex);
   const refIntensity = state.reflectionsOn ? state.reflectionIntensity : 0;
 
@@ -1931,10 +1977,7 @@ function buildVectorTextMesh(validLines) {
           size: state.size,
           depth: state.depth,
           curveSegments: q.curveSegments,
-          bevelEnabled: true,
-          bevelThickness: Math.max(1, state.depth * 0.06),
-          bevelSize: Math.max(0.5, state.depth * 0.03),
-          bevelSegments: q.bevelSegments,
+          ...getBevelParams(state.depth, q),
         });
         g.computeBoundingBox();
         const w = (g.boundingBox && !isNaN(g.boundingBox.max.x)) ? Math.max(state.size * 0.2, g.boundingBox.max.x - g.boundingBox.min.x + state.size * 0.1) : state.size * 0.5;
@@ -1953,10 +1996,7 @@ function buildVectorTextMesh(validLines) {
           size: state.size,
           depth: state.depth,
           curveSegments: q.curveSegments,
-          bevelEnabled: true,
-          bevelThickness: Math.max(1, state.depth * 0.06),
-          bevelSize: Math.max(0.5, state.depth * 0.03),
-          bevelSegments: q.bevelSegments,
+          ...getBevelParams(state.depth, q),
         });
         referenceGeo.computeBoundingBox();
         const bb = referenceGeo.boundingBox;
@@ -1988,10 +2028,7 @@ function buildVectorTextMesh(validLines) {
           size: state.size,
           depth: state.depth,
           curveSegments: q.curveSegments,
-          bevelEnabled: true,
-          bevelThickness: Math.max(1, state.depth * 0.06),
-          bevelSize: Math.max(0.5, state.depth * 0.03),
-          bevelSegments: q.bevelSegments,
+          ...getBevelParams(state.depth, q),
         });
 
         charGeo.computeBoundingBox();
@@ -2012,7 +2049,7 @@ function buildVectorTextMesh(validLines) {
           : defaultMaterial;
         globalCharIdx++;
 
-        const charMesh = new THREE.Mesh(charGeo, charMat);
+        const charMesh = new THREE.Mesh(charGeo, getActiveMaterials(charMat));
         charMesh.castShadow = state.shadowsOn;
         charMesh.receiveShadow = state.shadowsOn;
         charMesh.position.set(
@@ -2032,10 +2069,7 @@ function buildVectorTextMesh(validLines) {
         size: state.size,
         depth: state.depth,
         curveSegments: q.curveSegments,
-        bevelEnabled: true,
-        bevelThickness: Math.max(1, state.depth * 0.06),
-        bevelSize: Math.max(0.5, state.depth * 0.03),
-        bevelSegments: q.bevelSegments,
+        ...getBevelParams(state.depth, q),
       });
 
       geometry.computeBoundingBox();
@@ -2045,7 +2079,7 @@ function buildVectorTextMesh(validLines) {
       }
       assignGeometryUVs(geometry);
 
-      const lineMesh = new THREE.Mesh(geometry, defaultMaterial);
+      const lineMesh = new THREE.Mesh(geometry, getActiveMaterials(defaultMaterial));
       lineMesh.castShadow = state.shadowsOn;
       lineMesh.receiveShadow = state.shadowsOn;
       lineMesh.position.y = lineY;
@@ -3996,10 +4030,7 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
               size: fontSize3D,
               depth: textDepth,
               curveSegments: q.curveSegments,
-              bevelEnabled: true,
-              bevelThickness: Math.max(0.8, textDepth * 0.05),
-              bevelSize: Math.max(0.4, textDepth * 0.025),
-              bevelSegments: q.bevelSegments,
+              ...getBevelParams(textDepth, q),
             });
             g.computeBoundingBox();
             const w = (g.boundingBox && !isNaN(g.boundingBox.max.x)) ? Math.max(fontSize3D * 0.2, g.boundingBox.max.x - g.boundingBox.min.x + fontSize3D * 0.05) : fontSize3D * 0.5;
@@ -4023,10 +4054,7 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
               size: fontSize3D,
               depth: textDepth,
               curveSegments: q.curveSegments,
-              bevelEnabled: true,
-              bevelThickness: Math.max(0.8, textDepth * 0.05),
-              bevelSize: Math.max(0.4, textDepth * 0.025),
-              bevelSegments: q.bevelSegments,
+              ...getBevelParams(textDepth, q),
             });
             charGeo.computeBoundingBox();
             if (charGeo.boundingBox && !isNaN(charGeo.boundingBox.min.x)) {
@@ -4057,10 +4085,7 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
               size: fontSize3D,
               depth: textDepth,
               curveSegments: q.curveSegments,
-              bevelEnabled: true,
-              bevelThickness: Math.max(0.8, textDepth * 0.05),
-              bevelSize: Math.max(0.4, textDepth * 0.025),
-              bevelSegments: q.bevelSegments,
+              ...getBevelParams(textDepth, q),
             });
             lineGeo.computeBoundingBox();
             if (lineGeo.boundingBox && !isNaN(lineGeo.boundingBox.min.x)) {
@@ -5251,6 +5276,11 @@ function saveStudioState() {
       reflectionsOn: state.reflectionsOn,
       reflectionIntensity: state.reflectionIntensity,
       bloomEnabled: state.bloomEnabled,
+      dualColorEnabled: state.dualColorEnabled,
+      sideColor: state.sideColor,
+      bevelStyle: state.bevelStyle,
+      customRoughness: state.customRoughness,
+      customMetalness: state.customMetalness,
       bloomStrength: state.bloomStrength,
       bloomRadius: state.bloomRadius,
       bloomThreshold: state.bloomThreshold,
@@ -5498,6 +5528,29 @@ function loadStudioState() {
       state.neonIntensity = saved.neonIntensity;
       neonIntensityRange.value = saved.neonIntensity;
       if (neonIntensityValue) neonIntensityValue.textContent = saved.neonIntensity;
+    }
+    if (saved.dualColorEnabled !== undefined && dualColorToggle) {
+      state.dualColorEnabled = saved.dualColorEnabled;
+      dualColorToggle.checked = saved.dualColorEnabled;
+      if (dualColorGroup) dualColorGroup.hidden = !state.dualColorEnabled;
+    }
+    if (saved.sideColor && sideColorPicker) {
+      state.sideColor = saved.sideColor;
+      sideColorPicker.value = saved.sideColor;
+    }
+    if (saved.bevelStyle && bevelStyleGrid) {
+      state.bevelStyle = saved.bevelStyle;
+      setActivePreset(bevelStyleGrid, 'bevel', saved.bevelStyle);
+    }
+    if (saved.customMetalness !== undefined && metalnessRange) {
+      state.customMetalness = saved.customMetalness;
+      metalnessRange.value = saved.customMetalness;
+      if (metalnessValue) metalnessValue.textContent = Number(saved.customMetalness).toFixed(2);
+    }
+    if (saved.customRoughness !== undefined && roughnessRange) {
+      state.customRoughness = saved.customRoughness;
+      roughnessRange.value = saved.customRoughness;
+      if (roughnessValue) roughnessValue.textContent = Number(saved.customRoughness).toFixed(2);
     }
     if (saved.bloomEnabled !== undefined && bloomToggle) {
       state.bloomEnabled = saved.bloomEnabled;
@@ -6107,6 +6160,150 @@ controls.addEventListener('start', () => {
     if (cameraAnimGrid) setActivePreset(cameraAnimGrid, 'camAnim', 'none');
   }
 });
+
+
+// ---------- Video Promo Templates ----------
+if (promoTemplateBtn && promoTemplateMenu) {
+  promoTemplateBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const expanded = promoTemplateBtn.getAttribute('aria-expanded') === 'true';
+    promoTemplateBtn.setAttribute('aria-expanded', String(!expanded));
+    promoTemplateMenu.hidden = expanded;
+  });
+
+  promoTemplateMenu.addEventListener('click', (e) => {
+    const item = e.target.closest('[data-promo-template]');
+    if (!item) return;
+    const templateId = item.dataset.promoTemplate;
+    applyVideoPromoTemplate(templateId);
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!promoTemplateMenu.hidden && !promoTemplateMenu.contains(e.target) && e.target !== promoTemplateBtn) {
+      promoTemplateMenu.hidden = true;
+      promoTemplateBtn.setAttribute('aria-expanded', 'false');
+    }
+  });
+}
+
+function applyVideoPromoTemplate(templateId) {
+  if (promoTemplateMenu) promoTemplateMenu.hidden = true;
+  if (promoTemplateBtn) promoTemplateBtn.setAttribute('aria-expanded', 'false');
+
+  if (templateId === 'megaSale') {
+    state.text = 'MEGA SALE 50% OFF';
+    syncStudioText('MEGA SALE 50% OFF');
+    state.colorMode = 'gradient';
+    state.gradientPreset = 'gold';
+    state.colorStart = '#ffd700';
+    state.colorEnd = '#ff4500';
+    state.materialType = 'metallic';
+    state.dualColorEnabled = true;
+    state.sideColor = '#1e1b4b';
+    state.bevelStyle = 'chiseled';
+    state.cameraAnim = 'dollyIn';
+  } else if (templateId === 'newCollection') {
+    state.text = 'NEW COLLECTION';
+    syncStudioText('NEW COLLECTION');
+    state.colorMode = 'gradient';
+    state.gradientPreset = 'silver';
+    state.colorStart = '#f8fafc';
+    state.colorEnd = '#94a3b8';
+    state.materialType = 'glossy';
+    state.dualColorEnabled = true;
+    state.sideColor = '#0f172a';
+    state.bevelStyle = 'round';
+    state.cameraAnim = 'breathe';
+  } else if (templateId === 'flashDeal') {
+    state.text = 'FLASH DEAL ⚡ 24H';
+    syncStudioText('FLASH DEAL ⚡ 24H');
+    state.colorMode = 'gradient';
+    state.gradientPreset = 'electricCyan';
+    state.colorStart = '#00f0ff';
+    state.colorEnd = '#3b82f6';
+    state.materialType = 'neon';
+    state.bloomEnabled = true;
+    if (bloomToggle) bloomToggle.checked = true;
+    state.dualColorEnabled = true;
+    state.sideColor = '#030712';
+    state.bevelStyle = 'chiseled';
+    state.cameraAnim = 'orbitSlow';
+  } else if (templateId === 'shopNow') {
+    state.contentMode = 'sticker';
+    state.stickerShape = 'pill';
+    state.stickerText = 'SHOP NOW 🛍️';
+    syncStudioText('SHOP NOW 🛍️');
+    state.stickerBgColor = '#dc2626';
+    state.stickerTextColor = '#ffffff';
+    state.stickerWith3DText = true;
+    state.materialType = 'glossy';
+    state.bevelStyle = 'round';
+    state.cameraAnim = 'none';
+  }
+
+  if (textInput) textInput.value = state.text;
+  if (stickerTextInput) stickerTextInput.value = state.stickerText;
+  if (colorModeSelect) colorModeSelect.value = state.colorMode;
+  if (gradientPresetSelect) gradientPresetSelect.value = state.gradientPreset;
+  if (dualColorToggle) dualColorToggle.checked = state.dualColorEnabled;
+  if (dualColorGroup) dualColorGroup.hidden = !state.dualColorEnabled;
+  if (sideColorPicker) sideColorPicker.value = state.sideColor;
+  if (bevelStyleGrid) setActivePreset(bevelStyleGrid, 'bevel', state.bevelStyle);
+  if (materialPresetGrid) setActivePreset(materialPresetGrid, 'material', state.materialType);
+  if (cameraAnimGrid) setActivePreset(cameraAnimGrid, 'camAnim', state.cameraAnim);
+  if (contentModeGrid) setActivePreset(contentModeGrid, 'content', state.contentMode);
+  if (textContentSection) textContentSection.hidden = state.contentMode !== 'text';
+  if (stickerContentSection) stickerContentSection.hidden = state.contentMode !== 'sticker';
+  applyBloomSettings();
+  rebuildTextMesh();
+  saveStudioStateDebounced();
+}
+
+if (bevelStyleGrid) {
+  bevelStyleGrid.addEventListener('click', (e) => {
+    const btn = e.target.closest('.preset-btn');
+    if (!btn) return;
+    state.bevelStyle = btn.dataset.bevel || 'round';
+    setActivePreset(bevelStyleGrid, 'bevel', state.bevelStyle);
+    rebuildTextMesh();
+    saveStudioStateDebounced();
+  });
+}
+
+if (dualColorToggle) {
+  dualColorToggle.addEventListener('change', () => {
+    state.dualColorEnabled = dualColorToggle.checked;
+    if (dualColorGroup) dualColorGroup.hidden = !state.dualColorEnabled;
+    rebuildTextMesh();
+    saveStudioStateDebounced();
+  });
+}
+
+if (sideColorPicker) {
+  sideColorPicker.addEventListener('input', () => {
+    state.sideColor = sideColorPicker.value;
+    rebuildTextMesh();
+    saveStudioStateDebounced();
+  });
+}
+
+if (metalnessRange) {
+  metalnessRange.addEventListener('input', () => {
+    state.customMetalness = Number(metalnessRange.value);
+    if (metalnessValue) metalnessValue.textContent = state.customMetalness.toFixed(2);
+    applyMaterial();
+    saveStudioStateDebounced();
+  });
+}
+
+if (roughnessRange) {
+  roughnessRange.addEventListener('input', () => {
+    state.customRoughness = Number(roughnessRange.value);
+    if (roughnessValue) roughnessValue.textContent = state.customRoughness.toFixed(2);
+    applyMaterial();
+    saveStudioStateDebounced();
+  });
+}
 
 resetCameraBtn.addEventListener('click', () => {
   state.cameraAnim = 'none';
@@ -7330,6 +7527,19 @@ function reset3DStudio() {
   controls.update();
   state.autoRotate = false;
   if (autoRotateToggle) autoRotateToggle.checked = false;
+  state.dualColorEnabled = false;
+  if (dualColorToggle) dualColorToggle.checked = false;
+  if (dualColorGroup) dualColorGroup.hidden = true;
+  state.sideColor = '#0a192f';
+  if (sideColorPicker) sideColorPicker.value = '#0a192f';
+  state.bevelStyle = 'round';
+  if (bevelStyleGrid) setActivePreset(bevelStyleGrid, 'bevel', 'round');
+  state.customRoughness = null;
+  state.customMetalness = null;
+  if (metalnessRange) metalnessRange.value = 0.35;
+  if (metalnessValue) metalnessValue.textContent = '0.35';
+  if (roughnessRange) roughnessRange.value = 0.22;
+  if (roughnessValue) roughnessValue.textContent = '0.22';
   state.bloomEnabled = false;
   if (bloomToggle) bloomToggle.checked = false;
   applyBloomSettings();

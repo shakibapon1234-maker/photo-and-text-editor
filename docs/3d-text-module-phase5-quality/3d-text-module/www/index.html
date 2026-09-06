@@ -20,6 +20,15 @@
           <button type="button" role="menuitem" data-template-color="#ffffff" data-template-label="Pure White"><i style="--template-color:#ffffff"></i><span>Pure White <small>#FFFFFF · 255, 255, 255</small></span></button>
         </div>
       </div>
+      <div class="color-template-wrap">
+        <button type="button" id="promoTemplateBtn" class="color-template-trigger" style="border-color:#38bdf8;color:#7dd3fc;" aria-expanded="false" aria-controls="promoTemplateMenu">🎬 ভিডিও প্রোমো টেমপ্লেট <span aria-hidden="true">▾</span></button>
+        <div id="promoTemplateMenu" class="color-template-menu" hidden role="menu" aria-label="ভিডিও প্রোমো টেমপ্লেট">
+          <button type="button" role="menuitem" data-promo-template="megaSale"><span>🔥 Mega Sale (৫০% ছাড়) <small>Gold 3D + Dark Contrast Side</small></span></button>
+          <button type="button" role="menuitem" data-promo-template="newCollection"><span>✨ New Collection (নতুন কালেকশন) <small>Platinum + Elegant Bevel</small></span></button>
+          <button type="button" role="menuitem" data-promo-template="flashDeal"><span>⚡ Flash Deal (ধামাকা অফার) <small>Electric Neon + Chiseled Cut</small></span></button>
+          <button type="button" role="menuitem" data-promo-template="shopNow"><span>🛍️ Shop Now (এখনই কিনুন) <small>3D Pill Badge + Crimson Red</small></span></button>
+        </div>
+      </div>
       <div class="project-actions" aria-label="প্রজেক্ট ফাইল">
         <button type="button" id="saveProjectBtn" class="project-action-btn" title="বর্তমান কাজ Project file হিসেবে সেভ করুন">💾 প্রজেক্ট সেভ</button>
         <button type="button" id="loadProjectBtn" class="project-action-btn" title="আগে সেভ করা Project file খুলুন">📂 প্রজেক্ট লোড</button>
@@ -539,6 +548,14 @@
           <input type="range" id="sizeRange" min="5" max="140" value="70" />
           <span class="field-value" id="sizeValue">70</span>
         </label>
+        <label class="field" style="margin-top: 8px;">
+          <span>বেভেল স্টাইল (Bevel Style)</span>
+          <div class="preset-grid preset-grid-3" id="bevelStyleGrid" style="margin-top: 4px;">
+            <button type="button" class="preset-btn active" data-bevel="round">সফট / রাউন্ড</button>
+            <button type="button" class="preset-btn" data-bevel="chiseled">হীরক / শার্প চিজেলড</button>
+            <button type="button" class="preset-btn" data-bevel="flat">ফ্ল্যাট / শার্প এজ</button>
+          </div>
+        </label>
       </section>
 
       <section class="panel-section">
@@ -620,6 +637,30 @@
             <option value="solid">এক কালার (Solid Color)</option>
           </select>
         </label>
+
+                <label class="field checkbox-field" style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
+          <input type="checkbox" id="dualColorToggle" />
+          <span>🎨 ডুয়াল-কালার ৩D (Face ও Side আলাদা কালার)</span>
+        </label>
+        <div id="dualColorGroup" hidden style="margin-top: 6px; background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 6px;">
+          <label class="field">
+            <span>সাইড এক্সট্রুশন কালার</span>
+            <input type="color" id="sideColorPicker" value="#0a192f" />
+          </label>
+        </div>
+
+        <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
+          <label class="field">
+            <span>মেটালিক রিফ্লেকশন</span>
+            <input type="range" id="metalnessRange" min="0" max="1" step="0.05" value="0.35" />
+            <span class="field-value" id="metalnessValue">0.35</span>
+          </label>
+          <label class="field">
+            <span>রাফনেস / গ্লস</span>
+            <input type="range" id="roughnessRange" min="0" max="1" step="0.05" value="0.22" />
+            <span class="field-value" id="roughnessValue">0.22</span>
+          </label>
+        </div>
 
         <div id="solidColorGroup" hidden>
           <label class="field">
@@ -1041,6 +1082,6 @@
     </aside>
   </div>
 
-  <script type="module" src="main.bundle.js?v=1788689564456"></script>
+  <script type="module" src="main.bundle.js?v=1788691181142"></script>
 </body>
 </html>
