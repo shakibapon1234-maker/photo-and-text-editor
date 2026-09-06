@@ -6,13 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Photo Editor by Shakib</title>
     <meta name="description" content="A powerful local photo editor to resize, adjust brightness, and crop images.">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+Bengali:wght@400;600;700;800;900&display=swap"
-        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-
-    <!-- Tesseract.js for OCR (Image to Text) -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-
     <!-- PWA / অফলাইন সাপোর্ট -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#121316">
@@ -1189,6 +1183,13 @@
                         </div>
 
                         <button class="btn btn-primary btn-action" id="collageGenerateBtn" disabled>🖼️ কোলাজ তৈরি করুন</button>
+                        <div class="result-preview" id="collageResultWrap" style="display:none; margin-top:14px; text-align:center;">
+                            <p class="field-note" style="margin-bottom:8px; font-weight:600; color:var(--text-primary);">✓ কোলাজ তৈরি সম্পন্ন হয়েছে:</p>
+                            <img id="collageResultThumb" style="max-width:100%; border-radius:8px; border:1.5px solid var(--border); box-shadow:0 4px 12px rgba(0,0,0,0.25);" alt="কোলাজ প্রিভিউ">
+                            <div style="margin-top:10px;">
+                                <button type="button" class="btn btn-success" id="collageDownloadBtn" style="width:100%;">⬇️ কোলাজ ডাউনলোড করুন</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1563,8 +1564,8 @@
             </div>
         </div>
     </div>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="jszip.min.js"></script>
+    <script src="../gif.js"></script>
     <script src="social-presets.js"></script>
     <script src="watermark.js"></script>
     <script src="collage.js"></script>

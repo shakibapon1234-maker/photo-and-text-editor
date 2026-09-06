@@ -33,7 +33,8 @@
             layout.text = {
                 fontPx,
                 x: Math.round(fx * canvasWidth),
-                y: Math.round(fy * canvasHeight)
+                y: Math.round(fy * canvasHeight),
+                rotation: Number(settings.textRotation) || 0
             };
         }
 
@@ -48,7 +49,8 @@
                 width,
                 height,
                 x: Math.round(fx * canvasWidth),
-                y: Math.round(fy * canvasHeight)
+                y: Math.round(fy * canvasHeight),
+                rotation: Number(settings.logoRotation) || 0
             };
         }
 
@@ -74,20 +76,18 @@
             // A soft shadow keeps the text legible over busy/light photo areas.
             ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
             ctx.shadowBlur = Math.max(2, layout.text.fontPx * 0.08);
-            ctx.fillText(settings.text, layout.text.x, layout.text.y);
+            ctx.translate(layout.text.x, layout.text.y);
+            ctx.rotate(layout.text.rotation * Math.PI / 180);
+            ctx.fillText(settings.text, 0, 0);
             ctx.restore();
         }
 
         if (layout.logo && logoImg) {
             ctx.save();
             ctx.globalAlpha = (settings.logoOpacity != null ? settings.logoOpacity : 100) / 100;
-            ctx.drawImage(
-                logoImg,
-                layout.logo.x - layout.logo.width / 2,
-                layout.logo.y - layout.logo.height / 2,
-                layout.logo.width,
-                layout.logo.height
-            );
+            ctx.translate(layout.logo.x, layout.logo.y);
+            ctx.rotate(layout.logo.rotation * Math.PI / 180);
+            ctx.drawImage(logoImg, -layout.logo.width / 2, -layout.logo.height / 2, layout.logo.width, layout.logo.height);
             ctx.restore();
         }
 

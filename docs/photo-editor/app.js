@@ -68,6 +68,16 @@
     const contrastValue = document.getElementById('contrastValue');
     const saturationSlider = document.getElementById('saturationSlider');
     const saturationValue = document.getElementById('saturationValue');
+    const hueSlider = document.getElementById('hueSlider');
+    const hueValue = document.getElementById('hueValue');
+    const blurSlider = document.getElementById('blurSlider');
+    const blurValue = document.getElementById('blurValue');
+    const vignetteSlider = document.getElementById('vignetteSlider');
+    const vignetteValue = document.getElementById('vignetteValue');
+    const exposureSlider = document.getElementById('exposureSlider');
+    const exposureValue = document.getElementById('exposureValue');
+    const temperatureSlider = document.getElementById('temperatureSlider');
+    const temperatureValue = document.getElementById('temperatureValue');
     const applyBrightness = document.getElementById('applyBrightness');
     const brightnessResult = document.getElementById('brightnessResult');
     const newBrightness = document.getElementById('newBrightness');
@@ -81,6 +91,7 @@
     let presetGrayscale = 0; // 0–1
     let presetSepia = 0;     // 0–1
     let presetHueRotate = 0; // degrees
+    let filterVignette = 0;  // 0–100
 
     // Crop Tool
     const cropX = document.getElementById('cropX');
@@ -97,6 +108,8 @@
     // Download
     const downloadSection = document.getElementById('downloadSection');
     const downloadBtn = document.getElementById('downloadBtn');
+    const sendToPresentationBtn = document.getElementById('sendToPresentationBtn');
+    const sendTo3dBtn = document.getElementById('sendTo3dBtn');
 
     // Toast
     const toast = document.getElementById('toast');
@@ -344,6 +357,23 @@
         saturationSlider.value = 100;
         saturationValue.textContent = '100';
         saturationSlider.style.setProperty('--slider-percent', '33.3%');
+        hueSlider.value = 0;
+        hueValue.textContent = '0';
+        hueSlider.style.setProperty('--slider-percent', '50%');
+        blurSlider.value = 0;
+        blurValue.textContent = '0';
+        blurSlider.style.setProperty('--slider-percent', '0%');
+        vignetteSlider.value = 0;
+        vignetteValue.textContent = '0';
+        vignetteSlider.style.setProperty('--slider-percent', '0%');
+        filterVignette = 0;
+        exposureSlider.value = 0;
+        exposureValue.textContent = '0';
+        exposureSlider.style.setProperty('--slider-percent', '50%');
+        temperatureSlider.value = 0;
+        temperatureValue.textContent = '0';
+        temperatureSlider.style.setProperty('--slider-percent', '50%');
+        previewImage.style.filter = 'none';
 
         // Phase 8: clear any active filter preset (grayscale/sepia/hue-rotate)
         // and its highlighted button so a fresh upload always starts neutral.
@@ -661,8 +691,39 @@
     // ============================================
 
     function updateSliderPercent(slider) {
-        const percent = (slider.value / slider.max) * 100;
+        const min = Number(slider.min || 0);
+        const max = Number(slider.max || 100);
+        const percent = ((Number(slider.value) - min) / (max - min)) * 100;
         slider.style.setProperty('--slider-percent', percent + '%');
+    }
+
+    // Show adjustment changes immediately while the sliders move. The Apply
+    // button below still commits the same values into the exported image.
+    function updateBrightnessLivePreview() {
+        if (!originalImage) return;
+        const brightness = parseInt(brightnessSlider.value, 10) / 100;
+        const contrast = parseInt(contrastSlider.value, 10) / 100;
+        const saturation = parseInt(saturationSlider.value, 10) / 100;
+        brightnessValue.textContent = brightnessSlider.value;
+        contrastValue.textContent = contrastSlider.value;
+        saturationValue.textContent = saturationSlider.value;
+        hueValue.textContent = hueSlider.value;
+        blurValue.textContent = blurSlider.value;
+        vignetteValue.textContent = vignetteSlider.value;
+        exposureValue.textContent = exposureSlider.value;
+        temperatureValue.textContent = temperatureSlider.value;
+        updateSliderPercent(brightnessSlider);
+        updateSliderPercent(contrastSlider);
+        updateSliderPercent(saturationSlider);
+        updateSliderPercent(hueSlider);
+        updateSliderPercent(blurSlider);
+        updateSliderPercent(vignetteSlider);
+        updateSliderPercent(exposureSlider);
+        updateSliderPercent(temperatureSlider);
+        previewImage.style.filter = buildFilterString(
+            brightness, contrast, saturation,
+            presetGrayscale, presetSepia, presetHueRotate + Number(hueSlider.value), Number(blurSlider.value)
+        );
     }
 
     // Phase 8: PURE function — builds the ctx.filter CSS string from plain
@@ -673,11 +734,12 @@
     // as a no-op grayscale(0)/sepia(0)/hue-rotate(0deg), keeping the
     // filter string identical to the pre-Phase-8 output when no filter
     // preset is active.
-    function buildFilterString(brightness, contrast, saturation, grayscale, sepia, hueRotate) {
+    function buildFilterString(brightness, contrast, saturation, grayscale, sepia, hueRotate, blur) {
         let filter = `brightness(${brightness}) contrast(${contrast}) saturate(${saturation})`;
         if (grayscale) filter += ` grayscale(${grayscale})`;
         if (sepia) filter += ` sepia(${sepia})`;
         if (hueRotate) filter += ` hue-rotate(${hueRotate}deg)`;
+        if (blur) filter += ` blur(${blur}px)`;
         return filter;
     }
 
@@ -744,7 +806,16 @@
             presetGrayscale = parseFloat(btn.dataset.g || 0);
             presetSepia = parseFloat(btn.dataset.sp || 0);
             presetHueRotate = parseFloat(btn.dataset.h || 0);
+            hueSlider.value = 0;
+            blurSlider.value = btn.dataset.bl || 0;
+            vignetteSlider.value = btn.dataset.v || 0;
+            filterVignette = Number(vignetteSlider.value);
+            updateBrightnessLivePreview();
         });
+    });
+
+    [brightnessSlider, contrastSlider, saturationSlider, hueSlider, blurSlider, vignetteSlider, exposureSlider, temperatureSlider].forEach(slider => {
+        slider.addEventListener('input', updateBrightnessLivePreview);
     });
 
     // Phase 18: auto-enhance button
@@ -783,6 +854,12 @@
             presetGrayscale = 0;
             presetSepia = 0;
             presetHueRotate = 0;
+            hueSlider.value = 0;
+            blurSlider.value = 0;
+            vignetteSlider.value = 0;
+            filterVignette = 0;
+            exposureSlider.value = 0;
+            temperatureSlider.value = 0;
             document.querySelectorAll('.preset-btn-bright').forEach(b => b.classList.remove('active'));
 
             showToast(`✨ অটো ফিক্স: Brightness ${settings.brightness}%, Contrast ${settings.contrast}%, Saturation ${settings.saturation}% — "অ্যাপ্লাই করুন" চাপুন`);
@@ -801,14 +878,39 @@
         setTimeout(() => {
             canvas.width = originalWidth;
             canvas.height = originalHeight;
-            ctx.filter = buildFilterString(brightness, contrast, saturation, presetGrayscale, presetSepia, presetHueRotate);
+            ctx.filter = buildFilterString(brightness, contrast, saturation, presetGrayscale, presetSepia, presetHueRotate + Number(hueSlider.value), Number(blurSlider.value));
             ctx.drawImage(originalImage, 0, 0);
             ctx.filter = 'none';
 
+            const exposure = Number(exposureSlider.value);
+            const temperature = Number(temperatureSlider.value);
+            if (exposure || temperature) {
+                const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const gain = Math.pow(2, exposure / 100);
+                const temp = temperature * 0.7;
+                for (let i = 0; i < pixels.data.length; i += 4) {
+                    pixels.data[i] = Math.max(0, Math.min(255, pixels.data[i] * gain + temp));
+                    pixels.data[i + 1] = Math.max(0, Math.min(255, pixels.data[i + 1] * gain));
+                    pixels.data[i + 2] = Math.max(0, Math.min(255, pixels.data[i + 2] * gain - temp));
+                }
+                ctx.putImageData(pixels, 0, 0);
+            }
+
+            filterVignette = Number(vignetteSlider.value);
+            if (filterVignette > 0) {
+                const strength = filterVignette / 100;
+                const gradient = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, Math.min(canvas.width, canvas.height) * 0.15, canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.72);
+                gradient.addColorStop(0, 'rgba(0,0,0,0)');
+                gradient.addColorStop(1, `rgba(0,0,0,${(strength * 0.75).toFixed(3)})`);
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
             canvas.toBlob(blob => {
+                previewImage.style.filter = 'none';
                 processedBlob = blob;
                 brightnessResult.style.display = 'block';
-                newBrightness.textContent = `B:${brightnessSlider.value}% C:${contrastSlider.value}% S:${saturationSlider.value}%`;
+                newBrightness.textContent = `B:${brightnessSlider.value}% C:${contrastSlider.value}% S:${saturationSlider.value}% H:${hueSlider.value}°`;
                 downloadSection.style.display = 'block';
                 updatePreview(blob);
                 pushHistory(blob, `ব্রাইটনেস/কন্ট্রাস্ট/স্যাচুরেশন পরিবর্তন`);
@@ -1205,7 +1307,7 @@
         }
 
         const ext = processedBlob.type.split('/')[1] === 'jpeg' ? 'jpg' : processedBlob.type.split('/')[1];
-        const baseName = originalFile.name.replace(/\.[^/.]+$/, '');
+        const baseName = (originalFile?.name || 'edited-image').replace(/\.[^/.]+$/, '');
         const fileName = `${baseName}_edited.${ext}`;
 
         const url = URL.createObjectURL(processedBlob);
@@ -1215,10 +1317,52 @@
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
 
         showToast('📁 ফাইল ডাউনলোড হচ্ছে!', 'success');
     });
+
+    // Shared local Asset Library for the desktop suite. This avoids a
+    // download/upload round trip: the current edited image becomes available
+    // in Presentation Studio immediately (same Electron origin/localStorage).
+    const PRESENTATION_ASSET_KEY = 'presentation-studio-assets-v1';
+    function sendCurrentImageToPresentation() {
+        const source = processedBlob || originalFile;
+        if (!source) {
+            showToast('আগে একটি ছবি আপলোড বা এডিট করুন', 'error');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const assets = JSON.parse(localStorage.getItem(PRESENTATION_ASSET_KEY) || '[]');
+                if (!assets.some(asset => asset.src === reader.result)) {
+                    assets.push({ src: reader.result, added: Date.now(), name: originalFile?.name || 'Photo Editor image' });
+                    localStorage.setItem(PRESENTATION_ASSET_KEY, JSON.stringify(assets.slice(-30)));
+                }
+                localStorage.setItem('presentation-studio-pending-asset-v1', JSON.stringify({ src: reader.result, added: Date.now(), name: originalFile?.name || 'Photo Editor image' }));
+                showToast('📊 ছবিটি Presentation Asset Library-তে পাঠানো হয়েছে', 'success');
+            } catch (_) {
+                showToast('❌ Presentation asset save করা যায়নি', 'error');
+            }
+        };
+        reader.readAsDataURL(source);
+    }
+    if (sendToPresentationBtn) sendToPresentationBtn.addEventListener('click', sendCurrentImageToPresentation);
+
+    function sendCurrentImageTo3D() {
+        const source = processedBlob || originalFile;
+        if (!source) { showToast('আগে একটি ছবি আপলোড বা এডিট করুন', 'error'); return; }
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                localStorage.setItem('3d-studio-pending-image-v1', reader.result);
+                showToast('🧊 ছবিটি 3D Studio-তে পাঠানো হয়েছে — 3D tab খুলুন', 'success');
+            } catch (_) { showToast('❌ 3D Studio-তে পাঠানো যায়নি', 'error'); }
+        };
+        reader.readAsDataURL(source);
+    }
+    if (sendTo3dBtn) sendTo3dBtn.addEventListener('click', sendCurrentImageTo3D);
 
     // ============================================
     // Utilities
@@ -1583,7 +1727,9 @@
         if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
         if (!(e.ctrlKey || e.metaKey)) return;
         const key = e.key.toLowerCase();
-        if (key === 'z' && !e.shiftKey) { e.preventDefault(); undoEdit(); }
+        if (key === 'p' && e.shiftKey) { e.preventDefault(); sendCurrentImageToPresentation(); }
+        else if (key === '3' && e.shiftKey) { e.preventDefault(); sendCurrentImageTo3D(); }
+        else if (key === 'z' && !e.shiftKey) { e.preventDefault(); undoEdit(); }
         else if (key === 'y' || (key === 'z' && e.shiftKey)) { e.preventDefault(); redoEdit(); }
     });
 
@@ -3562,9 +3708,75 @@
             wandActionBtns.style.display = 'flex';
         }
 
-        function applyWandAction(mode) {
+        // GIF files used to be flattened because canvas exports only one GIF
+        // frame. WebCodecs decodes every source frame and gif.js encodes the
+        // edited frames back into an actual animated GIF.
+        async function applyWandToGif(mode, w, h) {
+            if (!window.ImageDecoder || !window.GIF || !originalFile) {
+                throw new Error('এই browser-এ animated GIF export সাপোর্ট নেই');
+            }
+            const decoder = new ImageDecoder({ data: await originalFile.arrayBuffer(), type: 'image/gif' });
+            await decoder.tracks.ready;
+            const track = decoder.tracks.selectedTrack;
+            const frameCount = track.frameCount || 1;
+            const gif = new GIF({ workers: 2, quality: 10, width: w, height: h, repeat: 0, transparent: 0x00ff00, workerScript: '../gif.worker.js' });
+            const fill = mode === 'fill' ? hexToRgb(wandFillColor.value) : null;
+            const work = document.createElement('canvas');
+            work.width = w; work.height = h;
+            const workCtx = work.getContext('2d', { willReadFrequently: true });
+            for (let frameIndex = 0; frameIndex < frameCount; frameIndex++) {
+                const decoded = await decoder.decode({ frameIndex });
+                const bitmap = decoded.image;
+                workCtx.clearRect(0, 0, w, h);
+                workCtx.drawImage(bitmap, 0, 0, w, h);
+                const pixels = workCtx.getImageData(0, 0, w, h);
+                for (let i = 0; i < w * h; i++) {
+                    if (!wandMask[i]) continue;
+                    const p = i * 4;
+                    if (mode === 'remove') {
+                        // GIF supports one transparent colour. Reserve vivid
+                        // green for it, then tell gif.js to make it transparent.
+                        pixels.data[p] = 0; pixels.data[p + 1] = 255; pixels.data[p + 2] = 0; pixels.data[p + 3] = 255;
+                    } else {
+                        pixels.data[p] = fill.r; pixels.data[p + 1] = fill.g; pixels.data[p + 2] = fill.b; pixels.data[p + 3] = 255;
+                    }
+                }
+                workCtx.putImageData(pixels, 0, 0);
+                gif.addFrame(workCtx, { copy: true, delay: Math.max(20, Math.round((decoded.image.duration || 100000) / 1000)) });
+                decoded.image.close?.();
+                showToast(`GIF frame প্রসেস হচ্ছে: ${frameIndex + 1}/${frameCount}`, 'success');
+            }
+            decoder.close();
+            return new Promise((resolve, reject) => {
+                gif.on('finished', resolve);
+                gif.on('abort', () => reject(new Error('GIF export বন্ধ হয়েছে')));
+                gif.render();
+            });
+        }
+
+        async function applyWandAction(mode) {
             if (!wandMask) return;
             const w = wandMaskW, h = wandMaskH;
+            if (originalFile?.type === 'image/gif') {
+                try {
+                    wandStatus.textContent = '⏳ Animated GIF-এর সব frame process হচ্ছে…';
+                    const gifBlob = await applyWandToGif(mode, w, h);
+                    processedBlob = gifBlob;
+                    const url = URL.createObjectURL(gifBlob);
+                    originalImage = new Image();
+                    originalImage.src = url;
+                    previewImage.src = url;
+                    downloadSection.style.display = 'block';
+                    downloadBtn.setAttribute('data-ext', 'gif');
+                    pushHistory(gifBlob, mode === 'remove' ? 'Animated GIF Magic Wand → Remove' : 'Animated GIF Magic Wand → Fill');
+                    showToast('✅ Animated GIF তৈরি হয়েছে — এখন GIF হিসেবেই ডাউনলোড হবে।', 'success');
+                    deactivateWand();
+                    return;
+                } catch (error) {
+                    showToast(`❌ GIF export করা যায়নি: ${error.message}`, 'error');
+                    return;
+                }
+            }
             canvas.width = w; canvas.height = h;
             ctx.clearRect(0, 0, w, h);
             ctx.drawImage(originalImage, 0, 0, w, h);
@@ -4110,6 +4322,7 @@
         const applyWatermarkBtn = document.getElementById('applyWatermark');
         const wmOverlay = document.getElementById('wmOverlay');
         const wmTextHandle = document.getElementById('wmTextHandle');
+        const wmTextHandleLabel = document.getElementById('wmTextHandleLabel');
         const wmLogoHandle = document.getElementById('wmLogoHandle');
         const wmLogoHandleImg = document.getElementById('wmLogoHandleImg');
         const wmTemplateGrid = document.getElementById('wmTemplateGrid');
@@ -4123,6 +4336,8 @@
 
         let wmTextPos = { fx: 0.88, fy: 0.88 };
         let wmLogoPos = { fx: 0.88, fy: 0.88 };
+        let wmTextRotation = 0;
+        let wmLogoRotation = 0;
         let wmLogoImage = null;   // loaded HTMLImageElement for the uploaded logo
         let wmLogoAspect = 1;     // naturalHeight / naturalWidth, for preserving logo proportions
 
@@ -4171,9 +4386,10 @@
             const rect = getImageDisplayRect();
             const refDim = Math.min(rect.width, rect.height);
             const fontPx = Math.max(8, Math.round(refDim * (parseFloat(wmFontSize.value) / 100)));
-            wmTextHandle.textContent = wmText.value || 'নমুনা টেক্সট';
+            wmTextHandleLabel.textContent = wmText.value || 'নমুনা টেক্সট';
             wmTextHandle.style.left = (wmTextPos.fx * 100) + '%';
             wmTextHandle.style.top = (wmTextPos.fy * 100) + '%';
+            wmTextHandle.style.transform = `translate(-50%, -50%) rotate(${wmTextRotation}deg)`;
             wmTextHandle.style.fontSize = fontPx + 'px';
             wmTextHandle.style.fontFamily = wmFontFamily.value;
             wmTextHandle.style.fontWeight = wmFontFamily.value.includes('Noto Sans Bengali') ? '900' : '700';
@@ -4195,6 +4411,7 @@
             wmLogoHandleImg.style.height = height + 'px';
             wmLogoHandle.style.left = (wmLogoPos.fx * 100) + '%';
             wmLogoHandle.style.top = (wmLogoPos.fy * 100) + '%';
+            wmLogoHandle.style.transform = `translate(-50%, -50%) rotate(${wmLogoRotation}deg)`;
             wmLogoHandle.style.opacity = parseFloat(wmLogoOpacity.value) / 100;
             wmLogoHandle.style.display = 'block';
         }
@@ -4292,12 +4509,9 @@
         wirePositionGrid(wmTextPositionGrid, wmTextPos, updateTextHandle);
         wirePositionGrid(wmLogoPositionGrid, wmLogoPos, updateLogoHandle);
 
-        // ---------- Free-drag positioning ----------
-        // Same "fixed element + JS-computed left/top from the pointer"
-        // approach as the eyedropper loupe, adapted to set a persistent
-        // fx/fy anchor (0–1) instead of a one-off cursor-follow position.
-        function wireDrag(handle, posState, grid, onMove) {
-            let dragging = false;
+        // ---------- Direct mouse transform: move, corner-resize, rotate ----------
+        function wireTransform(handle, posState, grid, onMove, sizeInput, minSize, maxSize, getRotation, setRotation) {
+            let interaction = null;
 
             function clientToFraction(clientX, clientY) {
                 const rect = getImageDisplayRect();
@@ -4310,36 +4524,61 @@
                 return { fx, fy };
             }
 
+            function getCenter() {
+                const rect = handle.getBoundingClientRect();
+                return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            }
+
             function onPointerMove(e) {
-                if (!dragging) return;
-                const pt = clientToFraction(e.clientX, e.clientY);
-                if (!pt) return;
-                posState.fx = pt.fx;
-                posState.fy = pt.fy;
+                if (!interaction) return;
+                if (interaction.kind === 'move') {
+                    const pt = clientToFraction(e.clientX, e.clientY);
+                    if (!pt) return;
+                    posState.fx = pt.fx;
+                    posState.fy = pt.fy;
+                } else if (interaction.kind === 'resize') {
+                    const distance = Math.max(1, Math.hypot(e.clientX - interaction.center.x, e.clientY - interaction.center.y));
+                    sizeInput.value = String(Math.max(minSize, Math.min(maxSize, interaction.size * distance / interaction.distance)));
+                    refreshSliderLabels();
+                } else if (interaction.kind === 'rotate') {
+                    const angle = Math.atan2(e.clientY - interaction.center.y, e.clientX - interaction.center.x) * 180 / Math.PI + 90;
+                    setRotation(Math.round(angle));
+                }
                 onMove();
             }
 
             function onPointerUp() {
-                if (!dragging) return;
-                dragging = false;
+                if (!interaction) return;
+                const moved = interaction.kind === 'move';
+                interaction = null;
                 handle.classList.remove('dragging');
-                // A manual drag no longer matches any 9-grid preset exactly —
-                // clear the active highlight so the grid doesn't lie about it.
-                if (grid) grid.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                if (moved && grid) grid.querySelectorAll('button').forEach(b => b.classList.remove('active'));
                 document.removeEventListener('pointermove', onPointerMove);
                 document.removeEventListener('pointerup', onPointerUp);
             }
 
             handle.addEventListener('pointerdown', (e) => {
+                if (e.button !== undefined && e.button !== 0) return;
                 e.preventDefault();
-                dragging = true;
+                const actionControl = e.target.closest('[data-wm-action]');
+                const kind = actionControl ? actionControl.dataset.wmAction : 'move';
+                const center = getCenter();
+                interaction = {
+                    kind,
+                    center,
+                    size: Number(sizeInput.value),
+                    distance: Math.max(1, Math.hypot(e.clientX - center.x, e.clientY - center.y)),
+                    rotation: getRotation()
+                };
                 handle.classList.add('dragging');
                 document.addEventListener('pointermove', onPointerMove);
                 document.addEventListener('pointerup', onPointerUp);
             });
         }
-        wireDrag(wmTextHandle, wmTextPos, wmTextPositionGrid, updateTextHandle);
-        wireDrag(wmLogoHandle, wmLogoPos, wmLogoPositionGrid, updateLogoHandle);
+        wireTransform(wmTextHandle, wmTextPos, wmTextPositionGrid, updateTextHandle, wmFontSize, 2, 20,
+            () => wmTextRotation, (value) => { wmTextRotation = value; });
+        wireTransform(wmLogoHandle, wmLogoPos, wmLogoPositionGrid, updateLogoHandle, wmLogoScale, 5, 60,
+            () => wmLogoRotation, (value) => { wmLogoRotation = value; });
 
         // ---------- Tab / image lifecycle ----------
         document.addEventListener('app:tabchange', syncOverlayVisibility);
@@ -4358,11 +4597,13 @@
                 color: wmTextColor.value,
                 textOpacity: parseFloat(wmTextOpacity.value),
                 textPos: { fx: wmTextPos.fx, fy: wmTextPos.fy },
+                textRotation: wmTextRotation,
                 logoEnabled: wmLogoEnabled.checked,
                 logoScaleRatio: parseFloat(wmLogoScale.value) / 100,
                 logoAspect: wmLogoAspect,
                 logoOpacity: parseFloat(wmLogoOpacity.value),
-                logoPos: { fx: wmLogoPos.fx, fy: wmLogoPos.fy }
+                logoPos: { fx: wmLogoPos.fx, fy: wmLogoPos.fy },
+                logoRotation: wmLogoRotation
             };
         }
 
@@ -4955,6 +5196,20 @@
             return ocrFileInput.files[0];
         }
 
+        let ocrEnginePromise = null;
+        function loadOcrEngine() {
+            if (window.Tesseract) return Promise.resolve(window.Tesseract);
+            if (ocrEnginePromise) return ocrEnginePromise;
+            ocrEnginePromise = new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+                script.onload = () => window.Tesseract ? resolve(window.Tesseract) : reject(new Error('OCR engine did not load'));
+                script.onerror = () => reject(new Error('OCR engine could not be downloaded'));
+                document.head.appendChild(script);
+            });
+            return ocrEnginePromise;
+        }
+
         ocrRunBtn.addEventListener('click', async () => {
             if (isOcrRunning) return;
 
@@ -4971,6 +5226,7 @@
             ocrStatus.textContent = 'প্রসেস করছে... (প্রথমবারে ল্যাঙ্গুয়েজ ডাউনলোড হতে পারে)';
 
             try {
+                const Tesseract = await loadOcrEngine();
                 const worker = await Tesseract.createWorker(lang, 1, {
                     logger: m => {
                         if (m.status === 'recognizing text') {
