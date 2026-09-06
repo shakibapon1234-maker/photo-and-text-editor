@@ -11,16 +11,9 @@
   function selectSlide(index, event) {
     event?.preventDefault(); event?.stopImmediatePropagation();
     if (index < 0 || index >= slides.length) return;
-    const token = ++navigationToken;
-    const apply = () => {
-      if (token !== navigationToken || index >= slides.length) return;
-      current = index; selected = null; drag = null;
-      render();
-    };
-    apply();
-    requestAnimationFrame(apply);
-    setTimeout(apply, 40);
-    setTimeout(() => { if (token === navigationToken) navigationToken = 0; }, 160);
+    if (current === index && !selected) return;
+    current = index; selected = null; drag = null;
+    render();
   }
 
   function removeSlide(index, event) {
@@ -48,12 +41,32 @@
     if (event.key === 'ArrowDown') { selectSlide(Math.min(slides.length - 1, current + 1), event); }
   }, true);
 
-  // ── MASTER HIGH-FIDELITY SLIDE THUMBNAIL RENDERER ──
-  window.renderSlideThumbnailsMaster = function () {
+  // ── MASTER HIGH-FIDELITY SLIDE THUMBNAIL RENDERER (ULTRA OPTIMIZED) ──
+  let _thumbRaf = null;
+
+  function doRenderSlideThumbnails() {
     if (window.__presentationLiveDrag) return;
 
     const list = $('slideList');
     if (!list) return;
+
+    // Fast-path: if thumbnail count matches slides count and only active slide index changed
+    const existingThumbs = list.children;
+    if (existingThumbs.length === slides.length && window.__onlyActiveSlideChanged) {
+      window.__onlyActiveSlideChanged = false;
+      for (let idx = 0; idx < existingThumbs.length; idx++) {
+        existingThumbs[idx].classList.toggle('active', idx === current);
+      }
+      const box = $('slideQuickNavList');
+      if (box) {
+        const rows = box.querySelectorAll('.slide-quick-row button:first-child');
+        rows.forEach((btn, idx) => {
+          btn.textContent = (idx === current ? '▶ ' : '') + (idx + 1) + '. Slide';
+        });
+      }
+      return;
+    }
+    window.__onlyActiveSlideChanged = false;
 
     const getBrollBg = window.getBrollPresetGradient || (p => {
       const map = {
@@ -67,7 +80,7 @@
       return map[p] || null;
     });
 
-    list.innerHTML = '';
+    list.replaceChildren();
     slides.forEach((s, i) => {
       const thumb = document.createElement('div');
       thumb.className = 'slide-thumb' + (i === current ? ' active' : '');
@@ -116,18 +129,15 @@
         const mediaWrap = document.createElement('div');
         mediaWrap.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:1;opacity:' + (Number(s.bgMediaOpacity ?? 100) / 100) + ';';
         if (s.bgMediaType === 'video') {
-          const vid = document.createElement('video');
-          vid.src = s.bgMedia;
-          vid.muted = true;
-          vid.autoplay = true;
-          vid.loop = true;
-          vid.playsInline = true;
-          vid.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
-          vid.play().catch(() => {});
-          mediaWrap.appendChild(vid);
+          // High performance: Do NOT run hardware video decoders on 20+ sidebar thumbnails!
+          const vidPoster = document.createElement('div');
+          vidPoster.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;background:linear-gradient(135deg,rgba(15,23,42,0.85),rgba(30,41,59,0.95));display:flex;flex-direction:column;align-items:center;justify-content:center;color:#38bdf8;font-size:9px;font-weight:700;letter-spacing:0.5px;';
+          vidPoster.innerHTML = '<span style="font-size:16px;margin-bottom:2px">🎬</span><span>VIDEO BG</span>';
+          mediaWrap.appendChild(vidPoster);
         } else {
           const img = document.createElement('img');
           img.src = s.bgMedia;
+          img.loading = 'lazy';
           img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
           mediaWrap.appendChild(img);
         }
@@ -182,18 +192,14 @@
         } else if (el.type === 'image') {
           const img = document.createElement('img');
           img.src = el.src;
+          img.loading = 'lazy';
           img.style.cssText = 'width:100%;height:100%;display:block;object-fit:cover;';
           elBox.appendChild(img);
         } else if (el.type === 'video') {
-          const vid = document.createElement('video');
-          vid.src = el.src;
-          vid.muted = true;
-          vid.autoplay = true;
-          vid.loop = true;
-          vid.playsInline = true;
-          vid.style.cssText = 'width:100%;height:100%;display:block;object-fit:cover;';
-          vid.play().catch(() => {});
-          elBox.appendChild(vid);
+          const vBox = document.createElement('div');
+          vBox.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,0.85);border:1px dashed #38bdf8;border-radius:2px;color:#38bdf8;font-size:7px;font-weight:700;';
+          vBox.innerHTML = '▶ Video';
+          elBox.appendChild(vBox);
         } else if (el.type === 'table') {
           const table = document.createElement('table');
           table.style.cssText = 'width:100%;height:100%;border-collapse:collapse;table-layout:fixed;background:#fff;font-size:3px;color:#17223a;';
@@ -266,9 +272,23 @@
       row.appendChild(open);
       box.appendChild(row);
     });
+  }
+
+  window.renderSlideThumbnailsMaster = function (immediate = false) {
+    if (window.__presentationLiveDrag) return;
+    if (immediate) {
+      if (_thumbRaf) { cancelAnimationFrame(_thumbRaf); _thumbRaf = null; }
+      doRenderSlideThumbnails();
+      return;
+    }
+    if (_thumbRaf) return;
+    _thumbRaf = requestAnimationFrame(() => {
+      _thumbRaf = null;
+      doRenderSlideThumbnails();
+    });
   };
 
-  renderSlides = function() { window.renderSlideThumbnailsMaster(); };
+  renderSlides = function(immediate = false) { window.renderSlideThumbnailsMaster(immediate); };
   window.renderSlides = renderSlides;
-  window.renderSlideThumbnailsMaster();
+  window.renderSlideThumbnailsMaster(true);
 })();

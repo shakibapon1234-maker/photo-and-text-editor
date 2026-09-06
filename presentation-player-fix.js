@@ -811,6 +811,12 @@
 
       idx = singleSlideOnly ? (current || 0) : (((i % slides.length) + slides.length) % slides.length);
       const sl = slides[idx];
+
+      // Release hardware decoders for any previous videos before replacing slide
+      const prevVids = stage.querySelectorAll('video');
+      prevVids.forEach(v => {
+        try { v.pause(); v.removeAttribute('src'); v.load(); } catch (_) {}
+      });
       stage.replaceChildren();
 
       // 1. Background

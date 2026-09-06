@@ -5293,4 +5293,619 @@
         });
     })(); // end initOcrModule
 
+
+    // ============================================================
+    // Phase 13: Border / Frame Module
+    // ============================================================
+    (function initBorderFrameModule() {
+        var borderSizeSlider = document.getElementById('borderSize');
+        var borderSizeValue  = document.getElementById('borderSizeValue');
+        var borderColorInput = document.getElementById('borderColor');
+        var borderRadiusSlider = document.getElementById('borderRadius');
+        var borderRadiusValue  = document.getElementById('borderRadiusValue');
+        var borderShadowEnabled = document.getElementById('borderShadowEnabled');
+        var borderShadowFields  = document.getElementById('borderShadowFields');
+        var borderShadowBlur  = document.getElementById('borderShadowBlur');
+        var borderShadowBlurVal = document.getElementById('borderShadowBlurValue');
+        var borderShadowColor = document.getElementById('borderShadowColor');
+        var borderInnerEnabled = document.getElementById('borderInnerEnabled');
+        var applyBorderBtn = document.getElementById('applyBorder');
+
+        if (!applyBorderBtn) return; // guard if HTML not loaded
+
+        var BORDER_PRESETS = {
+            'white-thin':  { size: 15,  color: '#ffffff', radius: 0,   shadow: false },
+            'black-thick': { size: 50,  color: '#000000', radius: 0,   shadow: false },
+            'gold':        { size: 22,  color: '#e69521', radius: 4,   shadow: true,  shadowBlur: 18, shadowColor: '#8b5a00' },
+            'polaroid':    { size: 24,  color: '#f5f5f0', radius: 0,   shadow: true,  shadowBlur: 28, shadowColor: '#00000055', polaroidBottom: true },
+            'neon-blue':   { size: 12,  color: '#00d4ff', radius: 10,  shadow: true,  shadowBlur: 28, shadowColor: '#00d4ffaa' },
+            'vintage':     { size: 30,  color: '#d4b896', radius: 0,   shadow: false, inner: true }
+        };
+
+        borderSizeSlider.addEventListener('input', function() { borderSizeValue.textContent = borderSizeSlider.value; });
+        borderRadiusSlider.addEventListener('input', function() { borderRadiusValue.textContent = borderRadiusSlider.value; });
+        borderShadowBlur.addEventListener('input', function() { borderShadowBlurVal.textContent = borderShadowBlur.value; });
+        borderShadowEnabled.addEventListener('change', function() {
+            borderShadowFields.style.display = borderShadowEnabled.checked ? 'block' : 'none';
+        });
+
+        document.querySelectorAll('[data-border-preset]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var p = BORDER_PRESETS[btn.dataset.borderPreset];
+                if (!p) return;
+                borderSizeSlider.value = p.size; borderSizeValue.textContent = p.size;
+                borderColorInput.value = p.color;
+                borderRadiusSlider.value = p.radius; borderRadiusValue.textContent = p.radius;
+                borderShadowEnabled.checked = !!p.shadow;
+                borderShadowFields.style.display = p.shadow ? 'block' : 'none';
+                if (p.shadowBlur) { borderShadowBlur.value = p.shadowBlur; borderShadowBlurVal.textContent = p.shadowBlur; }
+                if (p.shadowColor) borderShadowColor.value = (p.shadowColor.length === 7) ? p.shadowColor : '#000000';
+                borderInnerEnabled.checked = !!p.inner;
+            });
+        });
+
+        applyBorderBtn.addEventListener('click', function() {
+            if (!originalImage) { showToast('প্রথমে একটি ছবি আপলোড করুন', 'error'); return; }
+            var size    = parseInt(borderSizeSlider.value, 10);
+            var color   = borderColorInput.value;
+            var radius  = parseInt(borderRadiusSlider.value, 10);
+            var shadow  = borderShadowEnabled.checked;
+            var sBlur   = shadow ? parseInt(borderShadowBlur.value, 10) : 0;
+            var sColor  = shadow ? borderShadowColor.value : '#000000';
+            var hasInner = borderInnerEnabled.checked;
+            var srcW = originalWidth, srcH = originalHeight;
+            var outW = srcW + size * 2, outH = srcH + size * 2;
+            var extra = shadow ? sBlur * 2 + 12 : 0;
+            var off = document.createElement('canvas');
+            off.width  = outW + extra;
+            off.height = outH + extra;
+            var oc = off.getContext('2d');
+            var ox = extra / 2, oy = extra / 2;
+
+            // Shadow
+            if (shadow) {
+                oc.save();
+                oc.shadowColor = sColor; oc.shadowBlur = sBlur;
+                oc.shadowOffsetX = 3; oc.shadowOffsetY = 5;
+                oc.fillStyle = color;
+                feRoundRect(oc, ox, oy, outW, outH, radius);
+                oc.fill();
+                oc.restore();
+            }
+            // Border background
+            oc.fillStyle = color;
+            feRoundRect(oc, ox, oy, outW, outH, radius);
+            oc.fill();
+            // Image (clipped to rounded rect if needed)
+            oc.save();
+            if (radius > 0) {
+                feRoundRect(oc, ox + size, oy + size, srcW, srcH, Math.max(0, radius - size * 0.4));
+                oc.clip();
+            }
+            oc.drawImage(originalImage, ox + size, oy + size, srcW, srcH);
+            oc.restore();
+            // Inner border line
+            if (hasInner && size > 5) {
+                var ip = Math.max(2, Math.floor(size * 0.3));
+                oc.strokeStyle = 'rgba(255,255,255,0.35)';
+                oc.lineWidth = 1.5;
+                feRoundRect(oc, ox + ip, oy + ip, outW - ip * 2, outH - ip * 2, Math.max(0, radius - ip));
+                oc.stroke();
+            }
+
+            off.toBlob(function(blob) {
+                if (!blob) { showToast('বর্ডার প্রয়োগ করা যায়নি', 'error'); return; }
+                var url = URL.createObjectURL(blob);
+                var img = new Image();
+                img.onload = function() {
+                    originalImage = img;
+                    originalWidth  = img.naturalWidth;
+                    originalHeight = img.naturalHeight;
+                    aspectRatio    = originalWidth / originalHeight;
+                    canvas.width   = originalWidth;
+                    canvas.height  = originalHeight;
+                    ctx.drawImage(img, 0, 0);
+                    pushHistory(blob, '🖼️ বর্ডার/ফ্রেম');
+                    document.dispatchEvent(new CustomEvent('app:historyrestored'));
+                    updatePreview();
+                    showToast('✅ বর্ডার সফলভাবে প্রয়োগ হয়েছে!', 'success');
+                };
+                img.src = url;
+            }, 'image/png');
+        });
+
+        function feRoundRect(ctx2, x, y, w, h, r) {
+            r = Math.min(r, w / 2, h / 2);
+            ctx2.beginPath();
+            ctx2.moveTo(x + r, y);
+            ctx2.lineTo(x + w - r, y);
+            ctx2.arcTo(x + w, y, x + w, y + r, r);
+            ctx2.lineTo(x + w, y + h - r);
+            ctx2.arcTo(x + w, y + h, x + w - r, y + h, r);
+            ctx2.lineTo(x + r, y + h);
+            ctx2.arcTo(x, y + h, x, y + h - r, r);
+            ctx2.lineTo(x, y + r);
+            ctx2.arcTo(x, y, x + r, y, r);
+            ctx2.closePath();
+        }
+
+        // Global color swatches (border & glow tabs both use .fe-color-swatch)
+        document.querySelectorAll('.fe-color-swatch').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var target = document.getElementById(btn.dataset.target);
+                if (target) target.value = btn.dataset.color;
+            });
+        });
+    })(); // end initBorderFrameModule
+
+    // ============================================================
+    // Phase 14: Gradient Overlay Module
+    // ============================================================
+    (function initGradientOverlayModule() {
+        var gradColor1      = document.getElementById('gradColor1');
+        var gradColor2      = document.getElementById('gradColor2');
+        var gradOpSlider    = document.getElementById('gradOpacity');
+        var gradOpValue     = document.getElementById('gradOpacityValue');
+        var gradDirection   = document.getElementById('gradDirection');
+        var gradBlendMode   = document.getElementById('gradBlendMode');
+        var gradTypeLinear  = document.getElementById('gradTypeLinear');
+        var gradTypeRadial  = document.getElementById('gradTypeRadial');
+        var gradDirWrap     = document.getElementById('gradDirectionWrap');
+        var applyGradBtn    = document.getElementById('applyGradient');
+
+        if (!applyGradBtn) return;
+
+        var GRAD_PRESETS = {
+            'sunset':      { c1: '#ff6b35', c2: '#f7c59f', dir: 'bt',    blend: 'overlay',  op: 65, linear: true  },
+            'ocean':       { c1: '#0077b6', c2: '#90e0ef', dir: 'tb',    blend: 'multiply', op: 55, linear: true  },
+            'forest':      { c1: '#1b4332', c2: '#52b788', dir: 'bt',    blend: 'multiply', op: 50, linear: true  },
+            'neon-purple': { c1: '#7209b7', c2: '#f72585', dir: 'tl-br', blend: 'screen',   op: 60, linear: true  },
+            'gold-luxury': { c1: '#f6d365', c2: '#fda085', dir: 'tl-br', blend: 'overlay',  op: 70, linear: true  },
+            'night':       { c1: '#0d1b2a', c2: '#1b263b', dir: 'tb',    blend: 'multiply', op: 80, linear: true  }
+        };
+
+        gradOpSlider.addEventListener('input', function() { gradOpValue.textContent = gradOpSlider.value; });
+
+        document.querySelectorAll('input[name="gradType"]').forEach(function(r) {
+            r.addEventListener('change', function() {
+                gradDirWrap.style.display = gradTypeLinear.checked ? 'block' : 'none';
+            });
+        });
+
+        document.querySelectorAll('[data-grad-preset]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var p = GRAD_PRESETS[btn.dataset.gradPreset];
+                if (!p) return;
+                gradColor1.value = p.c1; gradColor2.value = p.c2;
+                if (gradDirection) gradDirection.value = p.dir;
+                gradBlendMode.value = p.blend;
+                gradOpSlider.value = p.op; gradOpValue.textContent = p.op;
+                gradTypeLinear.checked = !!p.linear;
+                gradTypeRadial.checked = !p.linear;
+                gradDirWrap.style.display = p.linear ? 'block' : 'none';
+            });
+        });
+
+        applyGradBtn.addEventListener('click', function() {
+            if (!originalImage) { showToast('প্রথমে একটি ছবি আপলোড করুন', 'error'); return; }
+            var w = originalWidth, h = originalHeight;
+            var opacity  = parseInt(gradOpSlider.value, 10) / 100;
+            var blend    = gradBlendMode.value;
+            var isRadial = gradTypeRadial.checked;
+            var c1 = gradColor1.value, c2 = gradColor2.value;
+            var dir = gradDirection ? gradDirection.value : 'tb';
+
+            var off = document.createElement('canvas');
+            off.width = w; off.height = h;
+            var oc = off.getContext('2d');
+            oc.drawImage(originalImage, 0, 0, w, h);
+
+            var grad;
+            if (isRadial) {
+                grad = oc.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.7);
+            } else {
+                var x0 = 0, y0 = 0, x1 = 0, y1 = h;
+                if (dir === 'bt') { y0 = h; y1 = 0; }
+                else if (dir === 'lr') { x1 = w; y1 = 0; }
+                else if (dir === 'rl') { x0 = w; x1 = 0; y1 = 0; }
+                else if (dir === 'tl-br') { x1 = w; y1 = h; }
+                else if (dir === 'tr-bl') { x0 = w; x1 = 0; y1 = h; }
+                grad = oc.createLinearGradient(x0, y0, x1, y1);
+            }
+            grad.addColorStop(0, feHexRgba(c1, opacity));
+            grad.addColorStop(1, feHexRgba(c2, opacity));
+
+            oc.globalCompositeOperation = blend;
+            oc.fillStyle = grad;
+            oc.fillRect(0, 0, w, h);
+            oc.globalCompositeOperation = 'source-over';
+
+            off.toBlob(function(blob) {
+                if (!blob) { showToast('গ্রেডিয়েন্ট প্রয়োগ করা যায়নি', 'error'); return; }
+                var url = URL.createObjectURL(blob);
+                var img = new Image();
+                img.onload = function() {
+                    originalImage = img;
+                    canvas.width = w; canvas.height = h;
+                    ctx.drawImage(img, 0, 0);
+                    pushHistory(blob, '🌈 গ্রেডিয়েন্ট');
+                    document.dispatchEvent(new CustomEvent('app:historyrestored'));
+                    updatePreview();
+                    showToast('✅ গ্রেডিয়েন্ট সফলভাবে প্রয়োগ হয়েছে!', 'success');
+                };
+                img.src = url;
+            }, 'image/png');
+        });
+
+        function feHexRgba(hex, alpha) {
+            var r = parseInt(hex.slice(1, 3), 16);
+            var g = parseInt(hex.slice(3, 5), 16);
+            var b = parseInt(hex.slice(5, 7), 16);
+            return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+        }
+    })(); // end initGradientOverlayModule
+
+    // ============================================================
+    // Phase 15: Privacy Blur Module
+    // ============================================================
+    (function initPrivacyBlurModule() {
+        var privacyIntensity    = document.getElementById('privacyIntensity');
+        var privacyIntensityVal = document.getElementById('privacyIntensityValue');
+        var privacyTypeBlur     = document.getElementById('privacyTypeBlur');
+        var privacyTypePixelate = document.getElementById('privacyTypePixelate');
+        var privacyTypeSolid    = document.getElementById('privacyTypeSolid');
+        var solidWrap  = document.getElementById('privacySolidColorWrap');
+        var solidColor = document.getElementById('privacySolidColor');
+        var startBtn   = document.getElementById('privacyBlurStartBtn');
+        var cancelBtn  = document.getElementById('privacyBlurCancelBtn');
+        var applyBtn   = document.getElementById('applyPrivacyBlur');
+        var statusEl   = document.getElementById('privacyBlurStatus');
+
+        if (!startBtn) return;
+
+        var selCanvas = null, selCtx = null;
+        var isDrawing = false, selReady = false;
+        var startX = 0, startY = 0, curX = 0, curY = 0;
+
+        privacyIntensity.addEventListener('input', function() { privacyIntensityVal.textContent = privacyIntensity.value; });
+        document.querySelectorAll('input[name="privacyType"]').forEach(function(r) {
+            r.addEventListener('change', function() {
+                solidWrap.style.display = privacyTypeSolid.checked ? 'block' : 'none';
+            });
+        });
+
+        function ensureSelCanvas() {
+            if (selCanvas) return selCanvas;
+            var wrapper = document.getElementById('previewImageWrapper');
+            selCanvas = document.createElement('canvas');
+            selCanvas.id = 'privacySelCanvas';
+            selCanvas.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;z-index:22;touch-action:none;';
+            wrapper.appendChild(selCanvas);
+            selCtx = selCanvas.getContext('2d');
+            return selCanvas;
+        }
+
+        function removeSelCanvas() {
+            if (selCanvas) { selCanvas.remove(); selCanvas = null; selCtx = null; }
+        }
+
+        function syncCanvasSize() {
+            if (!selCanvas) return;
+            var pi = document.getElementById('previewImage');
+            selCanvas.width  = pi.offsetWidth  || selCanvas.parentElement.offsetWidth;
+            selCanvas.height = pi.offsetHeight || selCanvas.parentElement.offsetHeight;
+        }
+
+        function activate() {
+            if (!originalImage) { showToast('প্রথমে একটি ছবি আপলোড করুন', 'error'); return; }
+            var sc = ensureSelCanvas();
+            syncCanvasSize();
+            startBtn.style.display  = 'none';
+            cancelBtn.style.display = 'inline-flex';
+            applyBtn.style.display  = 'none';
+            statusEl.style.display  = 'block';
+            statusEl.textContent    = '▶ প্রিভিউতে এলাকা সিলেক্ট করুন (ড্র্যাগ করুন)';
+            selReady = false;
+            sc.addEventListener('pointerdown', onDown);
+            sc.addEventListener('pointermove', onMove);
+            sc.addEventListener('pointerup',   onUp);
+        }
+
+        function deactivate() {
+            if (selCanvas) {
+                selCanvas.removeEventListener('pointerdown', onDown);
+                selCanvas.removeEventListener('pointermove', onMove);
+                selCanvas.removeEventListener('pointerup',   onUp);
+                if (selCtx) selCtx.clearRect(0, 0, selCanvas.width, selCanvas.height);
+            }
+            removeSelCanvas();
+            startBtn.style.display  = '';
+            cancelBtn.style.display = 'none';
+            applyBtn.style.display  = 'none';
+            statusEl.style.display  = 'none';
+            selReady = false;
+        }
+
+        function getPos(e) {
+            var rect = selCanvas.getBoundingClientRect();
+            return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        }
+
+        function onDown(e) {
+            e.preventDefault();
+            selCanvas.setPointerCapture(e.pointerId);
+            syncCanvasSize();
+            var p = getPos(e);
+            startX = p.x; startY = p.y; curX = p.x; curY = p.y;
+            isDrawing = true; selReady = false;
+            applyBtn.style.display = 'none';
+            statusEl.textContent = '▶ ড্র্যাগ করুন...';
+        }
+
+        function onMove(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            var p = getPos(e);
+            curX = p.x; curY = p.y;
+            drawSel();
+        }
+
+        function onUp(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            isDrawing = false;
+            var w = Math.abs(curX - startX), h = Math.abs(curY - startY);
+            if (w > 8 && h > 8) {
+                selReady = true;
+                applyBtn.style.display = '';
+                statusEl.textContent = '✅ সিলেকশন রেডি — "ব্লার প্রয়োগ করুন" ক্লিক করুন অথবা আবার সিলেক্ট করুন';
+            } else {
+                statusEl.textContent = '▶ প্রিভিউতে এলাকা সিলেক্ট করুন (ড্র্যাগ করুন)';
+            }
+        }
+
+        function drawSel() {
+            selCtx.clearRect(0, 0, selCanvas.width, selCanvas.height);
+            var x = Math.min(startX, curX), y = Math.min(startY, curY);
+            var w = Math.abs(curX - startX), h = Math.abs(curY - startY);
+            selCtx.fillStyle   = 'rgba(0,212,255,0.12)';
+            selCtx.fillRect(x, y, w, h);
+            selCtx.strokeStyle = '#00d4ff';
+            selCtx.lineWidth   = 2;
+            selCtx.setLineDash([5, 3]);
+            selCtx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+            selCtx.setLineDash([]);
+        }
+
+        startBtn.addEventListener('click', activate);
+        cancelBtn.addEventListener('click', deactivate);
+
+        applyBtn.addEventListener('click', function() {
+            if (!selReady || !originalImage) return;
+            var previewImg = document.getElementById('previewImage');
+            var pRect = previewImg.getBoundingClientRect();
+            var wRect = document.getElementById('previewImageWrapper').getBoundingClientRect();
+            var dispX = pRect.left - wRect.left, dispY = pRect.top - wRect.top;
+            var dispW = pRect.width, dispH = pRect.height;
+            var scaleX = originalWidth / dispW, scaleY = originalHeight / dispH;
+            var sx = Math.min(startX, curX), sy = Math.min(startY, curY);
+            var sw = Math.abs(curX - startX),  sh = Math.abs(curY - startY);
+            var imgX = Math.max(0, Math.round((sx - dispX) * scaleX));
+            var imgY = Math.max(0, Math.round((sy - dispY) * scaleY));
+            var imgW = Math.min(originalWidth  - imgX, Math.round(sw * scaleX));
+            var imgH = Math.min(originalHeight - imgY, Math.round(sh * scaleY));
+            if (imgW < 2 || imgH < 2) { showToast('সিলেকশন এলাকা খুব ছোট', 'error'); return; }
+
+            var off = document.createElement('canvas');
+            off.width = originalWidth; off.height = originalHeight;
+            var oc = off.getContext('2d');
+            oc.drawImage(originalImage, 0, 0);
+            var intensity = parseInt(privacyIntensity.value, 10);
+
+            if (privacyTypeSolid.checked) {
+                oc.fillStyle = solidColor.value;
+                oc.fillRect(imgX, imgY, imgW, imgH);
+            } else if (privacyTypePixelate.checked) {
+                var pxSz = Math.max(4, intensity * 2);
+                var rgn = oc.getImageData(imgX, imgY, imgW, imgH);
+                fePixelate(rgn, pxSz);
+                oc.putImageData(rgn, imgX, imgY);
+            } else {
+                var rgn2 = oc.getImageData(imgX, imgY, imgW, imgH);
+                var blurred = feBoxBlur(rgn2, Math.max(2, intensity));
+                oc.putImageData(blurred, imgX, imgY);
+            }
+
+            off.toBlob(function(blob) {
+                if (!blob) { showToast('ব্লার প্রয়োগ করা যায়নি', 'error'); return; }
+                var url = URL.createObjectURL(blob);
+                var img = new Image();
+                img.onload = function() {
+                    originalImage = img;
+                    canvas.width = originalWidth; canvas.height = originalHeight;
+                    ctx.drawImage(img, 0, 0);
+                    pushHistory(blob, '🔒 প্রাইভেসি ব্লার');
+                    document.dispatchEvent(new CustomEvent('app:historyrestored'));
+                    updatePreview();
+                    showToast('✅ প্রাইভেসি ব্লার প্রয়োগ হয়েছে!', 'success');
+                    // Keep selection mode active for more areas
+                    selReady = false;
+                    applyBtn.style.display = 'none';
+                    if (selCtx) selCtx.clearRect(0, 0, selCanvas.width, selCanvas.height);
+                    statusEl.textContent = '▶ প্রিভিউতে এলাকা সিলেক্ট করুন (ড্র্যাগ করুন)';
+                };
+                img.src = url;
+            }, 'image/png');
+        });
+
+        document.addEventListener('app:tabchange', function(e) {
+            if (e.detail !== 'privacyblur') deactivate();
+        });
+
+        function fePixelate(imageData, pixSize) {
+            var d = imageData.data, w = imageData.width, h = imageData.height;
+            for (var y = 0; y < h; y += pixSize) {
+                for (var x = 0; x < w; x += pixSize) {
+                    var idx = (y * w + x) * 4;
+                    var r = d[idx], g = d[idx+1], b = d[idx+2], a = d[idx+3];
+                    for (var py = y; py < Math.min(y + pixSize, h); py++) {
+                        for (var px = x; px < Math.min(x + pixSize, w); px++) {
+                            var i = (py * w + px) * 4;
+                            d[i]=r; d[i+1]=g; d[i+2]=b; d[i+3]=a;
+                        }
+                    }
+                }
+            }
+        }
+
+        function feBoxBlur(imageData, radius) {
+            // 3-pass box blur for smooth result
+            var cur = imageData;
+            for (var p = 0; p < 3; p++) cur = feSingleBlur(cur, radius);
+            return cur;
+        }
+
+        function feSingleBlur(imageData, radius) {
+            var d = imageData.data, w = imageData.width, h = imageData.height;
+            var out = new ImageData(w, h), od = out.data;
+            for (var y = 0; y < h; y++) {
+                for (var x = 0; x < w; x++) {
+                    var r=0, g=0, b=0, a=0, cnt=0;
+                    for (var dy = -radius; dy <= radius; dy++) {
+                        for (var dx = -radius; dx <= radius; dx++) {
+                            var nx = Math.min(w-1, Math.max(0, x+dx));
+                            var ny = Math.min(h-1, Math.max(0, y+dy));
+                            var i = (ny*w+nx)*4;
+                            r+=d[i]; g+=d[i+1]; b+=d[i+2]; a+=d[i+3]; cnt++;
+                        }
+                    }
+                    var idx2 = (y*w+x)*4;
+                    od[idx2]=r/cnt; od[idx2+1]=g/cnt; od[idx2+2]=b/cnt; od[idx2+3]=a/cnt;
+                }
+            }
+            return out;
+        }
+    })(); // end initPrivacyBlurModule
+
+    // ============================================================
+    // Phase 16: Glow / Neon Effect Module
+    // ============================================================
+    (function initGlowEffectModule() {
+        var glowIntensitySlider = document.getElementById('glowIntensity');
+        var glowIntensityValue  = document.getElementById('glowIntensityValue');
+        var glowSpreadSlider    = document.getElementById('glowSpread');
+        var glowSpreadValue     = document.getElementById('glowSpreadValue');
+        var glowColorInput      = document.getElementById('glowColor');
+        var glowTypeBloom       = document.getElementById('glowTypeBloom');
+        var glowTypeNeon        = document.getElementById('glowTypeNeon');
+        var glowTypeDream       = document.getElementById('glowTypeDream');
+        var glowKeepOriginal    = document.getElementById('glowKeepOriginal');
+        var applyGlowBtn        = document.getElementById('applyGlow');
+
+        if (!applyGlowBtn) return;
+
+        var GLOW_PRESETS = {
+            'golden-glow': { color: '#ffd700', intensity: 70, spread: 25, type: 'bloom' },
+            'neon-blue':   { color: '#00d4ff', intensity: 80, spread: 20, type: 'neon'  },
+            'neon-pink':   { color: '#f72585', intensity: 75, spread: 20, type: 'neon'  },
+            'neon-green':  { color: '#39ff14', intensity: 70, spread: 18, type: 'neon'  },
+            'dream':       { color: '#f9a8d4', intensity: 55, spread: 32, type: 'dream' },
+            'cinematic':   { color: '#e69521', intensity: 45, spread: 40, type: 'bloom' }
+        };
+
+        glowIntensitySlider.addEventListener('input', function() { glowIntensityValue.textContent = glowIntensitySlider.value; });
+        glowSpreadSlider.addEventListener('input', function() { glowSpreadValue.textContent = glowSpreadSlider.value; });
+
+        document.querySelectorAll('[data-glow-preset]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var p = GLOW_PRESETS[btn.dataset.glowPreset];
+                if (!p) return;
+                glowColorInput.value = p.color;
+                glowIntensitySlider.value = p.intensity; glowIntensityValue.textContent = p.intensity;
+                glowSpreadSlider.value = p.spread; glowSpreadValue.textContent = p.spread;
+                glowTypeBloom.checked = (p.type === 'bloom');
+                glowTypeNeon.checked  = (p.type === 'neon');
+                glowTypeDream.checked = (p.type === 'dream');
+            });
+        });
+
+        applyGlowBtn.addEventListener('click', function() {
+            if (!originalImage) { showToast('প্রথমে একটি ছবি আপলোড করুন', 'error'); return; }
+            var w = originalWidth, h = originalHeight;
+            var intensity    = parseInt(glowIntensitySlider.value, 10) / 100;
+            var spread       = parseInt(glowSpreadSlider.value, 10);
+            var glowColor    = glowColorInput.value;
+            var keepOriginal = glowKeepOriginal.checked;
+            var type = glowTypeNeon.checked ? 'neon' : glowTypeDream.checked ? 'dream' : 'bloom';
+
+            var off = document.createElement('canvas');
+            off.width = w; off.height = h;
+            var oc = off.getContext('2d');
+            oc.drawImage(originalImage, 0, 0, w, h);
+
+            // Build glow layer on separate offscreen canvas
+            var glowOff = document.createElement('canvas');
+            glowOff.width = w; glowOff.height = h;
+            var gc = glowOff.getContext('2d');
+
+            if (type === 'bloom') {
+                // Bloom: blurred copy blended with "screen"
+                gc.filter = 'blur(' + spread + 'px) brightness(' + (1 + intensity * 0.6) + ')';
+                gc.drawImage(originalImage, 0, 0, w, h);
+                gc.filter = 'none';
+                oc.globalCompositeOperation = keepOriginal ? 'screen' : 'source-over';
+                oc.globalAlpha = Math.min(1, intensity * 1.1);
+                oc.drawImage(glowOff, 0, 0);
+
+            } else if (type === 'neon') {
+                // Neon: saturated bright blurred copy tinted with glow color, then screen
+                gc.filter = 'blur(' + spread + 'px) saturate(3) brightness(2)';
+                gc.drawImage(originalImage, 0, 0, w, h);
+                gc.filter = 'none';
+                // Tint the blurred layer with the neon color
+                gc.globalCompositeOperation = 'color';
+                gc.globalAlpha = 0.75;
+                gc.fillStyle = glowColor;
+                gc.fillRect(0, 0, w, h);
+                gc.globalAlpha = 1; gc.globalCompositeOperation = 'source-over';
+                oc.globalCompositeOperation = 'screen';
+                oc.globalAlpha = Math.min(1, intensity * 1.05);
+                oc.drawImage(glowOff, 0, 0);
+
+            } else { // dream
+                // Dreamy: heavy soft-light blend with saturation boost
+                gc.filter = 'blur(' + (spread * 1.6) + 'px) brightness(1.2) saturate(1.4)';
+                gc.drawImage(originalImage, 0, 0, w, h);
+                gc.filter = 'none';
+                oc.globalCompositeOperation = 'soft-light';
+                oc.globalAlpha = Math.min(1, intensity * 1.3);
+                oc.drawImage(glowOff, 0, 0);
+                // Subtle color wash
+                oc.globalCompositeOperation = 'soft-light';
+                oc.globalAlpha = intensity * 0.25;
+                oc.fillStyle = glowColor;
+                oc.fillRect(0, 0, w, h);
+            }
+
+            oc.globalAlpha = 1;
+            oc.globalCompositeOperation = 'source-over';
+
+            off.toBlob(function(blob) {
+                if (!blob) { showToast('গ্লো প্রয়োগ করা যায়নি', 'error'); return; }
+                var url = URL.createObjectURL(blob);
+                var img = new Image();
+                img.onload = function() {
+                    originalImage = img;
+                    canvas.width = w; canvas.height = h;
+                    ctx.drawImage(img, 0, 0);
+                    pushHistory(blob, '✨ গ্লো/নিয়ন ইফেক্ট');
+                    document.dispatchEvent(new CustomEvent('app:historyrestored'));
+                    updatePreview();
+                    showToast('✅ গ্লো সফলভাবে প্রয়োগ হয়েছে!', 'success');
+                };
+                img.src = url;
+            }, 'image/png');
+        });
+    })(); // end initGlowEffectModule
+
 })(); // end main app IIFE

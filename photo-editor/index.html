@@ -183,6 +183,44 @@
                         </svg>
                         <span>টেক্সট ও দেখাও</span>
                     </button>
+                    <!-- Phase 13: Border / Frame -->
+                    <button class="tab-btn" data-tab="border">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <rect x="7" y="7" width="10" height="10" rx="1"/>
+                        </svg>
+                        <span>বর্ডার/ফ্রেম</span>
+                    </button>
+                    <!-- Phase 14: Gradient Overlay -->
+                    <button class="tab-btn" data-tab="gradient">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <line x1="3" y1="9" x2="21" y2="9" stroke-opacity="0.5"/>
+                            <line x1="3" y1="15" x2="21" y2="15" stroke-opacity="0.3"/>
+                        </svg>
+                        <span>গ্রেডিয়েন্ট</span>
+                    </button>
+                    <!-- Phase 15: Privacy Blur -->
+                    <button class="tab-btn" data-tab="privacyblur">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                            <circle cx="12" cy="16" r="1.2" fill="currentColor" stroke="none"/>
+                        </svg>
+                        <span>প্রাইভেসি ব্লার</span>
+                    </button>
+                    <!-- Phase 16: Glow / Neon Effect -->
+                    <button class="tab-btn" data-tab="glow">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+                        </svg>
+                        <span>গ্লো/নিয়ন</span>
+                    </button>
                 </div>
 
                 <!-- Scrollable panel that holds whichever tool is active, so switching
@@ -1245,6 +1283,304 @@
                                 <button class="btn btn-ghost" id="ocrClearBtn" type="button">🧹 ক্লিয়ার</button>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+
+                <!-- Phase 13: Border / Frame Tab -->
+                <div class="tool-content" id="tab-border">
+                    <div class="tool-card">
+                        <h3>🖼️ বর্ডার ও ফ্রেম</h3>
+                        <p class="tool-desc">ছবির চারপাশে সুন্দর বর্ডার বা ফ্রেম যোগ করুন</p>
+
+                        <div class="form-group">
+                            <label>ফ্রেম প্রিসেট</label>
+                            <div class="preset-grid">
+                                <button class="preset-btn" data-border-preset="white-thin">🤍 সাদা পাতলা</button>
+                                <button class="preset-btn" data-border-preset="black-thick">🖤 কালো মোটা</button>
+                                <button class="preset-btn" data-border-preset="gold">✨ গোল্ড</button>
+                                <button class="preset-btn" data-border-preset="polaroid">📷 পোলারয়েড</button>
+                                <button class="preset-btn" data-border-preset="neon-blue">💙 নিয়ন ব্লু</button>
+                                <button class="preset-btn" data-border-preset="vintage">🎞️ ভিনটেজ</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>বর্ডার সাইজ: <strong id="borderSizeValue">20</strong>px</label>
+                            <input type="range" id="borderSize" min="0" max="150" value="20" class="range-slider">
+                            <div class="range-labels"><span>বন্ধ</span><span>মোটা</span></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>বর্ডার রঙ</label>
+                            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                                <input type="color" id="borderColor" value="#ffffff" style="width:44px;height:36px;border:none;cursor:pointer;border-radius:6px;">
+                                <div style="display:flex;gap:5px;flex-wrap:wrap;" id="borderColorSwatches">
+                                    <button type="button" class="fe-color-swatch" data-target="borderColor" data-color="#ffffff" style="background:#ffffff;"></button>
+                                    <button type="button" class="fe-color-swatch" data-target="borderColor" data-color="#000000" style="background:#000000;"></button>
+                                    <button type="button" class="fe-color-swatch" data-target="borderColor" data-color="#e69521" style="background:#e69521;"></button>
+                                    <button type="button" class="fe-color-swatch" data-target="borderColor" data-color="#e2534d" style="background:#e2534d;"></button>
+                                    <button type="button" class="fe-color-swatch" data-target="borderColor" data-color="#3b82f6" style="background:#3b82f6;"></button>
+                                    <button type="button" class="fe-color-swatch" data-target="borderColor" data-color="#10b981" style="background:#10b981;"></button>
+                                    <button type="button" class="fe-color-swatch" data-target="borderColor" data-color="#d4b896" style="background:#d4b896;"></button>
+                                    <button type="button" class="fe-color-swatch" data-target="borderColor" data-color="#f5f5f0" style="background:#f5f5f0;border:1px solid #ccc;"></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>রাউন্ড কর্নার: <strong id="borderRadiusValue">0</strong>px</label>
+                            <input type="range" id="borderRadius" min="0" max="200" value="0" class="range-slider">
+                            <div class="range-labels"><span>চারকোণা</span><span>গোলাকার</span></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="wm-toggle">
+                                <input type="checkbox" id="borderShadowEnabled">
+                                <span>🌑 ড্রপ শ্যাডো যোগ করুন</span>
+                            </label>
+                            <div id="borderShadowFields" style="display:none;margin-top:10px;padding:10px;background:var(--bg-card-hover);border-radius:var(--radius-md);">
+                                <div class="form-group" style="margin-bottom:10px;">
+                                    <label>শ্যাডো ব্লার: <strong id="borderShadowBlurValue">20</strong>px</label>
+                                    <input type="range" id="borderShadowBlur" min="0" max="80" value="20" class="range-slider">
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label>শ্যাডো রঙ</label>
+                                    <input type="color" id="borderShadowColor" value="#000000" style="width:44px;height:36px;border:none;cursor:pointer;border-radius:6px;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="wm-toggle">
+                                <input type="checkbox" id="borderInnerEnabled">
+                                <span>🔲 ডবল ফ্রেম (ভেতরে পাতলা বর্ডার)</span>
+                            </label>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="applyBorder">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                            বর্ডার প্রয়োগ করুন
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Phase 14: Gradient Overlay Tab -->
+                <div class="tool-content" id="tab-gradient">
+                    <div class="tool-card">
+                        <h3>🌈 গ্রেডিয়েন্ট ওভারলে</h3>
+                        <p class="tool-desc">ছবির উপরে সুন্দর রঙিন গ্রেডিয়েন্ট ওভারলে দিন</p>
+
+                        <div class="form-group">
+                            <label>দ্রুত প্রিসেট</label>
+                            <div class="preset-grid">
+                                <button class="preset-btn" data-grad-preset="sunset">🌇 সানসেট</button>
+                                <button class="preset-btn" data-grad-preset="ocean">🌊 ওশান</button>
+                                <button class="preset-btn" data-grad-preset="forest">🌿 ফরেস্ট</button>
+                                <button class="preset-btn" data-grad-preset="neon-purple">💜 নিয়ন</button>
+                                <button class="preset-btn" data-grad-preset="gold-luxury">✨ গোল্ড</button>
+                                <button class="preset-btn" data-grad-preset="night">🌙 নাইট</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>গ্রেডিয়েন্ট টাইপ</label>
+                            <div class="mode-toggle">
+                                <label class="mode-option">
+                                    <input type="radio" name="gradType" id="gradTypeLinear" value="linear" checked>
+                                    <span>↕ লিনিয়ার</span>
+                                </label>
+                                <label class="mode-option">
+                                    <input type="radio" name="gradType" id="gradTypeRadial" value="radial">
+                                    <span>⊙ রেডিয়াল</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group" id="gradDirectionWrap">
+                            <label>দিক</label>
+                            <select id="gradDirection">
+                                <option value="tb">উপর → নিচ</option>
+                                <option value="bt">নিচ → উপর</option>
+                                <option value="lr">বাম → ডান</option>
+                                <option value="rl">ডান → বাম</option>
+                                <option value="tl-br">কোণাকুণি (↘)</option>
+                                <option value="tr-bl">কোণাকুণি (↙)</option>
+                            </select>
+                        </div>
+
+                        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                            <div class="form-group" style="flex:1;min-width:120px;">
+                                <label>শুরুর রঙ</label>
+                                <input type="color" id="gradColor1" value="#e69521" style="width:100%;height:40px;border:none;cursor:pointer;border-radius:6px;">
+                            </div>
+                            <div class="form-group" style="flex:1;min-width:120px;">
+                                <label>শেষের রঙ</label>
+                                <input type="color" id="gradColor2" value="#a855f7" style="width:100%;height:40px;border:none;cursor:pointer;border-radius:6px;">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>ব্লেন্ড মোড</label>
+                            <select id="gradBlendMode">
+                                <option value="multiply">Multiply (গাঢ়)</option>
+                                <option value="overlay" selected>Overlay (মিশ্র)</option>
+                                <option value="screen">Screen (হালকা)</option>
+                                <option value="color">Color (শুধু রঙ)</option>
+                                <option value="soft-light">Soft Light (নরম)</option>
+                                <option value="hard-light">Hard Light (কড়া)</option>
+                                <option value="source-over">Normal (স্বাভাবিক)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>অপাসিটি: <strong id="gradOpacityValue">60</strong>%</label>
+                            <input type="range" id="gradOpacity" min="5" max="100" value="60" class="range-slider">
+                            <div class="range-labels"><span>হালকা</span><span>গাঢ়</span></div>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="applyGradient">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                            গ্রেডিয়েন্ট প্রয়োগ করুন
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Phase 15: Privacy Blur Tab -->
+                <div class="tool-content" id="tab-privacyblur">
+                    <div class="tool-card">
+                        <h3>🔒 প্রাইভেসি ব্লার</h3>
+                        <p class="tool-desc">ছবির যেকোনো অংশ (মুখ/নম্বর/ঠিকানা) ব্লার বা মোজাইক করে লুকান</p>
+
+                        <div class="form-group">
+                            <label>ইফেক্ট টাইপ</label>
+                            <div class="mode-toggle">
+                                <label class="mode-option">
+                                    <input type="radio" name="privacyType" id="privacyTypeBlur" value="blur" checked>
+                                    <span>💨 ব্লার</span>
+                                </label>
+                                <label class="mode-option">
+                                    <input type="radio" name="privacyType" id="privacyTypePixelate" value="pixelate">
+                                    <span>🔲 মোজাইক</span>
+                                </label>
+                                <label class="mode-option">
+                                    <input type="radio" name="privacyType" id="privacyTypeSolid" value="solid">
+                                    <span>⬛ সলিড</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>তীব্রতা: <strong id="privacyIntensityValue">15</strong></label>
+                            <input type="range" id="privacyIntensity" min="2" max="50" value="15" class="range-slider">
+                            <div class="range-labels"><span>হালকা</span><span>পুরোপুরি লুকান</span></div>
+                        </div>
+
+                        <div class="form-group" id="privacySolidColorWrap" style="display:none;">
+                            <label>সলিড রঙ</label>
+                            <input type="color" id="privacySolidColor" value="#000000" style="width:56px;height:36px;border:none;cursor:pointer;border-radius:6px;">
+                        </div>
+
+                        <div class="form-group" style="background:var(--bg-card-hover);border-radius:var(--radius-md);padding:12px;">
+                            <p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">📌 <strong style="color:var(--text-primary);">কীভাবে ব্যবহার করবেন:</strong></p>
+                            <ol style="font-size:12px;color:var(--text-secondary);padding-left:16px;line-height:1.9;margin:0;">
+                                <li>নিচের বাটনে ক্লিক করে সিলেকশন মোড চালু করুন</li>
+                                <li>প্রিভিউতে যে অংশটি লুকাতে চান সেখানে ড্র্যাগ করুন</li>
+                                <li>"ব্লার প্রয়োগ করুন" ক্লিক করুন — আবার সিলেক্ট করুন যতটুকু দরকার</li>
+                            </ol>
+                        </div>
+
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+                            <button class="btn btn-warning btn-action" id="privacyBlurStartBtn" style="flex:1;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4,2"/></svg>
+                                সিলেকশন মোড চালু করুন
+                            </button>
+                            <button class="btn btn-ghost" id="privacyBlurCancelBtn" style="display:none;">বাতিল</button>
+                        </div>
+
+                        <p id="privacyBlurStatus" style="display:none;font-size:13px;color:var(--accent-primary);padding:6px 0;text-align:center;"></p>
+
+                        <button class="btn btn-primary btn-action" id="applyPrivacyBlur" style="display:none;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                            ব্লার প্রয়োগ করুন
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Phase 16: Glow / Neon Effect Tab -->
+                <div class="tool-content" id="tab-glow">
+                    <div class="tool-card">
+                        <h3>✨ গ্লো / নিয়ন ইফেক্ট</h3>
+                        <p class="tool-desc">ছবিতে মনোমুগ্ধকর গ্লো বা নিয়ন ইফেক্ট যোগ করুন</p>
+
+                        <div class="form-group">
+                            <label>দ্রুত প্রিসেট</label>
+                            <div class="preset-grid">
+                                <button class="preset-btn" data-glow-preset="golden-glow">✨ গোল্ডেন</button>
+                                <button class="preset-btn" data-glow-preset="neon-blue">💙 নিয়ন ব্লু</button>
+                                <button class="preset-btn" data-glow-preset="neon-pink">💜 নিয়ন পিঙ্ক</button>
+                                <button class="preset-btn" data-glow-preset="neon-green">💚 নিয়ন গ্রিন</button>
+                                <button class="preset-btn" data-glow-preset="dream">🌸 ড্রিম</button>
+                                <button class="preset-btn" data-glow-preset="cinematic">🎬 সিনেমাটিক</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>গ্লো টাইপ</label>
+                            <div class="mode-toggle">
+                                <label class="mode-option">
+                                    <input type="radio" name="glowType" id="glowTypeBloom" value="bloom" checked>
+                                    <span>✨ ব্লুম</span>
+                                </label>
+                                <label class="mode-option">
+                                    <input type="radio" name="glowType" id="glowTypeNeon" value="neon">
+                                    <span>⚡ নিয়ন</span>
+                                </label>
+                                <label class="mode-option">
+                                    <input type="radio" name="glowType" id="glowTypeDream" value="dream">
+                                    <span>🌫️ ড্রিমি</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>গ্লো রঙ</label>
+                            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                                <input type="color" id="glowColor" value="#e69521" style="width:44px;height:36px;border:none;cursor:pointer;border-radius:6px;">
+                                <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                                    <button type="button" class="fe-color-swatch" data-target="glowColor" data-color="#ffffff" style="background:#ffffff;"></button>
+                                    <button type="button" class="fe-color-swatch" data-target="glowColor" data-color="#e69521" style="background:#e69521;"></button>
+                                    <button type="button" class="fe-color-swatch" data-target="glowColor" data-color="#00d4ff" style="background:#00d4ff;"></button>
+                                    <button type="button" class="fe-color-swatch" data-target="glowColor" data-color="#a855f7" style="background:#a855f7;"></button>
+                                    <button type="button" class="fe-color-swatch" data-target="glowColor" data-color="#ec4899" style="background:#ec4899;"></button>
+                                    <button type="button" class="fe-color-swatch" data-target="glowColor" data-color="#10b981" style="background:#10b981;"></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>তীব্রতা: <strong id="glowIntensityValue">60</strong>%</label>
+                            <input type="range" id="glowIntensity" min="10" max="100" value="60" class="range-slider">
+                            <div class="range-labels"><span>হালকা</span><span>তীব্র</span></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>গ্লো ছড়ানো: <strong id="glowSpreadValue">20</strong>px</label>
+                            <input type="range" id="glowSpread" min="2" max="60" value="20" class="range-slider">
+                            <div class="range-labels"><span>ছোট</span><span>বড়</span></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="wm-toggle">
+                                <input type="checkbox" id="glowKeepOriginal" checked>
+                                <span>মূল ছবির সাথে মিশিয়ে দিন (Blend with original)</span>
+                            </label>
+                        </div>
+
+                        <button class="btn btn-primary btn-action" id="applyGlow">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                            গ্লো প্রয়োগ করুন
+                        </button>
                     </div>
                 </div>
 

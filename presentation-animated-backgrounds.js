@@ -95,8 +95,9 @@
     const broll = $('brollLayer');
     if (broll) broll.remove();
 
-    // Build a cache key from all relevant props
-    const cacheKey = [s.bgMedia, s.bgMediaType, s.bgPlaybackRate,
+    // Build a lightweight cache key from props without cloning large base64 strings
+    const mediaKey = (typeof s.bgMedia === 'string') ? (s.bgMedia.slice(0, 48) + '_' + s.bgMedia.length) : '';
+    const cacheKey = [mediaKey, s.bgMediaType, s.bgPlaybackRate,
       s.bgOverlayColor, s.bgOverlayOpacity, s.bgMediaOpacity, s.bgMediaBlur].join('|');
 
     // Skip work if nothing changed and not forced
@@ -173,6 +174,8 @@
     const l = $('animatedBackgroundLayer');
     const vid = l && l.querySelector('video');
     if (vid && !vid.paused) vid.pause();
+    const broll = $('brollLayer');
+    if (broll) broll.style.animationPlayState = 'paused';
     $('slide')?.classList.add('is-dragging');
   }
 
@@ -182,6 +185,8 @@
     const l = $('animatedBackgroundLayer');
     const vid = l && l.querySelector('video');
     if (vid && vid.paused) vid.play().catch(() => {});
+    const broll = $('brollLayer');
+    if (broll) broll.style.animationPlayState = '';
     $('slide')?.classList.remove('is-dragging');
   }
 

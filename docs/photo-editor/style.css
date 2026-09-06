@@ -2690,4 +2690,102 @@ kbd {
     box-shadow: 0 0 0 3px rgba(230, 149, 33, 0.15);
 }
 
+/* ============================================================
+   Phases 13-16: New Feature Tab Styles
+   ============================================================ */
 
+/* Colour Swatch Buttons */
+.fe-color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.fe-color-swatch:hover {
+    transform: scale(1.18);
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 8px rgba(230,149,33,0.5);
+}
+.fe-color-swatch:active { transform: scale(0.94); }
+
+/* Mode Toggle (radio pill buttons used in gradient/glow/privacy tabs) */
+.mode-toggle {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.mode-option { flex: 1; min-width: 70px; }
+.mode-option input[type="radio"] { display: none; }
+.mode-option span {
+    display: block;
+    text-align: center;
+    padding: 7px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--border-color);
+    background: var(--bg-card-hover);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: none;
+}
+.mode-option input[type="radio"]:checked + span {
+    background: var(--accent-gradient);
+    border-color: var(--accent-primary);
+    color: #fff;
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+.mode-option span:hover {
+    border-color: var(--accent-secondary);
+    color: var(--text-primary);
+}
+
+/* Warning / amber action button (Privacy Blur start) */
+.btn-warning {
+    background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+    color: #fff;
+    border: none;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    padding: 10px 18px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    transition: opacity 0.15s ease, box-shadow 0.15s ease;
+}
+.btn-warning:hover {
+    opacity: 0.88;
+    box-shadow: 0 0 14px rgba(245,158,11,0.45);
+}
+.btn-warning:active { opacity: 0.75; }
+.btn-warning:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Border/Gradient/Glow tabs — 3-col preset grid */
+#tab-border .preset-grid,
+#tab-gradient .preset-grid,
+#tab-glow .preset-grid {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+/* Privacy blur status message */
+#privacyBlurStatus {
+    font-size: 12.5px;
+    color: var(--accent-primary);
+    text-align: center;
+}
+
+/* Neon glow hover colours on glow preset buttons */
+#tab-glow [data-glow-preset="neon-blue"]:hover  { box-shadow: 0 0 16px rgba(0,212,255,0.55); }
+#tab-glow [data-glow-preset="neon-pink"]:hover   { box-shadow: 0 0 16px rgba(247,37,133,0.55); }
+#tab-glow [data-glow-preset="neon-green"]:hover  { box-shadow: 0 0 16px rgba(57,255,20,0.45); }
+#tab-glow [data-glow-preset="golden-glow"]:hover { box-shadow: 0 0 16px rgba(255,215,0,0.55); }
+#tab-glow [data-glow-preset="dream"]:hover       { box-shadow: 0 0 16px rgba(249,168,212,0.55); }

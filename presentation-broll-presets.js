@@ -9,19 +9,32 @@
     z-index: 0 !important;
     overflow: hidden !important;
     pointer-events: none !important;
-    transform: translateZ(0);
+    transform: translate3d(0, 0, 0) !important;
+    contain: strict !important;
+    isolation: isolate !important;
+    backface-visibility: hidden !important;
   }
   #brollLayer:before, #brollLayer:after {
     content: "" !important;
     position: absolute !important;
-    inset: -50% !important;
-    width: 200% !important;
-    height: 200% !important;
+    inset: -25% !important;
+    width: 150% !important;
+    height: 150% !important;
     display: block !important;
     background-repeat: repeat !important;
     will-change: transform;
     pointer-events: none !important;
+    transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
   }
+
+  /* Automatically pause background animation when dragging objects to free 100% CPU/GPU for interactive transforms */
+  #slide.is-dragging #brollLayer,
+  #slide.is-dragging #brollLayer:before,
+  #slide.is-dragging #brollLayer:after {
+    animation-play-state: paused !important;
+  }
+
   #brollLayer.space {
     background: radial-gradient(circle at 70% 25%, #ffd166 0%, #ff8c00 1.5%, transparent 4%),
                 radial-gradient(circle at 20% 80%, #6366f1 0%, #312e81 8%, transparent 20%),
@@ -52,16 +65,16 @@
     background: #020617;
   }
   #brollLayer.aurora:before {
-    background: radial-gradient(ellipse at 20% 80%, rgba(16, 185, 129, 0.65) 0%, transparent 50%),
-                radial-gradient(ellipse at 70% 30%, rgba(56, 189, 248, 0.7) 0%, transparent 55%),
-                radial-gradient(ellipse at 90% 70%, rgba(168, 85, 247, 0.6) 0%, transparent 50%);
-    filter: blur(25px);
+    background: radial-gradient(ellipse at 20% 80%, rgba(16, 185, 129, 0.65) 0%, rgba(16, 185, 129, 0.25) 30%, transparent 55%),
+                radial-gradient(ellipse at 70% 30%, rgba(56, 189, 248, 0.7) 0%, rgba(56, 189, 248, 0.25) 35%, transparent 60%),
+                radial-gradient(ellipse at 90% 70%, rgba(168, 85, 247, 0.6) 0%, rgba(168, 85, 247, 0.2) 30%, transparent 55%);
+    filter: blur(12px);
     animation: broll_aurora_wave 10s ease-in-out infinite alternate !important;
   }
   #brollLayer.aurora:after {
-    background: radial-gradient(ellipse at 50% 20%, rgba(244, 114, 182, 0.4) 0%, transparent 45%),
-                radial-gradient(ellipse at 40% 90%, rgba(34, 197, 94, 0.5) 0%, transparent 50%);
-    filter: blur(35px);
+    background: radial-gradient(ellipse at 50% 20%, rgba(244, 114, 182, 0.45) 0%, rgba(244, 114, 182, 0.15) 30%, transparent 50%),
+                radial-gradient(ellipse at 40% 90%, rgba(34, 197, 94, 0.5) 0%, rgba(34, 197, 94, 0.18) 30%, transparent 55%);
+    filter: blur(14px);
     animation: broll_aurora_shift 14s ease-in-out infinite alternate !important;
   }
   @keyframes broll_aurora_wave {
@@ -132,7 +145,7 @@
     background: radial-gradient(ellipse at 15% 70%, #ffc76c 0 10%, transparent 28%),
                 radial-gradient(ellipse at 50% 75%, #ffedd5 0 8%, transparent 22%),
                 radial-gradient(ellipse at 85% 55%, #fed7aa 0 10%, transparent 30%);
-    filter: blur(12px);
+    filter: blur(8px);
     animation: broll_sunset_clouds 18s linear infinite alternate !important;
   }
   #brollLayer.sunset:after, #brollLayer.cloudSunset:after {
@@ -143,8 +156,9 @@
     background: linear-gradient(180deg, #0369a1, #0284c7 45%, #075985);
   }
   #brollLayer.water:before {
-    background: repeating-radial-gradient(ellipse at 50% 105%, rgba(186, 230, 253, 0.4) 0 1px, transparent 2px 16px);
-    transform-origin: 50% 100%;
+    background: radial-gradient(ellipse at 50% 100%, rgba(186, 230, 253, 0.35) 0%, transparent 50%),
+                radial-gradient(ellipse at 30% 80%, rgba(125, 211, 252, 0.25) 0%, transparent 45%),
+                radial-gradient(ellipse at 70% 85%, rgba(186, 230, 253, 0.3) 0%, transparent 40%);
     animation: broll_water_ripple 6s ease-in-out infinite alternate !important;
   }
   #brollLayer.water:after {

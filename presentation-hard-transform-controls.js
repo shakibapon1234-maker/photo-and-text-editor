@@ -108,6 +108,9 @@
   }
 
   function begin(kind, event, item, side = '') {
+    window.__presentationLiveDrag = true;
+    $('slide')?.classList.add('is-dragging');
+
     const stage = $('slide');
     const rect = stage.getBoundingClientRect();
     const startRot = Number(item.rotation) || 0;
@@ -331,6 +334,7 @@
     _pendingDrag = null; // Cancel any pending drag that didn't start
     if (typeof window.drag !== 'undefined') window.drag = null;
     window.__presentationLiveDrag = false;
+    $('slide')?.classList.remove('is-dragging');
 
     // If a text element was clicked (not dragged) and it was already selected, activate inline text editing
     if (!action && pending && pending.wasAlreadySelected && pending.item.type === 'text') {
@@ -358,6 +362,7 @@
     _pendingDrag = null;
     if (typeof window.drag !== 'undefined') window.drag = null;
     window.__presentationLiveDrag = false;
+    $('slide')?.classList.remove('is-dragging');
     if (!action) return;
     action = null;
     render();
@@ -369,6 +374,7 @@
     _pendingDrag = null;
     if (typeof window.drag !== 'undefined') window.drag = null;
     window.__presentationLiveDrag = false;
+    $('slide')?.classList.remove('is-dragging');
     return wasBusy;
   };
 
