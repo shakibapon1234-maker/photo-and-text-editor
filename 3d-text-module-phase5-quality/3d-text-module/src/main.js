@@ -245,6 +245,7 @@ const camera = new THREE.PerspectiveCamera(
 );
 const DEFAULT_CAMERA_POS = new THREE.Vector3(0, 40, 220);
 camera.position.copy(DEFAULT_CAMERA_POS);
+let shapeStudio = null;
 
 // ---------- Phase 5: quality presets ----------
 // Three tiers trading render fidelity for performance on lower-end hardware.
@@ -6386,6 +6387,7 @@ exportBtn.addEventListener('click', async () => {
     // exports, return the selected layer so only that layer rotates.
     getTextMesh: () => state.contentMode === 'shape' ? shapeStudio?.getSelectedGroup?.() : textMesh,
     applyPresetOffset,
+    applyCameraAnimation,
     resetMeshToBaseTransform,
     handleResize,
     JSZip,
@@ -6688,7 +6690,7 @@ updateExportSourceNote();
 rebuildTextMesh();
 
 // ---------- Shape Studio (multi-layer 2D/3D shapes) ----------
-const shapeStudio = initShapeStudio({
+shapeStudio = initShapeStudio({
   THREE,
   TextGeometry,
   scene,
@@ -7321,7 +7323,17 @@ function reset3DStudio() {
   if (shapeContentSection) shapeContentSection.hidden = true;
   if (curveSection) curveSection.hidden = false;
 
-  shapeStudio.clearAll();
+  state.cameraAnim = 'none';
+  if (cameraAnimGrid) setActivePreset(cameraAnimGrid, 'camAnim', 'none');
+  camera.position.copy(DEFAULT_CAMERA_POS);
+  controls.target.set(0, 0, 0);
+  controls.update();
+  state.autoRotate = false;
+  if (autoRotateToggle) autoRotateToggle.checked = false;
+  state.bloomEnabled = false;
+  if (bloomToggle) bloomToggle.checked = false;
+  applyBloomSettings();
+  shapeStudio?.clearAll?.();
   try {
     localStorage.removeItem('3d_studio_saved_state');
     localStorage.removeItem('studio_state_plan3'); // legacy key, safe to remove

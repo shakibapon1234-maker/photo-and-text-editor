@@ -214,6 +214,9 @@ export async function exportPngSequence(deps, opts, callbacks = {}) {
     : (deps.EASINGS[opts.easing] || deps.EASINGS.linear);
   const baseRotYRad = (deps.state.rotY * Math.PI) / 180;
 
+  const savedCameraPos = camera.position.clone();
+  const savedCameraRot = camera.rotation.clone();
+
   for (let i = 0; i < frameCount; i++) {
     const tMs = frameCount > 1 ? (i / (frameCount - 1)) * totalMs : totalMs;
 
@@ -229,6 +232,10 @@ export async function exportPngSequence(deps, opts, callbacks = {}) {
       }
     }
 
+    if (deps.applyCameraAnimation) {
+      deps.applyCameraAnimation(tMs);
+    }
+
     renderer.render(scene, camera);
     // eslint-disable-next-line no-await-in-loop -- must serialize: each
     // frame's canvas content would be overwritten by the next render() call
@@ -241,6 +248,9 @@ export async function exportPngSequence(deps, opts, callbacks = {}) {
     onStatus?.(`ফ্রেম ${i + 1}/${frameCount} ক্যাপচার হচ্ছে…`);
   }
 
+  camera.position.copy(savedCameraPos);
+  camera.rotation.copy(savedCameraRot);
+  if (deps.controls?.target) camera.lookAt(deps.controls.target);
   deps.resetMeshToBaseTransform();
   endExportResolution(deps);
   restoreTransparentSurface();
@@ -359,6 +369,8 @@ export async function exportGif(deps, opts, callbacks = {}) {
   });
 
   const delayMsPerFrame = Math.max(20, Math.round(1000 / opts.fps)); // most GIF decoders floor below ~20ms
+  const savedCameraPos = camera.position.clone();
+  const savedCameraRot = camera.rotation.clone();
 
   for (let i = 0; i < frameCount; i++) {
     const tMs = frameCount > 1 ? (i / (frameCount - 1)) * totalMs : totalMs;
@@ -373,6 +385,10 @@ export async function exportGif(deps, opts, callbacks = {}) {
         const frac = totalMs > 0 ? tMs / totalMs : 0;
         mesh.rotation.y = baseRotYRad + frac * Math.PI * 2;
       }
+    }
+
+    if (deps.applyCameraAnimation) {
+      deps.applyCameraAnimation(tMs);
     }
 
     renderer.render(scene, camera);
@@ -396,6 +412,9 @@ export async function exportGif(deps, opts, callbacks = {}) {
     onStatus?.(`ফ্রেম ${i + 1}/${frameCount} রেন্ডার হচ্ছে…`);
   }
 
+  camera.position.copy(savedCameraPos);
+  camera.rotation.copy(savedCameraRot);
+  if (deps.controls?.target) camera.lookAt(deps.controls.target);
   deps.resetMeshToBaseTransform();
   endExportResolution(deps);
   restoreTransparentSurface?.();

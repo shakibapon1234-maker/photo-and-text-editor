@@ -35566,6 +35566,8 @@ async function exportPngSequence(deps, opts, callbacks = {}) {
   const preset = deps.ANIMATION_PRESETS[opts.presetId] || deps.ANIMATION_PRESETS.none;
   const easingFn = preset.continuous ? deps.EASINGS.linear : deps.EASINGS[opts.easing] || deps.EASINGS.linear;
   const baseRotYRad = deps.state.rotY * Math.PI / 180;
+  const savedCameraPos = camera2.position.clone();
+  const savedCameraRot = camera2.rotation.clone();
   for (let i = 0; i < frameCount; i++) {
     const tMs = frameCount > 1 ? i / (frameCount - 1) * totalMs : totalMs;
     if (isAnimated) {
@@ -35579,6 +35581,9 @@ async function exportPngSequence(deps, opts, callbacks = {}) {
         mesh.rotation.y = baseRotYRad + frac * Math.PI * 2;
       }
     }
+    if (deps.applyCameraAnimation) {
+      deps.applyCameraAnimation(tMs);
+    }
     renderer2.render(scene2, camera2);
     const blob = await new Promise((resolve) => canvas2.toBlob(resolve, "image/png"));
     if (!blob) throw new Error("PNG frame \u09A4\u09C8\u09B0\u09BF \u0995\u09B0\u09BE \u09AF\u09BE\u09DF\u09A8\u09BF\u2014\u0986\u09AC\u09BE\u09B0 \u099A\u09C7\u09B7\u09CD\u099F\u09BE \u0995\u09B0\u09C1\u09A8\u0964");
@@ -35586,6 +35591,9 @@ async function exportPngSequence(deps, opts, callbacks = {}) {
     onProgress?.((i + 1) / frameCount * 0.75);
     onStatus?.(`\u09AB\u09CD\u09B0\u09C7\u09AE ${i + 1}/${frameCount} \u0995\u09CD\u09AF\u09BE\u09AA\u099A\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7\u2026`);
   }
+  camera2.position.copy(savedCameraPos);
+  camera2.rotation.copy(savedCameraRot);
+  if (deps.controls?.target) camera2.lookAt(deps.controls.target);
   deps.resetMeshToBaseTransform();
   endExportResolution(deps);
   restoreTransparentSurface();
@@ -35657,6 +35665,8 @@ async function exportGif(deps, opts, callbacks = {}) {
     dither: false
   });
   const delayMsPerFrame = Math.max(20, Math.round(1e3 / opts.fps));
+  const savedCameraPos = camera2.position.clone();
+  const savedCameraRot = camera2.rotation.clone();
   for (let i = 0; i < frameCount; i++) {
     const tMs = frameCount > 1 ? i / (frameCount - 1) * totalMs : totalMs;
     if (isAnimated) {
@@ -35669,6 +35679,9 @@ async function exportGif(deps, opts, callbacks = {}) {
         const frac = totalMs > 0 ? tMs / totalMs : 0;
         mesh.rotation.y = baseRotYRad + frac * Math.PI * 2;
       }
+    }
+    if (deps.applyCameraAnimation) {
+      deps.applyCameraAnimation(tMs);
     }
     renderer2.render(scene2, camera2);
     if (opts.transparentBg) {
@@ -35684,6 +35697,9 @@ async function exportGif(deps, opts, callbacks = {}) {
     onProgress?.((i + 1) / frameCount * 0.5);
     onStatus?.(`\u09AB\u09CD\u09B0\u09C7\u09AE ${i + 1}/${frameCount} \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7\u2026`);
   }
+  camera2.position.copy(savedCameraPos);
+  camera2.rotation.copy(savedCameraRot);
+  if (deps.controls?.target) camera2.lookAt(deps.controls.target);
   deps.resetMeshToBaseTransform();
   endExportResolution(deps);
   restoreTransparentSurface?.();
@@ -37155,6 +37171,7 @@ var camera = new PerspectiveCamera(
 );
 var DEFAULT_CAMERA_POS = new Vector3(0, 40, 220);
 camera.position.copy(DEFAULT_CAMERA_POS);
+var shapeStudio = null;
 var QUALITY_PRESETS = {
   low: { curveSegments: 2, bevelSegments: 1, shadowMapSize: 512, pixelRatioCap: 1 },
   medium: { curveSegments: 6, bevelSegments: 3, shadowMapSize: 1024, pixelRatioCap: 2 },
@@ -42363,6 +42380,7 @@ exportBtn.addEventListener("click", async () => {
     // exports, return the selected layer so only that layer rotates.
     getTextMesh: () => state.contentMode === "shape" ? shapeStudio?.getSelectedGroup?.() : textMesh,
     applyPresetOffset,
+    applyCameraAnimation,
     resetMeshToBaseTransform,
     handleResize,
     JSZip: import_jszip.default
@@ -42624,7 +42642,7 @@ scene.environment = state.reflectionsOn ? envTexture : null;
 updateWebmSupportNote();
 updateExportSourceNote();
 rebuildTextMesh();
-var shapeStudio = initShapeStudio({
+shapeStudio = initShapeStudio({
   THREE: three_module_exports,
   TextGeometry,
   scene,
@@ -43217,7 +43235,17 @@ function reset3DStudio() {
   if (cubeContentSection) cubeContentSection.hidden = true;
   if (shapeContentSection) shapeContentSection.hidden = true;
   if (curveSection) curveSection.hidden = false;
-  shapeStudio.clearAll();
+  state.cameraAnim = "none";
+  if (cameraAnimGrid) setActivePreset(cameraAnimGrid, "camAnim", "none");
+  camera.position.copy(DEFAULT_CAMERA_POS);
+  controls.target.set(0, 0, 0);
+  controls.update();
+  state.autoRotate = false;
+  if (autoRotateToggle) autoRotateToggle.checked = false;
+  state.bloomEnabled = false;
+  if (bloomToggle) bloomToggle.checked = false;
+  applyBloomSettings();
+  shapeStudio?.clearAll?.();
   try {
     localStorage.removeItem("3d_studio_saved_state");
     localStorage.removeItem("studio_state_plan3");
