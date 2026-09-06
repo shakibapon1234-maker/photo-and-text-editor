@@ -1,4 +1,4 @@
-﻿// 3D Text Module — Phase 3: Animation System
+// 3D Text Module — Phase 3: Animation System
 // Scope (per PLAN_2 Phase 3 checklist):
 //   - Preset animation library (16 effects + "none" — finalized in the
 //     animation-list-finalization pass, see PLAN_2 §6 Open Decisions)
@@ -313,18 +313,21 @@ function applyCameraAnimation(now) {
     case 'dollyIn': {
       const factor = 1 - 0.25 * (0.5 + 0.5 * Math.sin(t * 0.85));
       camera.position.set(
-        cameraAnimBasePos.x * factor,
-        cameraAnimBasePos.y * factor,
-        cameraAnimBasePos.z * factor
+        target.x + (cameraAnimBasePos.x - target.x) * factor,
+        target.y + (cameraAnimBasePos.y - target.y) * factor,
+        target.z + (cameraAnimBasePos.z - target.z) * factor
       );
       camera.lookAt(target);
       break;
     }
     case 'orbitSlow': {
       const angle = t * 0.28;
-      const r = Math.sqrt(cameraAnimBasePos.x * cameraAnimBasePos.x + cameraAnimBasePos.z * cameraAnimBasePos.z) || 220;
-      camera.position.x = Math.sin(angle) * r;
-      camera.position.z = Math.cos(angle) * r;
+      const dx = cameraAnimBasePos.x - target.x;
+      const dz = cameraAnimBasePos.z - target.z;
+      const r = Math.sqrt(dx * dx + dz * dz) || 220;
+      const baseAngle = Math.atan2(dx, dz);
+      camera.position.x = target.x + Math.sin(baseAngle + angle) * r;
+      camera.position.z = target.z + Math.cos(baseAngle + angle) * r;
       camera.position.y = cameraAnimBasePos.y + Math.sin(t * 0.5) * 12;
       camera.lookAt(target);
       break;
@@ -342,9 +345,9 @@ function applyCameraAnimation(now) {
     case 'breathe': {
       const breathe = 1 + Math.sin(t * 1.3) * 0.06;
       camera.position.set(
-        cameraAnimBasePos.x * breathe,
-        cameraAnimBasePos.y * breathe,
-        cameraAnimBasePos.z * breathe
+        target.x + (cameraAnimBasePos.x - target.x) * breathe,
+        target.y + (cameraAnimBasePos.y - target.y) * breathe,
+        target.z + (cameraAnimBasePos.z - target.z) * breathe
       );
       camera.lookAt(target);
       break;
@@ -6078,10 +6081,21 @@ if (cameraAnimGrid) {
   cameraAnimGrid.addEventListener('click', (e) => {
     const btn = e.target.closest('.preset-btn');
     if (!btn) return;
-    state.cameraAnim = btn.dataset.camAnim || 'none';
+    const nextAnim = btn.dataset.camAnim || 'none';
+    if (nextAnim === 'none') {
+      if (state.cameraAnim && state.cameraAnim !== 'none') {
+        camera.position.copy(cameraAnimBasePos);
+        camera.lookAt(controls.target);
+      }
+      state.cameraAnim = 'none';
+    } else {
+      if (!state.cameraAnim || state.cameraAnim === 'none') {
+        cameraAnimBasePos.copy(camera.position);
+        cameraAnimBaseTarget.copy(controls.target);
+      }
+      state.cameraAnim = nextAnim;
+    }
     setActivePreset(cameraAnimGrid, 'camAnim', state.cameraAnim);
-    cameraAnimBasePos.copy(camera.position);
-    cameraAnimBaseTarget.copy(controls.target);
     saveStudioStateDebounced();
   });
 }
@@ -7188,7 +7202,12 @@ function animate(now) {
 
   controls.update();
   if (shapeStudio) shapeStudio.update();
-  renderer.render(scene, camera);
+  applyCameraAnimation(now);
+  if (state.bloomEnabled && composer) {
+    composer.render();
+  } else {
+    renderer.render(scene, camera);
+  }
 }
 animate();
 

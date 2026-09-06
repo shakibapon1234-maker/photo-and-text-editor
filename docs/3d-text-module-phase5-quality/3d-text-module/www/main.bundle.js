@@ -37197,6 +37197,55 @@ function applyBloomSettings() {
 }
 var cameraAnimBasePos = new Vector3().copy(DEFAULT_CAMERA_POS);
 var cameraAnimBaseTarget = new Vector3(0, 0, 0);
+function applyCameraAnimation(now2) {
+  if (!state.cameraAnim || state.cameraAnim === "none") return;
+  const t = (now2 || performance.now()) * 1e-3;
+  const target = controls.target;
+  switch (state.cameraAnim) {
+    case "dollyIn": {
+      const factor = 1 - 0.25 * (0.5 + 0.5 * Math.sin(t * 0.85));
+      camera.position.set(
+        target.x + (cameraAnimBasePos.x - target.x) * factor,
+        target.y + (cameraAnimBasePos.y - target.y) * factor,
+        target.z + (cameraAnimBasePos.z - target.z) * factor
+      );
+      camera.lookAt(target);
+      break;
+    }
+    case "orbitSlow": {
+      const angle = t * 0.28;
+      const dx = cameraAnimBasePos.x - target.x;
+      const dz = cameraAnimBasePos.z - target.z;
+      const r = Math.sqrt(dx * dx + dz * dz) || 220;
+      const baseAngle = Math.atan2(dx, dz);
+      camera.position.x = target.x + Math.sin(baseAngle + angle) * r;
+      camera.position.z = target.z + Math.cos(baseAngle + angle) * r;
+      camera.position.y = cameraAnimBasePos.y + Math.sin(t * 0.5) * 12;
+      camera.lookAt(target);
+      break;
+    }
+    case "craneUp": {
+      const craneLift = Math.sin(t * 0.75) * 52;
+      camera.position.set(
+        cameraAnimBasePos.x,
+        cameraAnimBasePos.y + craneLift,
+        cameraAnimBasePos.z - Math.abs(craneLift * 0.22)
+      );
+      camera.lookAt(target);
+      break;
+    }
+    case "breathe": {
+      const breathe = 1 + Math.sin(t * 1.3) * 0.06;
+      camera.position.set(
+        target.x + (cameraAnimBasePos.x - target.x) * breathe,
+        target.y + (cameraAnimBasePos.y - target.y) * breathe,
+        target.z + (cameraAnimBasePos.z - target.z) * breathe
+      );
+      camera.lookAt(target);
+      break;
+    }
+  }
+}
 function updateShadowFrustum() {
   if (!textMesh) return;
   const box = new Box3().setFromObject(textMesh);
@@ -42082,10 +42131,21 @@ if (cameraAnimGrid) {
   cameraAnimGrid.addEventListener("click", (e) => {
     const btn = e.target.closest(".preset-btn");
     if (!btn) return;
-    state.cameraAnim = btn.dataset.camAnim || "none";
+    const nextAnim = btn.dataset.camAnim || "none";
+    if (nextAnim === "none") {
+      if (state.cameraAnim && state.cameraAnim !== "none") {
+        camera.position.copy(cameraAnimBasePos);
+        camera.lookAt(controls.target);
+      }
+      state.cameraAnim = "none";
+    } else {
+      if (!state.cameraAnim || state.cameraAnim === "none") {
+        cameraAnimBasePos.copy(camera.position);
+        cameraAnimBaseTarget.copy(controls.target);
+      }
+      state.cameraAnim = nextAnim;
+    }
     setActivePreset(cameraAnimGrid, "camAnim", state.cameraAnim);
-    cameraAnimBasePos.copy(camera.position);
-    cameraAnimBaseTarget.copy(controls.target);
     saveStudioStateDebounced();
   });
 }
@@ -43037,7 +43097,12 @@ function animate(now2) {
   }
   controls.update();
   if (shapeStudio) shapeStudio.update();
-  renderer.render(scene, camera);
+  applyCameraAnimation(now2);
+  if (state.bloomEnabled && composer) {
+    composer.render();
+  } else {
+    renderer.render(scene, camera);
+  }
 }
 animate();
 function reset3DStudio() {
