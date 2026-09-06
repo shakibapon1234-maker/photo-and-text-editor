@@ -659,7 +659,7 @@ const state = {
   customMetalness: null,
   bloomStrength: 0.8,
   bloomRadius: 0.4,
-  bloomThreshold: 0.2,
+  bloomThreshold: 0.12,
   cameraAnim: 'none',
   contentMode: 'text', // PLAN_3 §1: 'text' | 'image' | 'sticker' — mutually exclusive, one active object at a time
   safeArea: safeAreaSelect?.value || 'none',
@@ -836,7 +836,10 @@ function buildMaterial(type, colorHex, isSide = false) {
     case 'neon': {
       // Balanced emissive so the letter contours, gradient, and 3D bevels stay sharp and legible
       const rawIntensity = typeof state.neonIntensity === 'number' ? state.neonIntensity : 0.8;
-      const intensity = Math.max(0.1, Math.min(2.5, rawIntensity)) * 0.45;
+      const intensity = Math.max(0.6, Math.min(3.5, rawIntensity)) * 1.2;
+      state.bloomEnabled = true;
+      if (typeof bloomToggle !== 'undefined' && bloomToggle) bloomToggle.checked = true;
+      if (typeof applyBloomSettings === 'function') applyBloomSettings();
       const mat = new THREE.MeshPhysicalMaterial({
         color: color,
         roughness: 0.22,
