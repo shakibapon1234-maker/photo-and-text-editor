@@ -635,11 +635,9 @@ let font = null;
 let textMesh = null;
 
 function getActiveStudioText() {
-  if (state.text && state.text.trim().length > 0) return state.text;
-  if (state.stickerText && state.stickerText.trim().length > 0) return state.stickerText;
-  if (typeof textInput !== 'undefined' && textInput && textInput.value && textInput.value.trim().length > 0) return textInput.value;
-  if (typeof stickerTextInput !== 'undefined' && stickerTextInput && stickerTextInput.value && stickerTextInput.value.trim().length > 0) return stickerTextInput.value;
-  return 'Warisha Fashion';
+  if (typeof state !== 'undefined' && typeof state.text === 'string') return state.text;
+  if (typeof textInput !== 'undefined' && textInput) return textInput.value || '';
+  return '';
 }
 
 function syncStudioText(newText) {
@@ -692,7 +690,7 @@ const state = {
   bgImageElement: null,
   imageElement: null, // HTMLImageElement of the uploaded photo, null until one is chosen
   pictureStyle: 'none', // §8.2 follow-up: id into PICTURE_STYLES, image mode only
-  stickerText: stickerTextInput.value, // PLAN_3 §2: sticker/badge mode only
+  stickerText: stickerTextInput.value || textInput.value || '', // PLAN_3 §2: sticker/badge mode only
   stickerShape: 'circle', // PLAN_3 §2.1: 'circle' | 'roundedRect' (Phase A1) | 'starburst' | 'stamp' | 'ribbon' | 'speech' | 'radiant' (Phase A2)
   stickerBgColor: stickerBgColorPicker.value,
   stickerTextColor: stickerTextColorPicker.value,
@@ -712,7 +710,7 @@ const state = {
   curveIntensity: Number(curveIntensityRange.value),
   curveDirection: 'up',
   curveSpacing: Number(curveSpacingRange.value) / 100,
-  text: textInput.value || 'Warisha Fashion',
+  text: textInput.value || '',
   depth: Number(depthRange.value),
   size: Number(sizeRange.value),
   rotX: Number(rotXRange.value),
@@ -2182,7 +2180,7 @@ function buildCanvasCardTextMesh(validLines) {
 // shape-drawing step below, nothing else in the pipeline.
 const STICKER_FONT_STACK = CANVAS_TEXT_FONT_STACK;
 const STICKER_FONT_PX = 200; // supersampled resolution, independent of world-space size
-const STICKER_PAD_RATIO = 0.28; // base padding between shape edge and text, relative to shape size
+const STICKER_PAD_RATIO = 0.08; // keep the shape border close to the rendered text
 
 // Phase A2: per-shape sizing knobs, layered on top of STICKER_PAD_RATIO.
 // `square: true` shapes (radial: circle/starburst/stamp/radiant) get a
@@ -4119,19 +4117,19 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
       const padMul = shapeSizing.padMul || 1.0;
       let padX, padY;
       if (shape === 'textBox' || shape === 'puffyBubble') {
-        padX = (text3DW * 0.06 + fontSize3D * 0.22) * bScale;
-        padY = (text3DH * 0.08 + fontSize3D * 0.18) * bScale;
+        padX = (text3DW * 0.025 + fontSize3D * 0.08) * bScale;
+        padY = (text3DH * 0.035 + fontSize3D * 0.08) * bScale;
       } else {
-        padX = (text3DW * 0.10 + fontSize3D * 0.35) * padMul * bScale;
-        padY = (text3DH * 0.12 + fontSize3D * 0.30) * padMul * bScale;
+        padX = (text3DW * 0.045 + fontSize3D * 0.12) * padMul * bScale;
+        padY = (text3DH * 0.055 + fontSize3D * 0.12) * padMul * bScale;
       }
       let worldWidth = (text3DW + padX * 2) + (borderOpts.borderWidth || 0) * 1.2;
       let worldHeight = (text3DH + padY * 2) + (borderOpts.borderWidth || 0) * 1.2;
 
       // In standing mode, the base floor plate has ample surface depth
       if (state.stickerMode === 'standing') {
-        worldHeight = Math.max(worldHeight, textDepth * 2.8 + 24);
-        worldWidth = Math.max(worldWidth, worldHeight * 1.15);
+        worldHeight = Math.max(worldHeight, textDepth * 1.5 + 8);
+        worldWidth = Math.max(worldWidth, worldHeight * 1.05);
       }
 
       if (usesIndividualLetterTiles) {
@@ -4896,7 +4894,8 @@ function scheduleRebuild() {
 }
 
 textInput.addEventListener('input', () => {
-  state.text = textInput.value;
+  syncStudioText(textInput.value);
+  if (state.contentMode === 'shape') window.__shapeStudio?.setSelectedText?.(textInput.value);
   scheduleRebuild();
 });
 
@@ -4952,8 +4951,9 @@ contentModeGrid.addEventListener('click', (e) => {
   const btn = e.target.closest('.preset-btn');
   if (!btn) return;
   state.contentMode = btn.dataset.content;
-  // Ensure the user's active text is 100% synchronized across modes
-  syncStudioText(getActiveStudioText());
+  // Keep the common text unchanged while switching the visual treatment.
+  syncStudioText(state.text);
+  if (state.contentMode === 'shape') window.__shapeStudio?.setSelectedText?.(state.text);
   setActivePreset(contentModeGrid, 'content', state.contentMode);
   textContentSection.hidden = state.contentMode !== 'text';
   imageContentSection.hidden = state.contentMode !== 'image';
@@ -5038,7 +5038,7 @@ if (cubeThemeGrid) cubeThemeGrid.addEventListener('click', (event) => {
 
 // ---------- PLAN_3 §2: sticker/badge text wiring ----------
 stickerTextInput.addEventListener('input', () => {
-  state.stickerText = stickerTextInput.value;
+  syncStudioText(stickerTextInput.value);
   scheduleRebuild();
 });
 
@@ -5363,7 +5363,7 @@ function loadStudioState() {
     const saved = JSON.parse(raw);
     if (!saved) return;
 
-    const savedSharedText = (saved.stickerText && saved.stickerText.trim().length > 0) ? saved.stickerText : (saved.text || 'Warisha Fashion');
+    const savedSharedText = typeof saved.text === 'string' ? saved.text : (saved.stickerText || '');
     state.text = savedSharedText;
     state.stickerText = savedSharedText;
     if (textInput) textInput.value = savedSharedText;
@@ -6902,6 +6902,7 @@ shapeStudio = initShapeStudio({
   FONT_MAP,
   fontLoader,
   getSharedAppearance: () => state,
+  getSharedText: () => state.text,
   isActive: () => state.contentMode === 'shape',
 });
 window.__shapeStudio = shapeStudio;

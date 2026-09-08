@@ -35780,6 +35780,7 @@ function initShapeStudio({
   FONT_MAP: FONT_MAP2,
   fontLoader: fontLoader2,
   getSharedAppearance,
+  getSharedText,
   isActive
   // () => boolean — true when contentMode === 'shape'
 }) {
@@ -36342,7 +36343,7 @@ function initShapeStudio({
       reflectionIntensity: 0.5,
       is3D: true,
       depth: 14,
-      text: "",
+      text: typeof getSharedText === "function" ? getSharedText() || "" : "",
       textColor: "#ffffff",
       textFillMode: "solid",
       textGradientColor1: "#fef08a",
@@ -36368,7 +36369,7 @@ function initShapeStudio({
   function addPreset(presetType) {
     const layer = defaultLayer(presetType);
     if (presetType === "textBox") {
-      layer.text = "\u0986\u09AA\u09A8\u09BE\u09B0 \u099F\u09C7\u0995\u09CD\u09B8\u099F";
+      layer.text = typeof getSharedText === "function" ? getSharedText() || "" : "";
       layer.fillColor = "#172554";
       layer.borderColor = "#fbbf24";
     }
@@ -36440,6 +36441,10 @@ function initShapeStudio({
     rebuildLayer(id);
     renderLayerList();
     persist();
+  }
+  function setSelectedText(text) {
+    if (!selectedId || !layers.has(selectedId)) return;
+    updateLayer(selectedId, { text: text || "" });
   }
   const PALETTES = {
     comic: ["#ef4444", "#facc15", "#22c55e", "#2563eb", "#a855f7", "#ef4444"],
@@ -36974,6 +36979,7 @@ function initShapeStudio({
     applyAnimation,
     resetAnimation,
     getSelectedTextUnitCount,
+    setSelectedText,
     getSnapshot,
     restoreSnapshot,
     flush: () => persist(true),
@@ -37497,11 +37503,9 @@ function buildLightingPreset(preset) {
 var font = null;
 var textMesh = null;
 function getActiveStudioText() {
-  if (state.text && state.text.trim().length > 0) return state.text;
-  if (state.stickerText && state.stickerText.trim().length > 0) return state.stickerText;
-  if (typeof textInput !== "undefined" && textInput && textInput.value && textInput.value.trim().length > 0) return textInput.value;
-  if (typeof stickerTextInput !== "undefined" && stickerTextInput && stickerTextInput.value && stickerTextInput.value.trim().length > 0) return stickerTextInput.value;
-  return "Warisha Fashion";
+  if (typeof state !== "undefined" && typeof state.text === "string") return state.text;
+  if (typeof textInput !== "undefined" && textInput) return textInput.value || "";
+  return "";
 }
 function syncStudioText(newText) {
   const val = newText !== void 0 ? newText : getActiveStudioText();
@@ -37555,7 +37559,7 @@ var state = {
   // HTMLImageElement of the uploaded photo, null until one is chosen
   pictureStyle: "none",
   // §8.2 follow-up: id into PICTURE_STYLES, image mode only
-  stickerText: stickerTextInput.value,
+  stickerText: stickerTextInput.value || textInput.value || "",
   // PLAN_3 §2: sticker/badge mode only
   stickerShape: "circle",
   // PLAN_3 §2.1: 'circle' | 'roundedRect' (Phase A1) | 'starburst' | 'stamp' | 'ribbon' | 'speech' | 'radiant' (Phase A2)
@@ -37582,7 +37586,7 @@ var state = {
   curveIntensity: Number(curveIntensityRange.value),
   curveDirection: "up",
   curveSpacing: Number(curveSpacingRange.value) / 100,
-  text: textInput.value || "Warisha Fashion",
+  text: textInput.value || "",
   depth: Number(depthRange.value),
   size: Number(sizeRange.value),
   rotX: Number(rotXRange.value),
@@ -38789,7 +38793,7 @@ function buildCanvasCardTextMesh(validLines) {
 }
 var STICKER_FONT_STACK = CANVAS_TEXT_FONT_STACK;
 var STICKER_FONT_PX = 200;
-var STICKER_PAD_RATIO = 0.28;
+var STICKER_PAD_RATIO = 0.08;
 var STICKER_SHAPE_SIZING = {
   circle: { square: true, padMul: 1.35 },
   textBox: { square: false, padMul: 0.85 },
@@ -40385,17 +40389,17 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
       const padMul = shapeSizing.padMul || 1;
       let padX, padY;
       if (shape === "textBox" || shape === "puffyBubble") {
-        padX = (text3DW * 0.06 + fontSize3D * 0.22) * bScale;
-        padY = (text3DH * 0.08 + fontSize3D * 0.18) * bScale;
+        padX = (text3DW * 0.025 + fontSize3D * 0.08) * bScale;
+        padY = (text3DH * 0.035 + fontSize3D * 0.08) * bScale;
       } else {
-        padX = (text3DW * 0.1 + fontSize3D * 0.35) * padMul * bScale;
-        padY = (text3DH * 0.12 + fontSize3D * 0.3) * padMul * bScale;
+        padX = (text3DW * 0.045 + fontSize3D * 0.12) * padMul * bScale;
+        padY = (text3DH * 0.055 + fontSize3D * 0.12) * padMul * bScale;
       }
       let worldWidth2 = text3DW + padX * 2 + (borderOpts.borderWidth || 0) * 1.2;
       let worldHeight2 = text3DH + padY * 2 + (borderOpts.borderWidth || 0) * 1.2;
       if (state.stickerMode === "standing") {
-        worldHeight2 = Math.max(worldHeight2, textDepth * 2.8 + 24);
-        worldWidth2 = Math.max(worldWidth2, worldHeight2 * 1.15);
+        worldHeight2 = Math.max(worldHeight2, textDepth * 1.5 + 8);
+        worldWidth2 = Math.max(worldWidth2, worldHeight2 * 1.05);
       }
       if (usesIndividualLetterTiles) {
         const tileLetters = Array.from(textStr).filter((ch) => ch.trim().length > 0);
@@ -41038,7 +41042,8 @@ function scheduleRebuild() {
   }, 120);
 }
 textInput.addEventListener("input", () => {
-  state.text = textInput.value;
+  syncStudioText(textInput.value);
+  if (state.contentMode === "shape") window.__shapeStudio?.setSelectedText?.(textInput.value);
   scheduleRebuild();
 });
 safeAreaSelect?.addEventListener("change", () => {
@@ -41089,7 +41094,8 @@ contentModeGrid.addEventListener("click", (e) => {
   const btn = e.target.closest(".preset-btn");
   if (!btn) return;
   state.contentMode = btn.dataset.content;
-  syncStudioText(getActiveStudioText());
+  syncStudioText(state.text);
+  if (state.contentMode === "shape") window.__shapeStudio?.setSelectedText?.(state.text);
   setActivePreset(contentModeGrid, "content", state.contentMode);
   textContentSection.hidden = state.contentMode !== "text";
   imageContentSection.hidden = state.contentMode !== "image";
@@ -41188,7 +41194,7 @@ if (cubeThemeGrid) cubeThemeGrid.addEventListener("click", (event) => {
   }
 });
 stickerTextInput.addEventListener("input", () => {
-  state.stickerText = stickerTextInput.value;
+  syncStudioText(stickerTextInput.value);
   scheduleRebuild();
 });
 stickerShapeGrid.addEventListener("click", (e) => {
@@ -41478,7 +41484,7 @@ function loadStudioState() {
     if (!raw) return;
     const saved = JSON.parse(raw);
     if (!saved) return;
-    const savedSharedText = saved.stickerText && saved.stickerText.trim().length > 0 ? saved.stickerText : saved.text || "Warisha Fashion";
+    const savedSharedText = typeof saved.text === "string" ? saved.text : saved.stickerText || "";
     state.text = savedSharedText;
     state.stickerText = savedSharedText;
     if (textInput) textInput.value = savedSharedText;
@@ -42838,6 +42844,7 @@ shapeStudio = initShapeStudio({
   FONT_MAP,
   fontLoader,
   getSharedAppearance: () => state,
+  getSharedText: () => state.text,
   isActive: () => state.contentMode === "shape"
 });
 window.__shapeStudio = shapeStudio;

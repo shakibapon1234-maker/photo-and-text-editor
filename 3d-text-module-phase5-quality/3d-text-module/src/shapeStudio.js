@@ -26,6 +26,7 @@ export function initShapeStudio({
   FONT_MAP,
   fontLoader,
   getSharedAppearance,
+  getSharedText,
   isActive, // () => boolean — true when contentMode === 'shape'
 }) {
   const STORAGE_KEY = 'shapeStudio_layers_v1';
@@ -619,7 +620,7 @@ export function initShapeStudio({
       reflectionIntensity: 0.5,
       is3D: true,
       depth: 14,
-      text: '',
+      text: typeof getSharedText === 'function' ? (getSharedText() || '') : '',
       textColor: '#ffffff',
       textFillMode: 'solid',
       textGradientColor1: '#fef08a',
@@ -647,7 +648,7 @@ export function initShapeStudio({
   function addPreset(presetType) {
     const layer = defaultLayer(presetType);
     if (presetType === 'textBox') {
-      layer.text = 'আপনার টেক্সট';
+      layer.text = typeof getSharedText === 'function' ? (getSharedText() || '') : '';
       layer.fillColor = '#172554';
       layer.borderColor = '#fbbf24';
     }
@@ -723,6 +724,11 @@ export function initShapeStudio({
     rebuildLayer(id);
     renderLayerList();
     persist();
+  }
+
+  function setSelectedText(text) {
+    if (!selectedId || !layers.has(selectedId)) return;
+    updateLayer(selectedId, { text: text || '' });
   }
 
   const PALETTES = {
@@ -1314,6 +1320,7 @@ export function initShapeStudio({
     applyAnimation,
     resetAnimation,
     getSelectedTextUnitCount,
+    setSelectedText,
     getSnapshot,
     restoreSnapshot,
     flush: () => persist(true),

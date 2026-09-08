@@ -121,6 +121,15 @@
         <p class="field-note">টেক্সট, ছবি, স্টিকার/ব্যাজ বা ৩D কিউব — যেকোনো একটা একবারে অ্যাক্টিভ থাকে।</p>
       </section>
 
+      <section class="panel-section" id="sharedTextSection">
+        <h3>কমন টেক্সট</h3>
+        <label class="field" style="align-items: flex-start;">
+          <span style="margin-top: 6px;">কন্টেন্ট</span>
+          <textarea id="textInput" rows="2" placeholder="লেখা লিখুন (Enter দিয়ে একাধিক লাইন)" style="resize: vertical; min-height: 52px; font-family: inherit;"></textarea>
+        </label>
+        <p class="field-note">এই লেখাটিই টেক্সট, স্টিকার/ব্যাজ ও অন্যান্য ডিজাইন মোডে থাকবে।</p>
+      </section>
+
       <section class="panel-section">
         <h3>প্লে স্ক্রিন ও সেফ এরিয়া</h3>
         <label class="field">
@@ -354,10 +363,6 @@
 
       <section class="panel-section" id="textContentSection">
         <h3>টেক্সট</h3>
-        <label class="field" style="align-items: flex-start;">
-          <span style="margin-top: 6px;">কন্টেন্ট</span>
-          <textarea id="textInput" rows="2" placeholder="লেখা লিখুন (Enter দিয়ে একাধিক লাইন)" style="resize: vertical; min-height: 52px; font-family: inherit;">Warisha Fashion</textarea>
-        </label>
         <label class="field" style="margin-top: 8px;">
           <span>ফন্ট (Font)</span>
           <select id="fontSelect">
@@ -416,7 +421,7 @@
         <h3>স্টিকার/ব্যাজ টেক্সট</h3>
         <label class="field" style="align-items: flex-start;">
           <span style="margin-top: 6px;">কন্টেন্ট</span>
-          <textarea id="stickerTextInput" rows="2" placeholder="ব্যাজের ভিতরের লেখা" style="resize: vertical; min-height: 52px; font-family: inherit;">Warisha Fashion</textarea>
+          <textarea id="stickerTextInput" rows="2" placeholder="কমন টেক্সট ব্যবহার হচ্ছে" style="resize: vertical; min-height: 52px; font-family: inherit;" hidden></textarea>
         </label>
 
         <label class="field" style="margin-top:8px;">
@@ -1083,6 +1088,6 @@
     </aside>
   </div>
 
-  <script type="module" src="main.bundle.js?v=1788712775366"></script>
+  <script type="module" src="main.bundle.js?v=1788866853145"></script>
 </body>
 </html>
