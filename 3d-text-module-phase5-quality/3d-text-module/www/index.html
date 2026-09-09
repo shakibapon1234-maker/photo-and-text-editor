@@ -423,6 +423,16 @@
           <span style="margin-top: 6px;">কন্টেন্ট</span>
           <textarea id="stickerTextInput" rows="2" placeholder="কমন টেক্সট ব্যবহার হচ্ছে" style="resize: vertical; min-height: 52px; font-family: inherit;" hidden></textarea>
         </label>
+        <div id="stickerSplitControls" hidden style="margin-top:8px; padding:10px; border:1px solid rgba(56,189,248,.35); border-radius:8px; background:rgba(14,165,233,.06);">
+          <strong>Glass + Solid Split Text</strong>
+          <textarea id="stickerSplitGlassTextInput" rows="2" placeholder="উপরের / বাম Glass অংশের লেখা" style="width:100%; margin-top:8px;"></textarea>
+          <label class="field"><span>Glass Text Color</span><input type="color" id="stickerSplitGlassTextColor" value="#1f2937"></label>
+          <textarea id="stickerSplitSolidTextInput" rows="2" placeholder="নিচের / ডান Solid অংশের লেখা" style="width:100%; margin-top:8px;"></textarea>
+          <label class="field"><span>Solid Text Color</span><input type="color" id="stickerSplitSolidTextColor" value="#ffffff"></label>
+          <label class="field"><span>Glass Bed Color</span><input type="color" id="stickerSplitGlassColor" value="#ffffff"></label>
+          <label class="field"><span>Solid Bed Color</span><input type="color" id="stickerSplitSolidColor" value="#0ea5e9"></label>
+          <label class="field"><span>Split Direction</span><select id="stickerSplitOrientation"><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option></select></label>
+        </div>
 
         <label class="field" style="margin-top:8px;">
           <span>টেক্সট স্টাইল ও পজিশন</span>
@@ -469,6 +479,7 @@
           <button type="button" class="preset-btn" data-sticker-shape="textBox" style="border-color:#f59e0b; font-weight:700;">📦 টেক্সট বক্স (3D Text Box)</button>
           <button type="button" class="preset-btn" data-sticker-shape="letterContour" style="border-color:#ffd700; font-weight:700;">🏆 Warisha Plate (গোল্ডেন প্লেট)</button>
           <button type="button" class="preset-btn" data-sticker-shape="glassPlate">🪟 ফ্রস্টেড গ্লাস প্লেট</button>
+          <button type="button" class="preset-btn" data-sticker-shape="glassSolidSplit">◐ Glass + Solid Split</button>
           <button type="button" class="preset-btn" data-sticker-shape="neonFrame">⚡ নিয়ন সাইবার ফ্রেম</button>
           <button type="button" class="preset-btn" data-sticker-shape="circle">গোল স্টিকার (Peeled)</button>
           <button type="button" class="preset-btn" data-sticker-shape="roundedRect">রাউন্ড-রেক্ট ব্যাজ</button>
@@ -1088,6 +1099,6 @@
     </aside>
   </div>
 
-  <script type="module" src="main.bundle.js?v=1788866853145"></script>
+  <script type="module" src="main.bundle.js?v=1788956503444"></script>
 </body>
 </html>

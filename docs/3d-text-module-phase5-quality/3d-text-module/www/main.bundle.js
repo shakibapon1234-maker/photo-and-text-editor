@@ -37028,6 +37028,14 @@ var pictureStyleGrid = document.getElementById("pictureStyleGrid");
 var stickerContentSection = document.getElementById("stickerContentSection");
 var stickerTextInput = document.getElementById("stickerTextInput");
 var stickerShapeGrid = document.getElementById("stickerShapeGrid");
+var stickerSplitControls = document.getElementById("stickerSplitControls");
+var stickerSplitGlassTextInput = document.getElementById("stickerSplitGlassTextInput");
+var stickerSplitSolidTextInput = document.getElementById("stickerSplitSolidTextInput");
+var stickerSplitGlassTextColor = document.getElementById("stickerSplitGlassTextColor");
+var stickerSplitSolidTextColor = document.getElementById("stickerSplitSolidTextColor");
+var stickerSplitGlassColor = document.getElementById("stickerSplitGlassColor");
+var stickerSplitSolidColor = document.getElementById("stickerSplitSolidColor");
+var stickerSplitOrientation = document.getElementById("stickerSplitOrientation");
 var stickerBgColorPicker = document.getElementById("stickerBgColorPicker");
 var stickerTextColorPicker = document.getElementById("stickerTextColorPicker");
 var stickerBorderWidthRange = document.getElementById("stickerBorderWidthRange");
@@ -37565,6 +37573,13 @@ var state = {
   // PLAN_3 §2.1: 'circle' | 'roundedRect' (Phase A1) | 'starburst' | 'stamp' | 'ribbon' | 'speech' | 'radiant' (Phase A2)
   stickerBgColor: stickerBgColorPicker.value,
   stickerTextColor: stickerTextColorPicker.value,
+  splitGlassText: "",
+  splitSolidText: "",
+  splitGlassTextColor: "#1f2937",
+  splitSolidTextColor: "#ffffff",
+  splitGlassColor: "#ffffff",
+  splitSolidColor: "#0ea5e9",
+  splitOrientation: "horizontal",
   stickerBorderWidth: parseInt(stickerBorderWidthRange?.value || "0", 10),
   stickerBorderColor: stickerBorderColorPicker?.value || "#ffffff",
   stickerShadow: stickerShadowCheckbox?.checked || false,
@@ -38794,6 +38809,69 @@ function buildCanvasCardTextMesh(validLines) {
 var STICKER_FONT_STACK = CANVAS_TEXT_FONT_STACK;
 var STICKER_FONT_PX = 200;
 var STICKER_PAD_RATIO = 0.08;
+function hexToRgba(hex, alpha) {
+  const value = String(hex || "#ffffff").replace("#", "");
+  const normalized = value.length === 3 ? value.split("").map((c) => c + c).join("") : value;
+  const number = Number.parseInt(normalized, 16);
+  if (!Number.isFinite(number)) return `rgba(255,255,255,${alpha})`;
+  return `rgba(${number >> 16 & 255},${number >> 8 & 255},${number & 255},${alpha})`;
+}
+function drawGlassSolidSplitTexture() {
+  const glassText = state.splitGlassText || state.stickerText || "Glass";
+  const solidText = state.splitSolidText || "Solid";
+  const vertical = state.splitOrientation === "vertical";
+  const fontSize = 150;
+  const measure = document.createElement("canvas").getContext("2d");
+  measure.font = `700 ${fontSize}px ${CANVAS_TEXT_FONT_STACK}`;
+  const glassWidth = measure.measureText(glassText).width;
+  const solidWidth = measure.measureText(solidText).width;
+  const pad = 70;
+  const canvasW = vertical ? Math.max(720, glassWidth + solidWidth + pad * 2) : Math.max(720, Math.max(glassWidth, solidWidth) + pad * 2);
+  const canvasH = vertical ? 360 : 520;
+  const canvas2 = document.createElement("canvas");
+  canvas2.width = canvasW;
+  canvas2.height = canvasH;
+  const ctx = canvas2.getContext("2d");
+  const radius = 42;
+  const split = vertical ? canvasW * 0.48 : canvasH * 0.48;
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(4, 4, canvasW - 8, canvasH - 8, radius);
+  ctx.clip();
+  ctx.fillStyle = hexToRgba(state.splitGlassColor || "#ffffff", 0.2);
+  ctx.fillRect(0, 0, canvasW, canvasH);
+  ctx.fillStyle = state.splitSolidColor || "#0ea5e9";
+  if (vertical) ctx.fillRect(split, 0, canvasW - split, canvasH);
+  else ctx.fillRect(0, split, canvasW, canvasH - split);
+  ctx.fillStyle = "rgba(255,255,255,.22)";
+  ctx.fillRect(0, 0, canvasW, Math.max(8, canvasH * 0.035));
+  ctx.strokeStyle = "rgba(255,255,255,.62)";
+  ctx.lineWidth = 8;
+  ctx.beginPath();
+  if (vertical) {
+    ctx.moveTo(split, 18);
+    ctx.lineTo(split, canvasH - 18);
+  } else {
+    ctx.moveTo(18, split);
+    ctx.lineTo(canvasW - 18, split);
+  }
+  ctx.stroke();
+  ctx.restore();
+  const fit = (text, maxWidth) => Math.min(fontSize, Math.max(52, fontSize * maxWidth / Math.max(1, measure.measureText(text).width)));
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `700 ${fit(glassText, vertical ? canvasW * 0.42 : canvasW - pad * 2)}px ${CANVAS_TEXT_FONT_STACK}`;
+  ctx.fillStyle = state.splitGlassTextColor || "#1f2937";
+  ctx.strokeStyle = "rgba(0,0,0,.3)";
+  ctx.lineWidth = 8;
+  ctx.strokeText(glassText, vertical ? split * 0.5 : canvasW / 2, vertical ? canvasH / 2 : canvasH * 0.25);
+  ctx.fillText(glassText, vertical ? split * 0.5 : canvasW / 2, vertical ? canvasH / 2 : canvasH * 0.25);
+  ctx.font = `700 ${fit(solidText, vertical ? canvasW * 0.42 : canvasW - pad * 2)}px ${CANVAS_TEXT_FONT_STACK}`;
+  ctx.fillStyle = state.splitSolidTextColor || "#ffffff";
+  ctx.strokeText(solidText, vertical ? split + (canvasW - split) / 2 : canvasW / 2, vertical ? canvasH / 2 : canvasH * 0.74);
+  ctx.fillText(solidText, vertical ? split + (canvasW - split) / 2 : canvasW / 2, vertical ? canvasH / 2 : canvasH * 0.74);
+  return { canvas: canvas2, aspect: canvasW / canvasH };
+}
 var STICKER_SHAPE_SIZING = {
   circle: { square: true, padMul: 1.35 },
   textBox: { square: false, padMul: 0.85 },
@@ -38803,6 +38881,7 @@ var STICKER_SHAPE_SIZING = {
   thoughtCloud: { square: false, padMul: 1.35, tailRatio: 0.22 },
   speechOval: { square: false, padMul: 1.25, tailRatio: 0.2 },
   glassPlate: { square: false, padMul: 1.1 },
+  glassSolidSplit: { square: false, padMul: 1.2 },
   waterRipple: { square: false, padMul: 1.2 },
   whiteCutout: { square: false, padMul: 1.1 },
   starburst: { square: false, padMul: 1.7 },
@@ -38838,6 +38917,7 @@ var STICKER_SHAPE_SIZING = {
 };
 function drawStickerCanvasTexture(text, shape, bgColor, textColor, curveOpts = { curveIntensity: 0 }, borderOpts = {}) {
   const { borderWidth = 0, borderColor = "#ffffff", shadow = false, targetAspect = null } = borderOpts;
+  if (shape === "glassSolidSplit") return drawGlassSolidSplitTexture();
   if (state.stickerWith3DText && targetAspect) {
     const canvasW2 = 1024;
     const canvasH2 = Math.max(128, Math.round(1024 / targetAspect));
@@ -40266,7 +40346,7 @@ function buildStickerCardMesh(text, shape, bgColor, textColor, curveOpts, border
   const usesIndividualLetterTiles = shape === "woodenBlocks" || shape === "redTiles";
   const wants3D = state.stickerMode === "standing" || state.stickerMode === "wall" || state.stickerWith3DText;
   const needsUnicodeCanvasText = isBanglaText(textStr);
-  const is3D = wants3D && !needsUnicodeCanvasText;
+  const is3D = wants3D && !needsUnicodeCanvasText && shape !== "glassSolidSplit";
   const isTypewriterMode = animState.presetId === "typewriter" && animState.playing;
   if (is3D) {
     if (!font) {
@@ -41071,6 +41151,7 @@ textTemplateGrid?.addEventListener("click", (event) => {
   state.depth = preset.depth;
   if (textInput) textInput.value = preset.text;
   if (contentModeGrid) setActivePreset(contentModeGrid, "content", "text");
+  if (stickerSplitControls) stickerSplitControls.hidden = true;
   if (textContentSection) textContentSection.hidden = false;
   if (imageContentSection) imageContentSection.hidden = true;
   if (stickerContentSection) stickerContentSection.hidden = true;
@@ -41201,8 +41282,33 @@ stickerShapeGrid.addEventListener("click", (e) => {
   const btn = e.target.closest(".preset-btn");
   if (!btn) return;
   state.stickerShape = btn.dataset.stickerShape;
+  if (stickerSplitControls) stickerSplitControls.hidden = state.stickerShape !== "glassSolidSplit";
+  if (state.stickerShape === "glassSolidSplit") {
+    state.splitGlassText = state.splitGlassText || state.stickerText || "";
+    if (stickerSplitGlassTextInput) stickerSplitGlassTextInput.value = state.splitGlassText;
+    if (stickerSplitSolidTextInput) stickerSplitSolidTextInput.value = state.splitSolidText;
+  }
   setActivePreset(stickerShapeGrid, "stickerShape", state.stickerShape);
   if (state.contentMode === "sticker") rebuildTextMesh();
+  saveStudioStateDebounced();
+});
+function bindSplitControl(input, field) {
+  if (!input) return;
+  input.addEventListener("input", () => {
+    state[field] = input.value;
+    if (state.stickerShape === "glassSolidSplit" && state.contentMode === "sticker") scheduleRebuild();
+    saveStudioStateDebounced();
+  });
+}
+bindSplitControl(stickerSplitGlassTextInput, "splitGlassText");
+bindSplitControl(stickerSplitSolidTextInput, "splitSolidText");
+bindSplitControl(stickerSplitGlassTextColor, "splitGlassTextColor");
+bindSplitControl(stickerSplitSolidTextColor, "splitSolidTextColor");
+bindSplitControl(stickerSplitGlassColor, "splitGlassColor");
+bindSplitControl(stickerSplitSolidColor, "splitSolidColor");
+if (stickerSplitOrientation) stickerSplitOrientation.addEventListener("change", () => {
+  state.splitOrientation = stickerSplitOrientation.value;
+  if (state.stickerShape === "glassSolidSplit" && state.contentMode === "sticker") scheduleRebuild();
   saveStudioStateDebounced();
 });
 stickerBgColorPicker.addEventListener("input", () => {
