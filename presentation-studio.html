@@ -67,12 +67,10 @@ const _getInitialDeck=()=>{
   try{
     const ls=JSON.parse(localStorage.getItem('presentation-studio-autosave-v1')||'null');
     if(ls&&Array.isArray(ls.slides)&&ls.slides.length>0){
-      const defLen = (window.DEFAULT_RECOVERED_SLIDES && window.DEFAULT_RECOVERED_SLIDES.length) || 0;
-      if(ls.slides.length >= defLen || defLen <= 1){
-        return structuredClone(ls.slides);
-      }
+      return structuredClone(ls.slides);
     }
   }catch(_){}
+  // Fall back to the server-written default deck (most recently saved project)
   try{if(window.DEFAULT_RECOVERED_SLIDES&&Array.isArray(window.DEFAULT_RECOVERED_SLIDES)&&window.DEFAULT_RECOVERED_SLIDES.length){return structuredClone(window.DEFAULT_RECOVERED_SLIDES);}}catch(_){}
   return[makeSlide()];
 };
@@ -290,18 +288,18 @@ function addTextTransformHandle(){
 }
 
 document.head.insertAdjacentHTML('beforeend','<style>.text-el{overflow:visible}.text-content{display:block;min-height:100%;cursor:text;user-select:text}.text-move-handle,.text-rotate-handle,.text-resize-handle{position:absolute;left:50%;width:40px;height:18px;transform:translateX(-50%);border:1px solid #1769e8;border-radius:4px;background:#fff;color:#1769e8;font:700 9px Arial;text-align:center;line-height:16px;cursor:grab;z-index:6;user-select:none}.text-move-handle{top:-25px}.text-rotate-handle{top:-50px}.text-resize-handle{top:6px}.text-rotate-handle:after{content:"";position:absolute;left:19px;top:16px;height:13px;border-left:2px solid #ffb11b}.slide{overflow:visible}</style>');
-startDrag=function(event){
-  const target=event.target;
-  if(target && (target.isContentEditable || target.closest?.('[contenteditable="true"], .inline-editing'))) return;
-  const node=event.currentTarget?.dataset?.id?event.currentTarget:event.target.closest('.element');
-  if(!node || node.classList.contains('inline-editing'))return;
-  selected=node.dataset.id;
-  const rect=$('slide').getBoundingClientRect(),item=selectedEl();
-  if(!item)return;
-  drag={el:item,r:rect,dx:event.clientX-rect.left-item.x*rect.width/100,dy:event.clientY-rect.top-item.y*rect.height/100,moved:false};
-  window.__presentationLiveDrag=true;
-  node.setPointerCapture?.(event.pointerId);
-  renderInspector();renderSlides();
+// startDrag is fully handled by presentation-hard-transform-controls.js which
+// uses a 5px drag threshold and properly handles double-click vs drag disambiguation.
+// We only keep startDrag as a no-op override to avoid conflicts with older handlers.
+startDrag = function(event) {
+  const target = event.target;
+  // If target is content editable (inline text edit mode), do not interfere
+  if (target && (target.isContentEditable || target.closest?.('[contenteditable="true"], .inline-editing'))) return;
+  const node = event.currentTarget?.dataset?.id ? event.currentTarget : event.target.closest('.element');
+  if (!node || node.classList.contains('inline-editing')) return;
+  // Just update selected — hard-transform-controls.js handles actual drag via its own pointerdown listener
+  selected = node.dataset.id;
+  renderInspector();
 };
 document.addEventListener('pointerdown',event=>{
   const target=event.target;

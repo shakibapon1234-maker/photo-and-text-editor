@@ -43400,7 +43400,7 @@ function applyCubeAnimation(now2) {
   return true;
 }
 function animate(now2) {
-  if (document.hidden || (window.frameElement && !window.frameElement.classList.contains('active'))) {
+  if (document.hidden || window.frameElement && !window.frameElement.classList.contains("active")) {
     setTimeout(() => requestAnimationFrame(animate), 250);
     return;
   }

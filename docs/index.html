@@ -150,11 +150,11 @@
   </header>
 
   <main class="suite-body">
-    <iframe id="framePhoto" class="app-frame active" src="photo-editor/index.html"></iframe>
-    <iframe id="frame3d" class="app-frame" src="3d-text-module-phase5-quality/3d-text-module/www/index.html?v=1.2.1"></iframe>
-    <iframe id="frameLogo" class="app-frame" src="spinning-circle-animation.html"></iframe>
-    <iframe id="framePromo" class="app-frame" src="promo-motion-studio.html"></iframe>
-    <iframe id="frameDesign" class="app-frame" src="design-tools.html"></iframe>
+    <iframe id="framePhoto" class="app-frame" data-src="photo-editor/index.html"></iframe>
+    <iframe id="frame3d" class="app-frame" data-src="3d-text-module-phase5-quality/3d-text-module/www/index.html?v=1.2.1"></iframe>
+    <iframe id="frameLogo" class="app-frame" data-src="spinning-circle-animation.html"></iframe>
+    <iframe id="framePromo" class="app-frame" data-src="promo-motion-studio.html"></iframe>
+    <iframe id="frameDesign" class="app-frame" data-src="design-tools.html"></iframe>
     <iframe id="framePresentation" class="app-frame" data-src="presentation-studio.html"></iframe>
   </main>
 
@@ -173,92 +173,28 @@
       const tabDesignBtn = document.getElementById('tabDesignBtn');
       const tabPresentationBtn = document.getElementById('tabPresentationBtn');
 
-      if (tab === 'photo') {
-        framePhoto.classList.add('active');
-        frame3d.classList.remove('active');
-        frameLogo.classList.remove('active');
-        framePromo.classList.remove('active');
-        frameDesign.classList.remove('active');
-        framePresentation.classList.remove('active');
-        tabPhotoBtn.classList.add('active');
-        tab3dBtn.classList.remove('active');
-        tabLogoBtn.classList.remove('active');
-        tabPromoBtn.classList.remove('active');
-        tabDesignBtn.classList.remove('active');
-        tabPresentationBtn.classList.remove('active');
-        try { localStorage.setItem('active_studio_tab', 'photo'); } catch (_) {}
-      } else if (tab === '3d') {
-        frame3d.classList.add('active');
-        framePhoto.classList.remove('active');
-        frameLogo.classList.remove('active');
-        framePromo.classList.remove('active');
-        frameDesign.classList.remove('active');
-        framePresentation.classList.remove('active');
-        tab3dBtn.classList.add('active');
-        tabPhotoBtn.classList.remove('active');
-        tabLogoBtn.classList.remove('active');
-        tabPromoBtn.classList.remove('active');
-        tabDesignBtn.classList.remove('active');
-        tabPresentationBtn.classList.remove('active');
-        try { localStorage.setItem('active_studio_tab', '3d'); } catch (_) {}
-      } else if (tab === 'logo') {
-        frameLogo.classList.add('active');
-        framePhoto.classList.remove('active');
-        frame3d.classList.remove('active');
-        framePromo.classList.remove('active');
-        frameDesign.classList.remove('active');
-        framePresentation.classList.remove('active');
-        tabLogoBtn.classList.add('active');
-        tabPhotoBtn.classList.remove('active');
-        tab3dBtn.classList.remove('active');
-        tabPromoBtn.classList.remove('active');
-        tabDesignBtn.classList.remove('active');
-        tabPresentationBtn.classList.remove('active');
-        try { localStorage.setItem('active_studio_tab', 'logo'); } catch (_) {}
-      } else if (tab === 'promo') {
-        framePromo.classList.add('active');
-        framePhoto.classList.remove('active');
-        frame3d.classList.remove('active');
-        frameLogo.classList.remove('active');
-        frameDesign.classList.remove('active');
-        framePresentation.classList.remove('active');
-        tabPromoBtn.classList.add('active');
-        tabPhotoBtn.classList.remove('active');
-        tab3dBtn.classList.remove('active');
-        tabLogoBtn.classList.remove('active');
-        tabDesignBtn.classList.remove('active');
-        tabPresentationBtn.classList.remove('active');
-        try { localStorage.setItem('active_studio_tab', 'promo'); } catch (_) {}
-      } else if (tab === 'design') {
-        frameDesign.classList.add('active');
-        framePhoto.classList.remove('active');
-        frame3d.classList.remove('active');
-        frameLogo.classList.remove('active');
-        framePromo.classList.remove('active');
-        framePresentation.classList.remove('active');
-        tabDesignBtn.classList.add('active');
-        tabPhotoBtn.classList.remove('active');
-        tab3dBtn.classList.remove('active');
-        tabLogoBtn.classList.remove('active');
-        tabPromoBtn.classList.remove('active');
-        tabPresentationBtn.classList.remove('active');
-        try { localStorage.setItem('active_studio_tab', 'design'); } catch (_) {}
-      } else if (tab === 'presentation') {
-        if (!framePresentation.src) framePresentation.src = framePresentation.dataset.src;
-        framePresentation.classList.add('active');
-        framePhoto.classList.remove('active');
-        frame3d.classList.remove('active');
-        frameLogo.classList.remove('active');
-        framePromo.classList.remove('active');
-        frameDesign.classList.remove('active');
-        tabPresentationBtn.classList.add('active');
-        tabPhotoBtn.classList.remove('active');
-        tab3dBtn.classList.remove('active');
-        tabLogoBtn.classList.remove('active');
-        tabPromoBtn.classList.remove('active');
-        tabDesignBtn.classList.remove('active');
-        try { localStorage.setItem('active_studio_tab', 'presentation'); } catch (_) {}
-      }
+      const tabs = [
+        { id: 'photo', frame: framePhoto, btn: tabPhotoBtn },
+        { id: '3d', frame: frame3d, btn: tab3dBtn },
+        { id: 'logo', frame: frameLogo, btn: tabLogoBtn },
+        { id: 'promo', frame: framePromo, btn: tabPromoBtn },
+        { id: 'design', frame: frameDesign, btn: tabDesignBtn },
+        { id: 'presentation', frame: framePresentation, btn: tabPresentationBtn }
+      ];
+
+      tabs.forEach(t => {
+        const isActive = (t.id === tab);
+        t.frame.classList.toggle('active', isActive);
+        t.btn.classList.toggle('active', isActive);
+        if (isActive) {
+          const currentSrc = t.frame.getAttribute('src');
+          if (!currentSrc || currentSrc === 'about:blank') {
+            t.frame.src = t.frame.dataset.src;
+          }
+        }
+      });
+
+      try { localStorage.setItem('active_studio_tab', tab); } catch (_) {}
     }
 
     function triggerGlobalClear() {

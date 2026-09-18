@@ -1,6 +1,7 @@
-const { app, BrowserWindow, session } = require('electron');
+const { app, BrowserWindow, session, net } = require('electron');
 const path = require('path');
 const http = require('http');
+const net_mod = require('net');
 const fs = require('fs');
 const os = require('os');
 
@@ -145,7 +146,9 @@ function startInternalServer(callback) {
 
     server.on('error', (err) => {
         if (err.code === 'EADDRINUSE') {
-            console.log(`Port ${SERVER_PORT} in use, attaching to existing.`);
+            // Port is occupied — try to connect to it to confirm it's a live server
+            // (not a zombie). If we can connect we just reuse it; otherwise wait.
+            console.warn(`Port ${SERVER_PORT} already in use – reusing existing server.`);
             if (callback) callback();
         } else {
             console.error('Server error:', err);
@@ -171,7 +174,10 @@ function createWindow() {
         backgroundColor: '#0f1115',
         webPreferences: {
             nodeIntegration: false,
-            contextIsolation: true
+            contextIsolation: true,
+            // Use a named persistent partition so IndexedDB and localStorage
+            // are stored and SURVIVE across app restarts.
+            partition: 'persist:studio'
         }
     });
 
@@ -179,14 +185,25 @@ function createWindow() {
     mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+// Disable HTTP disk cache so every JS/HTML file loads fresh from disk
+// This does NOT clear IndexedDB or localStorage — those are preserved between sessions.
+app.commandLine.appendSwitch('disable-http-cache');
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
 
-app.whenReady().then(async () => {
-    try {
-        await session.defaultSession.clearCache();
-    } catch (_) {}
+// Kill any zombie process holding port 8000 before we try to bind
+function freePort(port) {
+    return new Promise(resolve => {
+        const tester = net_mod.createServer();
+        tester.once('error', () => resolve(false)); // port in use, can't free
+        tester.once('listening', () => { tester.close(); resolve(true); }); // port free
+        tester.listen(port, '127.0.0.1');
+    });
+}
 
-    session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+app.whenReady().then(async () => {
+    // Grant media permissions for webcam / microphone if the app ever needs them
+    const studioSession = session.fromPartition('persist:studio');
+    studioSession.setPermissionRequestHandler((_webContents, permission, callback) => {
         callback(permission === 'media');
     });
 

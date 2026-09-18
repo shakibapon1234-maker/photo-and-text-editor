@@ -536,7 +536,15 @@
     createRecoveryUI();
 
     try {
-      db = await openDb();
+      // Open IDB and fetch recovered-project.json IN PARALLEL for speed
+      const [db_result, recoverJson] = await Promise.all([
+        openDb().catch(() => null),
+        fetch('recovered-project.json?t=' + Date.now())
+          .then(r => r.ok ? r.json() : null)
+          .catch(() => null)
+      ]);
+      db = db_result;
+
       const saved = await get(KEY);
       const emergency = await get('emergency_backup');
       const lsBackup = (() => {
@@ -546,12 +554,19 @@
         try { return JSON.parse(localStorage.getItem(LS_AUTOSAVE) || 'null'); } catch (_) { return null; }
       })();
 
+      // Include the server-written recovered-project.json as a ranked candidate.
+      // This is the most reliable persistence mechanism in Electron (written by the Node server).
+      const serverData = (recoverJson && Array.isArray(recoverJson.slides) && recoverJson.slides.length > 0)
+        ? { slides: recoverJson.slides, current: recoverJson.current || 0, savedAt: recoverJson.savedAt || 0, elementCount: countTotalElements(recoverJson.slides) }
+        : null;
+
       // Pick candidate with the highest slide count, then newest timestamp
       const candidates = [
         { source: 'idb_saved', data: saved },
         { source: 'idb_emergency', data: emergency },
         { source: 'ls_emergency', data: lsBackup },
-        { source: 'ls_auto', data: lsAuto }
+        { source: 'ls_auto', data: lsAuto },
+        { source: 'server_file', data: serverData }
       ].filter(c => c.data && Array.isArray(c.data.slides) && c.data.slides.length > 0);
 
       let bestCandidate = null;
@@ -580,31 +595,10 @@
           } else if (typeof renderSlides === 'function') {
             renderSlides();
           }
-        }
-      } else {
-        try {
-          const recResp = await fetch('recovered-project.json?t=' + Date.now());
-          if (recResp.ok) {
-            const recData = await recResp.json();
-            if (recData && Array.isArray(recData.slides) && recData.slides.length > 0) {
-              slides = structuredClone(recData.slides);
-              window.slides = slides;
-              current = Math.min(Math.max(0, recData.current || 0), slides.length - 1);
-              window.current = current;
-              selected = null;
-              if (typeof drag !== 'undefined') drag = null;
-              if (typeof render === 'function') render();
-              if (typeof window.renderSlideThumbnailsMaster === 'function') {
-                window.renderSlideThumbnailsMaster(true);
-              } else if (typeof renderSlides === 'function') {
-                renderSlides();
-              }
-              if (typeof window.showPresentationToast === 'function') {
-                window.showPresentationToast('✅ আপনার পূর্ববর্তী প্রজেক্ট সফলভাবে লোড হয়েছে!');
-              }
-            }
+          if (typeof window.showPresentationToast === 'function' && bestCandidate.slides.length > 1) {
+            window.showPresentationToast('✅ আপনার পূর্ববর্তী প্রজেক্ট সফলভাবে লোড হয়েছে!');
           }
-        } catch (_) {}
+        }
       }
     } catch (error) {
       console.warn('Reliable presentation storage unavailable', error);
