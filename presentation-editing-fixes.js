@@ -692,8 +692,15 @@
       return;
     }
 
-    // 3. DELETE & BACKSPACE (Delete selected element)
-    if (item && (key === 'Delete' || key === 'Backspace')) {
+    // 3. DELETE (Delete selected element ONLY when NOT editing text)
+    // Note: Backspace is strictly for text editing and must NEVER delete slide elements!
+    const hasAnyEditing = isEditing || 
+                          !!document.querySelector('#slide [contenteditable="true"], #slide .inline-editing') ||
+                          (document.activeElement && (document.activeElement.isContentEditable || ['input','textarea','select'].includes((document.activeElement.tagName||'').toLowerCase())));
+    if (hasAnyEditing) {
+      return; // Do NOT intercept keys while typing/editing
+    }
+    if (item && key === 'Delete') {
       event.preventDefault();
       event.stopImmediatePropagation();
       const curList = active()?.elements;

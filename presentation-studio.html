@@ -82,17 +82,74 @@ function active(){return slides[current]}function styleSlide(){const s=active();
 function render(){styleSlide();const box=$('slide');box.querySelectorAll('.element').forEach(e=>e.remove());active().elements.forEach(el=>{const node=document.createElement('div');node.className='element '+el.type+(selected===el.id?' selected':'');node.dataset.id=el.id;node.style.cssText=`left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;`;if(el.type==='text'){node.classList.add('text-el');let content=document.createElement('div');content.className='text-content';content.textContent=el.text;content.style.cssText='width:100%;height:100%;display:flex;align-items:center;justify-content:'+(el.textAlign==='left'?'flex-start':el.textAlign==='right'?'flex-end':'center')+';word-break:break-word;white-space:pre-wrap;cursor:text;outline:none;line-height:1.2;';node.appendChild(content);node.style.color=el.color;node.style.fontSize=el.size+'px';node.style.fontWeight=el.weight;node.style.fontFamily=el.fontFamily||'';node.style.textAlign=el.textAlign||'center';node.style.transform='rotate('+(Number(el.rotation)||0)+'deg)';node.style.transformOrigin='center center';const _bv=el.boxBg||el.backgroundColor||el.bgColor||(el.background&&el.background.startsWith('#')?el.background:null);if(_bv&&_bv!=='transparent'){const _bo=el.boxOpacity!==undefined?(Number(el.boxOpacity)>1?Number(el.boxOpacity)/100:Number(el.boxOpacity)):1;if(_bv.startsWith('#')&&_bo<1){const _hx=_bv.replace('#','');node.style.backgroundColor='rgba('+parseInt(_hx.slice(0,2),16)+','+parseInt(_hx.slice(2,4),16)+','+parseInt(_hx.slice(4,6),16)+','+_bo+')';}else{node.style.backgroundColor=_bv;}node.style.borderRadius='6px';}node.ondblclick=(e)=>{e.preventDefault();e.stopPropagation();selected=el.id;if(typeof window.activateInlineTextEdit==='function'){window.activateInlineTextEdit(el,{x:e.clientX,y:e.clientY});}}}else{node.classList.add('image-el');node.innerHTML=`<img src="${el.src}" draggable="false">`;const image=node.querySelector('img');image.style.pointerEvents='none';image.draggable=false;node.addEventListener('click',event=>{event.stopPropagation();selected=el.id;node.classList.add('selected');renderInspector();addImageTransformHandles()})}node.addEventListener('pointerdown',startDrag);box.appendChild(node)});renderSlides();renderInspector()}
 function renderSlides(){const list=$('slideList');list.innerHTML='';slides.forEach((s,i)=>{const n=document.createElement('div');n.className='slide-thumb '+(i===current?'active':'');n.style.background=s.background==='custom'?s.bgColor:themes[s.background];n.innerHTML=`<span class="num">${i+1}</span>`;s.elements.forEach(el=>{const mini=document.createElement('div');mini.style.cssText=`position:absolute;left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;overflow:hidden;white-space:pre-wrap;word-break:break-word;line-height:1.12;${el.type==='text'?`color:${el.color};font-size:${Math.max(4,el.size*.115)}px;font-weight:${el.weight};padding:1px`:'background:#ffffff12'}`;if(el.type==='image'){const img=document.createElement('img');img.src=el.src;img.style.cssText='width:100%;height:100%;display:block;object-fit:cover';mini.appendChild(img)}else mini.textContent=el.text;n.appendChild(mini)});n.onclick=()=>{current=i;selected=null;render()};list.appendChild(n)})}
 function selectedEl(){return active().elements.find(e=>e.id===selected)}function renderInspector(){const el=selectedEl();$('emptyInspector').classList.toggle('hidden',!!el);$('textInspector').classList.toggle('hidden',!el||el.type!=='text');$('imageInspector').classList.toggle('hidden',!el||el.type!=='image');if(el?.type==='text'){$('textValue').value=el.text;$('textColor').value=el.color;$('textSize').value=el.size;$('textWeight').value=el.weight}const s=active();$('background').value=s.background;$('bgColor').value=s.bgColor;$('bgCustomWrap').classList.toggle('hidden',s.background!=='custom')}
+let _pendingDragStudio = null;
 function startDrag(e){
-  // Do NOT drag while text is being edited inline or target is contenteditable
   const tgt = e.currentTarget;
   if(tgt && (tgt.classList.contains('inline-editing') || tgt.contentEditable==='true' || tgt.getAttribute('data-editing')==='true')){return;}
   if(e.target && (e.target.isContentEditable || e.target.contentEditable==='true' || e.target.closest?.('.text-content[contenteditable="true"], .inline-editing'))){return;}
-  selected=e.currentTarget.dataset.id;const r=$('slide').getBoundingClientRect(),el=selectedEl();drag={el,r,dx:e.clientX-r.left-el.x*r.width/100,dy:e.clientY-r.top-el.y*r.height/100};window.__presentationLiveDrag=true;e.currentTarget.classList.add('selected');e.currentTarget.setPointerCapture(e.pointerId);renderInspector();renderSlides()
+  
+  const id = e.currentTarget.dataset.id;
+  selected = id;
+  const r = $('slide').getBoundingClientRect(), el = selectedEl();
+  if (!el) return;
+
+  // Do NOT capture pointer immediately. Store pending drag and only initiate when dragged past 6px!
+  _pendingDragStudio = {
+    el, r,
+    startX: e.clientX,
+    startY: e.clientY,
+    dx: e.clientX - r.left - el.x * r.width / 100,
+    dy: e.clientY - r.top - el.y * r.height / 100,
+    target: e.currentTarget,
+    pointerId: e.pointerId
+  };
+  drag = null;
+  e.currentTarget.classList.add('selected');
+  renderInspector();
 }
-window.addEventListener('pointermove',e=>{
-  if(!drag)return;
-  // Cancel drag if element entered inline-editing mode
-  if(drag.el){const n=$('slide')?.querySelector('.element[data-id="'+drag.el.id+'"]');if(n&&(n.classList.contains('inline-editing')||n.contentEditable==='true')){drag=null;return;}}drag.moved=true;const {el,r,dx,dy}=drag;el.x=Math.max(0,Math.min(100-el.w,(e.clientX-r.left-dx)/r.width*100));el.y=Math.max(0,Math.min(100-el.h,(e.clientY-r.top-dy)/r.height*100));const node=$('slide').querySelector('.element[data-id="'+el.id+'"]');if(node){node.style.left=el.x+'%';node.style.top=el.y+'%'}});window.addEventListener('pointerup',e=>{const moved=drag?.moved;drag=null;window.drag=null;window.__presentationLiveDrag=false;if(moved)render()});window.addEventListener('pointercancel',()=>{drag=null;window.drag=null;window.__presentationLiveDrag=false;});
+
+window.addEventListener('pointermove', e => {
+  if (_pendingDragStudio && !drag) {
+    const dist = Math.hypot(e.clientX - _pendingDragStudio.startX, e.clientY - _pendingDragStudio.startY);
+    if (dist > 6) {
+      // Threshold passed: genuinely a drag
+      drag = _pendingDragStudio;
+      window.__presentationLiveDrag = true;
+      try { _pendingDragStudio.target.setPointerCapture?.(_pendingDragStudio.pointerId); } catch (_) {}
+      _pendingDragStudio = null;
+    } else {
+      return;
+    }
+  }
+  if (!drag) return;
+  if (drag.el) {
+    const n = $('slide')?.querySelector('.element[data-id="' + drag.el.id + '"]');
+    if (n && (n.classList.contains('inline-editing') || n.contentEditable === 'true')) {
+      drag = null; _pendingDragStudio = null; return;
+    }
+  }
+  drag.moved = true;
+  const { el, r, dx, dy } = drag;
+  el.x = Math.max(0, Math.min(100 - el.w, (e.clientX - r.left - dx) / r.width * 100));
+  el.y = Math.max(0, Math.min(100 - el.h, (e.clientY - r.top - dy) / r.height * 100));
+  const node = $('slide').querySelector('.element[data-id="' + el.id + '"]');
+  if (node) { node.style.left = el.x + '%'; node.style.top = el.y + '%'; }
+});
+
+window.addEventListener('pointerup', e => {
+  const moved = drag?.moved;
+  drag = null;
+  _pendingDragStudio = null;
+  window.drag = null;
+  window.__presentationLiveDrag = false;
+  if (moved) render();
+});
+window.addEventListener('pointercancel', () => {
+  drag = null;
+  _pendingDragStudio = null;
+  window.drag = null;
+  window.__presentationLiveDrag = false;
+});
 function addText(){const el={id:crypto.randomUUID(),type:'text',text:'নতুন টেক্সট',x:12,y:58,w:55,h:10,size:38,color:'#ffffff',weight:'700'};active().elements.push(el);selected=el.id;render()}
 function addImage(src){const el={id:crypto.randomUUID(),type:'image',src,x:18,y:42,w:42,h:34};active().elements.push(el);selected=el.id;render()}
 function importImage(file){if(!file||!file.type.startsWith('image/'))return;const rd=new FileReader();rd.onload=()=>addImage(rd.result);rd.readAsDataURL(file)}
@@ -101,7 +158,17 @@ $('slide').addEventListener('dragover',e=>{e.preventDefault();$('slide').classLi
 $('templateBtn').onclick=()=>{active().background='luxury';active().elements=[{id:crypto.randomUUID(),type:'text',text:'NEW COLLECTION',x:10,y:18,w:80,h:14,size:62,color:'#fff4cf',weight:'900'},{id:crypto.randomUUID(),type:'text',text:'Fashion • Quality • Elegance',x:12,y:38,w:70,h:9,size:25,color:'#ffd166',weight:'700'},{id:crypto.randomUUID(),type:'text',text:'YOUR BRAND',x:12,y:76,w:50,h:8,size:22,color:'#ffffff',weight:'700'}];selected=null;render()};
 function download(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}$('saveProject').onclick=()=>download('presentation-project.json',JSON.stringify({slides},null,2),'application/json');$('loadProject').onclick=()=>$('projectInput').click();$('projectInput').accept='.json,application/json,.html,text/html';$('projectInput').onchange=e=>{const file=e.target.files&&e.target.files[0];if(!file)return;const rd=new FileReader();rd.onload=()=>{try{let text=rd.result;let loadedSlides=null;if(text.includes('let slides = [')||text.includes('slides = [')){const match=text.match(/let\s+slides\s*=\s*(\[[\s\S]*?\]);/);if(match){try{loadedSlides=JSON.parse(match[1])}catch(_){}}}if(!loadedSlides){const d=JSON.parse(text);if(Array.isArray(d)){loadedSlides=d;}else if(d&&Array.isArray(d.slides)){loadedSlides=d.slides;}else if(d&&typeof d==='object'){const keys=Object.keys(d);const arr=keys.map(k=>d[k]).filter(v=>v&&typeof v==='object'&&Array.isArray(v.elements));if(arr.length>0)loadedSlides=arr;}}if(!loadedSlides||!loadedSlides.length)throw new Error('No slides found in file');slides=loadedSlides;window.slides=slides;current=0;selected=null;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();if(typeof window.showPresentationToast==='function')window.showPresentationToast('✅ প্রজেক্ট সফলভাবে লোড হয়েছে!');}catch(err){alert('Invalid presentation project file.\n\nDetails: '+err.message)}};rd.readAsText(file)};
 
-window.addEventListener('keydown',e=>{const el=selectedEl();const isEditing = e.target && (e.target.isContentEditable || ['input','textarea','select'].includes((e.target.tagName||'').toLowerCase()));if(e.key==='Delete'&&el&&!isEditing){active().elements=active().elements.filter(x=>x.id!==el.id);selected=null;render()}});render();
+window.addEventListener('keydown',e=>{
+  const el=selectedEl();
+  const isEditing = (e.target && (e.target.isContentEditable || ['input','textarea','select'].includes((e.target.tagName||'').toLowerCase()))) ||
+                    !!document.querySelector('#slide .inline-editing, #slide [contenteditable="true"]');
+  if(e.key==='Delete'&&el&&!isEditing){
+    active().elements=active().elements.filter(x=>x.id!==el.id);
+    selected=null;
+    render();
+  }
+});
+render();
 </script>
 <aside id="assetDrawer" class="hidden" style="position:fixed;right:14px;top:68px;width:330px;max-height:calc(100vh - 84px);z-index:30;overflow:auto;padding:14px;border:1px solid #40506b;border-radius:10px;background:#111b2c;box-shadow:0 20px 60px #000b"><div style="display:flex;align-items:center;gap:8px"><strong style="color:#ffd166">ASSET LIBRARY</strong><button id="closeAssets" style="margin-left:auto">×</button></div><p class="hint">Saved assets can be added to any slide. Later, Photo Editor and 3D Studio will send their outputs here.</p><div id="assetGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div></aside>
 <script>

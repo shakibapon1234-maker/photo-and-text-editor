@@ -181,7 +181,11 @@ function createWindow() {
 
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+    try {
+        await session.defaultSession.clearCache();
+    } catch (_) {}
+
     session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
         callback(permission === 'media');
     });
@@ -207,5 +211,6 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
     if (server) try { server.close(); } catch (_) {}
-    if (process.platform !== 'darwin') app.quit();
+    app.quit();
+    process.exit(0);
 });

@@ -22,6 +22,12 @@
     .element.is-active-drag {
       z-index: 500 !important;
     }
+    .element.inline-editing, .element.inline-editing * {
+      touch-action: auto !important;
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      cursor: text !important;
+    }
     /* 8 cardinal resize handles */
     .hard-resize {
       position: absolute;

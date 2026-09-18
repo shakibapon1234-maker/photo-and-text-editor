@@ -546,21 +546,41 @@
         try { return JSON.parse(localStorage.getItem(LS_AUTOSAVE) || 'null'); } catch (_) { return null; }
       })();
 
-      // Priority: (1) IndexedDB saved, (2) IndexedDB emergency, (3) localStorage emergency, (4) localStorage autosave
-      const bestCandidate = (saved && Array.isArray(saved.slides) && saved.slides.length > 0) ? saved
-                          : (emergency && Array.isArray(emergency.slides) && emergency.slides.length > 0) ? emergency
-                          : (lsBackup && Array.isArray(lsBackup.slides) && lsBackup.slides.length > 0) ? lsBackup
-                          : (lsAuto && Array.isArray(lsAuto.slides) && lsAuto.slides.length > 0) ? lsAuto
-                          : null;
+      // Pick candidate with the highest slide count, then newest timestamp
+      const candidates = [
+        { source: 'idb_saved', data: saved },
+        { source: 'idb_emergency', data: emergency },
+        { source: 'ls_emergency', data: lsBackup },
+        { source: 'ls_auto', data: lsAuto }
+      ].filter(c => c.data && Array.isArray(c.data.slides) && c.data.slides.length > 0);
+
+      let bestCandidate = null;
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => {
+          const countDiff = b.data.slides.length - a.data.slides.length;
+          if (countDiff !== 0) return countDiff;
+          return (b.data.savedAt || 0) - (a.data.savedAt || 0);
+        });
+        bestCandidate = candidates[0].data;
+      }
 
       if (bestCandidate && Array.isArray(bestCandidate.slides) && bestCandidate.slides.length > 0) {
-        // Apply saved deck — DON'T pre-set fingerprint so the forced save below actually writes
-        slides = structuredClone(bestCandidate.slides);
-        current = Math.min(Math.max(0, bestCandidate.current || 0), slides.length - 1);
-        selected = null;
-        if (typeof drag !== 'undefined') drag = null;
-        if (typeof render === 'function') render();
-        if (typeof renderSlides === 'function') renderSlides();
+        const activeCount = Array.isArray(slides) ? slides.length : 0;
+        // Only adopt bestCandidate if it has >= slides or active has <= 1
+        if (bestCandidate.slides.length >= activeCount || activeCount <= 1) {
+          slides = structuredClone(bestCandidate.slides);
+          window.slides = slides;
+          current = Math.min(Math.max(0, bestCandidate.current || 0), slides.length - 1);
+          window.current = current;
+          selected = null;
+          if (typeof drag !== 'undefined') drag = null;
+          if (typeof render === 'function') render();
+          if (typeof window.renderSlideThumbnailsMaster === 'function') {
+            window.renderSlideThumbnailsMaster(true);
+          } else if (typeof renderSlides === 'function') {
+            renderSlides();
+          }
+        }
       } else {
         try {
           const recResp = await fetch('recovered-project.json?t=' + Date.now());
@@ -568,11 +588,17 @@
             const recData = await recResp.json();
             if (recData && Array.isArray(recData.slides) && recData.slides.length > 0) {
               slides = structuredClone(recData.slides);
+              window.slides = slides;
               current = Math.min(Math.max(0, recData.current || 0), slides.length - 1);
+              window.current = current;
               selected = null;
               if (typeof drag !== 'undefined') drag = null;
               if (typeof render === 'function') render();
-              if (typeof renderSlides === 'function') renderSlides();
+              if (typeof window.renderSlideThumbnailsMaster === 'function') {
+                window.renderSlideThumbnailsMaster(true);
+              } else if (typeof renderSlides === 'function') {
+                renderSlides();
+              }
               if (typeof window.showPresentationToast === 'function') {
                 window.showPresentationToast('✅ আপনার পূর্ববর্তী প্রজেক্ট সফলভাবে লোড হয়েছে!');
               }
