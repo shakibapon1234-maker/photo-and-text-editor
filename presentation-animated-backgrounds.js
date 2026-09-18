@@ -1,4 +1,6 @@
 (() => {
+  // Object URL cache: slideIndex -> { url, file }
+  const _objURLs = {};
   const $ = id => document.getElementById(id);
   const input = $('backgroundImageInput');
   if (input) input.accept = 'image/*,video/mp4,video/webm,video/ogg';
@@ -123,13 +125,14 @@
     const tag = s.bgMediaType === 'video' ? 'video' : 'img';
     let media = l.querySelector('video, img');
 
-    if (!media || media.tagName.toLowerCase() !== tag || media.dataset.src !== s.bgMedia) {
-      // Remove previous media while keeping overlay intact if present
-      const overlayEl = l.querySelector('.animated-editor-overlay');
+    // Use the stored object URL if available, otherwise fall back to bgMedia
+    const mediaSrc = s.bgMediaObjURL || s.bgMedia;
+
+    if (!media || media.tagName.toLowerCase() !== tag || media.dataset.srcKey !== (s.bgMediaObjURL || '').slice(-32) + (s.bgMedia || '').slice(0, 16)) {
       l.innerHTML = '';
       media = document.createElement(tag);
-      media.src = s.bgMedia;
-      media.dataset.src = s.bgMedia;
+      media.src = mediaSrc;
+      media.dataset.srcKey = (s.bgMediaObjURL || '').slice(-32) + (s.bgMedia || '').slice(0, 16);
       if (tag === 'video') {
         media.autoplay = true;
         media.loop = true;
@@ -146,7 +149,12 @@
         media.play().catch(() => {});
       }
       l.appendChild(media);
-      if (overlayEl) l.appendChild(overlayEl);
+
+      // Overlay: separate div so it never blocks the media element
+      const ov = document.createElement('div');
+      ov.className = 'bg-overlay-layer';
+      ov.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:2;';
+      l.appendChild(ov);
     }
 
     if (tag === 'video') {
@@ -158,11 +166,19 @@
       }
     }
 
-    // Apply visual properties only (no layout changes)
-    l.style.opacity = s.bgMediaOpacity / 100;
-    l.style.filter = s.bgMediaBlur ? ('blur(' + s.bgMediaBlur + 'px) scale(1.04)') : 'none';
-    const hex = Math.round((s.bgOverlayOpacity / 100) * 255).toString(16).padStart(2, '0');
-    l.style.background = 'linear-gradient(' + s.bgOverlayColor + hex + ',' + s.bgOverlayColor + hex + ')';
+    // Apply visual properties to media element (not the container)
+    media.style.opacity = s.bgMediaOpacity / 100;
+    media.style.filter = s.bgMediaBlur ? ('blur(' + s.bgMediaBlur + 'px) scale(1.04)') : 'none';
+    l.style.opacity = '';
+    l.style.filter = '';
+    l.style.background = 'transparent';
+
+    // Apply overlay color to the overlay div
+    const ovEl = l.querySelector('.bg-overlay-layer');
+    if (ovEl) {
+      const hex = Math.round((s.bgOverlayOpacity / 100) * 255).toString(16).padStart(2, '0');
+      ovEl.style.background = s.bgOverlayColor + hex;
+    }
   }
 
   // ── Pause video during live drags to free up GPU bandwidth ───────────────
@@ -227,19 +243,44 @@
     input.onchange = e => {
       const f = e.target.files[0];
       if (!f || !(f.type.startsWith('image/') || f.type.startsWith('video/'))) return;
-      const r = new FileReader();
-      r.onload = () => {
-        const s = active();
+      const s = active();
+      const idx = slides.indexOf(s);
+
+      // Revoke any previous object URL for this slide
+      if (_objURLs[idx]) {
+        URL.revokeObjectURL(_objURLs[idx].url);
+        delete _objURLs[idx];
+      }
+
+      if (f.type.startsWith('video/')) {
+        // Use Object URL for videos — fast, memory-efficient, no base64 bloat
+        const objURL = URL.createObjectURL(f);
+        _objURLs[idx] = { url: objURL, name: f.name };
         s.background = 'media';
-        s.bgMedia = r.result;
-        s.bgMediaType = f.type.startsWith('video/') ? 'video' : 'image';
+        s.bgMedia = f.name; // store just the filename as identifier
+        s.bgMediaObjURL = objURL;
+        s.bgMediaType = 'video';
         s.brollPreset = 'none';
         delete s.bgImage;
         normalize(s);
-        _layerCache = ''; // force re-apply
+        _layerCache = '';
         render();
-      };
-      r.readAsDataURL(f);
+      } else {
+        // Images: use FileReader (small enough for base64)
+        const r = new FileReader();
+        r.onload = () => {
+          s.background = 'media';
+          s.bgMedia = r.result;
+          delete s.bgMediaObjURL;
+          s.bgMediaType = 'image';
+          s.brollPreset = 'none';
+          delete s.bgImage;
+          normalize(s);
+          _layerCache = '';
+          render();
+        };
+        r.readAsDataURL(f);
+      }
     };
   }
 

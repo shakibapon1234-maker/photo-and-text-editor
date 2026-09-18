@@ -7497,6 +7497,10 @@ function applyCubeAnimation(now) {
 }
 
 function animate(now) {
+  if (document.hidden || (window.frameElement && !window.frameElement.classList.contains('active'))) {
+    setTimeout(() => requestAnimationFrame(animate), 250);
+    return;
+  }
   requestAnimationFrame(animate);
   if (animState.playing) {
     tickAnimation(now);

@@ -4,6 +4,16 @@ const http = require('http');
 const fs = require('fs');
 const os = require('os');
 
+// Set unique app name and isolated userData directory to prevent LevelDB & GPU cache lock collisions with other Electron apps
+app.name = 'PhotoAnd3DTextStudio';
+try {
+    const customUserData = path.join(app.getPath('appData'), 'PhotoAnd3DTextStudio');
+    if (!fs.existsSync(customUserData)) fs.mkdirSync(customUserData, { recursive: true });
+    app.setPath('userData', customUserData);
+} catch (e) {
+    console.warn('Custom userData path error:', e);
+}
+
 let mainWindow = null;
 let server = null;
 const SERVER_PORT = 8000;
@@ -148,6 +158,8 @@ function createWindow() {
     mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
+
 app.whenReady().then(() => {
     session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
         callback(permission === 'media');
@@ -155,6 +167,20 @@ app.whenReady().then(() => {
 
     startInternalServer(() => {
         createWindow();
+        if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.on('render-process-gone', (event, details) => {
+                console.error('Renderer process gone (crashed):', details);
+                // Automatically recover from crash by reloading
+                setTimeout(() => {
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.loadURL(`http://localhost:${SERVER_PORT}/index.html`);
+                    }
+                }, 500);
+            });
+            mainWindow.webContents.on('unresponsive', () => {
+                console.warn('MainWindow became temporarily unresponsive');
+            });
+        }
     });
 });
 

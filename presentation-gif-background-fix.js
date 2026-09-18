@@ -3,6 +3,9 @@
   const input = $('backgroundImageInput');
   if (!input) return;
 
+  // Track Object URLs per slide index so we can revoke them when replaced
+  const _videoObjURLs = {};
+
   // Windows/Electron sometimes leave File.type empty for GIFs. Explicitly
   // allow the extension as well as standard image/video MIME types.
   input.accept = 'image/png,image/jpeg,image/webp,image/gif,.gif,video/mp4,video/webm,video/ogg';
@@ -22,21 +25,44 @@
       hint.classList.remove('hidden');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const slide = active();
+
+    const slide = active();
+    const idx = slides.indexOf(slide);
+
+    if (isVideo) {
+      // Use Object URL for videos — instant, no base64 memory bloat
+      // Revoke any previous object URL for this slide
+      if (_videoObjURLs[idx]) {
+        URL.revokeObjectURL(_videoObjURLs[idx]);
+        delete _videoObjURLs[idx];
+      }
+      const objURL = URL.createObjectURL(file);
+      _videoObjURLs[idx] = objURL;
+
       slide.background = 'media';
-      slide.bgMedia = reader.result;
-      slide.bgMediaType = isVideo ? 'video' : (isGif ? 'gif' : 'image');
+      slide.bgMedia = objURL;          // use object URL directly as src
+      slide.bgMediaType = 'video';
       slide.brollPreset = 'none';
       delete slide.bgImage;
-      hint.textContent = isGif
-        ? 'GIF selected. Native GIF speed cannot be changed by the browser; use a WebM/MP4 background when you need speed control.'
-        : '';
-      hint.classList.toggle('hidden', !isGif);
+      hint.classList.add('hidden');
       render();
-    };
-    reader.readAsDataURL(file);
+    } else {
+      // Images & GIFs: use FileReader (small enough for base64)
+      const reader = new FileReader();
+      reader.onload = () => {
+        slide.background = 'media';
+        slide.bgMedia = reader.result;
+        slide.bgMediaType = isGif ? 'gif' : 'image';
+        slide.brollPreset = 'none';
+        delete slide.bgImage;
+        hint.textContent = isGif
+          ? 'GIF selected. Native GIF speed cannot be changed by the browser; use a WebM/MP4 background when you need speed control.'
+          : '';
+        hint.classList.toggle('hidden', !isGif);
+        render();
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const previousRender = render;

@@ -60,12 +60,64 @@
     });
   }
 
+  // Fast fingerprint to avoid cloning and writing to disk when nothing changed
+  function computeDeckFingerprint(deck, curr) {
+    if (!Array.isArray(deck)) return '';
+    let hash = 'c:' + curr + ';';
+    for (let i = 0; i < deck.length; i++) {
+      const s = deck[i];
+      if (!s) continue;
+      hash += 's:' + (s.background || '') + (s.bgColor || '') + ';';
+      const els = s.elements;
+      if (Array.isArray(els)) {
+        for (let j = 0; j < els.length; j++) {
+          const e = els[j];
+          if (!e) continue;
+          hash += e.id + ':' + (e.x||0).toFixed(1) + ',' + (e.y||0).toFixed(1) + ',' + (e.w||0).toFixed(1) + ',' + (e.h||0).toFixed(1) + ':' + (e.type||'') + ':' + (e.text||'').length + ':' + (e.src ? (e.src.length + ':' + e.src.slice(0, 30)) : '') + ';';
+        }
+      }
+    }
+    return hash;
+  }
+
+  // Create lightweight snapshot for localStorage that won't blow storage quota or memory
+  function sanitizeForLocalStorage(snap) {
+    try {
+      const copy = structuredClone(snap);
+      if (Array.isArray(copy.slides)) {
+        copy.slides.forEach(s => {
+          if (Array.isArray(s.elements)) {
+            s.elements.forEach(e => {
+              // Strip heavy base64 strings from secondary history snapshots
+              if (e.src && e.src.length > 50000 && e.src.startsWith('data:')) {
+                e.src = '[base64-image-in-idb]';
+                e.__hasLargeSrc = true;
+              }
+            });
+          }
+        });
+      }
+      return copy;
+    } catch (_) {
+      return snap;
+    }
+  }
+
   function saveToLocalStorage(data) {
     try {
-      localStorage.setItem(LS_AUTOSAVE, JSON.stringify({ slides: data.slides, current: data.current }));
+      // Primary autosave: keep actual slides if fits
+      try {
+        localStorage.setItem(LS_AUTOSAVE, JSON.stringify({ slides: data.slides, current: data.current }));
+      } catch (errQuota) {
+        // If quota exceeded due to large images, save lightweight version
+        const safeData = sanitizeForLocalStorage(data);
+        localStorage.setItem(LS_AUTOSAVE, JSON.stringify({ slides: safeData.slides, current: safeData.current }));
+      }
+
       if (data.elementCount > 0) {
-        localStorage.setItem(LS_EMERGENCY, JSON.stringify(data));
-        updateSnapshotsHistory(data);
+        const safeSnap = sanitizeForLocalStorage(data);
+        localStorage.setItem(LS_EMERGENCY, JSON.stringify(safeSnap));
+        updateSnapshotsHistory(safeSnap);
       }
     } catch (_) {
       /* storage quota safe */
@@ -80,28 +132,36 @@
     }
   }
 
-  function updateSnapshotsHistory(data) {
+  function updateSnapshotsHistory(safeData) {
     try {
       let list = getSnapshotsHistory();
-      // Only keep unique snapshots with meaningful time gaps (> 15 seconds)
       const last = list[0];
-      if (last && (Date.now() - last.savedAt < 15000) && last.elementCount === data.elementCount) {
-        list[0] = data; // update latest
+      if (last && (Date.now() - last.savedAt < 20000) && last.elementCount === safeData.elementCount) {
+        list[0] = safeData; // update latest
       } else {
-        list.unshift(data);
+        list.unshift(safeData);
       }
-      list = list.slice(0, 10); // keep last 10 snapshots
+      list = list.slice(0, 5); // keep max 5 lightweight snapshots
       localStorage.setItem(LS_SNAPSHOTS, JSON.stringify(list));
     } catch (_) {}
   }
 
+  let lastSavedFingerprint = '';
+
   async function saveNow() {
     if (!ready || !db) return;
     if (writing) { queued = true; return; }
+
+    const currentFingerprint = computeDeckFingerprint(slides, current);
+    if (currentFingerprint === lastSavedFingerprint && lastSavedFingerprint !== '') {
+      return; // Nothing changed, skip saving completely!
+    }
+
     writing = true;
 
     try {
       const data = snapshot();
+      lastSavedFingerprint = currentFingerprint;
       const oldCurrent = await get(KEY);
       if (oldCurrent && oldCurrent.elementCount > 0) {
         await put('previous', oldCurrent);
@@ -117,7 +177,7 @@
       writing = false;
       if (queued) {
         queued = false;
-        saveNow();
+        setTimeout(saveNow, 300);
       }
     }
   }
@@ -125,7 +185,7 @@
   function schedule() {
     if (!ready) return;
     clearTimeout(timer);
-    timer = setTimeout(saveNow, 350);
+    timer = setTimeout(saveNow, 1200);
   }
 
   const renderBeforeReliableSave = render;
@@ -461,6 +521,19 @@
           applyDeck(bestCandidate.slides, bestCandidate.current || 0);
         } else if (saved?.slides?.length && countTotalElements(saved.slides) > 0) {
           applyDeck(saved.slides, saved.current || 0);
+        } else {
+          try {
+            const recResp = await fetch('recovered-project.json?t=' + Date.now());
+            if (recResp.ok) {
+              const recData = await recResp.json();
+              if (recData && Array.isArray(recData.slides) && recData.slides.length > 0) {
+                applyDeck(recData.slides, recData.current || 0);
+                if (typeof window.showPresentationToast === 'function') {
+                  window.showPresentationToast('✅ আপনার পূর্ববর্তী প্রজেক্ট সফলভাবে রিকভার করা হয়েছে!');
+                }
+              }
+            }
+          } catch (_) {}
         }
       }
     } catch (error) {
