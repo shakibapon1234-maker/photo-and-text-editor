@@ -42,6 +42,7 @@
     header.innerHTML = `
       <button id="alwaysNewSlide" class="primary" title="নতুন স্লাইড তৈরি করুন">＋ New Slide</button>
       <button id="alwaysDuplicateSlide" class="slide-dup-btn" title="বর্তমান স্লাইড হুবহু ডুপ্লিকেট করুন (Ctrl+Shift+D)">⧉ Duplicate</button>
+      <button id="alwaysNewProject" class="slide-newproj-btn" title="নতুন ফাঁকা প্রজেক্ট শুরু করুন">📄 New Project</button>
     `;
     list.parentElement.insertBefore(header, list);
 
@@ -51,6 +52,12 @@
 
     $('alwaysDuplicateSlide').onclick = () => {
       window.duplicateCurrentSlide();
+    };
+
+    $('alwaysNewProject').onclick = () => {
+      if (typeof window.openNewProjectModal === 'function') window.openNewProjectModal();
+      else if (typeof openNewProjectModal === 'function') openNewProjectModal();
+      else $('newProjectBtn')?.click();
     };
 
     document.head.insertAdjacentHTML('beforeend', `<style>
@@ -90,6 +97,29 @@
         color: #ffffff;
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+      }
+      #alwaysNewProject {
+        grid-column: 1 / -1;
+        background: #0f2d1a;
+        border: 1px solid #22c55e;
+        color: #86efac;
+        font-weight: 800;
+        padding: 7px 4px;
+        font-size: 11.5px;
+        white-space: nowrap;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        transition: all 0.15s ease;
+      }
+      #alwaysNewProject:hover {
+        background: #15803d;
+        color: #ffffff;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
       }
       .slide-thumb {
         position: relative;

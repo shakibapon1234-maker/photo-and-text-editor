@@ -24,12 +24,32 @@
   }
   window.showPresentationToast = showToast;
 
+  function isSidebarTextField(target) {
+    return !!(target && (target.closest?.('#textValue, #shapeText') || target.id === 'textValue' || target.id === 'shapeText'));
+  }
+
   // ──────────────────────────────────────────────────────────────────────────
   // 1. Activate Direct On-Screen Inline Text Editing
   // ──────────────────────────────────────────────────────────────────────────
   window.activateInlineTextEdit = function(item, clickPoint) {
+    if (isSidebarTextField(document.activeElement)) return;
     if (!item) item = typeof selectedEl === 'function' ? selectedEl() : null;
     if (!item || item.type !== 'text') return;
+    if (window.__presentationInlineEditLock && window.__presentationInlineEditLock !== item.id) {
+      const activeEditable = document.querySelector('#slide [contenteditable="true"], #slide .inline-editing');
+      if (activeEditable) activeEditable.blur?.();
+      return;
+    }
+    if (window.__presentationInlineEditLock === item.id) {
+      const node = $('slide')?.querySelector('.text-el[data-id="' + item.id + '"]');
+      const content = node?.querySelector('.text-content');
+      if (content && content.contentEditable !== 'true') {
+        content.contentEditable = 'true';
+      }
+      content?.focus();
+      return;
+    }
+    window.__presentationInlineEditLock = item.id;
     selected = item.id;
     
     const node = $('slide')?.querySelector('.text-el[data-id="' + item.id + '"]');
@@ -144,6 +164,7 @@
       // Resume background animation and commit changes
       window.dispatchEvent(new CustomEvent('presentation:texteditend'));
       window.dispatchEvent(new CustomEvent('presentation:change'));
+      window.__presentationInlineEditLock = null;
     };
 
     if (typeof renderInspector === 'function') renderInspector();
@@ -153,7 +174,23 @@
   // Activate Direct On-Screen Inline Shape Editing
   // ──────────────────────────────────────────────────────────────────────────
   window.activateInlineShapeEdit = function(item) {
+    if (isSidebarTextField(document.activeElement)) return;
     if (!item) return;
+    if (window.__presentationInlineEditLock && window.__presentationInlineEditLock !== item.id) {
+      const activeEditable = document.querySelector('#slide [contenteditable="true"], #slide .inline-editing');
+      if (activeEditable) activeEditable.blur?.();
+      return;
+    }
+    if (window.__presentationInlineEditLock === item.id) {
+      const node = $('slide')?.querySelector('.shape-el[data-id="' + item.id + '"]');
+      const label = node?.querySelector('.shape-label');
+      if (label && label.contentEditable !== 'true') {
+        label.contentEditable = 'true';
+      }
+      label?.focus();
+      return;
+    }
+    window.__presentationInlineEditLock = item.id;
     selected = item.id;
     const node = $('slide')?.querySelector('.shape-el[data-id="' + item.id + '"]');
     if (!node) return;
@@ -199,8 +236,13 @@
       node.classList.remove('inline-editing');
       label.style.pointerEvents = 'none';
       item.text = (label.innerText || label.textContent || '').replace(/\r/g, '');
-      if (typeof render === 'function') render();
+      if ($('shapeText')) $('shapeText').value = item.text;
+      if (typeof updateHandles === 'function') updateHandles();
+      if (typeof renderInspector === 'function') renderInspector();
+      if (typeof window.renderSlideThumbnailsMaster === 'function') window.renderSlideThumbnailsMaster();
+      else if (typeof renderSlides === 'function') renderSlides();
       window.dispatchEvent(new CustomEvent('presentation:change'));
+      window.__presentationInlineEditLock = null;
     };
 
     if (typeof renderInspector === 'function') renderInspector();
@@ -210,6 +252,7 @@
   // 2. Select All Text Inside Text Box or Shape on Ctrl+A
   // ──────────────────────────────────────────────────────────────────────────
   window.addEventListener('keydown', event => {
+    if (isSidebarTextField(event.target)) return;
     if ((event.ctrlKey || event.metaKey) && (event.key === 'a' || event.key === 'A')) {
       const target = event.target;
       const tagName = (target && target.tagName ? target.tagName.toLowerCase() : '');
@@ -1047,8 +1090,11 @@
       const id = node.dataset.id;
       const item = active()?.elements?.find(el => el.id === id);
       if (!item) return;
+      if (node.dataset.inlineDblBound === '1') return;
+      node.dataset.inlineDblBound = '1';
 
       node.ondblclick = e => {
+        if (window.__presentationInlineEditLock === item.id) return;
         e.preventDefault();
         e.stopPropagation();
         window.activateInlineTextEdit(item, { x: e.clientX, y: e.clientY });
@@ -1074,11 +1120,14 @@
       const id = node.dataset.id;
       const item = active()?.elements?.find(el => el.id === id);
       if (!item) return;
+      if (node.dataset.inlineDblBound === '1') return;
+      node.dataset.inlineDblBound = '1';
 
       const label = node.querySelector('.shape-label');
       if (!label) return;
 
       node.ondblclick = e => {
+        if (window.__presentationInlineEditLock === item.id) return;
         e.preventDefault();
         e.stopPropagation();
         window.activateInlineShapeEdit(item);

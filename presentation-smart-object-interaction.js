@@ -67,6 +67,7 @@
 
   // Capture at window level before legacy object listeners can cancel dragging.
   window.addEventListener('pointerdown', event => {
+    if (event.target.closest?.('#textValue, #shapeText')) return;
     if (event.target.isContentEditable || event.target.closest?.('[contenteditable="true"]')) return;
 
     // Smart hit testing: use elementsFromPoint so transparent areas of selected

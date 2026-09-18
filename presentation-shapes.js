@@ -283,6 +283,12 @@
     label.style.textDecoration = e.textDecoration || 'none';
     label.style.justifyContent = (e.textAlign === 'left') ? 'flex-start' : (e.textAlign === 'right') ? 'flex-end' : 'center';
     label.style.textAlign = e.textAlign || 'center';
+    label.ondblclick = ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      selected = e.id;
+      if (typeof window.activateInlineShapeEdit === 'function') window.activateInlineShapeEdit(e);
+    };
   }
 
   const oldRender = render;
@@ -298,6 +304,12 @@
       const n = document.createElement('div');
       n.dataset.id = e.id;
       paint(n, e);
+      n.ondblclick = ev => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        selected = e.id;
+        if (typeof window.activateInlineShapeEdit === 'function') window.activateInlineShapeEdit(e);
+      };
       n.addEventListener('pointerdown', startDrag);
       box.appendChild(n);
     });

@@ -1,1 +1,54 @@
-(()=>{const $=id=>document.getElementById(id);document.head.insertAdjacentHTML('beforeend','<style>.shape-label{position:absolute;inset:4px;display:flex;align-items:center;justify-content:center;text-align:center;overflow:hidden;line-height:1.15;cursor:text;outline:0;word-break:break-word}.shape-label:focus{box-shadow:inset 0 0 0 1px #fff}</style>');$('shapeInspector').insertAdjacentHTML('beforeend','<div class="section-title" style="margin-top:16px">SHAPE TEXT</div><label class="field">Text<textarea id="shapeText" placeholder="Double-click shape to type"></textarea></label><div class="row"><label class="field">Text color<input id="shapeTextColor" type="color"></label><label class="field">Text size<input id="shapeTextSize" type="number" min="8" max="120"></label></div>');function labels(){document.querySelectorAll('.shape-el').forEach(n=>{const e=active().elements.find(x=>x.id===n.dataset.id);if(!e)return;let s=n.querySelector('.shape-label');if(!s){s=document.createElement('div');s.className='shape-label';n.insertBefore(s,n.firstChild)}s.contentEditable='true';s.spellcheck=false;s.textContent=e.text||'';s.style.color=e.textColor||'#ffffff';s.style.fontSize=(e.textSize||18)+'px';s.style.fontWeight=e.textWeight||'700';s.onpointerdown=x=>x.stopPropagation();s.oninput=()=>{e.text=s.textContent;$('shapeText').value=e.text||''}})}const renderBeforeShapeText=render;render=function(){renderBeforeShapeText();labels()};const inspectorBeforeShapeText=renderInspector;renderInspector=function(){inspectorBeforeShapeText();const e=selectedEl(),ok=e&&e.type==='shape';if(!ok)return;$('shapeText').value=e.text||'';$('shapeTextColor').value=e.textColor||'#ffffff';$('shapeTextSize').value=e.textSize||18};$('shapeText').addEventListener('input',()=>{const e=selectedEl();if(!e||e.type!=='shape')return;e.text=$('shapeText').value;render()});$('shapeTextColor').addEventListener('input',()=>{const e=selectedEl();if(!e||e.type!=='shape')return;e.textColor=$('shapeTextColor').value;render()});$('shapeTextSize').addEventListener('input',()=>{const e=selectedEl();if(!e||e.type!=='shape')return;e.textSize=Math.max(8,Math.min(120,+$('shapeTextSize').value||18));render()});render()})();
+// presentation-shape-text.js - Clean inspector sync without blocking transform controls or double-clicks
+(() => {
+  const $ = id => document.getElementById(id);
+
+  const inspectorBeforeShapeText = renderInspector;
+  renderInspector = function () {
+    inspectorBeforeShapeText();
+    const e = selectedEl(), ok = e && e.type === 'shape';
+    if (!ok) return;
+    if ($('shapeText')) $('shapeText').value = e.text || '';
+    if ($('shapeTextColor')) $('shapeTextColor').value = e.textColor || '#ffffff';
+    if ($('shapeTextSize')) $('shapeTextSize').value = e.textSize || 18;
+  };
+
+  function updateShapeDom(e, fn) {
+    const node = $('slide')?.querySelector('.shape-el[data-id="' + e.id + '"]');
+    if (!node) return;
+    let label = node.querySelector('.shape-label');
+    if (!label) {
+      label = document.createElement('div');
+      label.className = 'shape-label';
+      label.contentEditable = 'false';
+      node.appendChild(label);
+    }
+    fn(label);
+  }
+
+  $('shapeText')?.addEventListener('input', () => {
+    const e = selectedEl();
+    if (!e || e.type !== 'shape') return;
+    e.text = $('shapeText').value;
+    updateShapeDom(e, l => {
+      if (!l.isContentEditable) l.textContent = e.text;
+    });
+    if (typeof window.renderSlideThumbnailsMaster === 'function') window.renderSlideThumbnailsMaster();
+    window.dispatchEvent(new CustomEvent('presentation:change'));
+  });
+
+  $('shapeTextColor')?.addEventListener('input', () => {
+    const e = selectedEl();
+    if (!e || e.type !== 'shape') return;
+    e.textColor = $('shapeTextColor').value;
+    updateShapeDom(e, l => { l.style.color = e.textColor; });
+    window.dispatchEvent(new CustomEvent('presentation:change'));
+  });
+
+  $('shapeTextSize')?.addEventListener('input', () => {
+    const e = selectedEl();
+    if (!e || e.type !== 'shape') return;
+    e.textSize = Math.max(8, Math.min(120, +$('shapeTextSize').value || 18));
+    updateShapeDom(e, l => { l.style.fontSize = e.textSize + 'px'; });
+    window.dispatchEvent(new CustomEvent('presentation:change'));
+  });
+})();

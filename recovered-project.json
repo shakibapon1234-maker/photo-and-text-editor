@@ -7,7 +7,7 @@
       "autoDuration": 0,
       "elements": [
         {
-          "id": "a99309e6-0175-48b5-a814-573f9b86dcad",
+          "id": "71fa741f-aceb-45f3-93ca-5927e555a379",
           "type": "text",
           "text": "নতুন টেক্সট",
           "x": 12,
@@ -21,6 +21,28 @@
           "animationDelay": 0,
           "animationDuration": 0.6,
           "animationStart": "click"
+        },
+        {
+          "id": "d960cd73-439a-43fa-84ca-4c1145b3ab37",
+          "type": "shape",
+          "shape": "hexagon",
+          "text": "uiu7i8",
+          "textColor": "#ffffff",
+          "textSize": 18,
+          "textWeight": "700",
+          "x": 30,
+          "y": 35,
+          "w": 22,
+          "h": 16,
+          "fill": "#4f8df7",
+          "stroke": "#ffffff",
+          "line": 2,
+          "opacity": 100,
+          "rotation": 0,
+          "animation": "none",
+          "animationDelay": 0,
+          "animationDuration": 0.6,
+          "animationStart": "click"
         }
       ],
       "bgPlaybackRate": 1,
@@ -30,10 +52,10 @@
       "bgMediaBlur": 0,
       "brollPreset": "none",
       "brollSpeed": "normal",
-      "notes": ""
+      "notes": "7"
     }
   ],
   "current": 0,
-  "elementCount": 1,
-  "savedAt": 1789740408468
+  "elementCount": 2,
+  "savedAt": 1789743339585
 }

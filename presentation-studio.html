@@ -253,7 +253,9 @@ function openNewProjectModal() {
   modal.addEventListener('pointerdown', e => { if (e.target === modal) modal.remove(); });
 }
 
-$('newProjectBtn').onclick = openNewProjectModal;
+window.openNewProjectModal = openNewProjectModal;
+window.startNewProject = startNewProject;
+if ($('newProjectBtn')) $('newProjectBtn').onclick = openNewProjectModal;
 </script>
 <aside id="assetDrawer" class="hidden" style="position:fixed;right:14px;top:68px;width:330px;max-height:calc(100vh - 84px);z-index:30;overflow:auto;padding:14px;border:1px solid #40506b;border-radius:10px;background:#111b2c;box-shadow:0 20px 60px #000b"><div style="display:flex;align-items:center;gap:8px"><strong style="color:#ffd166">ASSET LIBRARY</strong><button id="closeAssets" style="margin-left:auto">×</button></div><p class="hint">Saved assets can be added to any slide. Later, Photo Editor and 3D Studio will send their outputs here.</p><div id="assetGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div></aside>
 <script>

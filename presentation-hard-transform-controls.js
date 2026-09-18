@@ -154,6 +154,7 @@
   let _lastDownTime = 0, _lastDownId = null, _pendingDrag = null;
 
   window.addEventListener('pointerdown', event => {
+    if (event.target.closest?.('#textValue, #shapeText')) return;
     // 1. Intercept handles FIRST
     const handle = event.target.closest?.('.hard-resize, .hard-rotate');
     if (handle) {
@@ -212,6 +213,7 @@
     _lastDownId = item.id;
 
     if (isDbl && (item.type === 'text' || item.type === 'shape')) {
+      if (window.__presentationInlineEditLock === item.id) return;
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
@@ -358,13 +360,20 @@
     // Remove active drag elevation from all elements
     document.querySelectorAll('#slide .element.is-active-drag').forEach(el => el.classList.remove('is-active-drag'));
 
-    // If a text element was clicked (not dragged) and it was already selected, activate inline text editing
-    if (!action && pending && pending.wasAlreadySelected && pending.item.type === 'text') {
+    // If a text or shape element was clicked (not dragged) and it was already selected, activate inline editing
+    if (!action && pending && pending.wasAlreadySelected && (pending.item.type === 'text' || pending.item.type === 'shape')) {
+      if (window.__presentationInlineEditLock === pending.item.id) {
+        action = null;
+        render();
+        return;
+      }
       const node = nodeFor(pending.item);
-      const isContent = event.target.closest?.('.text-content');
+      const isContent = event.target.closest?.('.text-content, .shape-label');
       if (node && (event.target === node || isContent || node.contains(event.target))) {
-        if (typeof window.activateInlineTextEdit === 'function') {
+        if (pending.item.type === 'text' && typeof window.activateInlineTextEdit === 'function') {
           window.activateInlineTextEdit(pending.item, { x: event.clientX, y: event.clientY });
+        } else if (pending.item.type === 'shape' && typeof window.activateInlineShapeEdit === 'function') {
+          window.activateInlineShapeEdit(pending.item);
         }
       }
     }

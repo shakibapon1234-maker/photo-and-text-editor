@@ -109,6 +109,27 @@
       });
     });
 
+    // Make New Project button a prominent top-level button right on toolbarGroups
+    let newProjBtn = $('newProjectBtn') || Array.from(document.querySelectorAll('button')).find(b => b.id === 'newProjectBtn' || b.textContent.includes('New Project') || b.textContent.includes('নতুন প্রজেক্ট'));
+    if (!newProjBtn) {
+      newProjBtn = document.createElement('button');
+      newProjBtn.id = 'newProjectBtn';
+    }
+    newProjBtn.innerHTML = '📄 নতুন প্রজেক্ট';
+    newProjBtn.title = 'নতুন ফাঁকা প্রজেক্ট শুরু করুন (New Project)';
+    newProjBtn.style.cssText = 'background:#0f2d1a!important;border:1.5px solid #22c55e!important;color:#86efac!important;font-weight:800!important;padding:7px 14px!important;border-radius:7px!important;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;box-shadow:0 0 10px rgba(34,197,94,0.35);';
+    newProjBtn.onclick = (e) => {
+      e.stopPropagation();
+      if (typeof window.openNewProjectModal === 'function') {
+        window.openNewProjectModal();
+      } else if (typeof openNewProjectModal === 'function') {
+        openNewProjectModal();
+      }
+    };
+    if (newProjBtn.parentElement !== groups) {
+      groups.appendChild(newProjBtn);
+    }
+
     // Make Restore Vault button a prominent top-level button right on toolbarGroups
     let vaultBtn = $('restoreVaultBtn') || Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('রিস্টোর') || b.id === 'restoreVaultBtn');
     if (vaultBtn && vaultBtn.parentElement !== groups) {
@@ -116,7 +137,35 @@
       vaultBtn.style.cssText = 'background:#1e3a8a!important;border:1px solid #3b82f6!important;color:#ffffff!important;font-weight:800!important;padding:7px 14px!important;border-radius:7px!important;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;box-shadow:0 0 10px rgba(59,130,246,0.3);';
       groups.appendChild(vaultBtn);
     }
+
+    // Add New Project to Slide dropdown menu
+    const slideMenuForNewProj = groups.querySelector('.toolbar-menu[data-menu="slide"]');
+    if (slideMenuForNewProj && !$('slideNewProjectBtn')) {
+      const slideNewProj = document.createElement('button');
+      slideNewProj.id = 'slideNewProjectBtn';
+      slideNewProj.innerHTML = '📄 নতুন প্রজেক্ট (New Project)';
+      slideNewProj.style.cssText = 'background:#0f2d1a;border:1px solid #22c55e;color:#86efac;font-weight:800;margin:0;';
+      slideNewProj.onclick = () => {
+        if (typeof window.openNewProjectModal === 'function') window.openNewProjectModal();
+        else $('newProjectBtn')?.click();
+      };
+      slideMenuForNewProj.prepend(slideNewProj);
+    }
+
+    // Add New Project to Export dropdown menu
     const exportMenuForRestore = groups.querySelector('.toolbar-menu[data-menu="export"]');
+    if (exportMenuForRestore && !$('exportNewProjectBtn')) {
+      const exportNewProj = document.createElement('button');
+      exportNewProj.id = 'exportNewProjectBtn';
+      exportNewProj.innerHTML = '📄 নতুন প্রজেক্ট (New Project)';
+      exportNewProj.style.cssText = 'background:#0f2d1a;border:1px solid #22c55e;color:#86efac;font-weight:800;margin:0;';
+      exportNewProj.onclick = () => {
+        if (typeof window.openNewProjectModal === 'function') window.openNewProjectModal();
+        else $('newProjectBtn')?.click();
+      };
+      exportMenuForRestore.prepend(exportNewProj);
+    }
+
     if (exportMenuForRestore && !$('exportRestoreBtn')) {
       const exportRestore = document.createElement('button');
       exportRestore.id = 'exportRestoreBtn';
