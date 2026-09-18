@@ -52,10 +52,80 @@
       "bgMediaBlur": 0,
       "brollPreset": "none",
       "brollSpeed": "normal",
-      "notes": "7"
+      "notes": "7iuoipo909-0i[-"
+    },
+    {
+      "background": "fashion",
+      "bgColor": "#17233c",
+      "transition": "fade",
+      "autoDuration": 0,
+      "elements": [
+        {
+          "id": "5e0a5014-c568-440f-a2ef-af65d27c11ce",
+          "type": "text",
+          "text": "io;i;o'p'o",
+          "x": 12,
+          "y": 58,
+          "w": 55,
+          "h": 10.1010101010101,
+          "size": 38,
+          "color": "#ffffff",
+          "weight": "700",
+          "animation": "none",
+          "animationDelay": 0,
+          "animationDuration": 0.6,
+          "animationStart": "click"
+        },
+        {
+          "id": "4aad8fbe-8e0d-4818-acc0-ea210f64bcee",
+          "type": "text",
+          "text": "li;o';",
+          "x": 11.454787744773224,
+          "y": 32.15316302237685,
+          "w": 55,
+          "h": 10.1010101010101,
+          "size": 38,
+          "color": "#ffffff",
+          "weight": "700",
+          "animation": "none",
+          "animationDelay": 0,
+          "animationDuration": 0.6,
+          "animationStart": "click"
+        },
+        {
+          "id": "8e830f66-556e-493a-bd41-bedea08406cf",
+          "type": "shape",
+          "shape": "hexagon",
+          "text": "p'''\\\\op'op\\[\\[\\",
+          "textColor": "#ffffff",
+          "textSize": 18,
+          "textWeight": "700",
+          "x": 46.17446847628551,
+          "y": 21.915041245024735,
+          "w": 22,
+          "h": 16,
+          "fill": "#4f8df7",
+          "stroke": "#ffffff",
+          "line": 2,
+          "opacity": 100,
+          "rotation": 0,
+          "animation": "none",
+          "animationDelay": 0,
+          "animationDuration": 0.6,
+          "animationStart": "click"
+        }
+      ],
+      "bgPlaybackRate": 1,
+      "bgOverlayColor": "#000000",
+      "bgOverlayOpacity": 10,
+      "bgMediaOpacity": 100,
+      "bgMediaBlur": 0,
+      "brollPreset": "none",
+      "brollSpeed": "normal",
+      "notes": ""
     }
   ],
-  "current": 0,
-  "elementCount": 2,
-  "savedAt": 1789743339585
+  "current": 1,
+  "elementCount": 5,
+  "savedAt": 1789743795971
 }
