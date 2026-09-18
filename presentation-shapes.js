@@ -177,8 +177,6 @@
           <label class="field">Outline width<input id="shapeLine" type="number" min="0" max="16"></label>
         </div>
         <label class="field">Opacity<input id="shapeOpacity" type="range" min="0" max="100"></label>
-        <div class="section-title" style="margin-top:14px">SHAPE TEXT</div>
-        <label class="field">Text<textarea id="shapeText" placeholder="Double-click shape to type"></textarea></label>
         <div class="row">
           <label class="field">Text color<input id="shapeTextColor" type="color"></label>
           <label class="field">Text size<input id="shapeTextSize" type="number" min="8" max="120"></label>
@@ -328,13 +326,12 @@
       $('shapeStroke').value = e.stroke || '#ffffff';
       $('shapeLine').value = e.line ?? 2;
       $('shapeOpacity').value = e.opacity ?? 100;
-      if ($('shapeText')) $('shapeText').value = e.text || '';
       if ($('shapeTextColor')) $('shapeTextColor').value = e.textColor || '#ffffff';
       if ($('shapeTextSize')) $('shapeTextSize').value = e.textSize || 18;
     }
   };
 
-  ['shapeFill', 'shapeStroke', 'shapeLine', 'shapeOpacity', 'shapeTextColor', 'shapeTextSize', 'shapeText'].forEach(id => {
+  ['shapeFill', 'shapeStroke', 'shapeLine', 'shapeOpacity', 'shapeTextColor', 'shapeTextSize'].forEach(id => {
     const el = $(id);
     if (!el) return;
     el.oninput = () => {
@@ -344,7 +341,6 @@
       if (id === 'shapeStroke') e.stroke = el.value;
       if (id === 'shapeLine') e.line = Math.max(0, +el.value || 0);
       if (id === 'shapeOpacity') e.opacity = +el.value;
-      if (id === 'shapeText') e.text = el.value;
       if (id === 'shapeTextColor') e.textColor = el.value;
       if (id === 'shapeTextSize') e.textSize = Math.max(8, +el.value || 18);
       render();

@@ -151,7 +151,7 @@
     } catch (_) {}
   }
 
-  let _lastDownTime = 0, _lastDownId = null, _pendingDrag = null;
+  let _pendingDrag = null;
 
   window.addEventListener('pointerdown', event => {
     if (event.target.closest?.('#textValue, #shapeText')) return;
@@ -185,7 +185,7 @@
       return;
     }
 
-    // 4. Element selection — prioritize element directly under pointer
+  // 4. Element selection — prioritize element directly under pointer
     let node = event.target.closest?.('#slide .element');
     if (!node) {
       const allUnder = document.elementsFromPoint(event.clientX, event.clientY);
@@ -205,38 +205,16 @@
     const item = active()?.elements?.find(x => x.id === node.dataset.id);
     if (!item) return;
 
-    // 5. Double-click detection: activate on-canvas inline text editing
-    const now = Date.now();
-    const isDbl = (event.detail >= 2 || (now - _lastDownTime < 450 && _lastDownId === item.id));
-    const wasAlreadySelected = (selected === item.id);
-    _lastDownTime = now;
-    _lastDownId = item.id;
-
-    if (isDbl && (item.type === 'text' || item.type === 'shape')) {
-      if (window.__presentationInlineEditLock === item.id) return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      selected = item.id;
-      _pendingDrag = null;
-      if (item.type === 'text' && typeof window.activateInlineTextEdit === 'function') {
-        window.activateInlineTextEdit(item, { x: event.clientX, y: event.clientY });
-      } else if (item.type === 'shape' && typeof window.activateInlineShapeEdit === 'function') {
-        window.activateInlineShapeEdit(item);
-      }
-      return;
-    }
-
     // 6. Select element & queue drag (Smooth & effortless dragging for Text, Shapes, and Images)
     selected = item.id;
     document.querySelectorAll('#slide .element').forEach(el => {
       el.classList.toggle('selected', el === node);
-      el.classList.remove('is-active-drag'); // clear drag z-index from any previous element
+      el.classList.remove('is-active-drag');
     });
     updateHandles();
     if (typeof renderInspector === 'function') renderInspector();
 
-    _pendingDrag = { event, item, wasAlreadySelected };
+    _pendingDrag = { event, item, wasAlreadySelected: (selected === item.id) };
   }, true);
 
   const DRAG_THRESHOLD = 5; // pixels
@@ -359,24 +337,6 @@
     $('slide')?.classList.remove('is-dragging');
     // Remove active drag elevation from all elements
     document.querySelectorAll('#slide .element.is-active-drag').forEach(el => el.classList.remove('is-active-drag'));
-
-    // If a text or shape element was clicked (not dragged) and it was already selected, activate inline editing
-    if (!action && pending && pending.wasAlreadySelected && (pending.item.type === 'text' || pending.item.type === 'shape')) {
-      if (window.__presentationInlineEditLock === pending.item.id) {
-        action = null;
-        render();
-        return;
-      }
-      const node = nodeFor(pending.item);
-      const isContent = event.target.closest?.('.text-content, .shape-label');
-      if (node && (event.target === node || isContent || node.contains(event.target))) {
-        if (pending.item.type === 'text' && typeof window.activateInlineTextEdit === 'function') {
-          window.activateInlineTextEdit(pending.item, { x: event.clientX, y: event.clientY });
-        } else if (pending.item.type === 'shape' && typeof window.activateInlineShapeEdit === 'function') {
-          window.activateInlineShapeEdit(pending.item);
-        }
-      }
-    }
 
     if (!action) return;
     event.preventDefault();

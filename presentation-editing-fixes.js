@@ -25,20 +25,19 @@
   window.showPresentationToast = showToast;
 
   function isSidebarTextField(target) {
-    return !!(target && (target.closest?.('#textValue, #shapeText') || target.id === 'textValue' || target.id === 'shapeText'));
+    return !!(target && (target.closest?.('input, textarea, select') || ['input','textarea','select'].includes((target.tagName || '').toLowerCase())));
   }
 
   // ──────────────────────────────────────────────────────────────────────────
   // 1. Activate Direct On-Screen Inline Text Editing
   // ──────────────────────────────────────────────────────────────────────────
   window.activateInlineTextEdit = function(item, clickPoint) {
-    if (isSidebarTextField(document.activeElement)) return;
     if (!item) item = typeof selectedEl === 'function' ? selectedEl() : null;
     if (!item || item.type !== 'text') return;
     if (window.__presentationInlineEditLock && window.__presentationInlineEditLock !== item.id) {
       const activeEditable = document.querySelector('#slide [contenteditable="true"], #slide .inline-editing');
       if (activeEditable) activeEditable.blur?.();
-      return;
+      window.__presentationInlineEditLock = null;
     }
     if (window.__presentationInlineEditLock === item.id) {
       const node = $('slide')?.querySelector('.text-el[data-id="' + item.id + '"]');
@@ -46,8 +45,12 @@
       if (content && content.contentEditable !== 'true') {
         content.contentEditable = 'true';
       }
-      content?.focus();
-      return;
+      if (!node || !node.classList.contains('inline-editing')) {
+        window.__presentationInlineEditLock = null;
+      } else {
+        content?.focus();
+        return;
+      }
     }
     window.__presentationInlineEditLock = item.id;
     selected = item.id;
@@ -111,7 +114,6 @@
     content.oninput = e => {
       e.stopPropagation();
       item.text = (content.innerText || content.textContent || '').replace(/\r/g, '');
-      if ($('textValue')) $('textValue').value = item.text;
 
       // Auto-fit height if required (pure layout, no thumbnail rerender)
       const stage = $('slide')?.getBoundingClientRect();
@@ -150,8 +152,7 @@
       content.style.outlineOffset = '';
       content.style.background = '';
       item.text = (content.innerText || content.textContent || '').replace(/\r/g, '');
-      if ($('textValue')) $('textValue').value = item.text;
-      
+
       // Restore handles
       node.querySelectorAll('.hard-resize, .hard-rotate').forEach(h => {
         h.style.display = '';
@@ -174,12 +175,11 @@
   // Activate Direct On-Screen Inline Shape Editing
   // ──────────────────────────────────────────────────────────────────────────
   window.activateInlineShapeEdit = function(item) {
-    if (isSidebarTextField(document.activeElement)) return;
     if (!item) return;
     if (window.__presentationInlineEditLock && window.__presentationInlineEditLock !== item.id) {
       const activeEditable = document.querySelector('#slide [contenteditable="true"], #slide .inline-editing');
       if (activeEditable) activeEditable.blur?.();
-      return;
+      window.__presentationInlineEditLock = null;
     }
     if (window.__presentationInlineEditLock === item.id) {
       const node = $('slide')?.querySelector('.shape-el[data-id="' + item.id + '"]');
@@ -187,8 +187,12 @@
       if (label && label.contentEditable !== 'true') {
         label.contentEditable = 'true';
       }
-      label?.focus();
-      return;
+      if (!node || !node.classList.contains('inline-editing')) {
+        window.__presentationInlineEditLock = null;
+      } else {
+        label?.focus();
+        return;
+      }
     }
     window.__presentationInlineEditLock = item.id;
     selected = item.id;
@@ -226,7 +230,6 @@
     label.oninput = e => {
       e.stopPropagation();
       item.text = (label.innerText || label.textContent || '').replace(/\r/g, '');
-      if ($('shapeText')) $('shapeText').value = item.text;
       if (typeof window.renderSlideThumbnailsMaster === 'function') window.renderSlideThumbnailsMaster();
       window.dispatchEvent(new CustomEvent('presentation:change'));
     };
@@ -236,7 +239,6 @@
       node.classList.remove('inline-editing');
       label.style.pointerEvents = 'none';
       item.text = (label.innerText || label.textContent || '').replace(/\r/g, '');
-      if ($('shapeText')) $('shapeText').value = item.text;
       if (typeof updateHandles === 'function') updateHandles();
       if (typeof renderInspector === 'function') renderInspector();
       if (typeof window.renderSlideThumbnailsMaster === 'function') window.renderSlideThumbnailsMaster();
@@ -247,6 +249,50 @@
 
     if (typeof renderInspector === 'function') renderInspector();
   };
+
+  // The canvas also has drag/resize controls that listen to pointer events.
+  // Do not depend on the browser's `dblclick` event here: a control can change
+  // the event target between the first and second click, causing that event to
+  // be lost.  This small, independent recognizer always opens text/shape
+  // editing after two stationary primary clicks on the same object.
+  let inlineEditClick = null;
+  const INLINE_EDIT_DOUBLE_CLICK_MS = 700;
+  const INLINE_EDIT_MOVE_TOLERANCE = 7;
+  window.addEventListener('pointerup', event => {
+    if (event.button !== 0 || event.target.isContentEditable ||
+        event.target.closest?.('[contenteditable="true"], .inline-editing, .hard-resize, .hard-rotate, .smart-resize-handle, .smart-rotate-handle')) {
+      inlineEditClick = null;
+      return;
+    }
+
+    const node = event.target.closest?.('#slide .text-el, #slide .shape-el');
+    if (!node) {
+      inlineEditClick = null;
+      return;
+    }
+    const item = active()?.elements?.find(element => element.id === node.dataset.id);
+    if (!item || (item.type !== 'text' && item.type !== 'shape')) return;
+
+    const now = performance.now();
+    const previous = inlineEditClick;
+    inlineEditClick = { id: item.id, x: event.clientX, y: event.clientY, time: now };
+    if (!previous || previous.id !== item.id || now - previous.time > INLINE_EDIT_DOUBLE_CLICK_MS ||
+        Math.hypot(event.clientX - previous.x, event.clientY - previous.y) > INLINE_EDIT_MOVE_TOLERANCE) {
+      return;
+    }
+
+    inlineEditClick = null;
+    // Let the browser finish the second click and its legacy handlers first.
+    // Several transform plugins mutate selection during `pointerdown`/`click`;
+    // opening the editor after that sequence prevents them from closing it.
+    setTimeout(() => {
+      const currentItem = active()?.elements?.find(element => element.id === item.id);
+      if (!currentItem) return;
+      selected = currentItem.id;
+      if (currentItem.type === 'text') window.activateInlineTextEdit(currentItem, { x: event.clientX, y: event.clientY });
+      else if (currentItem.type === 'shape') window.activateInlineShapeEdit(currentItem);
+    }, 0);
+  }, true);
 
   // ──────────────────────────────────────────────────────────────────────────
   // 2. Select All Text Inside Text Box or Shape on Ctrl+A
@@ -1094,7 +1140,14 @@
       node.dataset.inlineDblBound = '1';
 
       node.ondblclick = e => {
-        if (window.__presentationInlineEditLock === item.id) return;
+        if (window.__presentationInlineEditLock === item.id) {
+          const checkNode = $('slide')?.querySelector('.text-el[data-id="' + item.id + '"]');
+          if (!checkNode || !checkNode.classList.contains('inline-editing')) {
+            window.__presentationInlineEditLock = null;
+          } else {
+            return;
+          }
+        }
         e.preventDefault();
         e.stopPropagation();
         window.activateInlineTextEdit(item, { x: e.clientX, y: e.clientY });
@@ -1127,7 +1180,14 @@
       if (!label) return;
 
       node.ondblclick = e => {
-        if (window.__presentationInlineEditLock === item.id) return;
+        if (window.__presentationInlineEditLock === item.id) {
+          const checkNode = $('slide')?.querySelector('.shape-el[data-id="' + item.id + '"]');
+          if (!checkNode || !checkNode.classList.contains('inline-editing')) {
+            window.__presentationInlineEditLock = null;
+          } else {
+            return;
+          }
+        }
         e.preventDefault();
         e.stopPropagation();
         window.activateInlineShapeEdit(item);
@@ -1166,6 +1226,14 @@
   // Hook into render() to bind inline editing listeners on each render
   const _origRender = render;
   render = function() {
+    const activeEditable = document.querySelector('#slide [contenteditable="true"], #slide .inline-editing');
+    if (activeEditable) {
+      // A pointer-up from drag/resize can leave a render queued for the next
+      // animation frame.  Never let that queued render rebuild (and blur) the
+      // live contenteditable node the user has just opened for typing.
+      return;
+    }
+    window.__presentationInlineEditLock = null;
     _origRender();
     bindInlineEditing();
     setupZoomControls();
