@@ -63,8 +63,20 @@ function addImageTransformHandles(){
 }
 
 const $=id=>document.getElementById(id);const themes={fashion:'linear-gradient(135deg,#170b32,#192d58)',luxury:'linear-gradient(135deg,#1d1307,#76500a)',ocean:'linear-gradient(135deg,#06203d,#0c5d86)',royal:'linear-gradient(135deg,#2b1055,#7597de)',blush:'linear-gradient(135deg,#5e1938,#f06292)',emerald:'linear-gradient(135deg,#063b36,#16a085)',sunset:'linear-gradient(135deg,#5b1a13,#f59e0b)',clean:'#f8fafc'};
-const _getInitialDeck=()=>{try{if(window.DEFAULT_RECOVERED_SLIDES&&Array.isArray(window.DEFAULT_RECOVERED_SLIDES)&&window.DEFAULT_RECOVERED_SLIDES.length){return structuredClone(window.DEFAULT_RECOVERED_SLIDES);}}catch(_){}return[makeSlide()];};
-let slides=_getInitialDeck(),current=0,selected=null,drag=null;window.slides=slides;window.getSlides=()=>slides;
+const _getInitialDeck=()=>{
+  try{
+    const ls=JSON.parse(localStorage.getItem('presentation-studio-autosave-v1')||'null');
+    if(ls&&Array.isArray(ls.slides)&&ls.slides.length>0){
+      const defLen = (window.DEFAULT_RECOVERED_SLIDES && window.DEFAULT_RECOVERED_SLIDES.length) || 0;
+      if(ls.slides.length >= defLen || defLen <= 1){
+        return structuredClone(ls.slides);
+      }
+    }
+  }catch(_){}
+  try{if(window.DEFAULT_RECOVERED_SLIDES&&Array.isArray(window.DEFAULT_RECOVERED_SLIDES)&&window.DEFAULT_RECOVERED_SLIDES.length){return structuredClone(window.DEFAULT_RECOVERED_SLIDES);}}catch(_){}
+  return[makeSlide()];
+};
+let slides=_getInitialDeck(),current=0,selected=null,drag=null;window.slides=slides;window.current=current;window.getSlides=()=>slides;
 function makeSlide(){return{background:'fashion',bgColor:'#17233c',elements:[{id:crypto.randomUUID(),type:'text',text:'আপনার অসাধারণ Presentation',x:9,y:16,w:82,h:14,size:52,color:'#ffffff',weight:'900'},{id:crypto.randomUUID(),type:'text',text:'শুরু করুন আপনার গল্প, পণ্য বা আইডিয়া দিয়ে',x:10,y:35,w:65,h:8,size:24,color:'#ffd166',weight:'700'}]}}
 function active(){return slides[current]}function styleSlide(){const s=active();$('slide').style.background=s.background==='custom'?s.bgColor:themes[s.background];}
 function render(){styleSlide();const box=$('slide');box.querySelectorAll('.element').forEach(e=>e.remove());active().elements.forEach(el=>{const node=document.createElement('div');node.className='element '+el.type+(selected===el.id?' selected':'');node.dataset.id=el.id;node.style.cssText=`left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;`;if(el.type==='text'){node.classList.add('text-el');let content=document.createElement('div');content.className='text-content';content.textContent=el.text;content.style.cssText='width:100%;height:100%;display:flex;align-items:center;justify-content:'+(el.textAlign==='left'?'flex-start':el.textAlign==='right'?'flex-end':'center')+';word-break:break-word;white-space:pre-wrap;cursor:text;outline:none;line-height:1.2;';node.appendChild(content);node.style.color=el.color;node.style.fontSize=el.size+'px';node.style.fontWeight=el.weight;node.style.fontFamily=el.fontFamily||'';node.style.textAlign=el.textAlign||'center';node.style.transform='rotate('+(Number(el.rotation)||0)+'deg)';node.style.transformOrigin='center center';const _bv=el.boxBg||el.backgroundColor||el.bgColor||(el.background&&el.background.startsWith('#')?el.background:null);if(_bv&&_bv!=='transparent'){const _bo=el.boxOpacity!==undefined?(Number(el.boxOpacity)>1?Number(el.boxOpacity)/100:Number(el.boxOpacity)):1;if(_bv.startsWith('#')&&_bo<1){const _hx=_bv.replace('#','');node.style.backgroundColor='rgba('+parseInt(_hx.slice(0,2),16)+','+parseInt(_hx.slice(2,4),16)+','+parseInt(_hx.slice(4,6),16)+','+_bo+')';}else{node.style.backgroundColor=_bv;}node.style.borderRadius='6px';}node.ondblclick=(e)=>{e.preventDefault();e.stopPropagation();selected=el.id;if(typeof window.activateInlineTextEdit==='function'){window.activateInlineTextEdit(el,{x:e.clientX,y:e.clientY});}}}else{node.classList.add('image-el');node.innerHTML=`<img src="${el.src}" draggable="false">`;const image=node.querySelector('img');image.style.pointerEvents='none';image.draggable=false;node.addEventListener('click',event=>{event.stopPropagation();selected=el.id;node.classList.add('selected');renderInspector();addImageTransformHandles()})}node.addEventListener('pointerdown',startDrag);box.appendChild(node)});renderSlides();renderInspector()}
@@ -84,7 +96,7 @@ window.addEventListener('pointermove',e=>{
 function addText(){const el={id:crypto.randomUUID(),type:'text',text:'নতুন টেক্সট',x:12,y:58,w:55,h:10,size:38,color:'#ffffff',weight:'700'};active().elements.push(el);selected=el.id;render()}
 function addImage(src){const el={id:crypto.randomUUID(),type:'image',src,x:18,y:42,w:42,h:34};active().elements.push(el);selected=el.id;render()}
 function importImage(file){if(!file||!file.type.startsWith('image/'))return;const rd=new FileReader();rd.onload=()=>addImage(rd.result);rd.readAsDataURL(file)}
-$('newSlide').onclick=()=>{slides.splice(current+1,0,makeSlide());current++;selected=null;render()};$('duplicateSlide').onclick=()=>{slides.splice(current+1,0,structuredClone(active()));current++;active().elements.forEach(e=>e.id=crypto.randomUUID());selected=null;render()};$('deleteSlide').onclick=()=>{if(slides.length===1)return;slides.splice(current,1);current=Math.max(0,current-1);selected=null;render()};$('moveUp').onclick=()=>{if(!current)return;[slides[current-1],slides[current]]=[slides[current],slides[current-1]];current--;render()};$('moveDown').onclick=()=>{if(current===slides.length-1)return;[slides[current+1],slides[current]]=[slides[current],slides[current+1]];current++;render()};$('addText').onclick=addText;$('imageInput').onchange=e=>importImage(e.target.files[0]);$('background').onchange=e=>{active().background=e.target.value;render()};$('bgColor').oninput=e=>{active().bgColor=e.target.value;render()};['textValue','textColor','textSize','textWeight'].forEach(id=>$(id).addEventListener('input',()=>{const e=selectedEl();if(!e)return;e.text=$('textValue').value;e.color=$('textColor').value;e.size=+$('textSize').value;e.weight=$('textWeight').value;render()}));
+$('newSlide').onclick=()=>{slides.splice(current+1,0,makeSlide());current++;window.slides=slides;window.current=current;selected=null;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();};$('duplicateSlide').onclick=()=>{slides.splice(current+1,0,structuredClone(active()));current++;window.slides=slides;window.current=current;active().elements.forEach(e=>e.id=crypto.randomUUID());selected=null;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();};$('deleteSlide').onclick=()=>{if(slides.length===1)return;slides.splice(current,1);current=Math.max(0,current-1);window.slides=slides;window.current=current;selected=null;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();};$('moveUp').onclick=()=>{if(!current)return;[slides[current-1],slides[current]]=[slides[current],slides[current-1]];current--;window.slides=slides;window.current=current;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();};$('moveDown').onclick=()=>{if(current===slides.length-1)return;[slides[current+1],slides[current]]=[slides[current],slides[current+1]];current++;window.slides=slides;window.current=current;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();};$('addText').onclick=addText;$('imageInput').onchange=e=>importImage(e.target.files[0]);$('background').onchange=e=>{active().background=e.target.value;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();};$('bgColor').oninput=e=>{active().bgColor=e.target.value;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();};['textColor','textSize','textWeight'].forEach(id=>$(id).addEventListener('input',()=>{const e=selectedEl();if(!e)return;e.color=$('textColor').value;e.size=+$('textSize').value;e.weight=$('textWeight').value;render()}));let _sideTextDebounce=0;$('textValue').addEventListener('input',()=>{const e=selectedEl();if(!e||e.type!=='text')return;e.text=$('textValue').value;const n=$('slide')?.querySelector('.element[data-id="'+e.id+'"] .text-content');if(n&&n.contentEditable!=='true')n.textContent=e.text;fitSelectedTextBox();clearTimeout(_sideTextDebounce);_sideTextDebounce=setTimeout(()=>{if(typeof renderSlides==='function')renderSlides();window.dispatchEvent(new CustomEvent('presentation:change'));},400);});
 $('slide').addEventListener('dragover',e=>{e.preventDefault();$('slide').classList.add('dragging')});$('slide').addEventListener('dragleave',()=>$('slide').classList.remove('dragging'));$('slide').addEventListener('drop',e=>{e.preventDefault();$('slide').classList.remove('dragging');importImage(e.dataTransfer.files[0])});
 $('templateBtn').onclick=()=>{active().background='luxury';active().elements=[{id:crypto.randomUUID(),type:'text',text:'NEW COLLECTION',x:10,y:18,w:80,h:14,size:62,color:'#fff4cf',weight:'900'},{id:crypto.randomUUID(),type:'text',text:'Fashion • Quality • Elegance',x:12,y:38,w:70,h:9,size:25,color:'#ffd166',weight:'700'},{id:crypto.randomUUID(),type:'text',text:'YOUR BRAND',x:12,y:76,w:50,h:8,size:22,color:'#ffffff',weight:'700'}];selected=null;render()};
 function download(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}$('saveProject').onclick=()=>download('presentation-project.json',JSON.stringify({slides},null,2),'application/json');$('loadProject').onclick=()=>$('projectInput').click();$('projectInput').accept='.json,application/json,.html,text/html';$('projectInput').onchange=e=>{const file=e.target.files&&e.target.files[0];if(!file)return;const rd=new FileReader();rd.onload=()=>{try{let text=rd.result;let loadedSlides=null;if(text.includes('let slides = [')||text.includes('slides = [')){const match=text.match(/let\s+slides\s*=\s*(\[[\s\S]*?\]);/);if(match){try{loadedSlides=JSON.parse(match[1])}catch(_){}}}if(!loadedSlides){const d=JSON.parse(text);if(Array.isArray(d)){loadedSlides=d;}else if(d&&Array.isArray(d.slides)){loadedSlides=d.slides;}else if(d&&typeof d==='object'){const keys=Object.keys(d);const arr=keys.map(k=>d[k]).filter(v=>v&&typeof v==='object'&&Array.isArray(v.elements));if(arr.length>0)loadedSlides=arr;}}if(!loadedSlides||!loadedSlides.length)throw new Error('No slides found in file');slides=loadedSlides;window.slides=slides;current=0;selected=null;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();if(typeof window.showPresentationToast==='function')window.showPresentationToast('✅ প্রজেক্ট সফলভাবে লোড হয়েছে!');}catch(err){alert('Invalid presentation project file.\n\nDetails: '+err.message)}};rd.readAsText(file)};
@@ -137,11 +149,9 @@ const inspectorWithQuickColor=renderInspector;renderInspector=function(){inspect
 function fitSelectedTextBox(){const el=selectedEl();if(!el||el.type!=='text')return;const lineCount=Math.max(1,String(el.text||'').split(/\r?\n/).length);const stageHeight=$('slide').getBoundingClientRect().height||540;const required=(lineCount*Number(el.size||42)*1.22+12)/stageHeight*100;el.h=Math.min(100-el.y,Math.max(5,required))}
 $('textValue').addEventListener('input',()=>{fitSelectedTextBox();render()});
 
-// Autosave the complete presentation locally. Manual Save Project remains a
-// portable backup; this version simply survives refreshes and app restarts.
+// Persistent Autosave is managed comprehensively with multi-tiered backup by presentation-reliable-autosave.js
 const PRESENTATION_PROJECT_KEY='presentation-studio-autosave-v1';
-try{const saved=JSON.parse(localStorage.getItem(PRESENTATION_PROJECT_KEY)||'null');if(saved&&Array.isArray(saved.slides)&&saved.slides.length){const starterDeck=(saved.slides.length===1&&(saved.slides[0]?.elements?.length||0)<=2);if(!starterDeck||slides.length<=1){slides=saved.slides;current=Math.min(Math.max(0,saved.current||0),slides.length-1);selected=null;render();}}}catch(_){/* a corrupt autosave never blocks the editor */}
-let autosaveTimer=0;const renderBeforeAutosave=render;render=function(){renderBeforeAutosave();clearTimeout(autosaveTimer);autosaveTimer=setTimeout(()=>{try{localStorage.setItem(PRESENTATION_PROJECT_KEY,JSON.stringify({slides,current}))}catch(_){/* large image assets may exceed storage; Asset Library is independent */}},250)};render();
+
 </script>
 <script>
 // Live editor preview: choosing an effect should feel immediate, not require
@@ -183,8 +193,12 @@ render=function(){
     if(el.type!=='text')return;
     const node=stage.querySelector('.text-el[data-id="'+el.id+'"]');
     if(!node)return;
+    // Skip auto-fit while user is actively inline-editing this element
+    if(node.classList.contains('inline-editing'))return;
+    // Bidirectional fit: shrink OR grow to match actual content height
     const requiredHeight=node.scrollHeight/stageHeight*100;
-    if(requiredHeight>el.h){el.h=Math.min(100-el.y,requiredHeight);node.style.height=el.h+'%';}
+    const fittedH=Math.min(100-el.y,Math.max(5,requiredHeight));
+    if(Math.abs(fittedH-el.h)>0.5){el.h=fittedH;node.style.height=el.h+'%';}
   });
   renderSlides();
   addTextTransformHandle();
@@ -225,6 +239,8 @@ startDrag=function(event){
 document.addEventListener('pointerdown',event=>{
   const target=event.target;
   if(target && (target.isContentEditable || target.closest?.('[contenteditable="true"], .inline-editing'))) return;
+  // Only handle legacy text-move/rotate/resize handles here; single-click element selection
+  // is now handled by presentation-hard-transform-controls.js using elementsFromPoint (smarter hit testing).
   const node=target.closest&&target.closest('.text-el');
   if(!node)return;
   const item=target.closest('.text-move-handle,.text-rotate-handle,.text-resize-handle');
@@ -238,8 +254,12 @@ document.addEventListener('pointerdown',event=>{
     const end=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);render()};
     window.addEventListener('pointermove',move);window.addEventListener('pointerup',end,{once:true});return;
   }
-  selected=node.dataset.id;document.querySelectorAll('.text-el').forEach(text=>text.classList.toggle('selected',text===node));renderInspector();addTextTransformHandle();
+  // For plain clicks on text-el body: do NOT override selected here.
+  // hard-transform-controls already set `selected` correctly via elementsFromPoint.
+  // Only refresh the inspector and handles to keep UI in sync.
+  renderInspector();addTextTransformHandle();
 },true);
+
 const originalImageAwareRender=render;
 render=function(){
   originalImageAwareRender();
@@ -264,12 +284,7 @@ document.addEventListener('pointerdown',event=>{
 },true);
 $('slide').addEventListener('pointerdown',event=>{if(!event.target.closest('.element,.hard-resize,.hard-rotate')&&!event.target.closest('#ctx-toolbar')){selected=null;render()}},true);
 document.addEventListener('pointerdown',event=>{if(!event.target.closest('.element,.hard-resize,.hard-rotate')&&!event.target.closest('.right')&&!event.target.closest('#textToolsMenu,#textTools')&&!event.target.closest('#ctx-toolbar')){selected=null;render()}},true);
-document.addEventListener('selectionchange',()=>{
-  const anchor=window.getSelection()?.anchorNode;
-  const content=anchor?.nodeType===Node.ELEMENT_NODE?anchor.closest?.('.text-content'):anchor?.parentElement?.closest?.('.text-content');
-  const node=content?.closest('.text-el');
-  if(node){selected=node.dataset.id;node.classList.add('selected');renderInspector();addTextTransformHandle();}
-});
+// (Selection is managed via pointerdown and hard-transform-controls to avoid jumping between text boxes)
 try{const pending=JSON.parse(localStorage.getItem('presentation-studio-pending-asset-v1')||'null');if(pending?.src){addImage(pending.src);localStorage.removeItem('presentation-studio-pending-asset-v1');}}catch(_){/* ignore invalid cross-tool handoff */}
 document.addEventListener('change',event=>{
   if(event.target?.id!=='backgroundImageInput')return;

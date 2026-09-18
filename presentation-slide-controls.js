@@ -32,6 +32,7 @@
       window.showPresentationToast('✓ স্লাইড ডুপ্লিকেট সম্পন্ন হয়েছে (Slide Duplicated)!');
     }
     window.dispatchEvent(new CustomEvent('presentation:change'));
+    if (typeof window.presentationSaveNow === 'function') window.presentationSaveNow();
   };
 
   // Build dual sticky header for Slide List (New Slide + Duplicate Slide)

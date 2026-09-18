@@ -68,27 +68,36 @@
   // Capture at window level before legacy object listeners can cancel dragging.
   window.addEventListener('pointerdown', event => {
     if (event.target.isContentEditable || event.target.closest?.('[contenteditable="true"]')) return;
-    const node = event.target.closest?.('#slide .element');
-    // While a text box is in inline-edit mode, don't start a move — let the
-    // native caret/selection work so the user can select text instead.
-    if (node && node.classList.contains('inline-editing')) return;
-    if (!node || event.target.closest('.free-resize-handle,.smart-resize-handle,.smart-rotate-handle')) return;
+
+    // Smart hit testing: use elementsFromPoint so transparent areas of selected
+    // elements don't block clicks on elements behind them.
+    const allUnder = document.elementsFromPoint(event.clientX, event.clientY);
+    const nodesUnder = allUnder
+      .map(el => el.closest?.('#slide .element'))
+      .filter((el, idx, arr) => el && arr.indexOf(el) === idx);
+
+    if (!nodesUnder.length) return;
+
+    // Cycle: if topmost is already selected, pick the one underneath
+    let node = nodesUnder[0];
+    if (nodesUnder.length > 1 && node.dataset.id === selected) {
+      node = nodesUnder[1];
+    }
+
+    // While a text box is in inline-edit mode, don't start a move
+    if (node.classList.contains('inline-editing')) return;
+    if (event.target.closest('.free-resize-handle,.smart-resize-handle,.smart-rotate-handle')) return;
+
     const item = active().elements.find(el => el.id === node.dataset.id);
     if (!item) return;
 
-    // Double-click detection: if editing-fixes.js already called stopImmediatePropagation
-    // on this same event (for inline edit), we will not reach here.
-    // But as a safety guard: if this pointerdown looks like the 2nd of a double-click,
-    // skip drag so inline editing can take over.
+    // Double-click detection
     const now = Date.now();
     if (now - _soi_lastT < SOI_DBLCLICK_MS && _soi_lastId === item.id &&
         (item.type === 'text' || item.type === 'shape')) {
-      // Double-click detected → skip drag, activate inline editing.
       event.preventDefault(); event.stopImmediatePropagation();
       selectNode(item);
       _soi_lastId = null; _soi_lastT = 0;
-      // Call globally-exposed inline edit functions (defined by presentation-editing-fixes.js
-      // which loads after this file but before any user interaction).
       if (item.type === 'text' && typeof window.activateInlineTextEdit === 'function') {
         window.activateInlineTextEdit(item);
       } else if (item.type === 'shape' && typeof window.activateInlineShapeEdit === 'function') {
@@ -104,6 +113,7 @@
     moving = { item, rect, dx:event.clientX - rect.left - item.x * rect.width / 100, dy:event.clientY - rect.top - item.y * rect.height / 100, pointerId:event.pointerId };
     selectNode(item);
   }, true);
+
   // Click/drag the object itself to move it. Positions may be outside the slide.
   $('slide').addEventListener('pointerdown', event => {
     const node = event.target.closest?.('.element');

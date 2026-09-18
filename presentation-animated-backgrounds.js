@@ -219,6 +219,22 @@
     window.addEventListener('pointercancel', () => {
       resumeVideosAfterDrag();
     }, { passive: true });
+    window.addEventListener('presentation:texteditstart', () => {
+      pauseVideosForDrag();
+    });
+    window.addEventListener('presentation:texteditend', () => {
+      resumeVideosAfterDrag();
+    });
+    document.addEventListener('focusin', e => {
+      if (e.target && (e.target.id === 'textValue' || e.target.isContentEditable || e.target.closest?.('.text-content'))) {
+        pauseVideosForDrag();
+      }
+    });
+    document.addEventListener('focusout', e => {
+      if (e.target && (e.target.id === 'textValue' || e.target.isContentEditable || e.target.closest?.('.text-content'))) {
+        resumeVideosAfterDrag();
+      }
+    });
   }
 
   // ── styleSlide hook — skip layer() during live drags ─────────────────────

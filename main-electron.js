@@ -97,6 +97,27 @@ function startInternalServer(callback) {
             }));
         }
 
+        // ── Persistent Project Save Endpoint ─────────────────────────────
+        if (pathname === '/api/save-project' && req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => { body += chunk; });
+            req.on('end', () => {
+                try {
+                    const data = JSON.parse(body);
+                    if (data && Array.isArray(data.slides) && data.slides.length > 0) {
+                        fs.writeFileSync(path.join(__dirname, 'recovered-project.json'), JSON.stringify(data, null, 2), 'utf8');
+                        fs.writeFileSync(path.join(__dirname, 'presentation-default-deck.js'), 'window.DEFAULT_RECOVERED_SLIDES = ' + JSON.stringify(data.slides) + ';\n', 'utf8');
+                    }
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    return res.end(JSON.stringify({ success: true, count: data.slides?.length }));
+                } catch (err) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    return res.end(JSON.stringify({ error: err.message }));
+                }
+            });
+            return;
+        }
+
         let filePath = path.join(__dirname, pathname === '/' ? 'index.html' : pathname);
 
         if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {

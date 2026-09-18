@@ -63,6 +63,9 @@
       h.style.display = 'none';
     });
 
+    // Notify background animations to pause to free up 100% GPU bandwidth
+    window.dispatchEvent(new CustomEvent('presentation:texteditstart'));
+
     setTimeout(() => {
       content.focus();
       try {
@@ -84,12 +87,13 @@
       } catch (_) {}
     }, 15);
 
+    let _inlineTextDebounce = 0;
     content.oninput = e => {
       e.stopPropagation();
       item.text = (content.innerText || content.textContent || '').replace(/\r/g, '');
       if ($('textValue')) $('textValue').value = item.text;
 
-      // Auto-fit height if required
+      // Auto-fit height if required (pure layout, no thumbnail rerender)
       const stage = $('slide')?.getBoundingClientRect();
       if (stage && node.scrollHeight > 0) {
         const reqH = (node.scrollHeight / stage.height) * 100;
@@ -99,9 +103,13 @@
         }
       }
 
-      if (typeof window.renderSlideThumbnailsMaster === 'function') window.renderSlideThumbnailsMaster();
-      else if (typeof renderSlides === 'function') renderSlides();
-      window.dispatchEvent(new CustomEvent('presentation:change'));
+      // Debounce heavy thumbnails and persistence so typing is 100% fluid (0ms lag)
+      clearTimeout(_inlineTextDebounce);
+      _inlineTextDebounce = setTimeout(() => {
+        if (typeof window.renderSlideThumbnailsMaster === 'function') window.renderSlideThumbnailsMaster();
+        else if (typeof renderSlides === 'function') renderSlides();
+        window.dispatchEvent(new CustomEvent('presentation:change'));
+      }, 500);
     };
 
     content.onkeydown = e => {
@@ -115,6 +123,7 @@
     };
 
     content.onblur = () => {
+      clearTimeout(_inlineTextDebounce);
       content.contentEditable = 'false';
       node.classList.remove('inline-editing');
       content.style.outline = '';
@@ -129,6 +138,11 @@
       });
       if (typeof updateHandles === 'function') updateHandles();
       if (typeof renderInspector === 'function') renderInspector();
+      if (typeof window.renderSlideThumbnailsMaster === 'function') window.renderSlideThumbnailsMaster();
+      else if (typeof renderSlides === 'function') renderSlides();
+
+      // Resume background animation and commit changes
+      window.dispatchEvent(new CustomEvent('presentation:texteditend'));
       window.dispatchEvent(new CustomEvent('presentation:change'));
     };
 

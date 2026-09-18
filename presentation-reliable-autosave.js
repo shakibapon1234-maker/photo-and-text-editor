@@ -63,11 +63,13 @@
   // Fast fingerprint to avoid cloning and writing to disk when nothing changed
   function computeDeckFingerprint(deck, curr) {
     if (!Array.isArray(deck)) return '';
-    let hash = 'c:' + curr + ';';
+    let hash = 'c:' + curr + ';n:' + deck.length + ';';
     for (let i = 0; i < deck.length; i++) {
       const s = deck[i];
       if (!s) continue;
-      hash += 's:' + (s.background || '') + (s.bgColor || '') + ';';
+      const bgImg = s.bgImage ? s.bgImage.slice(0, 60) : '';
+      const bgMed = s.bgMedia ? s.bgMedia.slice(0, 60) : '';
+      hash += 's:' + (s.background || '') + (s.bgColor || '') + bgImg + bgMed + ';';
       const els = s.elements;
       if (Array.isArray(els)) {
         for (let j = 0; j < els.length; j++) {
@@ -86,10 +88,15 @@
       const copy = structuredClone(snap);
       if (Array.isArray(copy.slides)) {
         copy.slides.forEach(s => {
+          if (s.bgMedia && typeof s.bgMedia === 'string' && s.bgMedia.length > 50000) {
+            s.bgMedia = '[heavy-bg-media-in-idb]';
+          }
+          if (s.bgImage && typeof s.bgImage === 'string' && s.bgImage.length > 50000) {
+            s.bgImage = '[heavy-bg-image-in-idb]';
+          }
           if (Array.isArray(s.elements)) {
             s.elements.forEach(e => {
-              // Strip heavy base64 strings from secondary history snapshots
-              if (e.src && e.src.length > 50000 && e.src.startsWith('data:')) {
+              if (e.src && typeof e.src === 'string' && e.src.length > 50000 && e.src.startsWith('data:')) {
                 e.src = '[base64-image-in-idb]';
                 e.__hasLargeSrc = true;
               }
@@ -105,19 +112,17 @@
 
   function saveToLocalStorage(data) {
     try {
-      // Primary autosave: keep actual slides if fits
+      // Always save lightweight sanitized version so it never exceeds quota
+      const safeData = sanitizeForLocalStorage(data);
       try {
-        localStorage.setItem(LS_AUTOSAVE, JSON.stringify({ slides: data.slides, current: data.current }));
-      } catch (errQuota) {
-        // If quota exceeded due to large images, save lightweight version
-        const safeData = sanitizeForLocalStorage(data);
         localStorage.setItem(LS_AUTOSAVE, JSON.stringify({ slides: safeData.slides, current: safeData.current }));
-      }
+      } catch (_) {}
 
-      if (data.elementCount > 0) {
-        const safeSnap = sanitizeForLocalStorage(data);
-        localStorage.setItem(LS_EMERGENCY, JSON.stringify(safeSnap));
-        updateSnapshotsHistory(safeSnap);
+      if (data.elementCount > 0 || (Array.isArray(data.slides) && data.slides.length > 0)) {
+        try {
+          localStorage.setItem(LS_EMERGENCY, JSON.stringify(safeData));
+          updateSnapshotsHistory(safeData);
+        } catch (_) {}
       }
     } catch (_) {
       /* storage quota safe */
@@ -137,24 +142,26 @@
       let list = getSnapshotsHistory();
       const last = list[0];
       if (last && (Date.now() - last.savedAt < 20000) && last.elementCount === safeData.elementCount) {
-        list[0] = safeData; // update latest
+        list[0] = safeData;
       } else {
         list.unshift(safeData);
       }
-      list = list.slice(0, 5); // keep max 5 lightweight snapshots
+      list = list.slice(0, 5);
       localStorage.setItem(LS_SNAPSHOTS, JSON.stringify(list));
     } catch (_) {}
   }
 
   let lastSavedFingerprint = '';
+  let lastSavedSlideCount = -1;
 
   async function saveNow() {
     if (!ready || !db) return;
     if (writing) { queued = true; return; }
 
     const currentFingerprint = computeDeckFingerprint(slides, current);
-    if (currentFingerprint === lastSavedFingerprint && lastSavedFingerprint !== '') {
-      return; // Nothing changed, skip saving completely!
+    const countChanged = Array.isArray(slides) && slides.length !== lastSavedSlideCount;
+    if (!countChanged && currentFingerprint === lastSavedFingerprint && lastSavedFingerprint !== '') {
+      return;
     }
 
     writing = true;
@@ -162,30 +169,47 @@
     try {
       const data = snapshot();
       lastSavedFingerprint = currentFingerprint;
-      const oldCurrent = await get(KEY);
-      if (oldCurrent && oldCurrent.elementCount > 0) {
-        await put('previous', oldCurrent);
-      }
-      await put(KEY, data);
-      if (data.elementCount > 0) {
-        await put('emergency_backup', data);
-      }
+      lastSavedSlideCount = Array.isArray(slides) ? slides.length : 0;
+
+      // 1. Synchronous localStorage update immediately
       saveToLocalStorage(data);
+
+      // 2. Primary fast IndexedDB put
+      await put(KEY, data);
+
+      // 3. Persistent backend server write
+      try {
+        if (typeof fetch === 'function') {
+          fetch('/api/save-project', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          }).catch(() => {});
+        }
+      } catch (_) {}
+
+      // 4. Emergency secondary backup
+      put('emergency_backup', data).catch(() => {});
     } catch (error) {
       console.warn('Presentation autosave failed', error);
     } finally {
       writing = false;
       if (queued) {
         queued = false;
-        setTimeout(saveNow, 300);
+        setTimeout(saveNow, 200);
       }
     }
   }
 
-  function schedule() {
+  function schedule(immediate = false) {
     if (!ready) return;
     clearTimeout(timer);
-    timer = setTimeout(saveNow, 1200);
+    // If slide count changed (new slide, duplicate, delete), save IMMEDIATELY!
+    if (immediate || (Array.isArray(slides) && slides.length !== lastSavedSlideCount)) {
+      saveNow();
+      return;
+    }
+    timer = setTimeout(saveNow, 600);
   }
 
   const renderBeforeReliableSave = render;
@@ -194,12 +218,23 @@
     schedule();
   };
 
-  window.addEventListener('presentation:change', schedule);
-  window.presentationSaveNow = saveNow;
-  window.addEventListener('beforeunload', () => {
+  window.addEventListener('presentation:change', () => schedule(true));
+  window.presentationSaveNow = () => saveNow();
+
+  const handleAppClose = () => {
     clearTimeout(timer);
-    saveNow();
-  });
+    lastSavedFingerprint = '';
+    try {
+      const data = snapshot();
+      saveToLocalStorage(data);
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/save-project', JSON.stringify(data));
+      }
+      saveNow();
+    } catch (_) {}
+  };
+  window.addEventListener('beforeunload', handleAppClose);
+  window.addEventListener('pagehide', handleAppClose);
 
   // ── Modal & UI Recovery System ──────────────────────────────────
   function applyDeck(deck, curr = 0) {
@@ -507,46 +542,57 @@
       const lsBackup = (() => {
         try { return JSON.parse(localStorage.getItem(LS_EMERGENCY) || 'null'); } catch (_) { return null; }
       })();
+      const lsAuto = (() => {
+        try { return JSON.parse(localStorage.getItem(LS_AUTOSAVE) || 'null'); } catch (_) { return null; }
+      })();
 
-      const activeElementCount = countTotalElements(slides);
+      // Priority: (1) IndexedDB saved, (2) IndexedDB emergency, (3) localStorage emergency, (4) localStorage autosave
+      const bestCandidate = (saved && Array.isArray(saved.slides) && saved.slides.length > 0) ? saved
+                          : (emergency && Array.isArray(emergency.slides) && emergency.slides.length > 0) ? emergency
+                          : (lsBackup && Array.isArray(lsBackup.slides) && lsBackup.slides.length > 0) ? lsBackup
+                          : (lsAuto && Array.isArray(lsAuto.slides) && lsAuto.slides.length > 0) ? lsAuto
+                          : null;
 
-      // Only load from storage if the active deck is a default single empty slide (1 slide, <= 2 starter items)
-      if (slides.length <= 1 && activeElementCount <= 2) {
-        const bestCandidate = (saved && countTotalElements(saved.slides) > 0) ? saved
-                            : (emergency && countTotalElements(emergency.slides) > 0) ? emergency
-                            : (lsBackup && countTotalElements(lsBackup.slides) > 0) ? lsBackup
-                            : null;
-
-        if (bestCandidate && bestCandidate.slides && bestCandidate.slides.length) {
-          applyDeck(bestCandidate.slides, bestCandidate.current || 0);
-        } else if (saved?.slides?.length && countTotalElements(saved.slides) > 0) {
-          applyDeck(saved.slides, saved.current || 0);
-        } else {
-          try {
-            const recResp = await fetch('recovered-project.json?t=' + Date.now());
-            if (recResp.ok) {
-              const recData = await recResp.json();
-              if (recData && Array.isArray(recData.slides) && recData.slides.length > 0) {
-                applyDeck(recData.slides, recData.current || 0);
-                if (typeof window.showPresentationToast === 'function') {
-                  window.showPresentationToast('✅ আপনার পূর্ববর্তী প্রজেক্ট সফলভাবে রিকভার করা হয়েছে!');
-                }
+      if (bestCandidate && Array.isArray(bestCandidate.slides) && bestCandidate.slides.length > 0) {
+        // Apply saved deck — DON'T pre-set fingerprint so the forced save below actually writes
+        slides = structuredClone(bestCandidate.slides);
+        current = Math.min(Math.max(0, bestCandidate.current || 0), slides.length - 1);
+        selected = null;
+        if (typeof drag !== 'undefined') drag = null;
+        if (typeof render === 'function') render();
+        if (typeof renderSlides === 'function') renderSlides();
+      } else {
+        try {
+          const recResp = await fetch('recovered-project.json?t=' + Date.now());
+          if (recResp.ok) {
+            const recData = await recResp.json();
+            if (recData && Array.isArray(recData.slides) && recData.slides.length > 0) {
+              slides = structuredClone(recData.slides);
+              current = Math.min(Math.max(0, recData.current || 0), slides.length - 1);
+              selected = null;
+              if (typeof drag !== 'undefined') drag = null;
+              if (typeof render === 'function') render();
+              if (typeof renderSlides === 'function') renderSlides();
+              if (typeof window.showPresentationToast === 'function') {
+                window.showPresentationToast('✅ আপনার পূর্ববর্তী প্রজেক্ট সফলভাবে লোড হয়েছে!');
               }
             }
-          } catch (_) {}
-        }
+          }
+        } catch (_) {}
       }
     } catch (error) {
       console.warn('Reliable presentation storage unavailable', error);
       try {
         const ls = JSON.parse(localStorage.getItem(LS_AUTOSAVE) || 'null');
-        if (ls && Array.isArray(ls.slides) && ls.slides.length && slides.length <= 1 && countTotalElements(slides) <= 2) {
+        if (ls && Array.isArray(ls.slides) && ls.slides.length > 0) {
           applyDeck(ls.slides, ls.current || 0);
         }
       } catch (_) {}
     }
 
     ready = true;
+    lastSavedSlideCount = Array.isArray(slides) ? slides.length : 0;
+    lastSavedFingerprint = computeDeckFingerprint(slides, current);
     schedule();
   })();
 })();

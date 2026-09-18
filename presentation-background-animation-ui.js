@@ -51,7 +51,16 @@
       const f = e.target.files[0];
       if (!f || !f.type.startsWith('image/')) return;
       const r = new FileReader();
-      r.onload = () => { active().background = 'image'; active().bgImage = r.result; render(); };
+      r.onload = () => {
+        active().background = 'image';
+        active().bgImage = r.result;
+        render();
+        // Force immediate save — background images are large and must not
+        // wait for the debounce timer if the user closes the app quickly.
+        if (typeof window.presentationSaveNow === 'function') {
+          setTimeout(window.presentationSaveNow, 100);
+        }
+      };
       r.readAsDataURL(f);
     };
   }

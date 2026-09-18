@@ -16,9 +16,11 @@
       touch-action: none;
     }
     .element.selected {
-      z-index: 500 !important;
       outline: 1.5px dashed #ffb11b !important;
       outline-offset: 2px;
+    }
+    .element.is-active-drag {
+      z-index: 500 !important;
     }
     /* 8 cardinal resize handles */
     .hard-resize {
@@ -110,6 +112,9 @@
   function begin(kind, event, item, side = '') {
     window.__presentationLiveDrag = true;
     $('slide')?.classList.add('is-dragging');
+    // Elevate only the actively-dragged element to float above others
+    const dragNode = nodeFor(item);
+    if (dragNode) dragNode.classList.add('is-active-drag');
 
     const stage = $('slide');
     const rect = stage.getBoundingClientRect();
@@ -173,15 +178,21 @@
       return;
     }
 
-    // 4. Element selection
-    const node = event.target.closest?.('#slide .element');
+    // 4. Element selection — prioritize element directly under pointer
+    let node = event.target.closest?.('#slide .element');
     if (!node) {
-      // Clicked on background canvas: end any active inline text edit
-      document.querySelectorAll('[contenteditable="true"]').forEach(el => {
-        el.contentEditable = 'false';
-        el.closest('.element')?.classList.remove('inline-editing');
-      });
-      return;
+      const allUnder = document.elementsFromPoint(event.clientX, event.clientY);
+      const nodesUnder = allUnder
+        .map(el => el.closest?.('#slide .element'))
+        .filter((el, idx, arr) => el && arr.indexOf(el) === idx);
+      if (!nodesUnder.length) {
+        document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+          el.contentEditable = 'false';
+          el.closest('.element')?.classList.remove('inline-editing');
+        });
+        return;
+      }
+      node = nodesUnder[0];
     }
 
     const item = active()?.elements?.find(x => x.id === node.dataset.id);
@@ -189,7 +200,7 @@
 
     // 5. Double-click detection: activate on-canvas inline text editing
     const now = Date.now();
-    const isDbl = (event.detail >= 2 || (now - _lastDownTime < 380 && _lastDownId === item.id));
+    const isDbl = (event.detail >= 2 || (now - _lastDownTime < 450 && _lastDownId === item.id));
     const wasAlreadySelected = (selected === item.id);
     _lastDownTime = now;
     _lastDownId = item.id;
@@ -210,7 +221,10 @@
 
     // 6. Select element & queue drag (Smooth & effortless dragging for Text, Shapes, and Images)
     selected = item.id;
-    document.querySelectorAll('#slide .element').forEach(el => el.classList.toggle('selected', el === node));
+    document.querySelectorAll('#slide .element').forEach(el => {
+      el.classList.toggle('selected', el === node);
+      el.classList.remove('is-active-drag'); // clear drag z-index from any previous element
+    });
     updateHandles();
     if (typeof renderInspector === 'function') renderInspector();
 
@@ -335,6 +349,8 @@
     if (typeof window.drag !== 'undefined') window.drag = null;
     window.__presentationLiveDrag = false;
     $('slide')?.classList.remove('is-dragging');
+    // Remove active drag elevation from all elements
+    document.querySelectorAll('#slide .element.is-active-drag').forEach(el => el.classList.remove('is-active-drag'));
 
     // If a text element was clicked (not dragged) and it was already selected, activate inline text editing
     if (!action && pending && pending.wasAlreadySelected && pending.item.type === 'text') {
@@ -363,6 +379,7 @@
     if (typeof window.drag !== 'undefined') window.drag = null;
     window.__presentationLiveDrag = false;
     $('slide')?.classList.remove('is-dragging');
+    document.querySelectorAll('#slide .element.is-active-drag').forEach(el => el.classList.remove('is-active-drag'));
     if (!action) return;
     action = null;
     render();
