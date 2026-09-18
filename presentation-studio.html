@@ -185,13 +185,18 @@ function clearAllAutosave() {
 }
 
 function startNewProject() {
-  slides = [makeSlide()];
+  const newSlide = makeSlide();
+  slides = [newSlide];
   window.slides = slides;
+  window.DEFAULT_RECOVERED_SLIDES = [newSlide];
   current = 0;
   window.current = current;
   selected = null;
   clearAllAutosave();
   render();
+  if (typeof window.presentationSaveNow === 'function') {
+    window.presentationSaveNow();
+  }
   if (typeof window.showPresentationToast === 'function')
     window.showPresentationToast('✅ নতুন প্রজেক্ট শুরু হয়েছে!');
 }

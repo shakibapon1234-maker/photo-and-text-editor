@@ -572,17 +572,25 @@
       let bestCandidate = null;
       if (candidates.length > 0) {
         candidates.sort((a, b) => {
+          const timeA = a.data.savedAt || 0;
+          const timeB = b.data.savedAt || 0;
+          const timeDiff = timeB - timeA;
+          // If one save is definitively newer (by more than 3 seconds), honor the newer user state
+          if (Math.abs(timeDiff) > 3000) {
+            return timeDiff;
+          }
+          // If timestamps are essentially simultaneous, prefer candidate with more slides
           const countDiff = b.data.slides.length - a.data.slides.length;
           if (countDiff !== 0) return countDiff;
-          return (b.data.savedAt || 0) - (a.data.savedAt || 0);
+          return timeDiff;
         });
         bestCandidate = candidates[0].data;
       }
 
       if (bestCandidate && Array.isArray(bestCandidate.slides) && bestCandidate.slides.length > 0) {
         const activeCount = Array.isArray(slides) ? slides.length : 0;
-        // Only adopt bestCandidate if it has >= slides or active has <= 1
-        if (bestCandidate.slides.length >= activeCount || activeCount <= 1) {
+        // Adopt bestCandidate if count differs or active has <= 1
+        if (bestCandidate.slides.length !== activeCount || activeCount <= 1) {
           slides = structuredClone(bestCandidate.slides);
           window.slides = slides;
           current = Math.min(Math.max(0, bestCandidate.current || 0), slides.length - 1);
