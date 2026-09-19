@@ -1015,7 +1015,9 @@
         const fontFam = el.fontFamily || 'Inter, Arial, "Noto Sans Bengali", sans-serif';
         const fontSty = el.fontStyle || 'normal';
         const textDec = el.textDecoration || 'none';
-        const pad = (el.padding !== undefined ? el.padding : 6) + 'px';
+        // Match the editor's .text-content box: every text object is centred
+        // vertically within the bounds the user positioned on the canvas.
+        const pad = (el.padding !== undefined ? el.padding : 4) + 'px';
         const txtColor = el.color || el.textColor || '#ffffff';
         const txtSize = Number(el.size || el.textSize || 38);
 
@@ -1029,7 +1031,8 @@
           + 'line-height:' + lineH + ';'
           + 'padding:' + pad + ';'
           + 'transform:rotate(' + rot + 'deg);transform-origin:center center;'
-          + 'white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;box-sizing:border-box;';
+          + 'white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;box-sizing:border-box;'
+          + 'display:flex;align-items:center;justify-content:' + (textAlign === 'left' ? 'flex-start' : textAlign === 'right' ? 'flex-end' : 'center') + ';';
 
         if (el.textGradient) {
           css += 'background:linear-gradient(' + (el.textGradientAngle ?? 90) + 'deg, ' + txtColor + ', ' + (el.textGradientTo || '#4f8df7') + ');'
@@ -1054,7 +1057,6 @@
           } else {
             css += 'background-color:' + boxBgColor + ';border-radius:6px;';
           }
-          css += 'display:flex;align-items:center;justify-content:' + (textAlign === 'left' ? 'flex-start' : textAlign === 'right' ? 'flex-end' : 'center') + ';';
         }
 
         node.style.cssText = css;

@@ -422,6 +422,27 @@
         box-shadow: 0 10px 30px rgba(0,0,0,0.7) !important;
         cursor: default !important;
       }
+      #__pres_controls.is-collapsed {
+        display: none !important;
+      }
+      #__pres_controls_toggle {
+        position: fixed !important;
+        z-index: 1000001 !important;
+        right: 18px !important;
+        bottom: 18px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 7px !important;
+        padding: 9px 13px !important;
+        border: 1px solid #4a6288 !important;
+        border-radius: 22px !important;
+        background: rgba(10, 16, 30, .92) !important;
+        color: #fff !important;
+        font: 700 12px 'Outfit', Arial, sans-serif !important;
+        cursor: pointer !important;
+        box-shadow: 0 8px 24px rgba(0,0,0,.62) !important;
+      }
+      #__pres_controls_toggle:hover { background: #24395c !important; border-color: #79abff !important; }
       #__pres_controls button {
         border: 1px solid #4a6288 !important;
         border-radius: 20px !important;
@@ -460,16 +481,23 @@
     const controls = document.createElement('div');
     controls.id = '__pres_controls';
 
+    const controlsToggle = document.createElement('button');
+    controlsToggle.id = '__pres_controls_toggle';
+    controlsToggle.type = 'button';
+    controlsToggle.textContent = '☰ Controls';
+    controlsToggle.title = 'Show presentation controls';
+
     if (singleSlideOnly) {
       // Single Current Slide Preview Mode
-      controls.innerHTML = '<span id="__pres_status" style="font-size:13px;color:#ffd166;font-weight:800;padding:0 6px">🎬 Running Slide Preview (Slide ' + ((current || 0) + 1) + ')</span><button id="__pres_next_step">Next Step ▶</button><button id="__pres_replay" style="background:#0284c7;border-color:#38bdf8">↺ Replay</button><button id="__pres_fs">⛶ Fullscreen</button><button id="__pres_exit" style="background:#be123c;border-color:#fb7185">✕ Exit Preview</button>';
+      controls.innerHTML = '<span id="__pres_status" style="font-size:13px;color:#ffd166;font-weight:800;padding:0 6px">🎬 Running Slide Preview (Slide ' + ((current || 0) + 1) + ')</span><button id="__pres_next_step">Next Step ▶</button><button id="__pres_replay" style="background:#0284c7;border-color:#38bdf8">↺ Replay</button><button id="__pres_fs">⛶ Fullscreen</button><button id="__pres_hide" title="Hide controls">×</button><button id="__pres_exit" style="background:#be123c;border-color:#fb7185">✕ Exit Preview</button>';
     } else {
       // Full Multi-Slide Slideshow Mode
-      controls.innerHTML = '<button id="__pres_prev">◀ Prev</button><span id="__pres_status" style="font-size:13px;color:#ffd166;font-weight:800;padding:0 6px">1 / ' + slides.length + '</span><button id="__pres_next">Next ▶</button><button id="__pres_voice">🎤 Voice</button><button id="__pres_fs">⛶ Fullscreen</button><button id="__pres_exit" style="background:#be123c;border-color:#fb7185">✕ Exit</button>';
+      controls.innerHTML = '<button id="__pres_prev">◀ Prev</button><span id="__pres_status" style="font-size:13px;color:#ffd166;font-weight:800;padding:0 6px">1 / ' + slides.length + '</span><button id="__pres_next">Next ▶</button><button id="__pres_voice">🎤 Voice</button><button id="__pres_fs">⛶ Fullscreen</button><button id="__pres_hide" title="Hide controls">×</button><button id="__pres_exit" style="background:#be123c;border-color:#fb7185">✕ Exit</button>';
     }
 
     overlay.appendChild(stageContainer);
     overlay.appendChild(controls);
+    overlay.appendChild(controlsToggle);
     document.body.appendChild(overlay);
     document.body.style.overflow = 'hidden';
 
@@ -1003,9 +1031,12 @@
           const fontW = el.weight || el.textWeight || '700';
           const txtColor = el.color || el.textColor || '#ffffff';
           const txtSize = Number(el.size || el.textSize || 38);
-          const pad = (el.padding !== undefined ? el.padding : 6) + 'px';
+          // The editor always places text inside a full-height flex child.  The
+          // player must do the same: otherwise a tall text box is top-aligned
+          // in preview while it is vertically centred on the design canvas.
+          const pad = (el.padding !== undefined ? el.padding : 4) + 'px';
 
-          let css = 'position:absolute;left:' + el.x + '%;top:' + el.y + '%;width:' + el.w + '%;height:' + el.h + '%;font-size:' + txtSize + 'px;font-weight:' + fontW + ';font-family:' + (el.fontFamily || 'Inter, Arial, sans-serif') + ';text-align:' + textAlign + ';line-height:' + (el.lineSpacing || 1.2) + ';padding:' + pad + ';transform:rotate(' + rot + 'deg);transform-origin:center center;white-space:pre-wrap;word-break:break-word;box-sizing:border-box;';
+          let css = 'position:absolute;left:' + el.x + '%;top:' + el.y + '%;width:' + el.w + '%;height:' + el.h + '%;font-size:' + txtSize + 'px;font-weight:' + fontW + ';font-family:' + (el.fontFamily || 'Inter, Arial, sans-serif') + ';text-align:' + textAlign + ';line-height:' + (el.lineSpacing || 1.2) + ';padding:' + pad + ';transform:rotate(' + rot + 'deg);transform-origin:center center;white-space:pre-wrap;word-break:break-word;box-sizing:border-box;display:flex;align-items:center;justify-content:' + (textAlign === 'left' ? 'flex-start' : textAlign === 'right' ? 'flex-end' : 'center') + ';';
 
           const boxBgColor = el.boxBg || el.backgroundColor || el.bgColor || (el.background && el.background.startsWith('#') ? el.background : null);
           let boxOp = 1;
@@ -1023,7 +1054,6 @@
             } else {
               css += 'background-color:' + boxBgColor + ';border-radius:6px;';
             }
-            css += 'display:flex;align-items:center;justify-content:' + (textAlign === 'left' ? 'flex-start' : textAlign === 'right' ? 'flex-end' : 'center') + ';';
           }
           if (el.textGradient) {
             css += 'background:linear-gradient(' + (el.textGradientAngle ?? 90) + 'deg, ' + txtColor + ', ' + (el.textGradientTo || '#4f8df7') + ');-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;';
@@ -1182,6 +1212,18 @@
     }
 
     $('__pres_exit').onclick = e => { e.stopPropagation(); closePlayer(); };
+    $('__pres_hide').onclick = e => {
+      e.stopPropagation();
+      controls.classList.add('is-collapsed');
+      controlsToggle.hidden = false;
+    };
+    controlsToggle.onclick = e => {
+      e.stopPropagation();
+      controls.classList.remove('is-collapsed');
+      controlsToggle.hidden = true;
+    };
+    // Keep the slide unobstructed from the outset; the compact tab restores controls on demand.
+    controls.classList.add('is-collapsed');
     $('__pres_fs').onclick = e => {
       e.stopPropagation();
       if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
