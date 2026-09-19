@@ -171,7 +171,12 @@
     const s = slides[index];
 
     // Background
-    if (s.background === 'custom') {
+    if (s.bgMedia || s.bgMediaAssetId) {
+      const preview = s.bgMediaType === 'video' ? s.bgMediaPoster : s.bgMedia;
+      thumb.style.background = preview ? 'center / cover no-repeat url("' + String(preview).replace(/"/g, '\\"') + '")' : 'linear-gradient(135deg,#0f172a,#1e293b)';
+    } else if (s.brollPreset && s.brollPreset !== 'none' && typeof window.getBrollPresetGradient === 'function') {
+      thumb.style.background = window.getBrollPresetGradient(s.brollPreset) || '#17233c';
+    } else if (s.background === 'custom') {
       thumb.style.background = s.bgColor || '#17233c';
     } else if (s.background === 'image' && s.bgImage) {
       thumb.style.backgroundImage = 'url("' + s.bgImage + '")';

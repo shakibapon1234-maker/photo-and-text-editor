@@ -1,6 +1,47 @@
 (() => {
-  // Object URL cache: slideIndex -> { url, file }
-  const _objURLs = {};
+  // Videos are binary assets, not slide JSON. Keeping them in IndexedDB avoids
+  // huge base64 strings freezing the editor while still surviving a refresh.
+  const MEDIA_DB = 'presentation-studio-media-v1', MEDIA_STORE = 'backgrounds';
+  let mediaDbPromise;
+  const resolvedMediaSlides = new WeakSet();
+  const openMediaDb = () => mediaDbPromise || (mediaDbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(MEDIA_DB, 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(MEDIA_STORE)) request.result.createObjectStore(MEDIA_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  }));
+  const putMedia = async blob => {
+    const id = crypto.randomUUID(); const db = await openMediaDb();
+    await new Promise((resolve, reject) => { const tx = db.transaction(MEDIA_STORE, 'readwrite'); tx.objectStore(MEDIA_STORE).put(blob, id); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); });
+    return id;
+  };
+  const getMedia = async id => {
+    const db = await openMediaDb();
+    return new Promise((resolve, reject) => { const tx = db.transaction(MEDIA_STORE, 'readonly'); const req = tx.objectStore(MEDIA_STORE).get(id); req.onsuccess = () => resolve(req.result || null); req.onerror = () => reject(req.error); });
+  };
+  window.PresentationBackgroundMediaStore = {
+    async saveVideo(file, slide) {
+      const id = await putMedia(file);
+      if (slide.bgMediaObjURL) URL.revokeObjectURL(slide.bgMediaObjURL);
+      slide.bgMediaAssetId = id;
+      slide.bgMediaObjURL = URL.createObjectURL(file);
+      resolvedMediaSlides.add(slide);
+      // Do not serialize the video into every autosave/server write.
+      delete slide.bgMedia;
+      return id;
+    },
+    async resolveVideo(slide) {
+      if (!slide?.bgMediaAssetId) return null;
+      if (slide.bgMediaObjURL && resolvedMediaSlides.has(slide)) return slide.bgMediaObjURL;
+      const blob = await getMedia(slide.bgMediaAssetId).catch(() => null);
+      if (!blob) return null;
+      slide.bgMediaObjURL = URL.createObjectURL(blob);
+      resolvedMediaSlides.add(slide);
+      return slide.bgMediaObjURL;
+    }
+  };
   const $ = id => document.getElementById(id);
   const input = $('backgroundImageInput');
   if (input) input.accept = 'image/*,video/mp4,video/webm,video/ogg';
@@ -85,7 +126,7 @@
     if (!slide) return;
     normalize(s);
 
-    if (!s.bgMedia) {
+    if (!s.bgMedia && !s.bgMediaAssetId) {
       const l = $('animatedBackgroundLayer');
       if (l) l.remove();
       if ($('mediaBackgroundControls')) $('mediaBackgroundControls').classList.add('hidden');
@@ -98,7 +139,7 @@
     if (broll) broll.remove();
 
     // Build a lightweight cache key from props without cloning large base64 strings
-    const mediaKey = (typeof s.bgMedia === 'string') ? (s.bgMedia.slice(0, 48) + '_' + s.bgMedia.length) : '';
+    const mediaKey = s.bgMediaAssetId || ((typeof s.bgMedia === 'string') ? (s.bgMedia.slice(0, 48) + '_' + s.bgMedia.length) : '');
     const cacheKey = [mediaKey, s.bgMediaType, s.bgPlaybackRate,
       s.bgOverlayColor, s.bgOverlayOpacity, s.bgMediaOpacity, s.bgMediaBlur].join('|');
 
@@ -127,6 +168,30 @@
 
     // Use the stored object URL if available, otherwise fall back to bgMedia
     const mediaSrc = s.bgMediaObjURL || s.bgMedia;
+
+    // One-time migration for videos saved by the previous data-URL version.
+    // It preserves the user's existing background while moving it to the fast
+    // persistent Blob store.
+    if (s.bgMediaType === 'video' && typeof s.bgMedia === 'string' && s.bgMedia.startsWith('data:') && !s.bgMediaAssetId) {
+      if (s.bgMediaPoster) l.style.background = 'center / cover no-repeat url("' + s.bgMediaPoster.replace(/"/g, '\\"') + '")';
+      fetch(s.bgMedia).then(response => response.blob()).then(blob => window.PresentationBackgroundMediaStore.saveVideo(blob, s)).then(() => {
+        _layerCache = ''; render();
+        if (typeof window.presentationSaveNow === 'function') window.presentationSaveNow();
+      }).catch(() => {});
+      return;
+    }
+
+    // Restored video assets resolve asynchronously. Show its poster meanwhile
+    // instead of leaving the slide black, then redraw once the Blob URL exists.
+    if (!mediaSrc && s.bgMediaAssetId) {
+      if (s.bgMediaPoster) {
+        l.style.background = 'center / cover no-repeat url("' + s.bgMediaPoster.replace(/"/g, '\\"') + '")';
+      }
+      window.PresentationBackgroundMediaStore.resolveVideo(s).then(url => {
+        if (url) { _layerCache = ''; render(); }
+      });
+      return;
+    }
 
     if (!media || media.tagName.toLowerCase() !== tag || media.dataset.srcKey !== (s.bgMediaObjURL || '').slice(-32) + (s.bgMedia || '').slice(0, 16)) {
       l.innerHTML = '';
@@ -260,27 +325,17 @@
       const f = e.target.files[0];
       if (!f || !(f.type.startsWith('image/') || f.type.startsWith('video/'))) return;
       const s = active();
-      const idx = slides.indexOf(s);
-
-      // Revoke any previous object URL for this slide
-      if (_objURLs[idx]) {
-        URL.revokeObjectURL(_objURLs[idx].url);
-        delete _objURLs[idx];
-      }
-
       if (f.type.startsWith('video/')) {
-        // Use Object URL for videos — fast, memory-efficient, no base64 bloat
-        const objURL = URL.createObjectURL(f);
-        _objURLs[idx] = { url: objURL, name: f.name };
-        s.background = 'media';
-        s.bgMedia = f.name; // store just the filename as identifier
-        s.bgMediaObjURL = objURL;
-        s.bgMediaType = 'video';
-        s.brollPreset = 'none';
-        delete s.bgImage;
-        normalize(s);
-        _layerCache = '';
-        render();
+        window.PresentationBackgroundMediaStore.saveVideo(f, s).then(() => {
+          s.background = 'media';
+          s.bgMediaType = 'video';
+          s.brollPreset = 'none';
+          delete s.bgImage;
+          normalize(s);
+          _layerCache = '';
+          render();
+          if (typeof window.presentationSaveNow === 'function') window.presentationSaveNow();
+        }).catch(() => {});
       } else {
         // Images: use FileReader (small enough for base64)
         const r = new FileReader();
@@ -303,7 +358,9 @@
   if ($('clearBackgroundImage')) {
     $('clearBackgroundImage').onclick = () => {
       const s = active();
-      delete s.bgMedia; delete s.bgMediaType; delete s.bgImage;
+      if (s.bgMediaObjURL) URL.revokeObjectURL(s.bgMediaObjURL);
+      delete s.bgMedia; delete s.bgMediaObjURL; delete s.bgMediaAssetId; delete s.bgMediaType; delete s.bgImage;
+      delete s.bgMediaPoster;
       s.brollPreset = 'none';
       s.background = 'fashion';
       _layerCache = '';

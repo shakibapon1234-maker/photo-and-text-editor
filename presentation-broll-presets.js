@@ -199,7 +199,7 @@
   function draw() {
     const s = active(), p = s.brollPreset || 'none', sp = s.brollSpeed || 'normal';
     let layer = $('brollLayer');
-    if (p === 'none' || s.bgMedia) {
+    if (p === 'none' || s.bgMedia || s.bgMediaAssetId) {
       if (layer) layer.remove();
       return;
     }
@@ -279,7 +279,11 @@
         const s = active();
         s.brollPreset = p;
         if (p !== 'none') {
+          if (s.bgMediaObjURL) URL.revokeObjectURL(s.bgMediaObjURL);
           delete s.bgMedia;
+          delete s.bgMediaObjURL;
+          delete s.bgMediaAssetId;
+          delete s.bgMediaPoster;
           delete s.bgMediaType;
         }
         if ($('brollPreset')) $('brollPreset').value = p;
@@ -314,7 +318,11 @@
       const s = active();
       s.brollPreset = e.target.value;
       if (e.target.value !== 'none') {
+        if (s.bgMediaObjURL) URL.revokeObjectURL(s.bgMediaObjURL);
         delete s.bgMedia;
+        delete s.bgMediaObjURL;
+        delete s.bgMediaAssetId;
+        delete s.bgMediaPoster;
         delete s.bgMediaType;
       }
       if ($('brollSpeedRow')) $('brollSpeedRow').classList.toggle('hidden', e.target.value === 'none');

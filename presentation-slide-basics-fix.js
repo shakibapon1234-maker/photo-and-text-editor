@@ -125,15 +125,23 @@
       thumb.appendChild(dupBtn);
 
       // Background Media (Video or Image)
-      if (s.bgMedia) {
+      if (s.bgMedia || s.bgMediaAssetId) {
         const mediaWrap = document.createElement('div');
         mediaWrap.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;overflow:hidden;pointer-events:none;z-index:1;opacity:' + (Number(s.bgMediaOpacity ?? 100) / 100) + ';';
         if (s.bgMediaType === 'video') {
-          // High performance: Do NOT run hardware video decoders on 20+ sidebar thumbnails!
-          const vidPoster = document.createElement('div');
-          vidPoster.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;background:linear-gradient(135deg,rgba(15,23,42,0.85),rgba(30,41,59,0.95));display:flex;flex-direction:column;align-items:center;justify-content:center;color:#38bdf8;font-size:9px;font-weight:700;letter-spacing:0.5px;';
-          vidPoster.innerHTML = '<span style="font-size:16px;margin-bottom:2px">🎬</span><span>VIDEO BG</span>';
-          mediaWrap.appendChild(vidPoster);
+          // A saved poster gives a real thumbnail without decoding every video.
+          if (s.bgMediaPoster) {
+            const img = document.createElement('img');
+            img.src = s.bgMediaPoster;
+            img.loading = 'lazy';
+            img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+            mediaWrap.appendChild(img);
+          } else {
+            const vidPoster = document.createElement('div');
+            vidPoster.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;background:linear-gradient(135deg,rgba(15,23,42,0.85),rgba(30,41,59,0.95));display:flex;flex-direction:column;align-items:center;justify-content:center;color:#38bdf8;font-size:9px;font-weight:700;letter-spacing:0.5px;';
+            vidPoster.innerHTML = '<span style="font-size:16px;margin-bottom:2px">🎬</span><span>VIDEO BG</span>';
+            mediaWrap.appendChild(vidPoster);
+          }
         } else {
           const img = document.createElement('img');
           img.src = s.bgMedia;

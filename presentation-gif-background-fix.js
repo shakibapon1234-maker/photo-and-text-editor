@@ -3,8 +3,35 @@
   const input = $('backgroundImageInput');
   if (!input) return;
 
-  // Track Object URLs per slide index so we can revoke them when replaced
-  const _videoObjURLs = {};
+  function makeVideoPoster(file, slide) {
+    // A small still image keeps sidebar thumbnails meaningful without running
+    // a video decoder for every slide. The source video itself is saved below.
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.muted = true; video.playsInline = true; video.preload = 'metadata';
+    video.onloadeddata = () => {
+      const capture = () => {
+        try {
+          const maxWidth = 360;
+          const ratio = Math.min(1, maxWidth / (video.videoWidth || maxWidth));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round((video.videoWidth || 640) * ratio));
+          canvas.height = Math.max(1, Math.round((video.videoHeight || 360) * ratio));
+          canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+          slide.bgMediaPoster = canvas.toDataURL('image/jpeg', .78);
+          if (typeof window.presentationSaveNow === 'function') window.presentationSaveNow();
+          render();
+        } catch (_) { /* A poster is optional; the video remains usable. */ }
+        URL.revokeObjectURL(url);
+      };
+      if (video.duration && isFinite(video.duration)) {
+        video.currentTime = Math.min(.1, Math.max(0, video.duration / 2));
+        video.onseeked = capture;
+      } else capture();
+    };
+    video.onerror = () => URL.revokeObjectURL(url);
+    video.src = url;
+  }
 
   // Windows/Electron sometimes leave File.type empty for GIFs. Explicitly
   // allow the extension as well as standard image/video MIME types.
@@ -30,22 +57,21 @@
     const idx = slides.indexOf(slide);
 
     if (isVideo) {
-      // Use Object URL for videos — instant, no base64 memory bloat
-      // Revoke any previous object URL for this slide
-      if (_videoObjURLs[idx]) {
-        URL.revokeObjectURL(_videoObjURLs[idx]);
-        delete _videoObjURLs[idx];
-      }
-      const objURL = URL.createObjectURL(file);
-      _videoObjURLs[idx] = objURL;
-
-      slide.background = 'media';
-      slide.bgMedia = objURL;          // use object URL directly as src
-      slide.bgMediaType = 'video';
-      slide.brollPreset = 'none';
-      delete slide.bgImage;
-      hint.classList.add('hidden');
-      render();
+      // The Blob is stored by the background-media store; its temporary URL is
+      // fast for playback, while the IndexedDB copy survives browser reloads.
+      window.PresentationBackgroundMediaStore.saveVideo(file, slide).then(() => {
+        slide.background = 'media';
+        slide.bgMediaType = 'video';
+        slide.brollPreset = 'none';
+        delete slide.bgImage;
+        hint.classList.add('hidden');
+        makeVideoPoster(file, slide);
+        render();
+        if (typeof window.presentationSaveNow === 'function') window.presentationSaveNow();
+      }).catch(() => {
+        hint.textContent = 'ভিডিওটি সেভ করা যায়নি। আবার চেষ্টা করুন।';
+        hint.classList.remove('hidden');
+      });
     } else {
       // Images & GIFs: use FileReader (small enough for base64)
       const reader = new FileReader();
@@ -53,13 +79,18 @@
         slide.background = 'media';
         slide.bgMedia = reader.result;
         slide.bgMediaType = isGif ? 'gif' : 'image';
+        delete slide.bgMediaAssetId;
+        if (slide.bgMediaObjURL) URL.revokeObjectURL(slide.bgMediaObjURL);
+        delete slide.bgMediaObjURL;
         slide.brollPreset = 'none';
         delete slide.bgImage;
+        delete slide.bgMediaPoster;
         hint.textContent = isGif
           ? 'GIF selected. Native GIF speed cannot be changed by the browser; use a WebM/MP4 background when you need speed control.'
           : '';
         hint.classList.toggle('hidden', !isGif);
         render();
+        if (typeof window.presentationSaveNow === 'function') window.presentationSaveNow();
       };
       reader.readAsDataURL(file);
     }

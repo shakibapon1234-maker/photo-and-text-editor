@@ -11,12 +11,13 @@
     return deck.reduce((acc, s) => acc + (Array.isArray(s?.elements) ? s.elements.length : 0), 0);
   };
 
-  const snapshot = () => ({
-    slides: structuredClone(slides),
-    current,
-    elementCount: countTotalElements(slides),
-    savedAt: Date.now()
-  });
+  const snapshot = () => {
+    const savedSlides = structuredClone(slides);
+    // Object URLs only work in the tab that created them. Persistent media is
+    // addressed by bgMediaAssetId, so never save an invalid blob: URL.
+    savedSlides.forEach(slide => { if (slide) delete slide.bgMediaObjURL; });
+    return { slides: savedSlides, current, elementCount: countTotalElements(slides), savedAt: Date.now() };
+  };
 
   function openDb() {
     return new Promise((resolve, reject) => {
@@ -64,18 +65,25 @@
   function computeDeckFingerprint(deck, curr) {
     if (!Array.isArray(deck)) return '';
     let hash = 'c:' + curr + ';n:' + deck.length + ';';
+    const valueSignature = value => {
+      if (value === null || value === undefined) return String(value);
+      if (typeof value === 'string') return 'str:' + value.length + ':' + value.slice(0, 24) + ':' + value.slice(-24);
+      if (typeof value !== 'object') return String(value);
+      try { return JSON.stringify(value); } catch (_) { return '[unserializable]'; }
+    };
+    const objectSignature = object => Object.keys(object || {}).sort().map(key => key + '=' + valueSignature(object[key])).join('|');
     for (let i = 0; i < deck.length; i++) {
       const s = deck[i];
       if (!s) continue;
-      const bgImg = s.bgImage ? s.bgImage.slice(0, 60) : '';
-      const bgMed = s.bgMedia ? s.bgMedia.slice(0, 60) : '';
-      hash += 's:' + (s.background || '') + (s.bgColor || '') + bgImg + bgMed + ';';
+      // Include every slide property: animated themes, background-media
+      // controls, placement and future visual settings must trigger autosave.
+      hash += 's:' + objectSignature(Object.fromEntries(Object.entries(s).filter(([key]) => key !== 'elements'))) + ';';
       const els = s.elements;
       if (Array.isArray(els)) {
         for (let j = 0; j < els.length; j++) {
           const e = els[j];
           if (!e) continue;
-          hash += e.id + ':' + (e.x||0).toFixed(1) + ',' + (e.y||0).toFixed(1) + ',' + (e.w||0).toFixed(1) + ',' + (e.h||0).toFixed(1) + ':' + (e.type||'') + ':' + (e.text||'').length + ':' + (e.src ? (e.src.length + ':' + e.src.slice(0, 30)) : '') + ';';
+          hash += 'e:' + objectSignature(e) + ';';
         }
       }
     }
