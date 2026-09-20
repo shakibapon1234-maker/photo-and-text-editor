@@ -19,6 +19,18 @@
     return { slides: savedSlides, current, elementCount: countTotalElements(slides), savedAt: Date.now() };
   };
 
+  // localStorage cannot reliably hold large base64 images. Its emergency copy
+  // intentionally replaces those images with this marker, so it must never
+  // win over a complete IndexedDB/server project during restore.
+  const countUnavailableMedia = (deck) => {
+    if (!Array.isArray(deck)) return 0;
+    return deck.reduce((total, slide) => total + (slide?.elements || []).reduce((n, element) => {
+      return n + (element?.__hasLargeSrc || element?.src === '[base64-image-in-idb]' ? 1 : 0);
+    }, 0), 0);
+  };
+
+  const hasUnavailableMedia = deck => countUnavailableMedia(deck) > 0;
+
   function openDb() {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(DB, 2);
@@ -90,9 +102,17 @@
     return hash;
   }
 
-  // Create lightweight snapshot for localStorage that won't blow storage quota or memory
+  // Keep a complete local copy whenever it fits. A per-image 50 KB cutoff
+  // caused ordinary uploaded logos/photos to be replaced even though the
+  // entire presentation was well within localStorage's capacity.
   function sanitizeForLocalStorage(snap) {
     try {
+      const completeJson = JSON.stringify(snap);
+      // Leave room below the usual 5 MB browser quota for the rest of the app.
+      if (completeJson.length <= 4200000) return structuredClone(snap);
+
+      // Large projects still get an emergency outline; their original media
+      // remains in IndexedDB and the server-backed project copy.
       const copy = structuredClone(snap);
       if (Array.isArray(copy.slides)) {
         copy.slides.forEach(s => {
@@ -165,6 +185,14 @@
   async function saveNow() {
     if (!ready || !db) return;
     if (writing) { queued = true; return; }
+
+    // Never let a lightweight emergency backup overwrite the real project.
+    // The real image bytes remain in IndexedDB/the server copy and are picked
+    // at startup instead.
+    if (hasUnavailableMedia(slides)) {
+      console.warn('Skipped saving an incomplete presentation backup.');
+      return;
+    }
 
     const currentFingerprint = computeDeckFingerprint(slides, current);
     const countChanged = Array.isArray(slides) && slides.length !== lastSavedSlideCount;
@@ -568,7 +596,8 @@
         ? { slides: recoverJson.slides, current: recoverJson.current || 0, savedAt: recoverJson.savedAt || 0, elementCount: countTotalElements(recoverJson.slides) }
         : null;
 
-      // Pick candidate with the highest slide count, then newest timestamp
+      // Pick a complete project before considering timestamps. localStorage
+      // backups can contain image placeholders when quota is limited.
       const candidates = [
         { source: 'idb_saved', data: saved },
         { source: 'idb_emergency', data: emergency },
@@ -580,6 +609,8 @@
       let bestCandidate = null;
       if (candidates.length > 0) {
         candidates.sort((a, b) => {
+          const missingMediaDiff = countUnavailableMedia(a.data.slides) - countUnavailableMedia(b.data.slides);
+          if (missingMediaDiff !== 0) return missingMediaDiff;
           const timeA = a.data.savedAt || 0;
           const timeB = b.data.savedAt || 0;
           const timeDiff = timeB - timeA;
@@ -597,8 +628,12 @@
 
       if (bestCandidate && Array.isArray(bestCandidate.slides) && bestCandidate.slides.length > 0) {
         const activeCount = Array.isArray(slides) ? slides.length : 0;
-        // Adopt bestCandidate if count differs or active has <= 1
-        if (bestCandidate.slides.length !== activeCount || activeCount <= 1) {
+        const activeMissingMedia = countUnavailableMedia(slides);
+        const candidateMissingMedia = countUnavailableMedia(bestCandidate.slides);
+        // Restore a complete deck even when it has the same number of slides.
+        // This is the case that previously left broken-image placeholders on
+        // the canvas after a browser refresh.
+        if (bestCandidate.slides.length !== activeCount || activeCount <= 1 || candidateMissingMedia < activeMissingMedia) {
           slides = structuredClone(bestCandidate.slides);
           window.slides = slides;
           current = Math.min(Math.max(0, bestCandidate.current || 0), slides.length - 1);

@@ -401,9 +401,26 @@
         height: ${slideH}px !important;
         transform-origin: center center !important;
         transform: scale(var(--pres-scale, 1)) !important;
-        background: #17233c !important;
+        /* Keep a default colour, but allow each slide's inline background
+           (colour, gradient, or image) to replace it. */
+        background: #17233c;
         box-shadow: 0 0 50px rgba(0,0,0,0.9) !important;
         overflow: hidden !important;
+        isolation: isolate !important;
+      }
+      /* The editor background is stored on a slide as bgMedia.  Give that
+         layer its own stacking level so broad editor CSS cannot hide it in
+         the preview/slideshow overlay. */
+      #__pres_stage > .bg-media {
+        display: block !important;
+        visibility: visible !important;
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        z-index: 0 !important;
+        pointer-events: none !important;
       }
       #__pres_controls {
         position: fixed !important;
@@ -896,6 +913,12 @@
       });
       stage.replaceChildren();
 
+      // Reset properties left by a preceding image-background slide. This
+      // also makes a media background independent of the previous slide.
+      stage.style.removeProperty('background-size');
+      stage.style.removeProperty('background-position');
+      stage.style.removeProperty('background-repeat');
+
       // 1. Background
       if (sl.background === 'custom') {
         stage.style.background = sl.bgColor || '#17233c';
@@ -920,11 +943,16 @@
       }
 
       // 3. Media Background (Video or Image)
-      if (sl.bgMedia) {
-        const media = document.createElement(sl.bgMediaType === 'video' ? 'video' : 'img');
+      // Videos are stored as IndexedDB blobs by the editor, so a slide may
+      // only retain bgMediaAssetId after a reload. Resolve that asset here as
+      // well; previously the slideshow only understood inline data URLs.
+      const addBackgroundMedia = (source, mediaType, replacePoster = false) => {
+        if (!source) return;
+        if (replacePoster) stage.querySelectorAll('.bg-media, .bg-overlay').forEach(node => node.remove());
+        const media = document.createElement(mediaType === 'video' ? 'video' : 'img');
         media.className = 'bg-media';
-        media.src = sl.bgMedia;
-        media.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;pointer-events:none;';
+        media.src = source;
+        media.style.cssText = 'position:absolute!important;inset:0!important;width:100%!important;height:100%!important;display:block!important;visibility:visible!important;object-fit:cover!important;z-index:0!important;pointer-events:none!important;';
         if (media.tagName === 'VIDEO') {
           media.autoplay = true; media.loop = true; media.muted = true; media.playsInline = true;
           media.playbackRate = Number(sl.bgPlaybackRate || 1);
@@ -938,7 +966,24 @@
           const ov = document.createElement('div');
           const hex = Math.round((sl.bgOverlayOpacity / 100) * 255).toString(16).padStart(2, '0');
           ov.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:1;background:' + (sl.bgOverlayColor || '#000000') + hex + ';';
+          ov.className = 'bg-overlay';
           stage.appendChild(ov);
+        }
+      };
+
+      if (sl.bgMedia && !String(sl.bgMedia).startsWith('[heavy-bg-media-')) {
+        addBackgroundMedia(sl.bgMedia, sl.bgMediaType);
+      } else if (sl.bgMediaAssetId) {
+        // A poster prevents a blank flash while IndexedDB resolves the video.
+        if (sl.bgMediaPoster) addBackgroundMedia(sl.bgMediaPoster, 'image');
+        if (window.PresentationBackgroundMediaStore?.resolveVideo) {
+          const requestedIndex = idx;
+          window.PresentationBackgroundMediaStore.resolveVideo(sl).then(url => {
+            // Do not paint a late video onto a slide the user has left.
+            if (url && idx === requestedIndex && stage.isConnected) {
+              addBackgroundMedia(url, 'video', true);
+            }
+          }).catch(() => {});
         }
       }
 

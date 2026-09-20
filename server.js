@@ -109,6 +109,18 @@ const server = http.createServer((req, res) => {
             try {
                 const data = JSON.parse(body);
                 if (data && Array.isArray(data.slides) && data.slides.length > 0) {
+                    const hasImagePlaceholders = data.slides.some(slide =>
+                        Array.isArray(slide?.elements) && slide.elements.some(element =>
+                            element?.__hasLargeSrc || element?.src === '[base64-image-in-idb]'
+                        )
+                    );
+                    // A quota-safe browser backup may deliberately omit large
+                    // base64 image bytes. Do not let it replace the durable
+                    // project file with broken-image placeholders.
+                    if (hasImagePlaceholders) {
+                        res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' });
+                        return res.end(JSON.stringify({ success: false, error: 'Incomplete image backup rejected' }));
+                    }
                     fs.writeFileSync(path.join(__dirname, 'recovered-project.json'), JSON.stringify(data, null, 2), 'utf8');
                     fs.writeFileSync(path.join(__dirname, 'presentation-default-deck.js'), 'window.DEFAULT_RECOVERED_SLIDES = ' + JSON.stringify(data.slides) + ';\n', 'utf8');
                 }

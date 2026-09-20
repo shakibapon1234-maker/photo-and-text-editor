@@ -66,7 +66,8 @@ const $=id=>document.getElementById(id);const themes={fashion:'linear-gradient(1
 const _getInitialDeck=()=>{
   try{
     const ls=JSON.parse(localStorage.getItem('presentation-studio-autosave-v1')||'null');
-    if(ls&&Array.isArray(ls.slides)&&ls.slides.length>0){
+    const hasImagePlaceholders=deck=>deck.some(slide=>(slide?.elements||[]).some(element=>element?.__hasLargeSrc||element?.src==='[base64-image-in-idb]'));
+    if(ls&&Array.isArray(ls.slides)&&ls.slides.length>0&&!hasImagePlaceholders(ls.slides)){
       return structuredClone(ls.slides);
     }
   }catch(_){}
@@ -149,7 +150,11 @@ window.addEventListener('pointercancel', () => {
   window.__presentationLiveDrag = false;
 });
 function addText(){const el={id:crypto.randomUUID(),type:'text',text:'নতুন টেক্সট',x:12,y:58,w:55,h:10,size:38,color:'#ffffff',weight:'700'};active().elements.push(el);selected=el.id;render()}
-function addImage(src){const el={id:crypto.randomUUID(),type:'image',src,x:18,y:42,w:42,h:34};active().elements.push(el);selected=el.id;render()}
+// Image uploads receive a synchronous local save before any asynchronous
+// IndexedDB/server write. This protects an upload even if the user refreshes
+// immediately after choosing the file.
+function saveImageDraftImmediately(){try{const draft={slides,current};const json=JSON.stringify(draft);if(json.length<=4200000)localStorage.setItem('presentation-studio-autosave-v1',json)}catch(_){}}
+function addImage(src){const el={id:crypto.randomUUID(),type:'image',src,x:18,y:42,w:42,h:34};active().elements.push(el);selected=el.id;render();saveImageDraftImmediately();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow()}
 function importImage(file){if(!file||!file.type.startsWith('image/'))return;const rd=new FileReader();rd.onload=()=>addImage(rd.result);rd.readAsDataURL(file)}
 $('newSlide').onclick=()=>{slides.splice(current+1,0,makeSlide());current++;window.slides=slides;window.current=current;selected=null;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();};$('duplicateSlide').onclick=()=>{slides.splice(current+1,0,structuredClone(active()));current++;window.slides=slides;window.current=current;active().elements.forEach(e=>e.id=crypto.randomUUID());selected=null;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();};$('deleteSlide').onclick=()=>{if(slides.length===1)return;slides.splice(current,1);current=Math.max(0,current-1);window.slides=slides;window.current=current;selected=null;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();};$('moveUp').onclick=()=>{if(!current)return;[slides[current-1],slides[current]]=[slides[current],slides[current-1]];current--;window.slides=slides;window.current=current;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();};$('moveDown').onclick=()=>{if(current===slides.length-1)return;[slides[current+1],slides[current]]=[slides[current],slides[current+1]];current++;window.slides=slides;window.current=current;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();};$('addText').onclick=addText;$('imageInput').onchange=e=>importImage(e.target.files[0]);$('background').onchange=e=>{active().background=e.target.value;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();};$('bgColor').oninput=e=>{active().bgColor=e.target.value;render();if(typeof window.presentationSaveNow==='function')window.presentationSaveNow();};['textColor','textSize','textWeight'].forEach(id=>$(id).addEventListener('input',()=>{const e=selectedEl();if(!e)return;e.color=$('textColor').value;e.size=+$('textSize').value;e.weight=$('textWeight').value;render()}));
 $('slide').addEventListener('dragover',e=>{e.preventDefault();$('slide').classList.add('dragging')});$('slide').addEventListener('dragleave',()=>$('slide').classList.remove('dragging'));$('slide').addEventListener('drop',e=>{e.preventDefault();$('slide').classList.remove('dragging');importImage(e.dataTransfer.files[0])});
