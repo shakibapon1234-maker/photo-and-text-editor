@@ -13,7 +13,7 @@
           "x": 12,
           "y": 58,
           "w": 55,
-          "h": 11.3,
+          "h": 13.8,
           "size": 38,
           "color": "#ffffff",
           "weight": "700",
@@ -167,7 +167,7 @@
       "notes": ""
     }
   ],
-  "current": 2,
+  "current": 0,
   "elementCount": 4,
-  "savedAt": 1789845504048
+  "savedAt": 1789852949787
 }
