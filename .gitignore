@@ -22,3 +22,7 @@ npm-debug.log*
 .cache/
 dist/
 *.tmp
+
+# Auto-generated runtime files (do not commit)
+presentation-default-deck.js
+recovered-project.json
