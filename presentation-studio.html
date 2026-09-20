@@ -68,6 +68,9 @@ const _getInitialDeck=()=>{
     const ls=JSON.parse(localStorage.getItem('presentation-studio-autosave-v1')||'null');
     const hasImagePlaceholders=deck=>deck.some(slide=>String(slide?.bgMedia||'').startsWith('[heavy-bg-media-')||String(slide?.bgImage||'').startsWith('[heavy-bg-image-')||(slide?.elements||[]).some(element=>element?.__hasLargeSrc||element?.src==='[base64-image-in-idb]'));
     if(ls&&Array.isArray(ls.slides)&&ls.slides.length>0&&!hasImagePlaceholders(ls.slides)){
+      // A complete local draft is the state the user last saw. The async
+      // recovery process must never replace it with an older server/IDB copy.
+      window.__presentationInitialDeckIsCompleteLocal=true;
       return structuredClone(ls.slides);
     }
   }catch(_){}

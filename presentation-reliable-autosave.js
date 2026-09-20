@@ -633,10 +633,12 @@
         const activeCount = Array.isArray(slides) ? slides.length : 0;
         const activeMissingMedia = countUnavailableMedia(slides);
         const candidateMissingMedia = countUnavailableMedia(bestCandidate.slides);
+        const keepCompleteLocalDraft = window.__presentationInitialDeckIsCompleteLocal && activeMissingMedia === 0;
         // Restore a complete deck even when it has the same number of slides.
         // This is the case that previously left broken-image placeholders on
-        // the canvas after a browser refresh.
-        if (bestCandidate.slides.length !== activeCount || activeCount <= 1 || candidateMissingMedia < activeMissingMedia) {
+        // the canvas after a browser refresh. A complete draft already loaded
+        // from localStorage is newer than recovery candidates, so keep it.
+        if (!keepCompleteLocalDraft && (bestCandidate.slides.length !== activeCount || activeCount <= 1 || candidateMissingMedia < activeMissingMedia)) {
           slides = structuredClone(bestCandidate.slides);
           window.slides = slides;
           current = Math.min(Math.max(0, bestCandidate.current || 0), slides.length - 1);
