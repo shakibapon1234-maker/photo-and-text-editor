@@ -107,9 +107,11 @@ function startInternalServer(callback) {
                     const data = JSON.parse(body);
                     if (data && Array.isArray(data.slides) && data.slides.length > 0) {
                         const hasImagePlaceholders = data.slides.some(slide =>
-                            Array.isArray(slide?.elements) && slide.elements.some(element =>
+                            String(slide?.bgMedia || '').startsWith('[heavy-bg-media-') ||
+                            String(slide?.bgImage || '').startsWith('[heavy-bg-image-') ||
+                            (Array.isArray(slide?.elements) && slide.elements.some(element =>
                                 element?.__hasLargeSrc || element?.src === '[base64-image-in-idb]'
-                            )
+                            ))
                         );
                         // Do not replace the durable project with a
                         // quota-safe browser outline that has no image bytes.

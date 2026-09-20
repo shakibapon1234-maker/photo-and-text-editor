@@ -133,7 +133,9 @@
           if (s.bgMediaPoster) {
             const img = document.createElement('img');
             img.src = s.bgMediaPoster;
-            img.loading = 'lazy';
+            // Data-URL posters are already local. Lazy loading can leave an
+            // off-screen sidebar thumbnail blank until it is manually opened.
+            img.loading = 'eager';
             img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
             mediaWrap.appendChild(img);
           } else {

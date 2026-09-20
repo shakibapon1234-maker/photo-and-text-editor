@@ -110,9 +110,11 @@ const server = http.createServer((req, res) => {
                 const data = JSON.parse(body);
                 if (data && Array.isArray(data.slides) && data.slides.length > 0) {
                     const hasImagePlaceholders = data.slides.some(slide =>
-                        Array.isArray(slide?.elements) && slide.elements.some(element =>
+                        String(slide?.bgMedia || '').startsWith('[heavy-bg-media-') ||
+                        String(slide?.bgImage || '').startsWith('[heavy-bg-image-') ||
+                        (Array.isArray(slide?.elements) && slide.elements.some(element =>
                             element?.__hasLargeSrc || element?.src === '[base64-image-in-idb]'
-                        )
+                        ))
                     );
                     // A quota-safe browser backup may deliberately omit large
                     // base64 image bytes. Do not let it replace the durable

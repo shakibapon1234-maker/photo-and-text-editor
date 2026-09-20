@@ -24,9 +24,12 @@
   // win over a complete IndexedDB/server project during restore.
   const countUnavailableMedia = (deck) => {
     if (!Array.isArray(deck)) return 0;
-    return deck.reduce((total, slide) => total + (slide?.elements || []).reduce((n, element) => {
-      return n + (element?.__hasLargeSrc || element?.src === '[base64-image-in-idb]' ? 1 : 0);
-    }, 0), 0);
+    return deck.reduce((total, slide) => total
+      + (String(slide?.bgMedia || '').startsWith('[heavy-bg-media-') ? 1 : 0)
+      + (String(slide?.bgImage || '').startsWith('[heavy-bg-image-') ? 1 : 0)
+      + (slide?.elements || []).reduce((n, element) => {
+        return n + (element?.__hasLargeSrc || element?.src === '[base64-image-in-idb]' ? 1 : 0);
+      }, 0), 0);
   };
 
   const hasUnavailableMedia = deck => countUnavailableMedia(deck) > 0;
