@@ -102,6 +102,20 @@ const server = http.createServer((req, res) => {
     }
 
     // ── Persistent Project Save Endpoint ─────────────────────────────
+    // FINAL.html is a user-supplied temporary backup. It is deleted only after
+    // the browser has copied its embedded backgrounds into IndexedDB.
+    if (pathname === '/api/delete-final-backup' && req.method === 'POST') {
+        const backupPath = path.join(__dirname, 'FINAL.html');
+        try {
+            if (fs.existsSync(backupPath)) fs.unlinkSync(backupPath);
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: true }));
+        } catch (error) {
+            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ success: false, error: error.message }));
+        }
+    }
+
     if (pathname === '/api/save-project' && req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk; });

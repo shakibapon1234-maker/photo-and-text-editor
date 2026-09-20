@@ -672,3 +672,11 @@
     schedule();
   })();
 })();
+
+// Optional one-time importer for a user-provided FINAL.html backup.
+// It is loaded dynamically so the large backup is never part of the app bundle.
+(() => {
+  const script = document.createElement('script');
+  script.src = 'presentation-final-background-import.js?v=1';
+  document.head.appendChild(script);
+})();
