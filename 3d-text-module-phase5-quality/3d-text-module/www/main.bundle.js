@@ -35848,7 +35848,11 @@ function initShapeStudio({
     deleteBtn: $("shapeDeleteBtn"),
     bringFrontBtn: $("shapeBringFrontBtn"),
     sendBackBtn: $("shapeSendBackBtn"),
-    clearAllBtn: $("shapeClearAllBtn")
+    clearAllBtn: $("shapeClearAllBtn"),
+    // InfoRow template controls
+    infoRowPanel: $("shapeInfoRowPanel"),
+    infoRowCellCount: $("shapeInfoRowCellCount"),
+    infoRowCellsContainer: $("shapeInfoRowCells")
   };
   const S = 50;
   const TAU2 = Math.PI * 2;
@@ -35979,9 +35983,12 @@ function initShapeStudio({
         pts.push([Math.cos(a) * r * 1.35, Math.sin(a) * r * 0.72]);
       }
       return pts;
-    } }
+    } },
+    // infoRow is special — it uses Canvas-based rendering, not ExtrudeGeometry.
+    // Its "points" are only used as a bounding hint for the selection outline.
+    infoRow: { label: "\u0987\u09A8\u09AB\u09CB \u09B0\u09CB", icon: "\u25A4", points: () => roundedRectPoints(S * 3.8, S * 0.72, 10) }
   };
-  const PRESET_ORDER = ["textBox", "rect", "roundedRect", "capsule", "glassCard", "arch", "ticket", "ribbon", "burst", "chevron", "badge", "cloud", "circle", "ellipse", "triangle", "pentagon", "hexagon", "star", "heart", "arrow", "speech"];
+  const PRESET_ORDER = ["infoRow", "textBox", "rect", "roundedRect", "capsule", "glassCard", "arch", "ticket", "ribbon", "burst", "chevron", "badge", "cloud", "circle", "ellipse", "triangle", "pentagon", "hexagon", "star", "heart", "arrow", "speech"];
   function buildGradientTexture(c1, c2, angleDeg) {
     const size = 256;
     const cnv = document.createElement("canvas");
@@ -36227,7 +36234,171 @@ function initShapeStudio({
     }
     uv.needsUpdate = true;
   }
+  function buildInfoRowGroup(layer) {
+    const group = new THREE.Group();
+    group.name = `shapeLayer:${layer.id}`;
+    const cells = layer.cells || [
+      { text: "\u09B8\u09B0\u09BE\u09B8\u09B0\u09BF \u0995\u09CB\u09AE\u09CD\u09AA\u09BE\u09A8\u09BF\u09A4\u09C7\n\u0995\u09BE\u099C\u09C7\u09B0 \u09B8\u09C1\u09AF\u09CB\u0997", color: "#1a4730", iconColor: "#ef4444", icon: "\u2714" },
+      { text: "\u0986\u09A7\u09C1\u09A8\u09BF\u0995\n\u09A1\u09C7\u0987\u09B0\u09C0 \u09AB\u09BE\u09B0\u09CD\u09AE", color: "#1a3a5c", iconColor: "#3b82f6", icon: "\u2714" },
+      { text: "\u09A5\u09BE\u0995\u09BE \u0993 \u0996\u09BE\u0993\u09AF\u09BC\u09BE\u09B0\n\u09B8\u09C1\u09AC\u09BF\u09A7\u09BE", color: "#1a4730", iconColor: "#22c55e", icon: "\u2714" }
+    ];
+    const n = cells.length;
+    const totalW = S * 3.8;
+    const totalH = S * 0.72;
+    const cellW = totalW / n;
+    const depth = layer.is3D ? Math.max(1, layer.depth) : 0.6;
+    const CANVAS_W = 2400;
+    const CANVAS_H = Math.round(CANVAS_W * totalH / totalW);
+    const canvas2 = document.createElement("canvas");
+    canvas2.width = CANVAS_W;
+    canvas2.height = CANVAS_H;
+    const ctx = canvas2.getContext("2d");
+    const cellPx = CANVAS_W / n;
+    const font2 = '"Noto Sans Bengali", "Nirmala UI", "Vrinda", Arial, sans-serif';
+    for (let i = 0; i < n; i++) {
+      const cell = cells[i];
+      const x = i * cellPx;
+      ctx.fillStyle = cell.color || "#1a4730";
+      if (i === 0) {
+        ctx.beginPath();
+        const r = CANVAS_H * 0.22;
+        ctx.moveTo(x + r, 0);
+        ctx.lineTo(x + cellPx, 0);
+        ctx.lineTo(x + cellPx, CANVAS_H);
+        ctx.lineTo(x + r, CANVAS_H);
+        ctx.arcTo(x, CANVAS_H, x, CANVAS_H - r, r);
+        ctx.lineTo(x, r);
+        ctx.arcTo(x, 0, x + r, 0, r);
+        ctx.closePath();
+        ctx.fill();
+      } else if (i === n - 1) {
+        const r = CANVAS_H * 0.22;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + cellPx - r, 0);
+        ctx.arcTo(x + cellPx, 0, x + cellPx, r, r);
+        ctx.lineTo(x + cellPx, CANVAS_H - r);
+        ctx.arcTo(x + cellPx, CANVAS_H, x + cellPx - r, CANVAS_H, r);
+        ctx.lineTo(x, CANVAS_H);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.fillRect(x, 0, cellPx, CANVAS_H);
+      }
+      if (i < n - 1) {
+        ctx.strokeStyle = "rgba(255,255,255,0.35)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x + cellPx, CANVAS_H * 0.12);
+        ctx.lineTo(x + cellPx, CANVAS_H * 0.88);
+        ctx.stroke();
+      }
+      const iconR = CANVAS_H * 0.28;
+      const iconCX = x + CANVAS_H * 0.5;
+      const iconCY = CANVAS_H / 2;
+      ctx.fillStyle = cell.iconColor || "#22c55e";
+      ctx.beginPath();
+      ctx.arc(iconCX, iconCY, iconR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.6)";
+      ctx.lineWidth = Math.max(2, CANVAS_H * 0.025);
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `bold ${Math.round(iconR * 1.1)}px ${font2}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(cell.icon || "\u2714", iconCX, iconCY + iconR * 0.08);
+      const textX = x + CANVAS_H * 0.5 + iconR * 2.4;
+      const textMaxW = cellPx - (textX - x) - CANVAS_H * 0.12;
+      const textLines = String(cell.text || "").split(/\r?\n/);
+      const textColor = cell.textColor || "#ffffff";
+      const lineCount = textLines.length;
+      let fontSize = Math.round(CANVAS_H * 0.22);
+      while (fontSize > 10) {
+        ctx.font = `700 ${fontSize}px ${font2}`;
+        const maxMeasure = textLines.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0);
+        if (maxMeasure <= textMaxW) break;
+        fontSize -= 1;
+      }
+      const lineH = fontSize * 1.28;
+      const blockH = lineCount * lineH;
+      let ty = iconCY - blockH / 2 + fontSize * 0.82;
+      textLines.forEach((line, li) => {
+        ctx.font = `700 ${fontSize}px ${font2}`;
+        ctx.fillStyle = li === 0 ? cell.accentColor || "#facc15" : textColor;
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        ctx.fillText(line, textX, ty);
+        ty += lineH;
+      });
+    }
+    if (layer.borderEnabled && layer.borderWidth > 0) {
+      const r = CANVAS_H * 0.22;
+      ctx.strokeStyle = layer.borderColor || "#ffffff";
+      ctx.lineWidth = Math.max(2, layer.borderWidth * 2.5);
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+      ctx.moveTo(r, 0);
+      ctx.lineTo(CANVAS_W - r, 0);
+      ctx.arcTo(CANVAS_W, 0, CANVAS_W, r, r);
+      ctx.lineTo(CANVAS_W, CANVAS_H - r);
+      ctx.arcTo(CANVAS_W, CANVAS_H, CANVAS_W - r, CANVAS_H, r);
+      ctx.lineTo(r, CANVAS_H);
+      ctx.arcTo(0, CANVAS_H, 0, CANVAS_H - r, r);
+      ctx.lineTo(0, r);
+      ctx.arcTo(0, 0, r, 0, r);
+      ctx.closePath();
+      ctx.stroke();
+    }
+    const texture = new THREE.CanvasTexture(canvas2);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = renderer2.capabilities.getMaxAnisotropy();
+    texture.needsUpdate = true;
+    const mat = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: layer.opacity < 1,
+      opacity: layer.opacity,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+      side: THREE.DoubleSide
+    });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(totalW, totalH), mat);
+    plane.renderOrder = 10;
+    plane.userData.layerId = layer.id;
+    group.add(plane);
+    if (layer.is3D && depth > 0.5) {
+      const slabShape = new THREE.Shape();
+      slabShape.moveTo(-totalW / 2, -totalH / 2);
+      slabShape.lineTo(totalW / 2, -totalH / 2);
+      slabShape.lineTo(totalW / 2, totalH / 2);
+      slabShape.lineTo(-totalW / 2, totalH / 2);
+      slabShape.closePath();
+      const slabGeo = new THREE.ExtrudeGeometry(slabShape, {
+        depth: Math.min(depth, 6),
+        bevelEnabled: false
+      });
+      slabGeo.translate(0, 0, -Math.min(depth, 6));
+      const slabMat = new THREE.MeshStandardMaterial({
+        color: cells[0]?.color || "#1a4730",
+        roughness: 0.4,
+        metalness: 0.2,
+        side: THREE.DoubleSide,
+        transparent: layer.opacity < 1,
+        opacity: layer.opacity * 0.85
+      });
+      const slab = new THREE.Mesh(slabGeo, slabMat);
+      slab.userData.layerId = layer.id;
+      group.add(slab);
+    }
+    group.userData.layerId = layer.id;
+    group.position.set(layer.posX, layer.posY, layer.posZ);
+    group.rotation.z = layer.rotationZ * Math.PI / 180;
+    group.scale.setScalar(layer.scaleMul);
+    return group;
+  }
   function buildLayerGroup(layer) {
+    if (layer.presetType === "infoRow") return buildInfoRowGroup(layer);
     const group = new THREE.Group();
     group.name = `shapeLayer:${layer.id}`;
     const rawPts = getLayerPoints(layer);
@@ -36355,7 +36526,9 @@ function initShapeStudio({
       neonIntensity: 0.8,
       reflectionsOn: true,
       materialReflectionIntensity: 1,
-      opacity: 1
+      opacity: 1,
+      // InfoRow specific — null for all other shapes
+      cells: null
     };
   }
   function addLayer(layer) {
@@ -36368,6 +36541,15 @@ function initShapeStudio({
   }
   function addPreset(presetType) {
     const layer = defaultLayer(presetType);
+    if (presetType === "infoRow") {
+      layer.cells = [
+        { text: "\u09B8\u09B0\u0995\u09BE\u09B0\u09BF \u0995\u09CB\u09AE\u09CD\u09AA\u09BE\u09A8\u09BF\u09A4\u09C7\n\u0995\u09BE\u099C\u09C7\u09B0 \u09B8\u09C1\u09AF\u09CB\u0997", color: "#1a4730", iconColor: "#ef4444", icon: "\u2714", textColor: "#ffffff", accentColor: "#facc15" },
+        { text: "\u0986\u09A7\u09C1\u09A8\u09BF\u0995 \u09B0\u09BF\u09AB\u09B0\u09CD\u09AE", color: "#1a3a5c", iconColor: "#3b82f6", icon: "\u2714", textColor: "#ffffff", accentColor: "#facc15" },
+        { text: "\u09A5\u09BE\u0995\u09BE \u0996\u09BE\u0993\u09AF\u09BC\u09BE\u09B0\n\u09B8\u09C1\u09AC\u09BF\u09A7\u09BE", color: "#1a4730", iconColor: "#22c55e", icon: "\u2714", textColor: "#ffffff", accentColor: "#facc15" }
+      ];
+      layer.borderEnabled = false;
+      layer.depth = 5;
+    }
     if (presetType === "textBox") {
       layer.text = typeof getSharedText === "function" ? getSharedText() || "" : "";
       layer.fillColor = "#172554";
@@ -36854,6 +37036,68 @@ function initShapeStudio({
     if (el.rotationValue) el.rotationValue.textContent = `${L.rotationZ}\xB0`;
     if (el.opacityRange) el.opacityRange.value = Math.round(L.opacity * 100);
     if (el.opacityValue) el.opacityValue.textContent = `${Math.round(L.opacity * 100)}%`;
+    const isInfoRow = L.presetType === "infoRow";
+    if (el.infoRowPanel) el.infoRowPanel.style.display = isInfoRow ? "block" : "none";
+    const regularFillSection = document.getElementById("shapeRegularFillSection");
+    const regularTextSection = document.getElementById("shapeRegularTextSection");
+    if (regularFillSection) regularFillSection.style.display = isInfoRow ? "none" : "";
+    if (regularTextSection) regularTextSection.style.display = isInfoRow ? "none" : "";
+    if (isInfoRow && el.infoRowPanel) {
+      renderInfoRowCellEditor(L);
+    }
+  }
+  function renderInfoRowCellEditor(L) {
+    const cells = L.cells || [];
+    if (el.infoRowCellCount) el.infoRowCellCount.value = cells.length;
+    if (!el.infoRowCellsContainer) return;
+    el.infoRowCellsContainer.innerHTML = cells.map((cell, i) => `
+      <div class="info-row-cell-editor" data-cell-index="${i}" style="border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:10px;margin-bottom:10px;background:rgba(255,255,255,0.04);">
+        <div style="font-size:11px;font-weight:600;color:#fbbf24;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">\u09B8\u09C7\u09B2 ${i + 1}</div>
+        <label class="field" style="margin-bottom:6px;">
+          <span style="font-size:12px;">\u099F\u09C7\u0995\u09CD\u09B8\u099F</span>
+          <textarea data-cell-prop="text" rows="2" style="width:100%;font-size:12px;resize:vertical;">${cell.text || ""}</textarea>
+        </label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <label class="field" style="margin:0;">
+            <span style="font-size:11px;">\u09AC\u09CD\u09AF\u09BE\u0995\u0997\u09CD\u09B0\u09BE\u0989\u09A8\u09CD\u09A1</span>
+            <input type="color" data-cell-prop="color" value="${cell.color || "#1a4730"}" style="width:100%;height:28px;" />
+          </label>
+          <label class="field" style="margin:0;">
+            <span style="font-size:11px;">\u0986\u0987\u0995\u09A8 \u0995\u09BE\u09B2\u09BE\u09B0</span>
+            <input type="color" data-cell-prop="iconColor" value="${cell.iconColor || "#22c55e"}" style="width:100%;height:28px;" />
+          </label>
+          <label class="field" style="margin:0;">
+            <span style="font-size:11px;">\u099F\u09C7\u0995\u09CD\u09B8\u099F \u0995\u09BE\u09B2\u09BE\u09B0</span>
+            <input type="color" data-cell-prop="textColor" value="${cell.textColor || "#ffffff"}" style="width:100%;height:28px;" />
+          </label>
+          <label class="field" style="margin:0;">
+            <span style="font-size:11px;">\u09B9\u09BE\u0987\u09B2\u09BE\u0987\u099F \u0995\u09BE\u09B2\u09BE\u09B0</span>
+            <input type="color" data-cell-prop="accentColor" value="${cell.accentColor || "#facc15"}" style="width:100%;height:28px;" />
+          </label>
+        </div>
+        <label class="field" style="margin-top:6px;margin-bottom:0;">
+          <span style="font-size:11px;">\u0986\u0987\u0995\u09A8 (\u0987\u09AE\u09CB\u099C\u09BF/\u099A\u09BF\u09B9\u09CD\u09A8)</span>
+          <input type="text" data-cell-prop="icon" value="${cell.icon || "\u2714"}" maxlength="4" style="font-size:18px;text-align:center;width:60px;" />
+        </label>
+      </div>
+    `).join("");
+    el.infoRowCellsContainer.querySelectorAll("[data-cell-prop]").forEach((input) => {
+      const handler = () => {
+        if (!selectedId) return;
+        const entry = layers.get(selectedId);
+        if (!entry) return;
+        const cellEl = input.closest("[data-cell-index]");
+        if (!cellEl) return;
+        const idx = parseInt(cellEl.dataset.cellIndex, 10);
+        const prop = input.dataset.cellProp;
+        const newCells = JSON.parse(JSON.stringify(entry.layer.cells || []));
+        if (!newCells[idx]) return;
+        newCells[idx][prop] = input.value;
+        updateLayer(selectedId, { cells: newCells });
+      };
+      input.addEventListener("input", handler);
+      input.addEventListener("change", handler);
+    });
   }
   function wireProp(elem, handler) {
     if (!elem) return;
@@ -36918,6 +37162,31 @@ function initShapeStudio({
   if (el.clearAllBtn) el.clearAllBtn.addEventListener("click", () => {
     if (confirm("\u09B8\u09AC \u09B6\u09C7\u09AA \u09AE\u09C1\u099B\u09C7 \u09AB\u09C7\u09B2\u09AC\u09C7\u09A8?")) clearAll();
   });
+  if (el.infoRowCellCount) {
+    el.infoRowCellCount.addEventListener("change", () => {
+      if (!selectedId) return;
+      const entry = layers.get(selectedId);
+      if (!entry || entry.layer.presetType !== "infoRow") return;
+      const newCount = Math.max(2, Math.min(4, parseInt(el.infoRowCellCount.value, 10) || 3));
+      el.infoRowCellCount.value = newCount;
+      const existing = JSON.parse(JSON.stringify(entry.layer.cells || []));
+      const DEFAULT_COLORS = ["#1a4730", "#1a3a5c", "#2d1b4e", "#1a2d4e"];
+      const DEFAULT_ICON_COLORS = ["#ef4444", "#3b82f6", "#22c55e", "#f59e0b"];
+      while (existing.length < newCount) {
+        const idx = existing.length;
+        existing.push({
+          text: `\u09B8\u09C7\u09B2 ${idx + 1}`,
+          color: DEFAULT_COLORS[idx % DEFAULT_COLORS.length],
+          iconColor: DEFAULT_ICON_COLORS[idx % DEFAULT_ICON_COLORS.length],
+          icon: "\u2714",
+          textColor: "#ffffff",
+          accentColor: "#facc15"
+        });
+      }
+      while (existing.length > newCount) existing.pop();
+      updateLayer(selectedId, { cells: existing });
+    });
+  }
   let persistTimer = null;
   function persist(immediate = false) {
     clearTimeout(persistTimer);

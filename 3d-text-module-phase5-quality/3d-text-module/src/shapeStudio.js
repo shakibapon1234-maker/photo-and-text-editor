@@ -115,6 +115,11 @@ export function initShapeStudio({
     bringFrontBtn: $('shapeBringFrontBtn'),
     sendBackBtn: $('shapeSendBackBtn'),
     clearAllBtn: $('shapeClearAllBtn'),
+
+    // InfoRow template controls
+    infoRowPanel: $('shapeInfoRowPanel'),
+    infoRowCellCount: $('shapeInfoRowCellCount'),
+    infoRowCellsContainer: $('shapeInfoRowCells'),
   };
 
   // ---------------------------------------------------------------------
@@ -208,8 +213,11 @@ export function initShapeStudio({
     chevron: { label: 'Chevron', icon: '❯', points: () => [[-S, S], [-S * 0.25, S], [S, 0], [-S * 0.25, -S], [-S, -S], [S * 0.2, 0]] },
     badge: { label: 'Badge', icon: '✪', points: () => { const pts = []; for (let i = 0; i < 16; i++) { const a = -Math.PI / 2 + i * TAU / 16; const r = i % 2 ? S * 0.86 : S; pts.push([Math.cos(a) * r, Math.sin(a) * r]); } return pts; } },
     cloud: { label: 'Cloud', icon: '☁', points: () => { const pts = []; for (let i = 0; i <= 40; i++) { const a = i * TAU / 40; const r = S * (0.76 + 0.13 * Math.sin(a * 3) + 0.10 * Math.sin(a * 5)); pts.push([Math.cos(a) * r * 1.35, Math.sin(a) * r * 0.72]); } return pts; } },
+    // infoRow is special — it uses Canvas-based rendering, not ExtrudeGeometry.
+    // Its "points" are only used as a bounding hint for the selection outline.
+    infoRow: { label: 'ইনফো রো', icon: '▤', points: () => roundedRectPoints(S * 3.8, S * 0.72, 10) },
   };
-  const PRESET_ORDER = ['textBox', 'rect', 'roundedRect', 'capsule', 'glassCard', 'arch', 'ticket', 'ribbon', 'burst', 'chevron', 'badge', 'cloud', 'circle', 'ellipse', 'triangle', 'pentagon', 'hexagon', 'star', 'heart', 'arrow', 'speech'];
+  const PRESET_ORDER = ['infoRow', 'textBox', 'rect', 'roundedRect', 'capsule', 'glassCard', 'arch', 'ticket', 'ribbon', 'burst', 'chevron', 'badge', 'cloud', 'circle', 'ellipse', 'triangle', 'pentagon', 'hexagon', 'star', 'heart', 'arrow', 'speech'];
 
   // ---------------------------------------------------------------------
   // Texture helpers
@@ -482,7 +490,205 @@ export function initShapeStudio({
     uv.needsUpdate = true;
   }
 
+  // ---------------------------------------------------------------------
+  // InfoRow: canvas-based multi-cell banner builder
+  // ---------------------------------------------------------------------
+  function buildInfoRowGroup(layer) {
+    const group = new THREE.Group();
+    group.name = `shapeLayer:${layer.id}`;
+
+    const cells = layer.cells || [
+      { text: 'সরাসরি কোম্পানিতে\nকাজের সুযোগ', color: '#1a4730', iconColor: '#ef4444', icon: '✔' },
+      { text: 'আধুনিক\nডেইরী ফার্ম', color: '#1a3a5c', iconColor: '#3b82f6', icon: '✔' },
+      { text: 'থাকা ও খাওয়ার\nসুবিধা', color: '#1a4730', iconColor: '#22c55e', icon: '✔' },
+    ];
+    const n = cells.length;
+    // Dimensions in world units
+    const totalW = S * 3.8;
+    const totalH = S * 0.72;
+    const cellW = totalW / n;
+    const depth = layer.is3D ? Math.max(1, layer.depth) : 0.6;
+
+    // Canvas dimensions (high-res for crisp text)
+    const CANVAS_W = 2400;
+    const CANVAS_H = Math.round(CANVAS_W * totalH / totalW);
+    const canvas = document.createElement('canvas');
+    canvas.width = CANVAS_W;
+    canvas.height = CANVAS_H;
+    const ctx = canvas.getContext('2d');
+    const cellPx = CANVAS_W / n;
+
+    const font = '"Noto Sans Bengali", "Nirmala UI", "Vrinda", Arial, sans-serif';
+
+    for (let i = 0; i < n; i++) {
+      const cell = cells[i];
+      const x = i * cellPx;
+
+      // Cell background
+      ctx.fillStyle = cell.color || '#1a4730';
+      if (i === 0) {
+        // Left pill end
+        ctx.beginPath();
+        const r = CANVAS_H * 0.22;
+        ctx.moveTo(x + r, 0);
+        ctx.lineTo(x + cellPx, 0);
+        ctx.lineTo(x + cellPx, CANVAS_H);
+        ctx.lineTo(x + r, CANVAS_H);
+        ctx.arcTo(x, CANVAS_H, x, CANVAS_H - r, r);
+        ctx.lineTo(x, r);
+        ctx.arcTo(x, 0, x + r, 0, r);
+        ctx.closePath();
+        ctx.fill();
+      } else if (i === n - 1) {
+        // Right pill end
+        const r = CANVAS_H * 0.22;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + cellPx - r, 0);
+        ctx.arcTo(x + cellPx, 0, x + cellPx, r, r);
+        ctx.lineTo(x + cellPx, CANVAS_H - r);
+        ctx.arcTo(x + cellPx, CANVAS_H, x + cellPx - r, CANVAS_H, r);
+        ctx.lineTo(x, CANVAS_H);
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.fillRect(x, 0, cellPx, CANVAS_H);
+      }
+
+      // Divider line between cells
+      if (i < n - 1) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x + cellPx, CANVAS_H * 0.12);
+        ctx.lineTo(x + cellPx, CANVAS_H * 0.88);
+        ctx.stroke();
+      }
+
+      // Icon circle
+      const iconR = CANVAS_H * 0.28;
+      const iconCX = x + CANVAS_H * 0.5;
+      const iconCY = CANVAS_H / 2;
+      ctx.fillStyle = cell.iconColor || '#22c55e';
+      ctx.beginPath();
+      ctx.arc(iconCX, iconCY, iconR, 0, Math.PI * 2);
+      ctx.fill();
+      // Icon border
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = Math.max(2, CANVAS_H * 0.025);
+      ctx.stroke();
+
+      // Icon symbol
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${Math.round(iconR * 1.1)}px ${font}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(cell.icon || '✔', iconCX, iconCY + iconR * 0.08);
+
+      // Cell text
+      const textX = x + CANVAS_H * 0.5 + iconR * 2.4;
+      const textMaxW = cellPx - (textX - x) - CANVAS_H * 0.12;
+      const textLines = String(cell.text || '').split(/\r?\n/);
+      const textColor = cell.textColor || '#ffffff';
+      // Accent/highlight line (first line in yellow if present)
+      const lineCount = textLines.length;
+      let fontSize = Math.round(CANVAS_H * 0.22);
+      // Shrink font if text is long
+      while (fontSize > 10) {
+        ctx.font = `700 ${fontSize}px ${font}`;
+        const maxMeasure = textLines.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0);
+        if (maxMeasure <= textMaxW) break;
+        fontSize -= 1;
+      }
+      const lineH = fontSize * 1.28;
+      const blockH = lineCount * lineH;
+      let ty = iconCY - blockH / 2 + fontSize * 0.82;
+      textLines.forEach((line, li) => {
+        ctx.font = `700 ${fontSize}px ${font}`;
+        // First line gets highlight color (yellow), rest white
+        ctx.fillStyle = li === 0 ? (cell.accentColor || '#facc15') : textColor;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(line, textX, ty);
+        ty += lineH;
+      });
+    }
+
+    // Apply border/outer glow if enabled
+    if (layer.borderEnabled && layer.borderWidth > 0) {
+      const r = CANVAS_H * 0.22;
+      ctx.strokeStyle = layer.borderColor || '#ffffff';
+      ctx.lineWidth = Math.max(2, layer.borderWidth * 2.5);
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(r, 0);
+      ctx.lineTo(CANVAS_W - r, 0);
+      ctx.arcTo(CANVAS_W, 0, CANVAS_W, r, r);
+      ctx.lineTo(CANVAS_W, CANVAS_H - r);
+      ctx.arcTo(CANVAS_W, CANVAS_H, CANVAS_W - r, CANVAS_H, r);
+      ctx.lineTo(r, CANVAS_H);
+      ctx.arcTo(0, CANVAS_H, 0, CANVAS_H - r, r);
+      ctx.lineTo(0, r);
+      ctx.arcTo(0, 0, r, 0, r);
+      ctx.closePath();
+      ctx.stroke();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    texture.needsUpdate = true;
+
+    const mat = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: layer.opacity < 1,
+      opacity: layer.opacity,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+      side: THREE.DoubleSide,
+    });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(totalW, totalH), mat);
+    plane.renderOrder = 10;
+    plane.userData.layerId = layer.id;
+    group.add(plane);
+
+    // Thin 3D slab behind the plane for depth
+    if (layer.is3D && depth > 0.5) {
+      const slabShape = new THREE.Shape();
+      slabShape.moveTo(-totalW / 2, -totalH / 2);
+      slabShape.lineTo(totalW / 2, -totalH / 2);
+      slabShape.lineTo(totalW / 2, totalH / 2);
+      slabShape.lineTo(-totalW / 2, totalH / 2);
+      slabShape.closePath();
+      const slabGeo = new THREE.ExtrudeGeometry(slabShape, {
+        depth: Math.min(depth, 6),
+        bevelEnabled: false,
+      });
+      slabGeo.translate(0, 0, -Math.min(depth, 6));
+      const slabMat = new THREE.MeshStandardMaterial({
+        color: cells[0]?.color || '#1a4730',
+        roughness: 0.4,
+        metalness: 0.2,
+        side: THREE.DoubleSide,
+        transparent: layer.opacity < 1,
+        opacity: layer.opacity * 0.85,
+      });
+      const slab = new THREE.Mesh(slabGeo, slabMat);
+      slab.userData.layerId = layer.id;
+      group.add(slab);
+    }
+
+    group.userData.layerId = layer.id;
+    group.position.set(layer.posX, layer.posY, layer.posZ);
+    group.rotation.z = (layer.rotationZ * Math.PI) / 180;
+    group.scale.setScalar(layer.scaleMul);
+    return group;
+  }
+
   function buildLayerGroup(layer) {
+    // InfoRow has its own completely different renderer
+    if (layer.presetType === 'infoRow') return buildInfoRowGroup(layer);
     const group = new THREE.Group();
     group.name = `shapeLayer:${layer.id}`;
 
@@ -633,6 +839,8 @@ export function initShapeStudio({
       reflectionsOn: true,
       materialReflectionIntensity: 1,
       opacity: 1,
+      // InfoRow specific — null for all other shapes
+      cells: null,
     };
   }
 
@@ -647,6 +855,15 @@ export function initShapeStudio({
 
   function addPreset(presetType) {
     const layer = defaultLayer(presetType);
+    if (presetType === 'infoRow') {
+      layer.cells = [
+        { text: 'সরকারি কোম্পানিতে\nকাজের সুযোগ', color: '#1a4730', iconColor: '#ef4444', icon: '✔', textColor: '#ffffff', accentColor: '#facc15' },
+        { text: 'আধুনিক রিফর্ম', color: '#1a3a5c', iconColor: '#3b82f6', icon: '✔', textColor: '#ffffff', accentColor: '#facc15' },
+        { text: 'থাকা খাওয়ার\nসুবিধা', color: '#1a4730', iconColor: '#22c55e', icon: '✔', textColor: '#ffffff', accentColor: '#facc15' },
+      ];
+      layer.borderEnabled = false;
+      layer.depth = 5;
+    }
     if (presetType === 'textBox') {
       layer.text = typeof getSharedText === 'function' ? (getSharedText() || '') : '';
       layer.fillColor = '#172554';
@@ -1182,6 +1399,75 @@ export function initShapeStudio({
     if (el.rotationValue) el.rotationValue.textContent = `${L.rotationZ}°`;
     if (el.opacityRange) el.opacityRange.value = Math.round(L.opacity * 100);
     if (el.opacityValue) el.opacityValue.textContent = `${Math.round(L.opacity * 100)}%`;
+
+    // --- InfoRow special panel ---
+    const isInfoRow = L.presetType === 'infoRow';
+    if (el.infoRowPanel) el.infoRowPanel.style.display = isInfoRow ? 'block' : 'none';
+    // Hide fill/text controls for infoRow (each cell has its own color)
+    const regularFillSection = document.getElementById('shapeRegularFillSection');
+    const regularTextSection = document.getElementById('shapeRegularTextSection');
+    if (regularFillSection) regularFillSection.style.display = isInfoRow ? 'none' : '';
+    if (regularTextSection) regularTextSection.style.display = isInfoRow ? 'none' : '';
+
+    if (isInfoRow && el.infoRowPanel) {
+      renderInfoRowCellEditor(L);
+    }
+  }
+
+  function renderInfoRowCellEditor(L) {
+    const cells = L.cells || [];
+    if (el.infoRowCellCount) el.infoRowCellCount.value = cells.length;
+    if (!el.infoRowCellsContainer) return;
+    el.infoRowCellsContainer.innerHTML = cells.map((cell, i) => `
+      <div class="info-row-cell-editor" data-cell-index="${i}" style="border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:10px;margin-bottom:10px;background:rgba(255,255,255,0.04);">
+        <div style="font-size:11px;font-weight:600;color:#fbbf24;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">সেল ${i + 1}</div>
+        <label class="field" style="margin-bottom:6px;">
+          <span style="font-size:12px;">টেক্সট</span>
+          <textarea data-cell-prop="text" rows="2" style="width:100%;font-size:12px;resize:vertical;">${cell.text || ''}</textarea>
+        </label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <label class="field" style="margin:0;">
+            <span style="font-size:11px;">ব্যাকগ্রাউন্ড</span>
+            <input type="color" data-cell-prop="color" value="${cell.color || '#1a4730'}" style="width:100%;height:28px;" />
+          </label>
+          <label class="field" style="margin:0;">
+            <span style="font-size:11px;">আইকন কালার</span>
+            <input type="color" data-cell-prop="iconColor" value="${cell.iconColor || '#22c55e'}" style="width:100%;height:28px;" />
+          </label>
+          <label class="field" style="margin:0;">
+            <span style="font-size:11px;">টেক্সট কালার</span>
+            <input type="color" data-cell-prop="textColor" value="${cell.textColor || '#ffffff'}" style="width:100%;height:28px;" />
+          </label>
+          <label class="field" style="margin:0;">
+            <span style="font-size:11px;">হাইলাইট কালার</span>
+            <input type="color" data-cell-prop="accentColor" value="${cell.accentColor || '#facc15'}" style="width:100%;height:28px;" />
+          </label>
+        </div>
+        <label class="field" style="margin-top:6px;margin-bottom:0;">
+          <span style="font-size:11px;">আইকন (ইমোজি/চিহ্ন)</span>
+          <input type="text" data-cell-prop="icon" value="${cell.icon || '✔'}" maxlength="4" style="font-size:18px;text-align:center;width:60px;" />
+        </label>
+      </div>
+    `).join('');
+
+    // Wire cell editor changes
+    el.infoRowCellsContainer.querySelectorAll('[data-cell-prop]').forEach((input) => {
+      const handler = () => {
+        if (!selectedId) return;
+        const entry = layers.get(selectedId);
+        if (!entry) return;
+        const cellEl = input.closest('[data-cell-index]');
+        if (!cellEl) return;
+        const idx = parseInt(cellEl.dataset.cellIndex, 10);
+        const prop = input.dataset.cellProp;
+        const newCells = JSON.parse(JSON.stringify(entry.layer.cells || []));
+        if (!newCells[idx]) return;
+        newCells[idx][prop] = input.value;
+        updateLayer(selectedId, { cells: newCells });
+      };
+      input.addEventListener('input', handler);
+      input.addEventListener('change', handler);
+    });
   }
 
   function wireProp(elem, handler) {
@@ -1250,6 +1536,34 @@ export function initShapeStudio({
   if (el.bringFrontBtn) el.bringFrontBtn.addEventListener('click', () => selectedId && bringToFront(selectedId));
   if (el.sendBackBtn) el.sendBackBtn.addEventListener('click', () => selectedId && sendToBack(selectedId));
   if (el.clearAllBtn) el.clearAllBtn.addEventListener('click', () => { if (confirm('সব শেপ মুছে ফেলবেন?')) clearAll(); });
+
+  // InfoRow cell count change
+  if (el.infoRowCellCount) {
+    el.infoRowCellCount.addEventListener('change', () => {
+      if (!selectedId) return;
+      const entry = layers.get(selectedId);
+      if (!entry || entry.layer.presetType !== 'infoRow') return;
+      const newCount = Math.max(2, Math.min(4, parseInt(el.infoRowCellCount.value, 10) || 3));
+      el.infoRowCellCount.value = newCount;
+      const existing = JSON.parse(JSON.stringify(entry.layer.cells || []));
+      const DEFAULT_COLORS = ['#1a4730', '#1a3a5c', '#2d1b4e', '#1a2d4e'];
+      const DEFAULT_ICON_COLORS = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b'];
+      // Grow or shrink cells array
+      while (existing.length < newCount) {
+        const idx = existing.length;
+        existing.push({
+          text: `সেল ${idx + 1}`,
+          color: DEFAULT_COLORS[idx % DEFAULT_COLORS.length],
+          iconColor: DEFAULT_ICON_COLORS[idx % DEFAULT_ICON_COLORS.length],
+          icon: '✔',
+          textColor: '#ffffff',
+          accentColor: '#facc15',
+        });
+      }
+      while (existing.length > newCount) existing.pop();
+      updateLayer(selectedId, { cells: existing });
+    });
+  }
 
   // ---------------------------------------------------------------------
   // Persistence

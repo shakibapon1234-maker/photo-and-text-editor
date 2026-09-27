@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="bn">
 <head>
 <meta charset="UTF-8" />
@@ -224,6 +224,23 @@
         <p class="field-note" id="shapeNoSelectionNote">একটা শেপ সিলেক্ট করুন এডিট করতে।</p>
 
         <div id="shapePropsPanel" style="display:none;">
+          <!-- InfoRow special panel — visible only when an infoRow layer is selected -->
+          <div id="shapeInfoRowPanel" style="display:none;">
+            <h4 style="margin:0 0 8px;font-size:13px;color:#fbbf24;">▤ ইনফো রো সেটিংস</h4>
+            <label class="field" style="margin-bottom:10px;">
+              <span>সেল সংখ্যা (কয় ভাগ করবেন)</span>
+              <select id="shapeInfoRowCellCount" style="font-size:14px;font-weight:600;">
+                <option value="2">২ ভাগ</option>
+                <option value="3" selected>৩ ভাগ</option>
+                <option value="4">৪ ভাগ</option>
+              </select>
+            </label>
+            <div id="shapeInfoRowCells"></div>
+            <hr style="border-color:rgba(255,255,255,0.1);margin:12px 0;" />
+          </div>
+
+          <!-- Regular fill/gradient — hidden for infoRow -->
+          <div id="shapeRegularFillSection">
           <h4 style="margin:14px 0 6px;font-size:13px;color:var(--text-secondary);">ফিল</h4>
           <div class="preset-grid" id="shapeFillModeGrid">
             <button type="button" class="preset-btn active" data-fill-mode="solid">সলিড কালার</button>
@@ -247,6 +264,7 @@
               <input type="range" id="shapeGradientAngle" min="0" max="180" value="45" class="range-slider" />
             </label>
           </div>
+          </div><!-- end shapeRegularFillSection -->
 
           <h4 style="margin:14px 0 6px;font-size:13px;color:var(--text-secondary);">বর্ডার</h4>
           <label class="field-inline">
@@ -288,6 +306,8 @@
             </label>
           </div>
 
+          <!-- Regular text panel — hidden for infoRow -->
+          <div id="shapeRegularTextSection">
           <h4 style="margin:14px 0 6px;font-size:13px;color:var(--text-secondary);">ভিতরে টেক্সট</h4>
           <label class="field">
             <span>টেক্সট</span>
@@ -335,6 +355,7 @@
               <option value="Bungee">Bungee</option>
             </select>
           </label>
+          </div><!-- end shapeRegularTextSection -->
 
           <h4 style="margin:14px 0 6px;font-size:13px;color:var(--text-secondary);">ট্রান্সফর্ম</h4>
           <label class="field">
@@ -1099,6 +1120,6 @@
     </aside>
   </div>
 
-  <script type="module" src="main.bundle.js?v=1789732734960"></script>
+  <script type="module" src="main.bundle.js?v=1790516768771"></script>
 </body>
 </html>
