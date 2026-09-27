@@ -35852,7 +35852,8 @@ function initShapeStudio({
     // InfoRow template controls
     infoRowPanel: $("shapeInfoRowPanel"),
     infoRowCellCount: $("shapeInfoRowCellCount"),
-    infoRowCellsContainer: $("shapeInfoRowCells")
+    infoRowCellsContainer: $("shapeInfoRowCells"),
+    infoRowShowIcons: $("shapeInfoRowShowIcons")
   };
   const S = 50;
   const TAU2 = Math.PI * 2;
@@ -36243,9 +36244,9 @@ function initShapeStudio({
       { text: "\u09A5\u09BE\u0995\u09BE \u0993 \u0996\u09BE\u0993\u09AF\u09BC\u09BE\u09B0\n\u09B8\u09C1\u09AC\u09BF\u09A7\u09BE", color: "#1a4730", iconColor: "#22c55e", icon: "\u2714" }
     ];
     const n = cells.length;
+    const showIcons = layer.showIcons !== false;
     const totalW = S * 3.8;
     const totalH = S * 0.72;
-    const cellW = totalW / n;
     const depth = layer.is3D ? Math.max(1, layer.depth) : 0.6;
     const CANVAS_W = 2400;
     const CANVAS_H = Math.round(CANVAS_W * totalH / totalW);
@@ -36255,13 +36256,14 @@ function initShapeStudio({
     const ctx = canvas2.getContext("2d");
     const cellPx = CANVAS_W / n;
     const font2 = '"Noto Sans Bengali", "Nirmala UI", "Vrinda", Arial, sans-serif';
+    const PAD = CANVAS_H * 0.08;
     for (let i = 0; i < n; i++) {
       const cell = cells[i];
       const x = i * cellPx;
       ctx.fillStyle = cell.color || "#1a4730";
-      if (i === 0) {
-        ctx.beginPath();
-        const r = CANVAS_H * 0.22;
+      const r = CANVAS_H * 0.22;
+      ctx.beginPath();
+      if (i === 0 && n > 1) {
         ctx.moveTo(x + r, 0);
         ctx.lineTo(x + cellPx, 0);
         ctx.lineTo(x + cellPx, CANVAS_H);
@@ -36269,66 +36271,80 @@ function initShapeStudio({
         ctx.arcTo(x, CANVAS_H, x, CANVAS_H - r, r);
         ctx.lineTo(x, r);
         ctx.arcTo(x, 0, x + r, 0, r);
-        ctx.closePath();
-        ctx.fill();
-      } else if (i === n - 1) {
-        const r = CANVAS_H * 0.22;
-        ctx.beginPath();
+      } else if (i === n - 1 && n > 1) {
         ctx.moveTo(x, 0);
         ctx.lineTo(x + cellPx - r, 0);
         ctx.arcTo(x + cellPx, 0, x + cellPx, r, r);
         ctx.lineTo(x + cellPx, CANVAS_H - r);
         ctx.arcTo(x + cellPx, CANVAS_H, x + cellPx - r, CANVAS_H, r);
         ctx.lineTo(x, CANVAS_H);
-        ctx.closePath();
-        ctx.fill();
+      } else if (n === 1) {
+        ctx.moveTo(x + r, 0);
+        ctx.lineTo(x + cellPx - r, 0);
+        ctx.arcTo(x + cellPx, 0, x + cellPx, r, r);
+        ctx.lineTo(x + cellPx, CANVAS_H - r);
+        ctx.arcTo(x + cellPx, CANVAS_H, x + cellPx - r, CANVAS_H, r);
+        ctx.lineTo(x + r, CANVAS_H);
+        ctx.arcTo(x, CANVAS_H, x, CANVAS_H - r, r);
+        ctx.lineTo(x, r);
+        ctx.arcTo(x, 0, x + r, 0, r);
       } else {
-        ctx.fillRect(x, 0, cellPx, CANVAS_H);
+        ctx.rect(x, 0, cellPx, CANVAS_H);
       }
+      ctx.closePath();
+      ctx.fill();
       if (i < n - 1) {
-        ctx.strokeStyle = "rgba(255,255,255,0.35)";
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        ctx.lineWidth = Math.max(2, CANVAS_W * 1e-3);
         ctx.beginPath();
-        ctx.moveTo(x + cellPx, CANVAS_H * 0.12);
-        ctx.lineTo(x + cellPx, CANVAS_H * 0.88);
+        ctx.moveTo(x + cellPx, CANVAS_H * 0.1);
+        ctx.lineTo(x + cellPx, CANVAS_H * 0.9);
         ctx.stroke();
       }
-      const iconR = CANVAS_H * 0.28;
-      const iconCX = x + CANVAS_H * 0.5;
-      const iconCY = CANVAS_H / 2;
-      ctx.fillStyle = cell.iconColor || "#22c55e";
-      ctx.beginPath();
-      ctx.arc(iconCX, iconCY, iconR, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,0.6)";
-      ctx.lineWidth = Math.max(2, CANVAS_H * 0.025);
-      ctx.stroke();
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `bold ${Math.round(iconR * 1.1)}px ${font2}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(cell.icon || "\u2714", iconCX, iconCY + iconR * 0.08);
-      const textX = x + CANVAS_H * 0.5 + iconR * 2.4;
-      const textMaxW = cellPx - (textX - x) - CANVAS_H * 0.12;
+      let textStartX, textAvailW;
+      if (showIcons) {
+        const iconR = CANVAS_H * 0.3;
+        const iconCX = x + PAD + iconR;
+        const iconCY = CANVAS_H / 2;
+        ctx.fillStyle = cell.iconColor || "#22c55e";
+        ctx.beginPath();
+        ctx.arc(iconCX, iconCY, iconR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.65)";
+        ctx.lineWidth = Math.max(2, CANVAS_H * 0.028);
+        ctx.stroke();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `bold ${Math.round(iconR * 1.05)}px ${font2}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(cell.icon || "\u2714", iconCX, iconCY + iconR * 0.06);
+        textStartX = iconCX + iconR + PAD * 1.2;
+        textAvailW = x + cellPx - textStartX - PAD;
+      } else {
+        textStartX = x + PAD * 1.5;
+        textAvailW = cellPx - PAD * 3;
+      }
       const textLines = String(cell.text || "").split(/\r?\n/);
       const textColor = cell.textColor || "#ffffff";
-      const lineCount = textLines.length;
-      let fontSize = Math.round(CANVAS_H * 0.22);
+      const lineCount = Math.max(1, textLines.length);
+      const maxFontH = (CANVAS_H - PAD * 2) / lineCount;
+      let fontSize = Math.min(Math.round(maxFontH * 0.88), Math.round(CANVAS_H * 0.45));
       while (fontSize > 10) {
-        ctx.font = `700 ${fontSize}px ${font2}`;
-        const maxMeasure = textLines.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0);
-        if (maxMeasure <= textMaxW) break;
+        ctx.font = `800 ${fontSize}px ${font2}`;
+        const maxW = textLines.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0);
+        if (maxW <= textAvailW) break;
         fontSize -= 1;
       }
-      const lineH = fontSize * 1.28;
+      fontSize = Math.max(10, fontSize);
+      const lineH = fontSize * 1.22;
       const blockH = lineCount * lineH;
-      let ty = iconCY - blockH / 2 + fontSize * 0.82;
+      let ty = CANVAS_H / 2 - blockH / 2 + fontSize * 0.82;
       textLines.forEach((line, li) => {
-        ctx.font = `700 ${fontSize}px ${font2}`;
+        ctx.font = `800 ${fontSize}px ${font2}`;
         ctx.fillStyle = li === 0 ? cell.accentColor || "#facc15" : textColor;
         ctx.textAlign = "left";
         ctx.textBaseline = "alphabetic";
-        ctx.fillText(line, textX, ty);
+        ctx.fillText(line, textStartX, ty);
         ty += lineH;
       });
     }
@@ -37049,7 +37065,9 @@ function initShapeStudio({
   function renderInfoRowCellEditor(L) {
     const cells = L.cells || [];
     if (el.infoRowCellCount) el.infoRowCellCount.value = cells.length;
+    if (el.infoRowShowIcons) el.infoRowShowIcons.checked = L.showIcons !== false;
     if (!el.infoRowCellsContainer) return;
+    const showingIcons = L.showIcons !== false;
     el.infoRowCellsContainer.innerHTML = cells.map((cell, i) => `
       <div class="info-row-cell-editor" data-cell-index="${i}" style="border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:10px;margin-bottom:10px;background:rgba(255,255,255,0.04);">
         <div style="font-size:11px;font-weight:600;color:#fbbf24;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">\u09B8\u09C7\u09B2 ${i + 1}</div>
@@ -37062,7 +37080,7 @@ function initShapeStudio({
             <span style="font-size:11px;">\u09AC\u09CD\u09AF\u09BE\u0995\u0997\u09CD\u09B0\u09BE\u0989\u09A8\u09CD\u09A1</span>
             <input type="color" data-cell-prop="color" value="${cell.color || "#1a4730"}" style="width:100%;height:28px;" />
           </label>
-          <label class="field" style="margin:0;">
+          <label class="field" style="margin:0;${showingIcons ? "" : "display:none;"}">
             <span style="font-size:11px;">\u0986\u0987\u0995\u09A8 \u0995\u09BE\u09B2\u09BE\u09B0</span>
             <input type="color" data-cell-prop="iconColor" value="${cell.iconColor || "#22c55e"}" style="width:100%;height:28px;" />
           </label>
@@ -37075,7 +37093,7 @@ function initShapeStudio({
             <input type="color" data-cell-prop="accentColor" value="${cell.accentColor || "#facc15"}" style="width:100%;height:28px;" />
           </label>
         </div>
-        <label class="field" style="margin-top:6px;margin-bottom:0;">
+        <label class="field" style="margin-top:6px;margin-bottom:0;${showingIcons ? "" : "display:none;"}">
           <span style="font-size:11px;">\u0986\u0987\u0995\u09A8 (\u0987\u09AE\u09CB\u099C\u09BF/\u099A\u09BF\u09B9\u09CD\u09A8)</span>
           <input type="text" data-cell-prop="icon" value="${cell.icon || "\u2714"}" maxlength="4" style="font-size:18px;text-align:center;width:60px;" />
         </label>
@@ -37185,6 +37203,14 @@ function initShapeStudio({
       }
       while (existing.length > newCount) existing.pop();
       updateLayer(selectedId, { cells: existing });
+    });
+  }
+  if (el.infoRowShowIcons) {
+    el.infoRowShowIcons.addEventListener("change", () => {
+      if (!selectedId) return;
+      const entry = layers.get(selectedId);
+      if (!entry || entry.layer.presetType !== "infoRow") return;
+      updateLayer(selectedId, { showIcons: el.infoRowShowIcons.checked });
     });
   }
   let persistTimer = null;
