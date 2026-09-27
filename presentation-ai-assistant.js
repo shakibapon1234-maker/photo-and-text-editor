@@ -59,6 +59,8 @@
         justify-content: center;
         transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease;
         filter: drop-shadow(0 10px 25px rgba(0,0,0,0.5));
+        /* Pass clicks through transparent areas */
+        pointer-events: none;
       }
       #ai-avatar-container:active {
         cursor: grabbing;
@@ -1707,6 +1709,66 @@
     }
   }
 
+
+  // ── Slide Navigation Fly Hooks ────────────────────────────────────────────
+  // Intercept Next / Prev button clicks and keyboard arrows to trigger fly animation
+  function setupSlideNavigationHooks() {
+    // We wait for DOM to be ready and for buttons to exist
+    function bindNavButtons() {
+      const nextBtn = document.getElementById('nextBtn');
+      const prevBtn = document.getElementById('prevBtn');
+
+      if (nextBtn && !nextBtn.__aiHooked) {
+        nextBtn.__aiHooked = true;
+        nextBtn.addEventListener('click', () => {
+          if (!isAIDollVisible()) return;
+          const target = { x: window.innerWidth / 2 - 70, y: Math.max(30, window.innerHeight / 2 - 130) };
+          animatedFlyToAction(target, '▶ Next Slide ✨', null, null);
+        }, true); // capture phase so we fire BEFORE the original handler
+      }
+
+      if (prevBtn && !prevBtn.__aiHooked) {
+        prevBtn.__aiHooked = true;
+        prevBtn.addEventListener('click', () => {
+          if (!isAIDollVisible()) return;
+          const target = { x: 24, y: Math.max(30, window.innerHeight / 2 - 100) };
+          animatedFlyToAction(target, '◀ Previous ✨', null, null);
+        }, true);
+      }
+    }
+
+    // Keyboard hooks — ArrowRight / Space = next, ArrowLeft = prev
+    window.addEventListener('keydown', (e) => {
+      if (!isAIDollVisible()) return;
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
+
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        const target = { x: window.innerWidth / 2 - 70, y: Math.max(30, window.innerHeight / 2 - 130) };
+        animatedFlyToAction(target, '▶ Next ✨', null, null);
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        const target = { x: 24, y: Math.max(30, window.innerHeight / 2 - 100) };
+        animatedFlyToAction(target, '◀ Back ✨', null, null);
+      }
+    }, true); // capture so we run before main keydown handler
+
+    // Try immediately, and also after a short delay for dynamically loaded buttons
+    bindNavButtons();
+    setTimeout(bindNavButtons, 1200);
+    setTimeout(bindNavButtons, 3000);
+  }
+
+  function isAIDollVisible() {
+    if (!container) return false;
+    if (container.classList.contains('hidden-doll')) return false;
+    if (container.style.display === 'none') return false;
+    // Check localStorage
+    try {
+      const v = localStorage.getItem('presentation_ai_doll_enabled');
+      if (v === 'false') return false;
+    } catch (_) {}
+    return true;
+  }
+
   // ── Initialization ────────────────────────────────────────────────────────
   function init() {
     injectStyles();
@@ -1728,7 +1790,7 @@
     // Controls inside doll pill
     document.getElementById('aiDollMicBtn')?.addEventListener('click', (e) => {
       e.stopPropagation();
-      toggleListening();
+      /* auto-listen disabled */
     });
 
     document.getElementById('aiDollMinBtn')?.addEventListener('click', (e) => {
@@ -1764,7 +1826,7 @@
       if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
       if (e.key === 'v' || e.key === 'V') {
         // Toggle listening via V
-        toggleListening();
+        /* auto-listen disabled */
       }
       if (e.key === 'Escape') {
         if (isListening) stopListening();
@@ -1777,6 +1839,7 @@
     initTTS();
     setupSpeechRecognition();
     setupStudioControls();
+    setupSlideNavigationHooks();
 
     // Friendly initial greeting after load
     setTimeout(() => {
