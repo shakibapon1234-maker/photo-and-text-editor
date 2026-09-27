@@ -101,9 +101,49 @@ const server = http.createServer((req, res) => {
         }));
     }
 
-    // ── Persistent Project Save Endpoint ─────────────────────────────
-    // FINAL.html is a user-supplied temporary backup. It is deleted only after
-    // the browser has copied its embedded backgrounds into IndexedDB.
+    // ── Video Conversion API Endpoint ─────────────────────────────
+    if (pathname === '/api/convert-video' && req.method === 'POST') {
+        let body = '';
+        req.on('data', chunk => { body += chunk; });
+        req.on('end', () => {
+            try {
+                const data = JSON.parse(body);
+                const inputPath = data.filePath;
+                const preset = data.preset || 'loop_60s';
+                const customTrim = data.customTrim !== undefined ? String(data.customTrim) : '';
+                if (!inputPath || !fs.existsSync(inputPath)) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    return res.end(JSON.stringify({ success: false, error: 'Input video file not found on disk' }));
+                }
+
+                const scriptPath = path.join(__dirname, 'video-converter-tool', 'converter.py');
+                const cp = require('child_process');
+                const args = [scriptPath, inputPath, preset];
+                if (customTrim) args.push(customTrim);
+
+                cp.execFile('python', args, (error, stdout, stderr) => {
+                    if (error) {
+                        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                        return res.end(JSON.stringify({ success: false, error: error.message || stderr }));
+                    }
+                    const ext = path.extname(inputPath);
+                    const base = inputPath.substring(0, inputPath.length - ext.length);
+                    const outp = base + `_converted_${preset}.mp4`;
+                    let sizeMB = 0;
+                    if (fs.existsSync(outp)) {
+                        sizeMB = (fs.statSync(outp).size / (1024 * 1024)).toFixed(2);
+                    }
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    return res.end(JSON.stringify({ success: true, outputPath: outp, sizeMB }));
+                });
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                return res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
     if (pathname === '/api/delete-final-backup' && req.method === 'POST') {
         const backupPath = path.join(__dirname, 'FINAL.html');
         try {

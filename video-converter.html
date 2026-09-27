@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎬 Auto-Cut Video Converter - Presentation Background Tool</title>
+    <style>
+        :root {
+            --bg-main: #181825;
+            --bg-card: #1e1e2e;
+            --bg-input: #313244;
+            --primary: #cba6f7;
+            --primary-btn: #a6e3a1;
+            --text-main: #cdd6f4;
+            --text-sub: #a6adc8;
+            --border: #45475a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: var(--bg-card);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+            width: 100%;
+            max-width: 680px;
+            padding: 30px;
+            border: 1px solid var(--border);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 25px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
+        }
+
+        .header h1 {
+            font-size: 1.6rem;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .header p {
+            color: var(--text-sub);
+            font-size: 0.95rem;
+            margin-top: 6px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+            color: var(--text-main);
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: #ffffff;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+        }
+
+        .preset-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .preset-card {
+            background: #252538;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .preset-card:hover {
+            border-color: #89b4fa;
+        }
+
+        .preset-card.selected {
+            border-color: var(--primary-btn);
+            background: #2a2d42;
+        }
+
+        .preset-card input[type="radio"] {
+            accent-color: var(--primary-btn);
+            transform: scale(1.2);
+        }
+
+        .preset-info h4 {
+            font-size: 0.95rem;
+            color: #89b4fa;
+            margin-bottom: 2px;
+        }
+
+        .preset-card.selected .preset-info h4 {
+            color: var(--primary-btn);
+        }
+
+        .preset-info p {
+            font-size: 0.82rem;
+            color: var(--text-sub);
+        }
+
+        .cut-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .cut-btn {
+            background: #252538;
+            border: 1px solid var(--border);
+            color: #fab387;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .cut-btn.selected {
+            background: #fab387;
+            color: #11111b;
+            border-color: #fab387;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary-btn);
+            color: #11111b;
+            font-weight: 700;
+            font-size: 1.05rem;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+            margin-top: 15px;
+        }
+
+        .btn-submit:hover {
+            opacity: 0.9;
+        }
+
+        .btn-submit:active {
+            transform: scale(0.99);
+        }
+
+        .btn-submit:disabled {
+            background: #585b70;
+            cursor: not-allowed;
+            color: #a6adc8;
+        }
+
+        .status-box {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            background: #252538;
+            display: none;
+            border: 1px solid var(--border);
+        }
+
+        .status-box.show {
+            display: block;
+        }
+
+        .status-box.success {
+            border-color: #a6e3a1;
+            background: rgba(166, 227, 161, 0.1);
+        }
+
+        .status-box.error {
+            border-color: #f38ba8;
+            background: rgba(243, 139, 168, 0.1);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 15px;
+            color: #89b4fa;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 Auto-Cut Presentation Video Converter</h1>
+            <p>আধা ঘন্টা বা যেকোনো দীর্ঘ ভিডিও কেটে প্রথম ৩০s/৬০s অপ্টিমাইজড ব্যাকগ্রাউন্ড তৈরি করুন</p>
+        </div>
+
+        <form id="convertForm">
+            <div class="form-group">
+                <label for="filePath">📁 Video File Path (ভিডিও ফাইল পাথ):</label>
+                <input type="text" id="filePath" placeholder="C:\Users\starlink\Downloads\video.mp4" required>
+            </div>
+
+            <div class="form-group">
+                <label>✂️ Auto-Cut Duration (ভিডিও কতটুকু কেটে ব্যাকগ্রাউন্ড রাখবেন):</label>
+                <div class="cut-row" id="cutRow">
+                    <button type="button" class="cut-btn" data-val="30">✂️ First 30s (Smallest)</button>
+                    <button type="button" class="cut-btn selected" data-val="60">🔁 First 60s (Recommended)</button>
+                    <button type="button" class="cut-btn" data-val="120">⏱️ First 2 Mins</button>
+                    <button type="button" class="cut-btn" data-val="full">🎬 Full Video (No Cut)</button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>⚡ Quality Preset:</label>
+                <div class="preset-grid">
+                    <label class="preset-card selected">
+                        <input type="radio" name="preset" value="loop_60s" checked>
+                        <div class="preset-info">
+                            <h4>🔁 Presentation Background (720p Recommended)</h4>
+                            <p>হাই কোয়ালিটি, মিউটেড অডিও, ব্যাকগ্রাউন্ড লুপের জন্য সেরা।</p>
+                        </div>
+                    </label>
+
+                    <label class="preset-card">
+                        <input type="radio" name="preset" value="bg_540p">
+                        <div class="preset-info">
+                            <h4>📱 Ultra Lightweight (540p Mobile / Low Memory)</h4>
+                            <p>লো মেমোরি ডিভাইসের জন্য এক্সট্রিম কম্প্রেসড ভিডিও।</p>
+                        </div>
+                    </label>
+
+                    <label class="preset-card">
+                        <input type="radio" name="preset" value="bg_720p_full">
+                        <div class="preset-info">
+                            <h4>🎬 Full HD Compressed 720p</h4>
+                            <p>কাটিং ছাড়া সম্পূর্ণ দৈর্ঘ্যের ভিডিও অপ্টিমাইজড কম্প্রেস।</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit" id="submitBtn">🚀 AUTO-CUT & COMPRESS VIDEO</button>
+        </form>
+
+        <div class="status-box" id="statusBox">
+            <div id="statusContent"></div>
+        </div>
+
+        <a href="presentation-studio.html" class="back-link">← Back to Presentation Studio</a>
+    </div>
+
+    <script>
+        let selectedCut = "60";
+
+        document.querySelectorAll('#cutRow .cut-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('#cutRow .cut-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                selectedCut = btn.getAttribute('data-val');
+            });
+        });
+
+        document.querySelectorAll('.preset-card').forEach(card => {
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('selected'));
+                card.classList.add('selected');
+                card.querySelector('input').checked = true;
+            });
+        });
+
+        const form = document.getElementById('convertForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const statusBox = document.getElementById('statusBox');
+        const statusContent = document.getElementById('statusContent');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const filePath = document.getElementById('filePath').value.trim();
+            const preset = document.querySelector('input[name="preset"]:checked').value;
+
+            if (!filePath) return;
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner"></span> Cutting & Converting... Please wait';
+            statusBox.className = 'status-box show';
+            statusContent.innerHTML = '⏳ Cutting video and optimizing with FFmpeg... This takes only a few seconds.';
+
+            try {
+                const response = await fetch('/api/convert-video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filePath, preset, customTrim: selectedCut === 'full' ? 0 : Number(selectedCut) })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    statusBox.className = 'status-box show success';
+                    statusContent.innerHTML = `
+                        <h3 style="color:#a6e3a1; margin-bottom: 6px;">✅ Video Cut & Converted Successfully!</h3>
+                        <p><b>Output File:</b> ${result.outputPath}</p>
+                        <p><b>New Size:</b> ${result.sizeMB} MB</p>
+                    `;
+                } else {
+                    statusBox.className = 'status-box show error';
+                    statusContent.innerHTML = `<h3 style="color:#f38ba8;">❌ Conversion Failed</h3><p>${result.error}</p>`;
+                }
+            } catch (err) {
+                statusBox.className = 'status-box show error';
+                statusContent.innerHTML = `<h3 style="color:#f38ba8;">❌ Network/Server Error</h3><p>${err.message}</p>`;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '🚀 AUTO-CUT & COMPRESS VIDEO';
+            }
+        });
+    </script>
+</body>
+</html>
