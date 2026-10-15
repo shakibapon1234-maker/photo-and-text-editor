@@ -236,8 +236,11 @@
     const strokeVal = e.stroke || e.borderColor || '#ffffff';
     const lineVal = e.line !== undefined ? e.line : (e.borderWidth !== undefined ? e.borderWidth : 2);
     const opVal = (e.opacity !== undefined ? Number(e.opacity) : 100) / 100;
+    const all = (typeof active === 'function' && active()?.elements) || [];
+    const elIdx = all.findIndex(x => x.id === e.id);
+    const zIdx = e.zIndex !== undefined ? e.zIndex : ((elIdx >= 0 ? elIdx : 0) + 2);
 
-    n.style.cssText = `left:${e.x}%;top:${e.y}%;width:${e.w}%;height:${e.h}%;` +
+    n.style.cssText = `left:${e.x}%;top:${e.y}%;width:${e.w}%;height:${e.h}%;z-index:${zIdx};` +
       `--sf:${fillVal};--ss:${strokeVal};--sl:${lineVal}px;--so:${opVal};` +
       `transform:rotate(${Number(e.rotation) || 0}deg);transform-origin:center center;background:transparent!important;border:none!important;`;
 
@@ -311,6 +314,16 @@
       n.addEventListener('pointerdown', startDrag);
       box.appendChild(n);
     });
+
+    // Re-sync all element nodes in exact array order with correct z-index
+    all.forEach((el, idx) => {
+      const node = box.querySelector('.element[data-id="' + el.id + '"]');
+      if (node) {
+        node.style.zIndex = el.zIndex !== undefined ? el.zIndex : (idx + 2);
+        box.appendChild(node);
+      }
+    });
+
     renderSlides();
     renderInspector();
   };

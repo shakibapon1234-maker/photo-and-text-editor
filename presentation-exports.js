@@ -17,6 +17,93 @@
     }
   }
 
+  // ── "Load from HTML" button: import slides from a downloaded .html slideshow ──
+  let loadHtmlBtn = $('loadFromHtml');
+  if (!loadHtmlBtn) {
+    loadHtmlBtn = document.createElement('button');
+    loadHtmlBtn.id = 'loadFromHtml';
+    loadHtmlBtn.textContent = '📂 Load from HTML';
+    loadHtmlBtn.title = 'HTML Slideshow ফাইল থেকে প্রজেক্ট লোড করুন';
+    loadHtmlBtn.style.cssText = 'background:#1a7a3c;border-color:#2ecc71;';
+    const present = $('presentBtn');
+    if (present && present.parentNode) {
+      present.parentNode.insertBefore(loadHtmlBtn, present);
+    }
+  }
+
+  loadHtmlBtn.onclick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.html,text/html';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+
+      // Extract embedded slides JSON from: let slides = [...];
+      let extracted = null;
+
+      // Pattern 1: let slides = [...]  or  let slides = {...}
+      const match1 = text.match(/let\s+slides\s*=\s*(\[[\s\S]*?\]);/);
+      if (match1) {
+        try { extracted = JSON.parse(match1[1]); } catch (_) {}
+      }
+
+      // Pattern 2: window.slides = [...]
+      if (!extracted) {
+        const match2 = text.match(/window\.slides\s*=\s*(\[[\s\S]*?\]);/);
+        if (match2) {
+          try { extracted = JSON.parse(match2[1]); } catch (_) {}
+        }
+      }
+
+      // Pattern 3: Greedy fallback — find the largest [...] block after "let slides ="
+      if (!extracted) {
+        const startIdx = text.indexOf('let slides = [');
+        if (startIdx !== -1) {
+          let depth = 0, i = startIdx + 'let slides = '.length, start = -1;
+          for (; i < text.length; i++) {
+            if (text[i] === '[') { if (depth === 0) start = i; depth++; }
+            else if (text[i] === ']') { depth--; if (depth === 0) { try { extracted = JSON.parse(text.slice(start, i + 1)); } catch(_){} break; } }
+          }
+        }
+      }
+
+      if (!extracted || !Array.isArray(extracted) || extracted.length === 0) {
+        alert('❌ এই HTML ফাইলে কোনো Presentation ডেটা পাওয়া যায়নি!\n\nশুধুমাত্র এই অ্যাপের "Download Slideshow (.html)" দিয়ে তৈরি ফাইল লোড করা যাবে।');
+        return;
+      }
+
+      const confirmed = confirm(
+        `✅ ${extracted.length}টি স্লাইড পাওয়া গেছে!\n\nফাইল: ${file.name}\n\nএই ডেটা কি এখনকার প্রজেক্টে লোড করবেন? (বর্তমান প্রজেক্ট রিপ্লেস হবে)`
+      );
+      if (!confirmed) return;
+
+      // Load into editor
+      window.slides = extracted;
+      try { slides.length = 0; extracted.forEach(s => slides.push(s)); } catch (_) {}
+      try { current = 0; } catch(_) {}
+      try { selected = null; } catch(_) {}
+      if (typeof render === 'function') render();
+      if (typeof window.syncEditorElementLayers === 'function') window.syncEditorElementLayers();
+      if (typeof window.applySlideFitting === 'function') window.applySlideFitting();
+
+      extracted.forEach((s, idx) => {
+        if (s.bgMediaType === 'video' && s.bgMedia && !s.bgMediaPoster && typeof window.captureVideoPoster === 'function') {
+          window.captureVideoPoster(s, idx);
+        }
+      });
+
+      if (typeof window.presentationSaveNow === 'function') window.presentationSaveNow();
+      if (typeof window.showPresentationToast === 'function') {
+        window.showPresentationToast(`✅ ${extracted.length}টি স্লাইড সফলভাবে লোড হয়েছে!`);
+      } else {
+        alert(`✅ ${extracted.length}টি স্লাইড সফলভাবে লোড হয়েছে!\n\nআপনি এখন এডিট করতে পারবেন এবং "Save Project (JSON)" দিয়ে JSON ফাইলে সেভ করুন।`);
+      }
+    };
+    input.click();
+  };
+
 
 
   function downloadFile(name, data, type) {

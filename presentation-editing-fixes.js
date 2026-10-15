@@ -548,6 +548,29 @@
     showToast('✓ Element deleted');
   };
 
+  // ── Sync Editor Element Layer Ordering & Z-Index with Array ──
+  function syncEditorElementLayers() {
+    const slideBox = document.getElementById('slide');
+    if (!slideBox || typeof active !== 'function' || !active() || !Array.isArray(active().elements)) return;
+
+    active().elements.forEach((el, idx) => {
+      delete el.zIndex; // Array order is the single source of truth for layer depth
+      const node = slideBox.querySelector('.element[data-id="' + el.id + '"]');
+      if (node) {
+        node.style.zIndex = idx + 2;
+        slideBox.appendChild(node);
+      }
+    });
+
+    const dropNote = slideBox.querySelector('.drop-note');
+    if (dropNote) slideBox.appendChild(dropNote);
+
+    slideBox.querySelectorAll('.hard-selection-box, .hard-resize, .hard-rotate, .image-move-handle, .image-rotate-handle, .image-resize-handle').forEach(h => {
+      slideBox.appendChild(h);
+    });
+  }
+  window.syncEditorElementLayers = syncEditorElementLayers;
+
   window.bringElementToFront = function(item) {
     if (!item) item = typeof selectedEl === 'function' ? selectedEl() : null;
     if (!item || !active() || !Array.isArray(active().elements)) return;
@@ -557,6 +580,7 @@
       es.push(el);
       selected = el.id;
       if (typeof render === 'function') render();
+      syncEditorElementLayers();
       if (typeof updateHandles === 'function') updateHandles();
       showToast('⤒ Brought to front (সবার উপরে)');
       window.dispatchEvent(new CustomEvent('presentation:change'));
@@ -573,6 +597,7 @@
       [es[i], es[i + 1]] = [es[i + 1], es[i]];
       selected = item.id;
       if (typeof render === 'function') render();
+      syncEditorElementLayers();
       if (typeof updateHandles === 'function') updateHandles();
       showToast('↑ Brought forward (এক ধাপ সামনে)');
       window.dispatchEvent(new CustomEvent('presentation:change'));
@@ -589,6 +614,7 @@
       [es[i], es[i - 1]] = [es[i - 1], es[i]];
       selected = item.id;
       if (typeof render === 'function') render();
+      syncEditorElementLayers();
       if (typeof updateHandles === 'function') updateHandles();
       showToast('↓ Sent backward (এক ধাপ পেছনে)');
       window.dispatchEvent(new CustomEvent('presentation:change'));
@@ -606,6 +632,7 @@
       es.unshift(el);
       selected = item.id;
       if (typeof render === 'function') render();
+      syncEditorElementLayers();
       if (typeof updateHandles === 'function') updateHandles();
       showToast('⤓ Sent to back (সবার নিচে)');
       window.dispatchEvent(new CustomEvent('presentation:change'));
@@ -1223,25 +1250,73 @@
     });
   }
 
-  // Hook into render() to bind inline editing listeners on each render
+  // ── Responsive 16:9 Canvas Auto-Fit (Matches presentation-player.html 100% WYSIWYG) ──
+  function applySlideFitting() {
+    const slide = $('slide');
+    const stageWrap = document.querySelector('.stage-wrap');
+    if (!slide || !stageWrap) return;
+
+    slide.style.width = '960px';
+    slide.style.height = '540px';
+    slide.style.flexShrink = '0';
+
+    const wrapW = stageWrap.clientWidth - 48;
+    const wrapH = stageWrap.clientHeight - 48;
+    const fitScale = (wrapW > 0 && wrapH > 0) ? Math.min(1, wrapW / 960, wrapH / 540) : 1;
+    const effectiveZoom = (_zoomLevel || 1.0) * fitScale;
+
+    slide.style.transform = `scale(${effectiveZoom})`;
+    slide.style.transformOrigin = 'center center';
+  }
+  window.applySlideFitting = applySlideFitting;
+  window.addEventListener('resize', applySlideFitting);
+
+  // Auto-capture video posters for thumbnail previews
+  window.captureVideoPoster = function(s, i) {
+    if (!s || !s.bgMedia || s.bgMediaPoster || s._capturingPoster) return;
+    s._capturingPoster = true;
+    const vid = document.createElement('video');
+    vid.preload = 'metadata';
+    vid.muted = true;
+    vid.playsInline = true;
+    vid.src = s.bgMediaObjURL || s.bgMedia;
+    vid.onloadeddata = () => {
+      try { vid.currentTime = 0.1; } catch (_) {}
+    };
+    vid.onseeked = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = 160;
+        c.height = 90;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(vid, 0, 0, c.width, c.height);
+        s.bgMediaPoster = c.toDataURL('image/jpeg', 0.75);
+        delete s._capturingPoster;
+        if (typeof window.renderSlideThumbnailsMaster === 'function') {
+          window.renderSlideThumbnailsMaster();
+        } else if (typeof renderSlides === 'function') {
+          renderSlides();
+        }
+      } catch (_) {}
+    };
+  };
+
+  // Hook into render() to bind inline editing listeners and sync layers on each render
   const _origRender = render;
   render = function() {
     const activeEditable = document.querySelector('#slide [contenteditable="true"], #slide .inline-editing');
     if (activeEditable) {
       // A pointer-up from drag/resize can leave a render queued for the next
-      // animation frame.  Never let that queued render rebuild (and blur) the
+      // animation frame. Never let that queued render rebuild (and blur) the
       // live contenteditable node the user has just opened for typing.
       return;
     }
     window.__presentationInlineEditLock = null;
     _origRender();
+    if (typeof syncEditorElementLayers === 'function') syncEditorElementLayers();
     bindInlineEditing();
     setupZoomControls();
-    const slide = $('slide');
-    if (slide && _zoomLevel !== 1.0) {
-      slide.style.transform = `scale(${_zoomLevel})`;
-      slide.style.transformOrigin = 'center center';
-    }
+    applySlideFitting();
   };
 
   const _origStartDrag = window.startDrag;

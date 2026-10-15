@@ -100,8 +100,10 @@
         thumb.style.backgroundImage = 'url("' + s.bgImage + '")';
         thumb.style.backgroundSize = 'cover';
         thumb.style.backgroundPosition = 'center';
+      } else if (s.bgColor && s.bgColor !== 'transparent' && s.bgColor !== '#17233c') {
+        thumb.style.background = s.bgColor;
       } else {
-        thumb.style.background = (typeof themes !== 'undefined' && themes[s.background]) ? themes[s.background] : '#17233c';
+        thumb.style.background = (typeof themes !== 'undefined' && themes[s.background]) ? themes[s.background] : (s.bgColor || '#17233c');
       }
 
       // Slide number badge
@@ -143,6 +145,9 @@
             vidPoster.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;background:linear-gradient(135deg,rgba(15,23,42,0.85),rgba(30,41,59,0.95));display:flex;flex-direction:column;align-items:center;justify-content:center;color:#38bdf8;font-size:9px;font-weight:700;letter-spacing:0.5px;';
             vidPoster.innerHTML = '<span style="font-size:16px;margin-bottom:2px">🎬</span><span>VIDEO BG</span>';
             mediaWrap.appendChild(vidPoster);
+            if (typeof window.captureVideoPoster === 'function') {
+              window.captureVideoPoster(s, i);
+            }
           }
         } else {
           const img = document.createElement('img');
@@ -164,10 +169,12 @@
       const elementsWrap = document.createElement('div');
       elementsWrap.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;overflow:hidden;';
 
-      (s.elements || []).forEach(el => {
+      (s.elements || []).forEach((el, elIdx) => {
         const elBox = document.createElement('div');
         const rot = Number(el.rotation) || 0;
-        elBox.style.cssText = 'position:absolute;left:' + el.x + '%;top:' + el.y + '%;width:' + el.w + '%;height:' + el.h + '%;transform:rotate(' + rot + 'deg);transform-origin:center center;overflow:hidden;box-sizing:border-box;pointer-events:none;';
+        // z-index: use explicit el.zIndex if set, otherwise use array position (so last elements render on top)
+        const zIdx = el.zIndex !== undefined ? el.zIndex : (elIdx + 1);
+        elBox.style.cssText = 'position:absolute;left:' + el.x + '%;top:' + el.y + '%;width:' + el.w + '%;height:' + el.h + '%;transform:rotate(' + rot + 'deg);transform-origin:center center;overflow:hidden;box-sizing:border-box;pointer-events:none;z-index:' + zIdx + ';';
 
         if (el.type === 'shape') {
           const fillVal = el.fill || el.fillColor || el.color || '#4f8df7';
