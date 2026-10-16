@@ -40,32 +40,50 @@
       if (!file) return;
       const text = await file.text();
 
-      // Extract embedded slides JSON from: let slides = [...];
+      // Extract embedded slides JSON safely
       let extracted = null;
 
-      // Pattern 1: let slides = [...]  or  let slides = {...}
-      const match1 = text.match(/let\s+slides\s*=\s*(\[[\s\S]*?\]);/);
+      // Pattern 1: Regex for standard structure
+      const match1 = text.match(/let\s+slides\s*=\s*(\[\s*\{[\s\S]*?\}\s*\]);/);
       if (match1) {
         try { extracted = JSON.parse(match1[1]); } catch (_) {}
       }
 
-      // Pattern 2: window.slides = [...]
+      // Pattern 2: String-aware bracket-depth parsing
       if (!extracted) {
-        const match2 = text.match(/window\.slides\s*=\s*(\[[\s\S]*?\]);/);
-        if (match2) {
-          try { extracted = JSON.parse(match2[1]); } catch (_) {}
-        }
-      }
+        const markers = ['let slides = [', 'window.slides = [', 'DEFAULT_RECOVERED_SLIDES = ['];
+        for (const marker of markers) {
+          const startIdx = text.indexOf(marker);
+          if (startIdx === -1) continue;
 
-      // Pattern 3: Greedy fallback — find the largest [...] block after "let slides ="
-      if (!extracted) {
-        const startIdx = text.indexOf('let slides = [');
-        if (startIdx !== -1) {
-          let depth = 0, i = startIdx + 'let slides = '.length, start = -1;
-          for (; i < text.length; i++) {
-            if (text[i] === '[') { if (depth === 0) start = i; depth++; }
-            else if (text[i] === ']') { depth--; if (depth === 0) { try { extracted = JSON.parse(text.slice(start, i + 1)); } catch(_){} break; } }
+          let depth = 0;
+          let start = startIdx + marker.length - 1;
+          let inString = false;
+          let escapeNext = false;
+
+          for (let i = start; i < text.length; i++) {
+            const ch = text[i];
+            if (escapeNext) { escapeNext = false; continue; }
+            if (ch === '\\' && inString) { escapeNext = true; continue; }
+            if (ch === '"') { inString = !inString; continue; }
+            if (inString) continue;
+
+            if (ch === '[') depth++;
+            else if (ch === ']') {
+              depth--;
+              if (depth === 0) {
+                try {
+                  const candidate = text.slice(start, i + 1);
+                  const parsed = JSON.parse(candidate);
+                  if (Array.isArray(parsed) && parsed.length > 0) {
+                    extracted = parsed;
+                    break;
+                  }
+                } catch(_) {}
+              }
+            }
           }
+          if (extracted) break;
         }
       }
 
@@ -245,7 +263,7 @@
     } catch (_) {}
 
     // ── Detect LAN Server IP to embed in the standalone presentation ──
-    let serverHost = '192.168.68.103:8000';
+    let serverHost = (window.location.host && !window.location.host.includes('file:')) ? window.location.host : 'localhost:8000';
     try {
       const ipResp = await fetch('/api/ip?t=' + Date.now());
       if (ipResp.ok) {

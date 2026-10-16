@@ -78,7 +78,26 @@ const _getInitialDeck=()=>{
   try{if(window.DEFAULT_RECOVERED_SLIDES&&Array.isArray(window.DEFAULT_RECOVERED_SLIDES)&&window.DEFAULT_RECOVERED_SLIDES.length){return structuredClone(window.DEFAULT_RECOVERED_SLIDES);}}catch(_){}
   return[makeSlide()];
 };
-let slides=_getInitialDeck(),current=0,selected=null,drag=null;window.slides=slides;window.current=current;window.getSlides=()=>slides;
+let slides=_getInitialDeck(),current=0,selected=null,drag=null;
+try {
+  Object.defineProperty(window, 'slides', {
+    get() { return slides; },
+    set(v) { if (Array.isArray(v)) slides = v; },
+    configurable: true
+  });
+  Object.defineProperty(window, 'current', {
+    get() { return current; },
+    set(v) { current = Number(v) || 0; },
+    configurable: true
+  });
+} catch (_) {
+  window.slides = slides;
+  window.current = current;
+}
+window.getSlides = () => slides;
+window.getCurrent = () => current;
+window.setSlides = (newSlides) => { if (Array.isArray(newSlides)) { slides = newSlides; } };
+window.setCurrent = (newCurrent) => { current = Number(newCurrent) || 0; };
 function makeSlide(){return{background:'fashion',bgColor:'#17233c',elements:[{id:crypto.randomUUID(),type:'text',text:'আপনার অসাধারণ Presentation',x:9,y:16,w:82,h:14,size:52,color:'#ffffff',weight:'900'},{id:crypto.randomUUID(),type:'text',text:'শুরু করুন আপনার গল্প, পণ্য বা আইডিয়া দিয়ে',x:10,y:35,w:65,h:8,size:24,color:'#ffd166',weight:'700'}]}}
 function active(){return slides[current]}function styleSlide(){const s=active();$('slide').style.background=s.background==='custom'?s.bgColor:themes[s.background];}
 function render(){styleSlide();const box=$('slide');box.querySelectorAll('.element').forEach(e=>e.remove());active().elements.forEach((el,elIdx)=>{const node=document.createElement('div');node.className='element '+el.type+(selected===el.id?' selected':'');node.dataset.id=el.id;const zIdx=el.zIndex!==undefined?el.zIndex:(elIdx+1);node.style.cssText=`left:${el.x}%;top:${el.y}%;width:${el.w}%;height:${el.h}%;z-index:${zIdx};`;if(el.type==='text'){node.classList.add('text-el');let content=document.createElement('div');content.className='text-content';content.textContent=el.text;content.style.cssText='width:100%;height:100%;display:flex;align-items:center;justify-content:'+(el.textAlign==='left'?'flex-start':el.textAlign==='right'?'flex-end':'center')+';word-break:break-word;white-space:pre-wrap;cursor:text;outline:none;line-height:1.2;';node.appendChild(content);node.style.color=el.color;node.style.fontSize=el.size+'px';node.style.fontWeight=el.weight;node.style.fontFamily=el.fontFamily||'';node.style.textAlign=el.textAlign||'center';node.style.transform='rotate('+(Number(el.rotation)||0)+'deg)';node.style.transformOrigin='center center';const _bv=el.boxBg||el.backgroundColor||el.bgColor||(el.background&&el.background.startsWith('#')?el.background:null);if(_bv&&_bv!=='transparent'){const _bo=el.boxOpacity!==undefined?(Number(el.boxOpacity)>1?Number(el.boxOpacity)/100:Number(el.boxOpacity)):1;if(_bv.startsWith('#')&&_bo<1){const _hx=_bv.replace('#','');node.style.backgroundColor='rgba('+parseInt(_hx.slice(0,2),16)+','+parseInt(_hx.slice(2,4),16)+','+parseInt(_hx.slice(4,6),16)+','+_bo+')';}else{node.style.backgroundColor=_bv;}node.style.borderRadius='6px';}node.ondblclick=(e)=>{e.preventDefault();e.stopPropagation();selected=el.id;if(typeof window.activateInlineTextEdit==='function'){window.activateInlineTextEdit(el,{x:e.clientX,y:e.clientY});}}}else{node.classList.add('image-el');node.innerHTML=`<img src="${el.src}" draggable="false">`;const image=node.querySelector('img');image.style.pointerEvents='none';image.draggable=false;node.addEventListener('click',event=>{event.stopPropagation();selected=el.id;node.classList.add('selected');renderInspector();addImageTransformHandles()})}node.addEventListener('pointerdown',startDrag);box.appendChild(node)});renderSlides();renderInspector()}

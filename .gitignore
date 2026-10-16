@@ -22,6 +22,10 @@ npm-debug.log*
 .cache/
 dist/
 *.tmp
+__pycache__/
+*.pyc
+3d-text-module-phase5-quality/3d-text-module/www/main.bundle.js
+3d-text-module-phase5-quality/3d-text-module/www/main.bundle.js.map
 
 # Auto-generated runtime files (do not commit)
 presentation-default-deck.js

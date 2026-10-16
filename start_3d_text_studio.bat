@@ -5,20 +5,20 @@ echo             Photo & 3D Text Studio Suite
 echo ===================================================
 echo.
 
-:: Kill any existing server on port 8000
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8000 ^| findstr LISTENING') do taskkill /F /PID %%a >nul 2>&1
-
 cd /d "%~dp0"
 
 echo [1/2] Building 3D Text Module bundle...
 cd "3d-text-module-phase5-quality\3d-text-module"
 call npm run build
+if %errorlevel% neq 0 (
+    echo [WARNING] 3D Text Module build reported warnings or errors. Continuing...
+)
 cd /d "%~dp0"
 
 echo [2/2] Starting local server at http://localhost:8000...
 echo.
 echo Opening browser...
-start http://localhost:8000
+start "" cmd /c "timeout /t 2 /nobreak >nul & start http://localhost:8000"
 
 node server.js
 

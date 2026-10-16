@@ -266,8 +266,22 @@
     try {
       const data = snapshot();
       saveToLocalStorage(data);
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon('/api/save-project', JSON.stringify(data));
+      const payload = JSON.stringify(data);
+      // Chromium limits sendBeacon/keepalive payloads to ~64KB
+      if (payload.length < 60000) {
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon('/api/save-project', payload);
+        }
+      } else {
+        // For large decks, attempt keepalive fetch with quota-safe summary or saveNow
+        try {
+          fetch('/api/save-project', {
+            method: 'POST',
+            body: payload,
+            keepalive: true,
+            headers: { 'Content-Type': 'application/json' }
+          }).catch(() => {});
+        } catch (_) {}
       }
       saveNow();
     } catch (_) {}
@@ -280,6 +294,8 @@
     if (!Array.isArray(deck) || !deck.length) return false;
     slides = structuredClone(deck);
     current = Math.min(Math.max(0, curr), slides.length - 1);
+    if (typeof window.setSlides === 'function') window.setSlides(slides);
+    if (typeof window.setCurrent === 'function') window.setCurrent(current);
     selected = null;
     if (typeof drag !== 'undefined') drag = null;
     render();

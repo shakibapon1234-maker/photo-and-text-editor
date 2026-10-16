@@ -235,10 +235,11 @@
     // ── Send Command to Presentation ──────────────────────────────────────
     async function sendCmd(action, value = '') {
       haptic();
+      const cid = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
       let sentViaWebRTC = false;
       if (peerConn && peerConn.open) {
         try {
-          peerConn.send({ action, val: value, t: Date.now() });
+          peerConn.send({ action, val: value, cid, t: Date.now() });
           sentViaWebRTC = true;
           showToast('✓ ' + action.toUpperCase() + ' Sent');
         } catch (_) {}
@@ -246,7 +247,7 @@
 
       // Also fire to local server if on same machine/wifi (dual transport fallback)
       try {
-        fetch('/api/remote-send?action=' + encodeURIComponent(action) + '&val=' + encodeURIComponent(value) + '&t=' + Date.now(), { signal: AbortSignal.timeout(800) })
+        fetch('/api/remote-send?action=' + encodeURIComponent(action) + '&val=' + encodeURIComponent(value) + '&cid=' + encodeURIComponent(cid) + '&t=' + Date.now(), { signal: AbortSignal.timeout(800) })
           .then(r => {
             if (r.ok && !sentViaWebRTC) showToast('✓ ' + action.toUpperCase() + ' Sent (Local)');
           }).catch(() => {});
@@ -284,8 +285,8 @@
       }
 
       if (isListening && recognition) {
-        try { recognition.stop(); } catch(_) {}
         isListening = false;
+        try { recognition.stop(); } catch(_) {}
         micBtn.classList.remove('listening');
         document.getElementById('micText').textContent = 'Voice Mic';
         return;
@@ -308,22 +309,26 @@
           for (let n = e.resultIndex; n < e.results.length; n++) {
             if (!e.results[n].isFinal) continue;
             const w = e.results[n][0].transcript.toLowerCase().trim();
-            if (/\b(next|forward|samne|poroborti|porer|advance)\b|নেক্সট|নেক্সড|সামনে|পরবর্তী|পরের|পরেরটা|আগাও|এগিয়ে/i.test(w)) {
+            if (/\b(next|forward|samne|poroborti|porer|advance)\b|নেক্সট|নেক্সড|সামনে|পরবর্তী|পরেরটা|আগাও|এগিয়ে/i.test(w)) {
               sendCmd('next');
-            } else if (/\b(back|previous|prev|peshone|ager|reverse|return)\b|ব্যাক|ব্যাকে|বেক|বেগ|পিছে|পিছনে|পেছনে|আগের|আগেরটা|আগে|পূর্বে|পূর্ববর্তী|প্রিভিয়াস|প্রিভিয়াস|পিছাও/i.test(w)) {
+            } else if (/\b(back|previous|prev|peshone|ager|reverse|return)\b|ব্যাক|ব্যাকে|বেক|পিছে|পিছনে|পেছনে|আগেরটা|পূর্বে|পূর্ববর্তী|প্রিভিয়াস|প্রিভিয়াস|পিছাও/i.test(w)) {
               sendCmd('prev');
             }
           }
         };
 
         recognition.onerror = e => {
-          isListening = false;
-          micBtn.classList.remove('listening');
-          document.getElementById('micText').textContent = 'Voice Mic';
+          if (e.error === 'no-speech') {
+            // Silence timeout is normal, do not cancel isListening
+            return;
+          }
           if (e.error === 'not-allowed') {
+            isListening = false;
+            micBtn.classList.remove('listening');
+            document.getElementById('micText').textContent = 'Voice Mic';
             alert('⚠️ মাইক্রোফোন পারমিশন প্রয়োজন!\nব্রাউজার সেটিংসে গিয়ে Microphone Allow করে দিন।');
           } else {
-            showToast('Voice error: ' + (e.error || 'unknown'));
+            showToast('Voice status: ' + (e.error || 'reconnecting'));
           }
         };
 
@@ -338,6 +343,7 @@
 
         recognition.start();
       } catch (err) {
+        isListening = false;
         micBtn.classList.remove('listening');
         document.getElementById('micText').textContent = 'Voice Mic';
         alert('⚠️ Voice Error: ' + err.message + '\nPlease use the touch buttons.');

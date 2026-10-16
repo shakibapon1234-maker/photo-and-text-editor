@@ -9,38 +9,78 @@
   function extractSlidesFromHtml(text) {
     let extracted = null;
 
-    // Pattern 1: Fast regex (works for smaller HTML)
-    const m = text.match(/let\s+slides\s*=\s*(\[[\s\S]*?\]);/);
+    // Pattern 1: Fast regex for clean JSON blocks
+    const m = text.match(/let\s+slides\s*=\s*(\[\s*\{[\s\S]*?\}\s*\]);/);
     if (m) {
       try { extracted = JSON.parse(m[1]); } catch (_) {}
     }
 
-    // Pattern 2: Greedy bracket-depth counter (robust for large HTML)
+    // Pattern 2: String-aware bracket depth parser (handles brackets inside text content)
     if (!extracted) {
-      const si = text.indexOf('let slides = [');
-      if (si !== -1) {
-        let depth = 0, i = si + 'let slides = '.length, start = -1;
-        for (; i < text.length; i++) {
+      const markers = ['let slides = [', 'window.slides = [', 'DEFAULT_RECOVERED_SLIDES = ['];
+      for (const marker of markers) {
+        const si = text.indexOf(marker);
+        if (si === -1) continue;
+
+        let depth = 0;
+        let start = si + marker.length - 1; // index of opening '['
+        let inString = false;
+        let escapeNext = false;
+
+        for (let i = start; i < text.length; i++) {
           const ch = text[i];
-          if (ch === '[') { if (depth === 0) start = i; depth++; }
+          if (escapeNext) {
+            escapeNext = false;
+            continue;
+          }
+          if (ch === '\\' && inString) {
+            escapeNext = true;
+            continue;
+          }
+          if (ch === '"') {
+            inString = !inString;
+            continue;
+          }
+          if (inString) continue;
+
+          if (ch === '[') depth++;
           else if (ch === ']') {
             depth--;
-            if (depth === 0 && start !== -1) {
-              try { extracted = JSON.parse(text.slice(start, i + 1)); } catch (_) {}
-              break;
+            if (depth === 0) {
+              try {
+                const jsonCandidate = text.slice(start, i + 1);
+                const parsed = JSON.parse(jsonCandidate);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  extracted = parsed;
+                  break;
+                }
+              } catch (_) {}
             }
           }
         }
+        if (extracted) break;
       }
     }
 
-    // Pattern 3: window.slides = [...] fallback
-    if (!extracted) {
-      const m2 = text.match(/window\.slides\s*=\s*(\[[\s\S]*?\]);/);
-      if (m2) { try { extracted = JSON.parse(m2[1]); } catch (_) {} }
+    // Validate extracted slide objects
+    if (Array.isArray(extracted) && extracted.length > 0) {
+      const validSlides = extracted.filter(s => s && typeof s === 'object' && Array.isArray(s.elements));
+      return validSlides.length > 0 ? validSlides : null;
     }
+    return null;
+  }
 
-    return (Array.isArray(extracted) && extracted.length > 0) ? extracted : null;
+  function validateDeckSchema(deck) {
+    if (!Array.isArray(deck) || deck.length === 0) return null;
+    return deck.map(s => {
+      if (!s || typeof s !== 'object') {
+        return { background: 'fashion', bgColor: '#17233c', elements: [] };
+      }
+      return {
+        ...s,
+        elements: Array.isArray(s.elements) ? s.elements.filter(e => e && typeof e === 'object' && e.id) : []
+      };
+    });
   }
 
   function patchProjectInput() {
@@ -63,16 +103,14 @@
         let loadedSlides = null;
 
         try {
-          // HTML file
           if (isHtml) {
             loadedSlides = extractSlidesFromHtml(text);
             if (!loadedSlides) {
-              alert('X এই HTML ফাইলে কোনো Presentation ডেটা পাওয়া যায়নি!\n\nশুধুমাত্র এই অ্যাপের "Download Slideshow (.html)" দিয়ে তৈরি ফাইল লোড করা যাবে।');
+              alert('❌ এই HTML ফাইলে কোনো Presentation ডেটা পাওয়া যায়নি!\n\nশুধুমাত্র এই অ্যাপের "Download Slideshow (.html)" দিয়ে তৈরি ফাইল লোড করা যাবে।');
               input.value = '';
               return;
             }
           } else {
-            // JSON file
             const d = JSON.parse(text);
             if (Array.isArray(d)) {
               loadedSlides = d;
@@ -84,13 +122,28 @@
             }
           }
 
-          if (!loadedSlides || !loadedSlides.length) throw new Error('No slides found in file');
+          loadedSlides = validateDeckSchema(loadedSlides);
+          if (!loadedSlides || !loadedSlides.length) throw new Error('No valid slides found in file');
 
-          // Apply to editor
-          window.slides = loadedSlides;
+          // Confirmation before replacing current presentation
+          if (window.slides && Array.isArray(window.slides) && window.slides.length > 0) {
+            const confirmed = confirm(`বর্তমান প্রজেক্টের স্থানে "${file.name}" থেকে ${loadedSlides.length}টি স্লাইড লোড হবে। আপনি কি নিশ্চিত?`);
+            if (!confirmed) {
+              input.value = '';
+              return;
+            }
+          }
+
+          // Apply to editor with full synchronization
+          if (typeof window.setSlides === 'function') window.setSlides(loadedSlides);
+          else window.slides = loadedSlides;
+
           try { slides.length = 0; loadedSlides.forEach(s => slides.push(s)); } catch (_) {}
+          if (typeof window.setCurrent === 'function') window.setCurrent(0);
+          else window.current = 0;
           try { current = 0; } catch(_) {}
           try { selected = null; } catch(_) {}
+
           if (typeof render === 'function') render();
           if (typeof window.syncEditorElementLayers === 'function') window.syncEditorElementLayers();
           if (typeof window.applySlideFitting === 'function') window.applySlideFitting();
@@ -104,9 +157,9 @@
 
           if (typeof window.presentationSaveNow === 'function') window.presentationSaveNow();
           if (typeof window.showPresentationToast === 'function') {
-            window.showPresentationToast('OK ' + loadedSlides.length + 'টি স্লাইড সফলভাবে লোড হয়েছে!');
+            window.showPresentationToast('✅ ' + loadedSlides.length + 'টি স্লাইড সফলভাবে লোড হয়েছে!');
           } else {
-            alert('OK ' + loadedSlides.length + 'টি স্লাইড সফলভাবে লোড হয়েছে!\n\n"Save Project (JSON)" দিয়ে JSON ফাইলে সেভ করুন।');
+            alert('✅ ' + loadedSlides.length + 'টি স্লাইড সফলভাবে লোড হয়েছে!\n\n"Save Project (JSON)" দিয়ে JSON ফাইলে সেভ করুন।');
           }
         } catch (err) {
           alert('Invalid presentation file.\n\nDetails: ' + err.message);

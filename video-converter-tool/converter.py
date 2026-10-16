@@ -4,6 +4,16 @@ import subprocess
 import shutil
 import re
 
+# Force UTF-8 encoding on standard streams on Windows to prevent UnicodeEncodeError with Bengali filenames
+if sys.platform == 'win32':
+    try:
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        if hasattr(sys.stderr, 'reconfigure'):
+            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:
+        pass
+
 def get_ffmpeg_path():
     # 1. Check system PATH
     ffmpeg_cmd = shutil.which("ffmpeg")
@@ -92,17 +102,25 @@ def convert_video(input_path, output_path, preset_key="loop_60s", custom_trim=No
         raise FileNotFoundError(f"Input file not found: {input_path}")
 
     preset = PRESETS.get(preset_key, PRESETS["loop_60s"])
-    trim_val = custom_trim if custom_trim is not None else preset.get("trim")
+    raw_trim = custom_trim if custom_trim is not None else preset.get("trim")
 
-    target_seconds = float(trim_val) if trim_val and float(trim_val) > 0 else 600.0
+    # Safely parse trim to float to handle decimals like 5.5s
+    trim_float = 0.0
+    if raw_trim is not None:
+        try:
+            trim_float = float(raw_trim)
+        except (ValueError, TypeError):
+            trim_float = 0.0
+
+    target_seconds = trim_float if trim_float > 0 else 600.0
 
     cmd = [
         ffmpeg_exe,
         "-y", # overwrite
     ]
 
-    if trim_val and int(trim_val) > 0:
-        cmd.extend(["-ss", "0", "-t", str(trim_val)])
+    if trim_float > 0:
+        cmd.extend(["-ss", "0", "-t", str(trim_float)])
 
     cmd.extend(["-i", input_path])
 
@@ -165,9 +183,12 @@ if __name__ == "__main__":
         base, _ = os.path.splitext(inp)
         outp = base + f"_converted_{preset_k}.mp4"
         print(f"Converting: {inp} -> {outp}")
+        last_logged_pct = -5.0
         def cb(pct, line, spd):
-            pct_text = f"{pct:.1f}%" if pct is not None else ""
-            print(f"Progress: {pct_text} | {spd} | {line}")
+            global last_logged_pct
+            if pct is not None and (pct - last_logged_pct >= 5.0 or pct >= 100.0):
+                last_logged_pct = pct
+                print(f"Progress: {pct:.1f}% | {spd}")
         convert_video(inp, outp, preset_k, custom_trim=trim, progress_callback=cb)
         print("Done!")
     else:
