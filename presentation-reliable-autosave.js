@@ -63,26 +63,36 @@
 
   function put(key, data) {
     return new Promise((resolve, reject) => {
-      if (!db) return resolve(null);
+      if (!db) return reject(new Error('IndexedDB not ready'));
       try {
         const tx = db.transaction(STORE, 'readwrite');
         const store = tx.objectStore(STORE);
         store.put(data, key);
-        tx.oncomplete = resolve;
-        tx.onerror = () => reject(tx.error);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => reject(tx.error || new Error('Put transaction failed'));
+        tx.onabort = () => reject(tx.error || new Error('Put transaction aborted'));
       } catch (err) {
-        resolve(null);
+        reject(err);
       }
     });
   }
 
-  // Fast fingerprint to avoid cloning and writing to disk when nothing changed
+  // Fast full-content hash so edits anywhere in long strings trigger autosave
   function computeDeckFingerprint(deck, curr) {
     if (!Array.isArray(deck)) return '';
     let hash = 'c:' + curr + ';n:' + deck.length + ';';
     const valueSignature = value => {
       if (value === null || value === undefined) return String(value);
-      if (typeof value === 'string') return 'str:' + value.length + ':' + value.slice(0, 24) + ':' + value.slice(-24);
+      if (typeof value === 'string') {
+        if (value.length < 64) return value;
+        // Fast 32-bit FNV-1a hash over entire string so any middle edits are caught
+        let h = 0x811c9dc5;
+        for (let i = 0; i < value.length; i++) {
+          h ^= value.charCodeAt(i);
+          h = (h * 0x01000193) >>> 0;
+        }
+        return 'str:' + value.length + '_' + h.toString(36);
+      }
       if (typeof value !== 'object') return String(value);
       try { return JSON.stringify(value); } catch (_) { return '[unserializable]'; }
     };
@@ -90,8 +100,6 @@
     for (let i = 0; i < deck.length; i++) {
       const s = deck[i];
       if (!s) continue;
-      // Include every slide property: animated themes, background-media
-      // controls, placement and future visual settings must trigger autosave.
       hash += 's:' + objectSignature(Object.fromEntries(Object.entries(s).filter(([key]) => key !== 'elements'))) + ';';
       const els = s.elements;
       if (Array.isArray(els)) {
@@ -110,12 +118,6 @@
   // entire presentation was well within localStorage's capacity.
   function sanitizeForLocalStorage(snap) {
     try {
-      const completeJson = JSON.stringify(snap);
-      // Leave room below the usual 5 MB browser quota for the rest of the app.
-      if (completeJson.length <= 4200000) return structuredClone(snap);
-
-      // Large projects still get an emergency outline; their original media
-      // remains in IndexedDB and the server-backed project copy.
       const copy = structuredClone(snap);
       if (Array.isArray(copy.slides)) {
         copy.slides.forEach(s => {
@@ -143,42 +145,27 @@
 
   function saveToLocalStorage(data) {
     try {
-      // Always save lightweight sanitized version so it never exceeds quota
+      // Only write compact outline without heavy base64 strings so it never fills localStorage quota
       const safeData = sanitizeForLocalStorage(data);
-      try {
-        localStorage.setItem(LS_AUTOSAVE, JSON.stringify({ slides: safeData.slides, current: safeData.current }));
-      } catch (_) {}
-
-      if (data.elementCount > 0 || (Array.isArray(data.slides) && data.slides.length > 0)) {
-        try {
-          localStorage.setItem(LS_EMERGENCY, JSON.stringify(safeData));
-          updateSnapshotsHistory(safeData);
-        } catch (_) {}
-      }
+      localStorage.setItem(LS_AUTOSAVE, JSON.stringify({ slides: safeData.slides, current: safeData.current }));
     } catch (_) {
       /* storage quota safe */
     }
   }
 
-  function getSnapshotsHistory() {
+  async function updateSnapshotsHistoryInIDB(data) {
+    if (!db) return;
     try {
-      return JSON.parse(localStorage.getItem(LS_SNAPSHOTS) || '[]');
-    } catch (_) {
-      return [];
-    }
-  }
-
-  function updateSnapshotsHistory(safeData) {
-    try {
-      let list = getSnapshotsHistory();
+      let list = (await get('snapshots_history')) || [];
+      if (!Array.isArray(list)) list = [];
       const last = list[0];
-      if (last && (Date.now() - last.savedAt < 20000) && last.elementCount === safeData.elementCount) {
-        list[0] = safeData;
+      if (last && (Date.now() - (last.savedAt || 0) < 20000) && last.elementCount === data.elementCount) {
+        list[0] = data;
       } else {
-        list.unshift(safeData);
+        list.unshift(data);
       }
       list = list.slice(0, 5);
-      localStorage.setItem(LS_SNAPSHOTS, JSON.stringify(list));
+      await put('snapshots_history', list);
     } catch (_) {}
   }
 
@@ -189,9 +176,6 @@
     if (!ready || !db) return;
     if (writing) { queued = true; return; }
 
-    // Never let a lightweight emergency backup overwrite the real project.
-    // The real image bytes remain in IndexedDB/the server copy and are picked
-    // at startup instead.
     if (hasUnavailableMedia(slides)) {
       console.warn('Skipped saving an incomplete presentation backup.');
       return;
@@ -207,14 +191,16 @@
 
     try {
       const data = snapshot();
-      lastSavedFingerprint = currentFingerprint;
-      lastSavedSlideCount = Array.isArray(slides) ? slides.length : 0;
 
-      // 1. Synchronous localStorage update immediately
+      // 1. Synchronous lightweight outline to localStorage
       saveToLocalStorage(data);
 
-      // 2. Primary fast IndexedDB put
+      // 2. Primary durable storage in IndexedDB
       await put(KEY, data);
+
+      // Only mark fingerprint after successful IndexedDB write
+      lastSavedFingerprint = currentFingerprint;
+      lastSavedSlideCount = Array.isArray(slides) ? slides.length : 0;
 
       // 3. Persistent backend server write
       try {
@@ -227,8 +213,9 @@
         }
       } catch (_) {}
 
-      // 4. Emergency secondary backup
+      // 4. Emergency secondary backup & snapshot history in IndexedDB (prevents localStorage exhaustion)
       put('emergency_backup', data).catch(() => {});
+      updateSnapshotsHistoryInIDB(data).catch(() => {});
     } catch (error) {
       console.warn('Presentation autosave failed', error);
     } finally {

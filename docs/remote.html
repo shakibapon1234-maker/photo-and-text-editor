@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Presentation Remote Control</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    html, body {
+      width: 100%; min-height: 100vh; min-height: 100dvh;
+      background: #060a14; color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      display: flex; flex-direction: column; justify-content: space-between;
+      padding: 10px; overflow-y: auto;
+    }
+
+    .container {
+      max-width: 480px; margin: 0 auto; width: 100%;
+      display: flex; flex-direction: column; height: 100%; min-height: calc(100dvh - 20px);
+      justify-content: space-between; gap: 10px;
+    }
+
+    /* Header & Timer Bar */
+    .remote-head {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 14px; background: rgba(23, 35, 60, 0.9);
+      border: 1px solid rgba(79, 141, 247, 0.35); border-radius: 14px;
+      backdrop-filter: blur(10px); flex-shrink: 0;
+    }
+    .head-title { font-size: 14px; font-weight: 800; color: #38bdf8; display: flex; align-items: center; gap: 6px; }
+    .timer-badge { font-family: monospace; font-size: 15px; font-weight: 700; color: #f59e0b; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 8px; }
+
+    /* Main Touch Controls Grid */
+    .touch-grid {
+      flex: 1; display: grid; grid-template-rows: 1fr 1.3fr; gap: 10px; min-height: 240px;
+    }
+    .touch-btn {
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+      border-radius: 20px; border: 2px solid rgba(255,255,255,0.15);
+      background: linear-gradient(145deg, #17243e, #0e172a);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      cursor: pointer; transition: transform 0.1s ease, background 0.15s ease;
+      touch-action: manipulation;
+    }
+    .touch-btn:active { transform: scale(0.96); }
+    
+    .touch-btn.prev-btn { border-color: #3b82f6; background: linear-gradient(145deg, #1e3a8a, #0f172a); }
+    .touch-btn.prev-btn:active { background: #2563eb; }
+
+    .touch-btn.next-btn { border-color: #10b981; background: linear-gradient(145deg, #065f46, #064e3b); }
+    .touch-btn.next-btn:active { background: #059669; }
+
+    .btn-icon { font-size: 36px; }
+    .btn-text { font-size: 20px; font-weight: 900; letter-spacing: 1px; }
+
+    /* Voice & Quick Action Toolbar */
+    .quick-bar {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex-shrink: 0;
+    }
+    .action-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 14px 10px; border-radius: 14px; border: 1px solid #334155;
+      background: #1e293b; color: #fff; font-size: 14px; font-weight: 800;
+      cursor: pointer; transition: all 0.15s ease; touch-action: manipulation;
+    }
+    .action-btn:active { transform: scale(0.96); }
+    .action-btn.mic-btn { background: #991b1b; border-color: #ef4444; }
+    .action-btn.mic-btn.listening { background: #dc2626; animation: pulse 1s infinite alternate; }
+    @keyframes pulse { from { box-shadow: 0 0 4px #ef4444; } to { box-shadow: 0 0 16px #ef4444; } }
+
+    /* Toast Notification */
+    #toast {
+      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.95); border: 1px solid #38bdf8;
+      color: #fff; font-size: 13px; font-weight: 700; padding: 8px 18px; border-radius: 20px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6); pointer-events: none; transition: opacity 0.3s;
+      opacity: 0; z-index: 100; white-space: nowrap;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+
+  <div class="container">
+    <div class="remote-head">
+      <div class="head-title">📱 Presentation Remote</div>
+      <div class="timer-badge" id="timer">00:00</div>
+    </div>
+
+    <!-- Live Connection Status Badge -->
+    <div id="connStatus" style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.3);border-radius:12px;font-size:12px;font-weight:700;">
+      <span id="connBadge" style="color:#f59e0b;">⏳ Initializing Cloud Remote...</span>
+      <button id="roomChangeBtn" style="background:#1e293b;border:1px solid #334155;color:#38bdf8;padding:4px 10px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;">Change Room</button>
+    </div>
+
+    <div class="touch-grid">
+      <button class="touch-btn prev-btn" id="prevBtn">
+        <span class="btn-icon">◀</span>
+        <span class="btn-text">PREVIOUS</span>
+      </button>
+      <button class="touch-btn next-btn" id="nextBtn">
+        <span class="btn-icon">▶</span>
+        <span class="btn-text">NEXT SLIDE</span>
+      </button>
+    </div>
+
+    <div class="quick-bar">
+      <button class="action-btn mic-btn" id="micBtn">
+        <span>🎤</span> <span id="micText">Voice Mic</span>
+      </button>
+      <button class="action-btn" id="fullBtn">
+        <span>⛶</span> Fullscreen
+      </button>
+    </div>
+  </div>
+
+  <div id="toast">Command Sent</div>
+
+  <script>
+    // Vibrate phone on tap if supported
+    function haptic() {
+      if (navigator.vibrate) try { navigator.vibrate(40); } catch(_) {}
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(t._tm);
+      t._tm = setTimeout(() => t.classList.remove('show'), 1500);
+    }
+
+    // ── WebRTC PeerJS Cloud Remote Logic ─────────────────────────────────
+    const urlParams = new URLSearchParams(window.location.search);
+    let targetRoom = urlParams.get('room') || (window.location.hash ? window.location.hash.replace('#', '') : '') || localStorage.getItem('wf_remote_last_room') || '';
+
+    let peer = null;
+    let peerConn = null;
+    let isConnected = false;
+
+    function updateConnStatus(text, color) {
+      const b = document.getElementById('connBadge');
+      if (b) {
+        b.textContent = text;
+        b.style.color = color;
+      }
+    }
+
+    function initPeerConnection(room) {
+      if (!room) {
+        updateConnStatus('📱 Scan QR on Presentation Screen', '#38bdf8');
+        return;
+      }
+      targetRoom = room.trim().toUpperCase();
+      try { localStorage.setItem('wf_remote_last_room', targetRoom); } catch(_) {}
+      updateConnStatus('🔄 Connecting to ' + targetRoom + '...', '#f59e0b');
+
+      if (peerConn) {
+        try { peerConn.close(); } catch(_) {}
+        peerConn = null;
+      }
+
+      if (!peer || peer.destroyed) {
+        try {
+          peer = new Peer(null, { debug: 0 });
+          peer.on('open', () => {
+            connectToHost(targetRoom);
+          });
+          peer.on('error', (err) => {
+            console.warn('Peer error:', err);
+            updateConnStatus('⚠️ ' + (err.type || 'Retrying connection...'), '#ef4444');
+            setTimeout(() => {
+              if (!isConnected && targetRoom) initPeerConnection(targetRoom);
+            }, 3000);
+          });
+        } catch (e) {
+          updateConnStatus('⚠️ Cloud library loading...', '#ef4444');
+        }
+      } else if (peer.open) {
+        connectToHost(targetRoom);
+      }
+    }
+
+    function connectToHost(room) {
+      const hostPeerId = 'wf-pres-' + room.toLowerCase().replace(/[^a-z0-9]/g, '');
+      try {
+        peerConn = peer.connect(hostPeerId, { reliable: true });
+
+        peerConn.on('open', () => {
+          isConnected = true;
+          updateConnStatus('🟢 Connected to ' + room, '#10b981');
+          showToast('✓ Connected to Presentation!');
+        });
+
+        peerConn.on('data', (data) => {
+          if (data && data.type === 'slide') {
+            showToast('Slide: ' + data.current);
+          }
+        });
+
+        peerConn.on('close', () => {
+          isConnected = false;
+          updateConnStatus('🔴 Disconnected. Reconnecting...', '#ef4444');
+          setTimeout(() => {
+            if (!isConnected && targetRoom) connectToHost(targetRoom);
+          }, 2500);
+        });
+
+        peerConn.on('error', (err) => {
+          console.warn('Peer conn error:', err);
+          updateConnStatus('⚠️ Retrying ' + room + '...', '#f59e0b');
+          setTimeout(() => {
+            if (!isConnected && targetRoom) connectToHost(targetRoom);
+          }, 3000);
+        });
+      } catch (e) {
+        updateConnStatus('⚠️ Connection failed', '#ef4444');
+      }
+    }
+
+    document.getElementById('roomChangeBtn').onclick = () => {
+      const entered = prompt('Enter Presentation Room Code (e.g. WF-4589):', targetRoom);
+      if (entered && entered.trim()) {
+        initPeerConnection(entered.trim());
+      }
+    };
+
+    if (targetRoom) {
+      initPeerConnection(targetRoom);
+    } else {
+      updateConnStatus('📱 Scan QR on Presentation Screen', '#38bdf8');
+    }
+
+    // ── Send Command to Presentation ──────────────────────────────────────
+    async function sendCmd(action, value = '') {
+      haptic();
+      const cid = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+      let sentViaWebRTC = false;
+      if (peerConn && peerConn.open) {
+        try {
+          peerConn.send({ action, val: value, cid, t: Date.now() });
+          sentViaWebRTC = true;
+          showToast('✓ ' + action.toUpperCase() + ' Sent');
+        } catch (_) {}
+      }
+
+      // Also fire to local server if on same machine/wifi (dual transport fallback)
+      try {
+        fetch('/api/remote-send?action=' + encodeURIComponent(action) + '&val=' + encodeURIComponent(value) + '&cid=' + encodeURIComponent(cid) + '&t=' + Date.now(), { signal: AbortSignal.timeout(800) })
+          .then(r => {
+            if (r.ok && !sentViaWebRTC) showToast('✓ ' + action.toUpperCase() + ' Sent (Local)');
+          }).catch(() => {});
+      } catch(_) {}
+
+      if (!sentViaWebRTC && (!peerConn || !peerConn.open)) {
+        showToast('🔄 Connecting to ' + (targetRoom || 'Presentation') + '...');
+        if (targetRoom) connectToHost(targetRoom);
+      }
+    }
+
+    document.getElementById('prevBtn').addEventListener('click', () => sendCmd('prev'));
+    document.getElementById('nextBtn').addEventListener('click', () => sendCmd('next'));
+    document.getElementById('fullBtn').addEventListener('click', () => sendCmd('fullscreen'));
+
+    // Stopwatch Timer
+    let seconds = 0;
+    setInterval(() => {
+      seconds++;
+      const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+      const s = String(seconds % 60).padStart(2, '0');
+      document.getElementById('timer').textContent = m + ':' + s;
+    }, 1000);
+
+    // Mobile Voice Control
+    let recognition = null;
+    let isListening = false;
+    const micBtn = document.getElementById('micBtn');
+
+    function toggleMic() {
+      const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!Speech) {
+        alert('⚠️ Speech Recognition not supported on this browser.\nPlease use the touch buttons (PREVIOUS / NEXT SLIDE).');
+        return;
+      }
+
+      if (isListening && recognition) {
+        isListening = false;
+        try { recognition.stop(); } catch(_) {}
+        micBtn.classList.remove('listening');
+        document.getElementById('micText').textContent = 'Voice Mic';
+        return;
+      }
+
+      try {
+        recognition = new Speech();
+        recognition.lang = 'bn-BD';
+        recognition.continuous = true;
+        recognition.interimResults = false;
+
+        recognition.onstart = () => {
+          isListening = true;
+          micBtn.classList.add('listening');
+          document.getElementById('micText').textContent = 'Listening...';
+          showToast('🎤 Say "Next" or "Back" (বাংলা বা ইংরেজি)');
+        };
+
+        recognition.onresult = e => {
+          for (let n = e.resultIndex; n < e.results.length; n++) {
+            if (!e.results[n].isFinal) continue;
+            const w = e.results[n][0].transcript.toLowerCase().trim();
+            if (/\b(next|forward|samne|poroborti|porer|advance)\b|নেক্সট|নেক্সড|সামনে|পরবর্তী|পরেরটা|আগাও|এগিয়ে/i.test(w)) {
+              sendCmd('next');
+            } else if (/\b(back|previous|prev|peshone|ager|reverse|return)\b|ব্যাক|ব্যাকে|বেক|পিছে|পিছনে|পেছনে|আগেরটা|পূর্বে|পূর্ববর্তী|প্রিভিয়াস|প্রিভিয়াস|পিছাও/i.test(w)) {
+              sendCmd('prev');
+            }
+          }
+        };
+
+        recognition.onerror = e => {
+          if (e.error === 'no-speech') {
+            // Silence timeout is normal, do not cancel isListening
+            return;
+          }
+          if (e.error === 'not-allowed') {
+            isListening = false;
+            micBtn.classList.remove('listening');
+            document.getElementById('micText').textContent = 'Voice Mic';
+            alert('⚠️ মাইক্রোফোন পারমিশন প্রয়োজন!\nব্রাউজার সেটিংসে গিয়ে Microphone Allow করে দিন।');
+          } else {
+            showToast('Voice status: ' + (e.error || 'reconnecting'));
+          }
+        };
+
+        recognition.onend = () => {
+          if (isListening && recognition) {
+            try { recognition.start(); } catch(_) {}
+          } else {
+            micBtn.classList.remove('listening');
+            document.getElementById('micText').textContent = 'Voice Mic';
+          }
+        };
+
+        recognition.start();
+      } catch (err) {
+        isListening = false;
+        micBtn.classList.remove('listening');
+        document.getElementById('micText').textContent = 'Voice Mic';
+        alert('⚠️ Voice Error: ' + err.message + '\nPlease use the touch buttons.');
+      }
+    }
+
+    micBtn.addEventListener('click', toggleMic);
+  </script>
+</body>
+</html>

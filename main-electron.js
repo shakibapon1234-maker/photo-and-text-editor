@@ -4,15 +4,9 @@ const http = require('http');
 const net_mod = require('net');
 const fs = require('fs');
 const os = require('os');
+const { pipeline } = require('stream');
 
-// Enforce single instance lock to prevent LevelDB/IndexedDB lock collisions
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
-if (!gotSingleInstanceLock) {
-    app.quit();
-    process.exit(0);
-}
-
-// Set unique app name and isolated userData directory
+// Configure custom userData path BEFORE requesting single instance lock (Fix Item 13)
 app.name = 'PhotoAnd3DTextStudio';
 try {
     const customUserData = path.join(app.getPath('appData'), 'PhotoAnd3DTextStudio');
@@ -22,9 +16,17 @@ try {
     console.warn('Custom userData path error:', e);
 }
 
+// Enforce single instance lock
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+    app.quit();
+    process.exit(0);
+}
+
 let mainWindow = null;
 let server = null;
 const SERVER_PORT = 8000;
+const openSockets = new Set();
 
 const MIME_TYPES = {
     '.html': 'text/html; charset=utf-8',
@@ -53,6 +55,9 @@ const MIME_TYPES = {
     '.map': 'application/json'
 };
 
+const ALLOWED_STATIC_EXTS = new Set(Object.keys(MIME_TYPES));
+const VALID_PRESETS = new Set(['loop_60s', 'loop_30s', 'loop_120s', 'bg_720p_full', 'bg_540p']);
+
 let cmdCounter = 1;
 let lastCommand = { id: 0, action: null, val: null, t: 0 };
 
@@ -77,6 +82,23 @@ function getLocalIp() {
     return candidateIp || '127.0.0.1';
 }
 
+function isLoopbackClient(req) {
+    const remoteIp = req.socket.remoteAddress || '';
+    return remoteIp === '127.0.0.1' || remoteIp === '::1' || remoteIp === '::ffff:127.0.0.1';
+}
+
+function isLocalOrigin(req) {
+    const origin = req.headers.origin;
+    if (!origin) return true;
+    try {
+        const u = new URL(origin);
+        const host = u.hostname;
+        const port = u.port || (u.protocol === 'https:' ? '443' : '80');
+        return (host === 'localhost' || host === '127.0.0.1') && String(port) === String(SERVER_PORT);
+    } catch (_) {}
+    return false;
+}
+
 function readRequestBody(req, maxBytes = 60 * 1024 * 1024) {
     return new Promise((resolve, reject) => {
         const chunks = [];
@@ -97,23 +119,13 @@ function readRequestBody(req, maxBytes = 60 * 1024 * 1024) {
     });
 }
 
-function atomicWriteFileSync(filePath, content) {
+async function atomicWriteFileAsync(filePath, content) {
     const tmpPath = `${filePath}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
-    fs.writeFileSync(tmpPath, content, 'utf8');
-    fs.renameSync(tmpPath, filePath);
+    await fs.promises.writeFile(tmpPath, content, 'utf8');
+    await fs.promises.rename(tmpPath, filePath);
 }
 
-const BLOCKED_NAMES = new Set([
-    'server.js',
-    'main-electron.js',
-    'package.json',
-    'package-lock.json',
-    '_server_ps.ps1',
-    'server.py',
-    'fix_html.ps1'
-]);
-
-function isStaticAccessAllowed(relativeFilePath) {
+function isStaticAccessAllowed(relativeFilePath, isLoopback) {
     const normalized = path.normalize(relativeFilePath).replace(/^[\\\/]+/, '');
     if (normalized.startsWith('..')) return false;
 
@@ -121,136 +133,166 @@ function isStaticAccessAllowed(relativeFilePath) {
     for (const part of parts) {
         if (!part) continue;
         if (part.startsWith('.')) return false;
-        if (BLOCKED_NAMES.has(part.toLowerCase())) return false;
     }
-    if (parts[0] === 'node_modules') return false;
+
+    const ext = path.extname(normalized).toLowerCase();
+    if (!ALLOWED_STATIC_EXTS.has(ext)) return false;
+
+    const filename = path.basename(normalized).toLowerCase();
+    if (filename === 'server.js' || filename === 'main-electron.js' || filename === 'package.json' || filename === 'package-lock.json') {
+        return false;
+    }
+
+    if (filename === 'recovered-project.json' || filename === 'presentation-default-deck.js') {
+        if (!isLoopback) return false;
+    }
+
     return true;
 }
 
-function isLoopbackClient(req) {
-    const remoteIp = req.socket.remoteAddress || '';
-    return remoteIp === '127.0.0.1' || remoteIp === '::1' || remoteIp === '::ffff:127.0.0.1';
-}
-
 function startInternalServer(callback) {
-    server = http.createServer(async (req, res) => {
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
+    server = http.createServer((req, res) => {
+        (async () => {
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
 
-        if (req.method === 'OPTIONS') {
-            res.writeHead(204);
-            return res.end();
-        }
-
-        let parsedUrl;
-        try {
-            parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-        } catch (_) {
-            res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
-            return res.end('Invalid URL');
-        }
-        const pathname = decodeURIComponent(parsedUrl.pathname);
-
-        // Mobile Remote Endpoints
-        if (pathname === '/api/remote-send') {
-            const action = parsedUrl.searchParams.get('action');
-            const val = parsedUrl.searchParams.get('val') || '';
-            if (action) {
-                cmdCounter++;
-                lastCommand = { id: cmdCounter, action, val, t: Date.now() };
+            // Strictly restricted CORS header
+            const reqOrigin = req.headers.origin;
+            if (reqOrigin && isLocalOrigin(req)) {
+                res.setHeader('Access-Control-Allow-Origin', reqOrigin);
+                res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+                res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
             }
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            return res.end(JSON.stringify({ success: true, command: lastCommand }));
-        }
 
-        if (pathname === '/api/remote-poll') {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            return res.end(JSON.stringify({ command: lastCommand }));
-        }
-
-        if (pathname === '/api/ip') {
-            const ip = getLocalIp();
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            return res.end(JSON.stringify({
-                ip,
-                port: SERVER_PORT,
-                remoteUrl: `http://${ip}:${SERVER_PORT}/remote.html`
-            }));
-        }
-
-        // Restrict sensitive APIs to local loopback client
-        if (pathname === '/api/convert-video' || pathname === '/api/delete-final-backup' || pathname === '/api/save-project') {
-            if (!isLoopbackClient(req)) {
-                res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
-                return res.end(JSON.stringify({ success: false, error: 'Forbidden: Local client access only' }));
+            if (req.method === 'OPTIONS') {
+                res.writeHead(204);
+                return res.end();
             }
-        }
 
-        // ── Video Conversion API Endpoint ─────────────────────────────
-        if (pathname === '/api/convert-video' && req.method === 'POST') {
+            // Safe URL parsing with malformed URI protection
+            let parsedUrl;
+            let pathname = '';
             try {
-                const body = await readRequestBody(req, 2 * 1024 * 1024);
-                const data = JSON.parse(body);
-                const inputPath = path.resolve(data.filePath || '');
-                const preset = data.preset || 'loop_60s';
-                const customTrim = data.customTrim !== undefined ? String(data.customTrim) : '';
+                parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+                pathname = decodeURIComponent(parsedUrl.pathname);
+            } catch (_) {
+                res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+                return res.end('400 Bad Request: Malformed URI');
+            }
 
-                const ALLOWED_VIDEO_EXTS = new Set(['.mp4', '.mov', '.mkv', '.avi', '.webm', '.flv', '.wmv', '.m4v', '.ts']);
-                const ext = path.extname(inputPath).toLowerCase();
-                if (!inputPath || !fs.existsSync(inputPath) || !ALLOWED_VIDEO_EXTS.has(ext)) {
-                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-                    return res.end(JSON.stringify({ success: false, error: 'Invalid or non-existent video file' }));
+            // Mobile Remote Endpoints
+            if (pathname === '/api/remote-send') {
+                const action = parsedUrl.searchParams.get('action');
+                const val = parsedUrl.searchParams.get('val') || '';
+                if (action) {
+                    cmdCounter++;
+                    lastCommand = { id: cmdCounter, action, val, t: Date.now() };
                 }
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ success: true, command: lastCommand }));
+            }
 
-                const scriptPath = path.join(__dirname, 'video-converter-tool', 'converter.py');
-                const cp = require('child_process');
-                const args = [scriptPath, inputPath, preset];
-                if (customTrim) args.push(customTrim);
+            if (pathname === '/api/remote-poll') {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ command: lastCommand }));
+            }
 
-                cp.execFile('python', args, {
-                    maxBuffer: 15 * 1024 * 1024,
-                    timeout: 600000
-                }, (error, stdout, stderr) => {
-                    if (error) {
-                        res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-                        return res.end(JSON.stringify({ success: false, error: error.message || stderr }));
+            if (pathname === '/api/ip') {
+                const ip = getLocalIp();
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({
+                    ip,
+                    port: SERVER_PORT,
+                    remoteUrl: `http://${ip}:${SERVER_PORT}/remote.html`
+                }));
+            }
+
+            // Restrict sensitive administrative APIs
+            if (pathname === '/api/convert-video' || pathname === '/api/delete-final-backup' || pathname === '/api/save-project') {
+                const isLocal = isLoopbackClient(req);
+                const isSameOrigin = isLocalOrigin(req);
+                const contentType = (req.headers['content-type'] || '').toLowerCase();
+
+                if (!isLocal || !isSameOrigin || !contentType.includes('application/json')) {
+                    res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+                    return res.end(JSON.stringify({ success: false, error: 'Forbidden: Unauthorized or cross-site request blocked' }));
+                }
+            }
+
+            // ── Video Conversion API Endpoint ─────────────────────────────
+            if (pathname === '/api/convert-video' && req.method === 'POST') {
+                try {
+                    const body = await readRequestBody(req, 2 * 1024 * 1024);
+                    const data = JSON.parse(body);
+                    const inputPath = path.resolve(data.filePath || '');
+                    const preset = String(data.preset || 'loop_60s');
+                    const customTrim = data.customTrim !== undefined ? String(data.customTrim) : '';
+
+                    if (!VALID_PRESETS.has(preset)) {
+                        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                        return res.end(JSON.stringify({ success: false, error: 'Invalid preset specified' }));
                     }
-                    const base = inputPath.substring(0, inputPath.length - ext.length);
-                    const outp = base + `_converted_${preset}.mp4`;
-                    let sizeMB = 0;
-                    if (fs.existsSync(outp)) {
-                        sizeMB = (fs.statSync(outp).size / (1024 * 1024)).toFixed(2);
+
+                    const ALLOWED_VIDEO_EXTS = new Set(['.mp4', '.mov', '.mkv', '.avi', '.webm', '.flv', '.wmv', '.m4v', '.ts']);
+                    const ext = path.extname(inputPath).toLowerCase();
+                    if (!inputPath || !fs.existsSync(inputPath) || !ALLOWED_VIDEO_EXTS.has(ext)) {
+                        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                        return res.end(JSON.stringify({ success: false, error: 'Invalid or non-existent video file' }));
                     }
+
+                    const scriptPath = path.join(__dirname, 'video-converter-tool', 'converter.py');
+                    const cp = require('child_process');
+                    const args = [scriptPath, inputPath, preset];
+                    if (customTrim) args.push(customTrim);
+
+                    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+                    cp.execFile(pythonCmd, args, {
+                        maxBuffer: 15 * 1024 * 1024,
+                        timeout: 600000
+                    }, (error, stdout, stderr) => {
+                        if (error) {
+                            res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                            return res.end(JSON.stringify({ success: false, error: error.message || stderr }));
+                        }
+                        const base = inputPath.substring(0, inputPath.length - ext.length);
+                        const outp = base + `_converted_${preset}.mp4`;
+                        let sizeMB = 0;
+                        if (fs.existsSync(outp)) {
+                            sizeMB = (fs.statSync(outp).size / (1024 * 1024)).toFixed(2);
+                        }
+                        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                        return res.end(JSON.stringify({ success: true, outputPath: outp, sizeMB }));
+                    });
+                } catch (err) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    return res.end(JSON.stringify({ error: err.message }));
+                }
+                return;
+            }
+
+            // ── Persistent Project Save Endpoint ─────────────────────────────
+            if (pathname === '/api/delete-final-backup' && req.method === 'POST') {
+                const backupPath = path.join(__dirname, 'FINAL.html');
+                try {
+                    if (fs.existsSync(backupPath)) await fs.promises.unlink(backupPath);
                     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-                    return res.end(JSON.stringify({ success: true, outputPath: outp, sizeMB }));
-                });
-            } catch (err) {
-                res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-                return res.end(JSON.stringify({ error: err.message }));
+                    return res.end(JSON.stringify({ success: true }));
+                } catch (error) {
+                    res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
+                    return res.end(JSON.stringify({ success: false, error: error.message }));
+                }
             }
-            return;
-        }
 
-        // ── Persistent Project Save Endpoint ─────────────────────────────
-        if (pathname === '/api/delete-final-backup' && req.method === 'POST') {
-            const backupPath = path.join(__dirname, 'FINAL.html');
-            try {
-                if (fs.existsSync(backupPath)) fs.unlinkSync(backupPath);
-                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-                return res.end(JSON.stringify({ success: true }));
-            } catch (error) {
-                res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-                return res.end(JSON.stringify({ success: false, error: error.message }));
-            }
-        }
+            if (pathname === '/api/save-project' && req.method === 'POST') {
+                try {
+                    const body = await readRequestBody(req, 60 * 1024 * 1024);
+                    const data = JSON.parse(body);
+                    if (!data || !Array.isArray(data.slides) || data.slides.length === 0) {
+                        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                        return res.end(JSON.stringify({ success: false, error: 'Invalid or empty slides array' }));
+                    }
 
-        if (pathname === '/api/save-project' && req.method === 'POST') {
-            try {
-                const body = await readRequestBody(req, 60 * 1024 * 1024);
-                const data = JSON.parse(body);
-                if (data && Array.isArray(data.slides) && data.slides.length > 0) {
                     const hasImagePlaceholders = data.slides.some(slide =>
                         String(slide?.bgMedia || '').startsWith('[heavy-bg-media-') ||
                         String(slide?.bgImage || '').startsWith('[heavy-bg-image-') ||
@@ -262,73 +304,120 @@ function startInternalServer(callback) {
                         res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' });
                         return res.end(JSON.stringify({ success: false, error: 'Incomplete image backup rejected' }));
                     }
-                    atomicWriteFileSync(path.join(__dirname, 'recovered-project.json'), JSON.stringify(data, null, 2));
-                    atomicWriteFileSync(path.join(__dirname, 'presentation-default-deck.js'), 'window.DEFAULT_RECOVERED_SLIDES = ' + JSON.stringify(data.slides) + ';\n');
+
+                    await atomicWriteFileAsync(path.join(__dirname, 'recovered-project.json'), JSON.stringify(data));
+                    await atomicWriteFileAsync(path.join(__dirname, 'presentation-default-deck.js'), 'window.DEFAULT_RECOVERED_SLIDES = ' + JSON.stringify(data.slides) + ';\n');
+
+                    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+                    return res.end(JSON.stringify({ success: true, count: data.slides.length }));
+                } catch (err) {
+                    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                    return res.end(JSON.stringify({ error: err.message }));
                 }
-                res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-                return res.end(JSON.stringify({ success: true, count: data.slides?.length }));
-            } catch (err) {
-                res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
-                return res.end(JSON.stringify({ error: err.message }));
             }
-        }
 
-        // Static files with HTTP Range streaming
-        const sanitizedRelPath = pathname === '/' ? 'index.html' : pathname.replace(/^[\\\/]+/, '');
-        if (!isStaticAccessAllowed(sanitizedRelPath)) {
-            res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
-            return res.end('403 Forbidden');
-        }
+            // Static files with Range & Pipeline streaming
+            const sanitizedRelPath = pathname === '/' ? 'index.html' : pathname.replace(/^[\\\/]+/, '');
+            const isLocal = isLoopbackClient(req);
 
-        let filePath = path.join(__dirname, sanitizedRelPath);
-        if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
-            filePath = path.join(filePath, 'index.html');
-        }
+            if (!isStaticAccessAllowed(sanitizedRelPath, isLocal)) {
+                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+                return res.end('403 Forbidden');
+            }
 
-        fs.stat(filePath, (err, stats) => {
-            if (err || !stats.isFile()) {
+            let filePath = path.join(__dirname, sanitizedRelPath);
+            try {
+                const stats = await fs.promises.stat(filePath);
+                if (stats.isDirectory()) {
+                    filePath = path.join(filePath, 'index.html');
+                }
+            } catch (_) {
                 res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
                 return res.end('404 Not Found');
             }
 
-            const ext = path.extname(filePath).toLowerCase();
-            const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-            const fileSize = stats.size;
-            const range = req.headers.range;
-
-            if (range) {
-                const parts = range.replace(/bytes=/, "").split("-");
-                const start = parseInt(parts[0], 10);
-                const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-
-                if (isNaN(start) || start >= fileSize || (parts[1] && end >= fileSize) || start > end) {
-                    res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` });
-                    return res.end();
+            fs.stat(filePath, (err, stats) => {
+                if (err || !stats.isFile()) {
+                    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+                    return res.end('404 Not Found');
                 }
 
-                const chunkSize = (end - start) + 1;
-                const fileStream = fs.createReadStream(filePath, { start, end });
-                res.writeHead(206, {
-                    'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-                    'Accept-Ranges': 'bytes',
-                    'Content-Length': chunkSize,
-                    'Content-Type': contentType
-                });
-                fileStream.pipe(res);
-            } else {
-                res.writeHead(200, {
-                    'Content-Length': fileSize,
-                    'Accept-Ranges': 'bytes',
-                    'Content-Type': contentType
-                });
-                fs.createReadStream(filePath).pipe(res);
+                const ext = path.extname(filePath).toLowerCase();
+                const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+                const fileSize = stats.size;
+                const range = req.headers.range;
+
+                if (range) {
+                    const match = range.match(/^bytes=(\d*)-(\d*)$/);
+                    if (!match) {
+                        res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` });
+                        return res.end();
+                    }
+
+                    let start, end;
+                    if (match[1] === '') {
+                        const suffix = parseInt(match[2], 10);
+                        if (isNaN(suffix) || suffix <= 0) {
+                            res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` });
+                            return res.end();
+                        }
+                        start = Math.max(0, fileSize - suffix);
+                        end = fileSize - 1;
+                    } else {
+                        start = parseInt(match[1], 10);
+                        end = match[2] ? parseInt(match[2], 10) : fileSize - 1;
+                    }
+
+                    if (isNaN(start) || start >= fileSize || end >= fileSize || start > end) {
+                        res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` });
+                        return res.end();
+                    }
+
+                    const chunkSize = (end - start) + 1;
+                    res.writeHead(206, {
+                        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                        'Accept-Ranges': 'bytes',
+                        'Content-Length': chunkSize,
+                        'Content-Type': contentType
+                    });
+
+                    const fileStream = fs.createReadStream(filePath, { start, end });
+                    pipeline(fileStream, res, (err) => {
+                        if (err && err.code !== 'ERR_STREAM_PREMATURE_CLOSE') {
+                            console.warn('Range stream pipeline notice:', err.message);
+                        }
+                    });
+                } else {
+                    res.writeHead(200, {
+                        'Content-Length': fileSize,
+                        'Accept-Ranges': 'bytes',
+                        'Content-Type': contentType
+                    });
+                    const fileStream = fs.createReadStream(filePath);
+                    pipeline(fileStream, res, (err) => {
+                        if (err && err.code !== 'ERR_STREAM_PREMATURE_CLOSE') {
+                            console.warn('File stream pipeline notice:', err.message);
+                        }
+                    });
+                }
+            });
+        })().catch(err => {
+            console.error('Electron internal server error:', err);
+            if (!res.headersSent) {
+                res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('500 Internal Server Error');
             }
         });
     });
 
+    server.on('connection', socket => {
+        openSockets.add(socket);
+        socket.on('close', () => openSockets.delete(socket));
+    });
+
     server.on('error', (err) => {
         if (err.code === 'EADDRINUSE') {
-            console.warn(`Port ${SERVER_PORT} already in use – reusing existing server.`);
+            console.warn(`Port ${SERVER_PORT} already in use – verifying connection.`);
             if (callback) callback();
         } else {
             console.error('Server error:', err);
@@ -355,7 +444,21 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
+            sandbox: true,
             partition: 'persist:studio'
+        }
+    });
+
+    // Window navigation & popups security
+    mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    mainWindow.webContents.on('will-navigate', (event, navigationUrl) => {
+        try {
+            const parsed = new URL(navigationUrl);
+            if (parsed.origin !== `http://localhost:${SERVER_PORT}` && parsed.protocol !== 'file:') {
+                event.preventDefault();
+            }
+        } catch (_) {
+            event.preventDefault();
         }
     });
 
@@ -417,6 +520,11 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
     if (server) {
         try {
+            // Destroy all active keep-alive sockets so server closes cleanly
+            for (const socket of openSockets) {
+                socket.destroy();
+            }
+            openSockets.clear();
             server.close(() => {
                 app.quit();
             });

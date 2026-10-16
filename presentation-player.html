@@ -1764,9 +1764,15 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
 
     function getRandomRoomCode() {
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      const arr = new Uint8Array(8);
+      if (window.crypto && window.crypto.getRandomValues) {
+        window.crypto.getRandomValues(arr);
+      } else {
+        for (let i = 0; i < 8; i++) arr[i] = Math.floor(Math.random() * 256);
+      }
       let part = '';
-      for (let i = 0; i < 6; i++) {
-        part += chars.charAt(Math.floor(Math.random() * chars.length));
+      for (let i = 0; i < 8; i++) {
+        part += chars.charAt(arr[i] % chars.length);
       }
       return 'WF-' + part;
     }
@@ -1932,24 +1938,35 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
     // Initialize cloud remote listener on page load
     setTimeout(initCloudRemote, 300);
 
-    // ── Local Server Poll Fallback ────────────────────────────────────
+    // ── Local Server Poll Fallback with Adaptive Backoff ──────────────
     let lastExecutedCmdId = 0;
-    setInterval(async () => {
+    let pollIntervalMs = 250;
+    let consecutivePollErrors = 0;
+    let isPolling = false;
+
+    async function pollServerCommand() {
+      if (isPolling) return;
+      isPolling = true;
       try {
         const sHost = getRemoteServerHost();
         const pollUrl = (window.location.protocol === 'file:')
           ? 'http://' + sHost + '/api/remote-poll?t=' + Date.now()
           : '/api/remote-poll?t=' + Date.now();
         const res = await fetch(pollUrl, { signal: AbortSignal.timeout(1200) });
-        if (!res.ok) return;
+        if (!res.ok) {
+          consecutivePollErrors++;
+          if (consecutivePollErrors > 3) pollIntervalMs = 5000;
+          return;
+        }
+        consecutivePollErrors = 0;
+        pollIntervalMs = 250;
         const data = await res.json();
-        if (data && data.command && data.command.id && String(data.command.id) !== String(lastExecutedCmdId)) {
+        if (data && data.command && data.command.id && data.command.id > lastExecutedCmdId) {
           const cmd = data.command;
-          // If this is the initial poll, only ignore commands from before this player window opened
           if (lastExecutedCmdId === 0) {
             lastExecutedCmdId = cmd.id;
             if (cmd.t && cmd.t < (Date.now() - 3000)) {
-              return; // Ignore old stale command from previous session
+              return;
             }
           } else {
             lastExecutedCmdId = cmd.id;
@@ -1958,8 +1975,15 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
             executeRemoteAction(cmd.action, 'srv-' + cmd.id);
           }
         }
-      } catch (_) {}
-    }, 200);
+      } catch (_) {
+        consecutivePollErrors++;
+        if (consecutivePollErrors > 3) pollIntervalMs = 5000;
+      } finally {
+        isPolling = false;
+        setTimeout(pollServerCommand, pollIntervalMs);
+      }
+    }
+    setTimeout(pollServerCommand, 500);
 
     // ── AI Assistant Management (Enable / Disable) ────────────────────
     function isAIAssistantEnabled() {
