@@ -6012,6 +6012,9 @@ window.addEventListener('keydown', (e) => {
   if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) {
     return;
   }
+  if (e.ctrlKey || e.metaKey || e.altKey) {
+    return;
+  }
 
   if (e.code === 'Space' && !isSpaceHeld) {
     isSpaceHeld = true;
@@ -7348,6 +7351,10 @@ viewportEl.addEventListener('pointerdown', beginHistoryEdit, true);
 window.addEventListener('pointerup', finishHistoryEdit, true);
 
 window.addEventListener('keydown', (event) => {
+  const tag = (event.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || event.target.isContentEditable) {
+    return;
+  }
   const mod = event.ctrlKey || event.metaKey;
   if (!mod || event.altKey) return;
   const key = event.key.toLowerCase();

@@ -27,15 +27,11 @@ if %errorlevel%==0 (
     exit /b
 )
 
-:: 3. Run PowerShell server
-echo [OK] Starting PowerShell Server...
-if defined CHROME (
-    start "" "%CHROME%" "http://localhost:8000/presentation-player.html"
-) else (
-    start http://localhost:8000/presentation-player.html
-)
-
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0_server_ps.ps1"
+:: 3. If Node.js is not found
 echo.
-echo Press any key to exit.
+echo [ERROR] Node.js is not detected on your system!
+echo Node.js is required to run the Presentation Player local server.
+echo Please install Node.js from https://nodejs.org and try again.
+echo.
 pause
+exit /b 1

@@ -78,7 +78,12 @@
     }
     #toast.show { opacity: 1; }
   </style>
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="peerjs.min.js"></script>
+  <script>
+    if (typeof Peer === 'undefined') {
+      document.write('<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"><\/script>');
+    }
+  </script>
 </head>
 <body>
 
@@ -133,7 +138,9 @@
 
     // ── WebRTC PeerJS Cloud Remote Logic ─────────────────────────────────
     const urlParams = new URLSearchParams(window.location.search);
-    let targetRoom = urlParams.get('room') || (window.location.hash ? window.location.hash.replace('#', '') : '') || localStorage.getItem('wf_remote_last_room') || '';
+    let lastSavedRoom = '';
+    try { lastSavedRoom = localStorage.getItem('wf_remote_last_room') || ''; } catch (_) {}
+    let targetRoom = urlParams.get('room') || (window.location.hash ? window.location.hash.replace('#', '') : '') || lastSavedRoom;
 
     let peer = null;
     let peerConn = null;
@@ -245,13 +252,15 @@
         } catch (_) {}
       }
 
-      // Also fire to local server if on same machine/wifi (dual transport fallback)
-      try {
-        fetch('/api/remote-send?action=' + encodeURIComponent(action) + '&val=' + encodeURIComponent(value) + '&cid=' + encodeURIComponent(cid) + '&t=' + Date.now(), { signal: AbortSignal.timeout(800) })
-          .then(r => {
-            if (r.ok && !sentViaWebRTC) showToast('✓ ' + action.toUpperCase() + ' Sent (Local)');
-          }).catch(() => {});
-      } catch(_) {}
+      // Also fire to local server if WebRTC is not connected (dual transport fallback)
+      if (!sentViaWebRTC) {
+        try {
+          fetch('/api/remote-send?action=' + encodeURIComponent(action) + '&val=' + encodeURIComponent(value) + '&cid=' + encodeURIComponent(cid) + '&t=' + Date.now(), { signal: AbortSignal.timeout(800) })
+            .then(r => {
+              if (r.ok) showToast('✓ ' + action.toUpperCase() + ' Sent (Local)');
+            }).catch(() => {});
+        } catch(_) {}
+      }
 
       if (!sentViaWebRTC && (!peerConn || !peerConn.open)) {
         showToast('🔄 Connecting to ' + (targetRoom || 'Presentation') + '...');

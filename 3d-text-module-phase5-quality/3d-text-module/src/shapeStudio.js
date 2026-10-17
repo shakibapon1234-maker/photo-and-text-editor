@@ -823,7 +823,9 @@ export function initShapeStudio({
   function reorderScene() {
     order.forEach((id, i) => {
       const entry = layers.get(id);
-      if (entry) entry.group.position.z = entry.layer.posZ + i * 0.02;
+      if (entry && entry.group && entry.group.position && entry.layer) {
+        entry.group.position.z = (entry.layer.posZ || 0) + i * 0.02;
+      }
     });
   }
 
@@ -1611,7 +1613,7 @@ export function initShapeStudio({
     clearTimeout(persistTimer);
     const write = () => {
       try {
-        const data = { order, layers: order.map((id) => layers.get(id).layer) };
+        const data = { order, layers: order.map((id) => layers.get(id)?.layer).filter(Boolean) };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       } catch (_) { /* ignore quota errors */ }
     };

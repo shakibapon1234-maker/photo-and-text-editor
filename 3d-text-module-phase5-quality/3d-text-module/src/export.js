@@ -121,66 +121,65 @@ export async function exportWebM(deps, opts, callbacks = {}) {
 
   const restoreTransparentSurface = beginTransparentExport(deps);
   beginExportResolution(deps, opts.width, opts.height);
+  const prevLoop = deps.animState ? deps.animState.loop : undefined;
 
-  const stream = deps.canvas.captureStream(opts.fps);
-  // Rough constant-quality target for VP9 screen-content-ish output; tuned
-  // for legibility of thin extruded-text edges rather than photographic
-  // content, which is why it's higher than a typical talking-head preset.
-  const videoBitsPerSecond = Math.round(opts.width * opts.height * opts.fps * 0.12);
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond });
-  const chunks = [];
-  recorder.ondataavailable = (e) => {
-    if (e.data && e.data.size) chunks.push(e.data);
-  };
+  try {
+    const stream = deps.canvas.captureStream(opts.fps);
+    const videoBitsPerSecond = Math.round(opts.width * opts.height * opts.fps * 0.12);
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond });
+    const chunks = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size) chunks.push(e.data);
+    };
 
-  const stopped = new Promise((resolve, reject) => {
-    recorder.onstop = () => resolve();
-    recorder.onerror = (e) => reject(e.error || new Error('MediaRecorder error'));
-  });
+    const stopped = new Promise((resolve, reject) => {
+      recorder.onstop = () => resolve();
+      recorder.onerror = (e) => reject(e.error || new Error('MediaRecorder error'));
+    });
 
-  const totalMs = opts.presetId !== 'none' ? opts.delayMs + opts.durationMs : opts.noPresetDurationMs;
+    const totalMs = opts.presetId !== 'none' ? opts.delayMs + opts.durationMs : opts.noPresetDurationMs;
 
-  onStatus?.('রেকর্ডিং শুরু হয়েছে…');
-  recorder.start(100); // 100ms timeslice so ondataavailable fires incrementally
+    onStatus?.('রেকর্ডিং শুরু হয়েছে…');
+    recorder.start(100); // 100ms timeslice so ondataavailable fires incrementally
 
-  if (opts.presetId !== 'none') {
-    deps.animState.presetId = opts.presetId;
-    deps.animState.durationMs = opts.durationMs;
-    deps.animState.delayMs = opts.delayMs;
-    deps.animState.loop = false;
-    deps.animState.playing = true;
-    deps.animState.startTime = performance.now();
-  }
-  // If presetId === 'none', autoRotate (if on) is already being driven every
-  // frame by the existing main render loop reading deps.state.autoRotate —
-  // nothing extra to start here. If both are off, the clip is intentionally
-  // a static-frame video for `noPresetDurationMs` milliseconds.
-
-  const startedAt = performance.now();
-  await new Promise((resolve) => {
-    function poll() {
-      const elapsed = performance.now() - startedAt;
-      onProgress?.(Math.min(1, totalMs > 0 ? elapsed / totalMs : 1));
-      if (elapsed >= totalMs) {
-        resolve();
-        return;
-      }
-      requestAnimationFrame(poll);
+    if (opts.presetId !== 'none') {
+      deps.animState.presetId = opts.presetId;
+      deps.animState.durationMs = opts.durationMs;
+      deps.animState.delayMs = opts.delayMs;
+      deps.animState.loop = false;
+      deps.animState.playing = true;
+      deps.animState.startTime = performance.now();
     }
-    poll();
-  });
 
-  deps.animState.playing = false;
-  onStatus?.('রেকর্ডিং শেষ হচ্ছে…');
-  recorder.stop();
-  await stopped;
+    const startedAt = performance.now();
+    await new Promise((resolve) => {
+      function poll() {
+        const elapsed = performance.now() - startedAt;
+        onProgress?.(Math.min(1, totalMs > 0 ? elapsed / totalMs : 1));
+        if (elapsed >= totalMs) {
+          resolve();
+          return;
+        }
+        requestAnimationFrame(poll);
+      }
+      poll();
+    });
 
-  deps.resetMeshToBaseTransform();
-  endExportResolution(deps);
-  restoreTransparentSurface();
+    deps.animState.playing = false;
+    onStatus?.('রেকর্ডিং শেষ হচ্ছে…');
+    if (recorder.state !== 'inactive') {
+      recorder.stop();
+      await stopped;
+    }
 
-  const blob = new Blob(chunks, { type: mimeType.split(';')[0] });
-  return { blob, mimeType, width: opts.width, height: opts.height, durationMs: totalMs };
+    const blob = new Blob(chunks, { type: mimeType.split(';')[0] });
+    return { blob, mimeType, width: opts.width, height: opts.height, durationMs: totalMs };
+  } finally {
+    if (prevLoop !== undefined && deps.animState) deps.animState.loop = prevLoop;
+    deps.resetMeshToBaseTransform();
+    endExportResolution(deps);
+    restoreTransparentSurface?.();
+  }
 }
 
 // ---------- PNG sequence (deterministic virtual clock) ----------
@@ -217,43 +216,48 @@ export async function exportPngSequence(deps, opts, callbacks = {}) {
   const savedCameraPos = camera.position.clone();
   const savedCameraRot = camera.rotation.clone();
 
-  for (let i = 0; i < frameCount; i++) {
-    const tMs = frameCount > 1 ? (i / (frameCount - 1)) * totalMs : totalMs;
+  try {
+    for (let i = 0; i < frameCount; i++) {
+      const isLooping = isTurntable || (isAnimated && preset.continuous);
+      const tMs = isLooping
+        ? (i / frameCount) * totalMs
+        : (frameCount > 1 ? (i / (frameCount - 1)) * totalMs : totalMs);
 
-    if (isAnimated) {
-      const elapsed = tMs - opts.delayMs;
-      const rawT = elapsed < 0 ? 0 : Math.min(1, opts.durationMs > 0 ? elapsed / opts.durationMs : 1);
-      deps.applyPresetOffset(preset, easingFn(rawT));
-    } else if (isTurntable) {
-      const mesh = deps.getTextMesh();
-      if (mesh) {
-        const frac = totalMs > 0 ? tMs / totalMs : 0;
-        mesh.rotation.y = baseRotYRad + frac * Math.PI * 2;
+      if (isAnimated) {
+        const elapsed = tMs - opts.delayMs;
+        const rawT = elapsed < 0 ? 0 : Math.min(1, opts.durationMs > 0 ? elapsed / opts.durationMs : 1);
+        deps.applyPresetOffset(preset, easingFn(rawT));
+      } else if (isTurntable) {
+        const mesh = deps.getTextMesh();
+        if (mesh) {
+          const frac = totalMs > 0 ? tMs / totalMs : 0;
+          mesh.rotation.y = baseRotYRad + frac * Math.PI * 2;
+        }
       }
+
+      if (deps.applyCameraAnimation) {
+        deps.applyCameraAnimation(tMs);
+      }
+
+      renderer.render(scene, camera);
+      // eslint-disable-next-line no-await-in-loop -- must serialize: each
+      // frame's canvas content would be overwritten by the next render() call
+      // otherwise, since there's only one shared canvas/backbuffer.
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('PNG frame তৈরি করা যায়নি—আবার চেষ্টা করুন।');
+      zip.file(`frame_${String(i + 1).padStart(pad, '0')}.png`, blob);
+
+      onProgress?.(((i + 1) / frameCount) * 0.75);
+      onStatus?.(`ফ্রেম ${i + 1}/${frameCount} ক্যাপচার হচ্ছে…`);
     }
-
-    if (deps.applyCameraAnimation) {
-      deps.applyCameraAnimation(tMs);
-    }
-
-    renderer.render(scene, camera);
-    // eslint-disable-next-line no-await-in-loop -- must serialize: each
-    // frame's canvas content would be overwritten by the next render() call
-    // otherwise, since there's only one shared canvas/backbuffer.
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-    if (!blob) throw new Error('PNG frame তৈরি করা যায়নি—আবার চেষ্টা করুন।');
-    zip.file(`frame_${String(i + 1).padStart(pad, '0')}.png`, blob);
-
-    onProgress?.(((i + 1) / frameCount) * 0.75);
-    onStatus?.(`ফ্রেম ${i + 1}/${frameCount} ক্যাপচার হচ্ছে…`);
+  } finally {
+    camera.position.copy(savedCameraPos);
+    camera.rotation.copy(savedCameraRot);
+    if (deps.controls?.target) camera.lookAt(deps.controls.target);
+    deps.resetMeshToBaseTransform();
+    endExportResolution(deps);
+    restoreTransparentSurface?.();
   }
-
-  camera.position.copy(savedCameraPos);
-  camera.rotation.copy(savedCameraRot);
-  if (deps.controls?.target) camera.lookAt(deps.controls.target);
-  deps.resetMeshToBaseTransform();
-  endExportResolution(deps);
-  restoreTransparentSurface();
 
   onStatus?.('ZIP প্যাক করা হচ্ছে…');
   const zipBlob = await zip.generateAsync({
@@ -368,56 +372,67 @@ export async function exportGif(deps, opts, callbacks = {}) {
     dither: false,
   });
 
-  const delayMsPerFrame = Math.max(20, Math.round(1000 / opts.fps)); // most GIF decoders floor below ~20ms
   const savedCameraPos = camera.position.clone();
   const savedCameraRot = camera.rotation.clone();
 
-  for (let i = 0; i < frameCount; i++) {
-    const tMs = frameCount > 1 ? (i / (frameCount - 1)) * totalMs : totalMs;
+  try {
+    let accumulatedCentiseconds = 0;
+    for (let i = 0; i < frameCount; i++) {
+      const isLooping = isTurntable || (isAnimated && preset.continuous);
+      const tMs = isLooping
+        ? (i / frameCount) * totalMs
+        : (frameCount > 1 ? (i / (frameCount - 1)) * totalMs : totalMs);
 
-    if (isAnimated) {
-      const elapsed = tMs - opts.delayMs;
-      const rawT = elapsed < 0 ? 0 : Math.min(1, opts.durationMs > 0 ? elapsed / opts.durationMs : 1);
-      deps.applyPresetOffset(preset, easingFn(rawT));
-    } else if (isTurntable) {
-      const mesh = deps.getTextMesh();
-      if (mesh) {
-        const frac = totalMs > 0 ? tMs / totalMs : 0;
-        mesh.rotation.y = baseRotYRad + frac * Math.PI * 2;
+      if (isAnimated) {
+        const elapsed = tMs - opts.delayMs;
+        const rawT = elapsed < 0 ? 0 : Math.min(1, opts.durationMs > 0 ? elapsed / opts.durationMs : 1);
+        deps.applyPresetOffset(preset, easingFn(rawT));
+      } else if (isTurntable) {
+        const mesh = deps.getTextMesh();
+        if (mesh) {
+          const frac = totalMs > 0 ? tMs / totalMs : 0;
+          mesh.rotation.y = baseRotYRad + frac * Math.PI * 2;
+        }
       }
+
+      if (deps.applyCameraAnimation) {
+        deps.applyCameraAnimation(tMs);
+      }
+
+      renderer.render(scene, camera);
+
+      if (opts.transparentBg) {
+        // Do not blend the partial-alpha shadow over the magenta key color;
+        // that is what made the downloaded GIF's shadow appear purple.
+        compositeCtx.clearRect(0, 0, opts.width, opts.height);
+        compositeCtx.drawImage(canvas, 0, 0, opts.width, opts.height);
+        prepareTransparentGifFrame(compositeCtx, opts.width, opts.height, KEY_RGB);
+      } else {
+        // Visible-background GIFs are composited onto the selected color.
+        compositeCtx.fillStyle = backgroundColor;
+        compositeCtx.fillRect(0, 0, opts.width, opts.height);
+        compositeCtx.drawImage(canvas, 0, 0, opts.width, opts.height);
+      }
+
+      // Calculate centiseconds with accumulated error correction to match requested fps
+      const targetCs = Math.round(((i + 1) * 100) / opts.fps);
+      const frameCs = Math.max(2, targetCs - accumulatedCentiseconds);
+      accumulatedCentiseconds += frameCs;
+      const frameDelayMs = frameCs * 10;
+
+      gif.addFrame(compositeCtx, { copy: true, delay: frameDelayMs });
+
+      onProgress?.(((i + 1) / frameCount) * 0.5); // rendering frames = first half of progress
+      onStatus?.(`ফ্রেম ${i + 1}/${frameCount} রেন্ডার হচ্ছে…`);
     }
-
-    if (deps.applyCameraAnimation) {
-      deps.applyCameraAnimation(tMs);
-    }
-
-    renderer.render(scene, camera);
-
-    if (opts.transparentBg) {
-      // Do not blend the partial-alpha shadow over the magenta key color;
-      // that is what made the downloaded GIF's shadow appear purple.
-      compositeCtx.clearRect(0, 0, opts.width, opts.height);
-      compositeCtx.drawImage(canvas, 0, 0, opts.width, opts.height);
-      prepareTransparentGifFrame(compositeCtx, opts.width, opts.height, KEY_RGB);
-    } else {
-      // Visible-background GIFs are composited onto the selected color.
-      compositeCtx.fillStyle = backgroundColor;
-      compositeCtx.fillRect(0, 0, opts.width, opts.height);
-      compositeCtx.drawImage(canvas, 0, 0, opts.width, opts.height);
-    }
-
-    gif.addFrame(compositeCtx, { copy: true, delay: delayMsPerFrame });
-
-    onProgress?.(((i + 1) / frameCount) * 0.5); // rendering frames = first half of progress
-    onStatus?.(`ফ্রেম ${i + 1}/${frameCount} রেন্ডার হচ্ছে…`);
+  } finally {
+    camera.position.copy(savedCameraPos);
+    camera.rotation.copy(savedCameraRot);
+    if (deps.controls?.target) camera.lookAt(deps.controls.target);
+    deps.resetMeshToBaseTransform();
+    endExportResolution(deps);
+    restoreTransparentSurface?.();
   }
-
-  camera.position.copy(savedCameraPos);
-  camera.rotation.copy(savedCameraRot);
-  if (deps.controls?.target) camera.lookAt(deps.controls.target);
-  deps.resetMeshToBaseTransform();
-  endExportResolution(deps);
-  restoreTransparentSurface?.();
 
   onStatus?.('GIF এনকোড হচ্ছে (এতে কিছুটা সময় লাগতে পারে)…');
   const blob = await new Promise((resolve, reject) => {

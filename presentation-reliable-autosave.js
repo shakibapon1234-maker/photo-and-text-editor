@@ -257,7 +257,8 @@
       // Chromium limits sendBeacon/keepalive payloads to ~64KB
       if (payload.length < 60000) {
         if (navigator.sendBeacon) {
-          navigator.sendBeacon('/api/save-project', payload);
+          const blob = new Blob([payload], { type: 'application/json' });
+          navigator.sendBeacon('/api/save-project', blob);
         }
       } else {
         // For large decks, attempt keepalive fetch with quota-safe summary or saveNow

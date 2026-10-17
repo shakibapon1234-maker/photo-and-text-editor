@@ -38,15 +38,22 @@ const MIME_TYPES = {
     '.woff': 'font/woff',
     '.woff2': 'font/woff2',
     '.wasm': 'application/wasm',
-    '.map': 'application/json'
+    '.map': 'application/json',
+    '.avif': 'image/avif',
+    '.mov': 'video/quicktime',
+    '.txt': 'text/plain; charset=utf-8'
 };
 
 const ALLOWED_STATIC_EXTS = new Set(Object.keys(MIME_TYPES));
 
 const VALID_PRESETS = new Set(['loop_60s', 'loop_30s', 'loop_120s', 'bg_720p_full', 'bg_540p']);
+const ALLOWED_REMOTE_ACTIONS = new Set(['next', 'prev', 'nextSlide', 'prevSlide', 'fullscreen']);
+let activeConversions = 0;
+const MAX_CONCURRENT_CONVERSIONS = 2;
+let saveProjectPromise = Promise.resolve();
 
 let cmdCounter = 1;
-let lastCommand = { id: 0, action: null, val: null, t: 0 };
+let lastCommand = { id: 0, action: null, val: null, cid: null, t: 0 };
 
 function getLocalIp() {
     const interfaces = os.networkInterfaces();
@@ -127,8 +134,13 @@ function readRequestBody(req, maxBytes = 60 * 1024 * 1024) {
 
 async function atomicWriteFileAsync(filePath, content) {
     const tmpPath = `${filePath}.${Date.now()}.${Math.random().toString(36).slice(2)}.tmp`;
-    await fs.promises.writeFile(tmpPath, content, 'utf8');
-    await fs.promises.rename(tmpPath, filePath);
+    try {
+        await fs.promises.writeFile(tmpPath, content, 'utf8');
+        await fs.promises.rename(tmpPath, filePath);
+    } catch (err) {
+        try { await fs.promises.unlink(tmpPath); } catch (_) {}
+        throw err;
+    }
 }
 
 function isStaticAccessAllowed(relativeFilePath, isLoopback) {
@@ -194,9 +206,10 @@ const server = http.createServer((req, res) => {
         if (pathname === '/api/remote-send') {
             const action = parsedUrl.searchParams.get('action');
             const val = parsedUrl.searchParams.get('val') || '';
-            if (action) {
+            const cid = parsedUrl.searchParams.get('cid') || '';
+            if (action && ALLOWED_REMOTE_ACTIONS.has(action)) {
                 cmdCounter++;
-                lastCommand = { id: cmdCounter, action, val, t: Date.now() };
+                lastCommand = { id: cmdCounter, action, val, cid, t: Date.now() };
             }
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
             return res.end(JSON.stringify({ success: true, command: lastCommand }));
@@ -232,16 +245,30 @@ const server = http.createServer((req, res) => {
 
         // ── Video Conversion API Endpoint ─────────────────────────────
         if (pathname === '/api/convert-video' && req.method === 'POST') {
+            if (activeConversions >= MAX_CONCURRENT_CONVERSIONS) {
+                res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
+                return res.end(JSON.stringify({ success: false, error: 'Too many concurrent video conversions. Please wait.' }));
+            }
             try {
                 const body = await readRequestBody(req, 2 * 1024 * 1024);
                 const data = JSON.parse(body);
                 const inputPath = path.resolve(data.filePath || '');
                 const preset = String(data.preset || 'loop_60s');
-                const customTrim = data.customTrim !== undefined ? String(data.customTrim) : '';
+                const rawTrim = data.customTrim !== undefined ? String(data.customTrim).trim() : '';
 
                 if (!VALID_PRESETS.has(preset)) {
                     res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
                     return res.end(JSON.stringify({ success: false, error: 'Invalid preset specified' }));
+                }
+
+                // Validate customTrim: must be positive number of seconds or HH:MM:SS
+                let customTrim = '';
+                if (rawTrim) {
+                    if (!/^\d+(\.\d+)?$/.test(rawTrim) && !/^(\d{1,2}:)?\d{1,2}:\d{2}(\.\d+)?$/.test(rawTrim)) {
+                        res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                        return res.end(JSON.stringify({ success: false, error: 'Invalid customTrim format' }));
+                    }
+                    customTrim = rawTrim;
                 }
 
                 const ALLOWED_VIDEO_EXTS = new Set(['.mp4', '.mov', '.mkv', '.avi', '.webm', '.flv', '.wmv', '.m4v', '.ts']);
@@ -256,11 +283,13 @@ const server = http.createServer((req, res) => {
                 const args = [scriptPath, inputPath, preset];
                 if (customTrim) args.push(customTrim);
 
+                activeConversions++;
                 const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
                 cp.execFile(pythonCmd, args, {
                     maxBuffer: 15 * 1024 * 1024,
                     timeout: 600000
                 }, (error, stdout, stderr) => {
+                    activeConversions = Math.max(0, activeConversions - 1);
                     if (error) {
                         res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
                         return res.end(JSON.stringify({ success: false, error: error.message || stderr }));
@@ -275,7 +304,8 @@ const server = http.createServer((req, res) => {
                     return res.end(JSON.stringify({ success: true, outputPath: outp, sizeMB }));
                 });
             } catch (err) {
-                res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                const status = err.message === 'Payload too large' ? 413 : 400;
+                res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
                 return res.end(JSON.stringify({ error: err.message }));
             }
             return;
@@ -316,19 +346,27 @@ const server = http.createServer((req, res) => {
                     return res.end(JSON.stringify({ success: false, error: 'Incomplete image backup rejected' }));
                 }
 
-                // Asynchronous atomic writes without pretty-printing to avoid blocking event loop
-                await atomicWriteFileAsync(path.join(__dirname, 'recovered-project.json'), JSON.stringify(data));
-                await atomicWriteFileAsync(path.join(__dirname, 'presentation-default-deck.js'), 'window.DEFAULT_RECOVERED_SLIDES = ' + JSON.stringify(data.slides) + ';\n');
+                // Serialize concurrent writes through saveProjectPromise queue
+                await (saveProjectPromise = saveProjectPromise.then(async () => {
+                    await atomicWriteFileAsync(path.join(__dirname, 'recovered-project.json'), JSON.stringify(data));
+                    await atomicWriteFileAsync(path.join(__dirname, 'presentation-default-deck.js'), 'window.DEFAULT_RECOVERED_SLIDES = ' + JSON.stringify(data.slides) + ';\n');
+                }));
 
                 res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
                 return res.end(JSON.stringify({ success: true, count: data.slides.length }));
             } catch (err) {
-                res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+                const status = err.message === 'Payload too large' ? 413 : 500;
+                res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
                 return res.end(JSON.stringify({ error: err.message }));
             }
         }
 
         // ── Static File Serving with HTTP Range & Pipeline Streaming ─────
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+            res.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' });
+            return res.end('405 Method Not Allowed');
+        }
+
         let resolvedRelPath = pathname === '/' ? 'index.html' : pathname.replace(/^[\\\/]+/, '');
         const isLocal = isLoopbackClient(req);
 
@@ -427,6 +465,15 @@ const server = http.createServer((req, res) => {
             res.end('500 Internal Server Error');
         }
     });
+});
+
+server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+        console.error(`[ERROR] Port ${PORT} is already in use by another process. Please close the existing process or use free_port.ps1.`);
+    } else {
+        console.error('[ERROR] Server failure:', err);
+    }
+    process.exit(1);
 });
 
 server.listen(PORT, '0.0.0.0', () => {

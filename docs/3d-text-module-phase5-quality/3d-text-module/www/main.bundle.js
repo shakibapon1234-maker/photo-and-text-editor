@@ -35507,50 +35507,57 @@ async function exportWebM(deps, opts, callbacks = {}) {
   }
   const restoreTransparentSurface = beginTransparentExport(deps);
   beginExportResolution(deps, opts.width, opts.height);
-  const stream = deps.canvas.captureStream(opts.fps);
-  const videoBitsPerSecond = Math.round(opts.width * opts.height * opts.fps * 0.12);
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond });
-  const chunks = [];
-  recorder.ondataavailable = (e) => {
-    if (e.data && e.data.size) chunks.push(e.data);
-  };
-  const stopped = new Promise((resolve, reject) => {
-    recorder.onstop = () => resolve();
-    recorder.onerror = (e) => reject(e.error || new Error("MediaRecorder error"));
-  });
-  const totalMs = opts.presetId !== "none" ? opts.delayMs + opts.durationMs : opts.noPresetDurationMs;
-  onStatus?.("\u09B0\u09C7\u0995\u09B0\u09CD\u09A1\u09BF\u0982 \u09B6\u09C1\u09B0\u09C1 \u09B9\u09AF\u09BC\u09C7\u099B\u09C7\u2026");
-  recorder.start(100);
-  if (opts.presetId !== "none") {
-    deps.animState.presetId = opts.presetId;
-    deps.animState.durationMs = opts.durationMs;
-    deps.animState.delayMs = opts.delayMs;
-    deps.animState.loop = false;
-    deps.animState.playing = true;
-    deps.animState.startTime = performance.now();
-  }
-  const startedAt = performance.now();
-  await new Promise((resolve) => {
-    function poll() {
-      const elapsed = performance.now() - startedAt;
-      onProgress?.(Math.min(1, totalMs > 0 ? elapsed / totalMs : 1));
-      if (elapsed >= totalMs) {
-        resolve();
-        return;
-      }
-      requestAnimationFrame(poll);
+  const prevLoop = deps.animState ? deps.animState.loop : void 0;
+  try {
+    const stream = deps.canvas.captureStream(opts.fps);
+    const videoBitsPerSecond = Math.round(opts.width * opts.height * opts.fps * 0.12);
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond });
+    const chunks = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size) chunks.push(e.data);
+    };
+    const stopped = new Promise((resolve, reject) => {
+      recorder.onstop = () => resolve();
+      recorder.onerror = (e) => reject(e.error || new Error("MediaRecorder error"));
+    });
+    const totalMs = opts.presetId !== "none" ? opts.delayMs + opts.durationMs : opts.noPresetDurationMs;
+    onStatus?.("\u09B0\u09C7\u0995\u09B0\u09CD\u09A1\u09BF\u0982 \u09B6\u09C1\u09B0\u09C1 \u09B9\u09AF\u09BC\u09C7\u099B\u09C7\u2026");
+    recorder.start(100);
+    if (opts.presetId !== "none") {
+      deps.animState.presetId = opts.presetId;
+      deps.animState.durationMs = opts.durationMs;
+      deps.animState.delayMs = opts.delayMs;
+      deps.animState.loop = false;
+      deps.animState.playing = true;
+      deps.animState.startTime = performance.now();
     }
-    poll();
-  });
-  deps.animState.playing = false;
-  onStatus?.("\u09B0\u09C7\u0995\u09B0\u09CD\u09A1\u09BF\u0982 \u09B6\u09C7\u09B7 \u09B9\u099A\u09CD\u099B\u09C7\u2026");
-  recorder.stop();
-  await stopped;
-  deps.resetMeshToBaseTransform();
-  endExportResolution(deps);
-  restoreTransparentSurface();
-  const blob = new Blob(chunks, { type: mimeType.split(";")[0] });
-  return { blob, mimeType, width: opts.width, height: opts.height, durationMs: totalMs };
+    const startedAt = performance.now();
+    await new Promise((resolve) => {
+      function poll() {
+        const elapsed = performance.now() - startedAt;
+        onProgress?.(Math.min(1, totalMs > 0 ? elapsed / totalMs : 1));
+        if (elapsed >= totalMs) {
+          resolve();
+          return;
+        }
+        requestAnimationFrame(poll);
+      }
+      poll();
+    });
+    deps.animState.playing = false;
+    onStatus?.("\u09B0\u09C7\u0995\u09B0\u09CD\u09A1\u09BF\u0982 \u09B6\u09C7\u09B7 \u09B9\u099A\u09CD\u099B\u09C7\u2026");
+    if (recorder.state !== "inactive") {
+      recorder.stop();
+      await stopped;
+    }
+    const blob = new Blob(chunks, { type: mimeType.split(";")[0] });
+    return { blob, mimeType, width: opts.width, height: opts.height, durationMs: totalMs };
+  } finally {
+    if (prevLoop !== void 0 && deps.animState) deps.animState.loop = prevLoop;
+    deps.resetMeshToBaseTransform();
+    endExportResolution(deps);
+    restoreTransparentSurface?.();
+  }
 }
 async function exportPngSequence(deps, opts, callbacks = {}) {
   const { onProgress, onStatus } = callbacks;
@@ -35568,35 +35575,39 @@ async function exportPngSequence(deps, opts, callbacks = {}) {
   const baseRotYRad = deps.state.rotY * Math.PI / 180;
   const savedCameraPos = camera2.position.clone();
   const savedCameraRot = camera2.rotation.clone();
-  for (let i = 0; i < frameCount; i++) {
-    const tMs = frameCount > 1 ? i / (frameCount - 1) * totalMs : totalMs;
-    if (isAnimated) {
-      const elapsed = tMs - opts.delayMs;
-      const rawT = elapsed < 0 ? 0 : Math.min(1, opts.durationMs > 0 ? elapsed / opts.durationMs : 1);
-      deps.applyPresetOffset(preset, easingFn(rawT));
-    } else if (isTurntable) {
-      const mesh = deps.getTextMesh();
-      if (mesh) {
-        const frac = totalMs > 0 ? tMs / totalMs : 0;
-        mesh.rotation.y = baseRotYRad + frac * Math.PI * 2;
+  try {
+    for (let i = 0; i < frameCount; i++) {
+      const isLooping = isTurntable || isAnimated && preset.continuous;
+      const tMs = isLooping ? i / frameCount * totalMs : frameCount > 1 ? i / (frameCount - 1) * totalMs : totalMs;
+      if (isAnimated) {
+        const elapsed = tMs - opts.delayMs;
+        const rawT = elapsed < 0 ? 0 : Math.min(1, opts.durationMs > 0 ? elapsed / opts.durationMs : 1);
+        deps.applyPresetOffset(preset, easingFn(rawT));
+      } else if (isTurntable) {
+        const mesh = deps.getTextMesh();
+        if (mesh) {
+          const frac = totalMs > 0 ? tMs / totalMs : 0;
+          mesh.rotation.y = baseRotYRad + frac * Math.PI * 2;
+        }
       }
+      if (deps.applyCameraAnimation) {
+        deps.applyCameraAnimation(tMs);
+      }
+      renderer2.render(scene2, camera2);
+      const blob = await new Promise((resolve) => canvas2.toBlob(resolve, "image/png"));
+      if (!blob) throw new Error("PNG frame \u09A4\u09C8\u09B0\u09BF \u0995\u09B0\u09BE \u09AF\u09BE\u09DF\u09A8\u09BF\u2014\u0986\u09AC\u09BE\u09B0 \u099A\u09C7\u09B7\u09CD\u099F\u09BE \u0995\u09B0\u09C1\u09A8\u0964");
+      zip.file(`frame_${String(i + 1).padStart(pad, "0")}.png`, blob);
+      onProgress?.((i + 1) / frameCount * 0.75);
+      onStatus?.(`\u09AB\u09CD\u09B0\u09C7\u09AE ${i + 1}/${frameCount} \u0995\u09CD\u09AF\u09BE\u09AA\u099A\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7\u2026`);
     }
-    if (deps.applyCameraAnimation) {
-      deps.applyCameraAnimation(tMs);
-    }
-    renderer2.render(scene2, camera2);
-    const blob = await new Promise((resolve) => canvas2.toBlob(resolve, "image/png"));
-    if (!blob) throw new Error("PNG frame \u09A4\u09C8\u09B0\u09BF \u0995\u09B0\u09BE \u09AF\u09BE\u09DF\u09A8\u09BF\u2014\u0986\u09AC\u09BE\u09B0 \u099A\u09C7\u09B7\u09CD\u099F\u09BE \u0995\u09B0\u09C1\u09A8\u0964");
-    zip.file(`frame_${String(i + 1).padStart(pad, "0")}.png`, blob);
-    onProgress?.((i + 1) / frameCount * 0.75);
-    onStatus?.(`\u09AB\u09CD\u09B0\u09C7\u09AE ${i + 1}/${frameCount} \u0995\u09CD\u09AF\u09BE\u09AA\u099A\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7\u2026`);
+  } finally {
+    camera2.position.copy(savedCameraPos);
+    camera2.rotation.copy(savedCameraRot);
+    if (deps.controls?.target) camera2.lookAt(deps.controls.target);
+    deps.resetMeshToBaseTransform();
+    endExportResolution(deps);
+    restoreTransparentSurface?.();
   }
-  camera2.position.copy(savedCameraPos);
-  camera2.rotation.copy(savedCameraRot);
-  if (deps.controls?.target) camera2.lookAt(deps.controls.target);
-  deps.resetMeshToBaseTransform();
-  endExportResolution(deps);
-  restoreTransparentSurface();
   onStatus?.("ZIP \u09AA\u09CD\u09AF\u09BE\u0995 \u0995\u09B0\u09BE \u09B9\u099A\u09CD\u099B\u09C7\u2026");
   const zipBlob = await zip.generateAsync({
     type: "blob",
@@ -35664,45 +35675,53 @@ async function exportGif(deps, opts, callbacks = {}) {
     transparent: opts.transparentBg ? KEY_COLOR_NUM : null,
     dither: false
   });
-  const delayMsPerFrame = Math.max(20, Math.round(1e3 / opts.fps));
   const savedCameraPos = camera2.position.clone();
   const savedCameraRot = camera2.rotation.clone();
-  for (let i = 0; i < frameCount; i++) {
-    const tMs = frameCount > 1 ? i / (frameCount - 1) * totalMs : totalMs;
-    if (isAnimated) {
-      const elapsed = tMs - opts.delayMs;
-      const rawT = elapsed < 0 ? 0 : Math.min(1, opts.durationMs > 0 ? elapsed / opts.durationMs : 1);
-      deps.applyPresetOffset(preset, easingFn(rawT));
-    } else if (isTurntable) {
-      const mesh = deps.getTextMesh();
-      if (mesh) {
-        const frac = totalMs > 0 ? tMs / totalMs : 0;
-        mesh.rotation.y = baseRotYRad + frac * Math.PI * 2;
+  try {
+    let accumulatedCentiseconds = 0;
+    for (let i = 0; i < frameCount; i++) {
+      const isLooping = isTurntable || isAnimated && preset.continuous;
+      const tMs = isLooping ? i / frameCount * totalMs : frameCount > 1 ? i / (frameCount - 1) * totalMs : totalMs;
+      if (isAnimated) {
+        const elapsed = tMs - opts.delayMs;
+        const rawT = elapsed < 0 ? 0 : Math.min(1, opts.durationMs > 0 ? elapsed / opts.durationMs : 1);
+        deps.applyPresetOffset(preset, easingFn(rawT));
+      } else if (isTurntable) {
+        const mesh = deps.getTextMesh();
+        if (mesh) {
+          const frac = totalMs > 0 ? tMs / totalMs : 0;
+          mesh.rotation.y = baseRotYRad + frac * Math.PI * 2;
+        }
       }
+      if (deps.applyCameraAnimation) {
+        deps.applyCameraAnimation(tMs);
+      }
+      renderer2.render(scene2, camera2);
+      if (opts.transparentBg) {
+        compositeCtx.clearRect(0, 0, opts.width, opts.height);
+        compositeCtx.drawImage(canvas2, 0, 0, opts.width, opts.height);
+        prepareTransparentGifFrame(compositeCtx, opts.width, opts.height, KEY_RGB);
+      } else {
+        compositeCtx.fillStyle = backgroundColor;
+        compositeCtx.fillRect(0, 0, opts.width, opts.height);
+        compositeCtx.drawImage(canvas2, 0, 0, opts.width, opts.height);
+      }
+      const targetCs = Math.round((i + 1) * 100 / opts.fps);
+      const frameCs = Math.max(2, targetCs - accumulatedCentiseconds);
+      accumulatedCentiseconds += frameCs;
+      const frameDelayMs = frameCs * 10;
+      gif.addFrame(compositeCtx, { copy: true, delay: frameDelayMs });
+      onProgress?.((i + 1) / frameCount * 0.5);
+      onStatus?.(`\u09AB\u09CD\u09B0\u09C7\u09AE ${i + 1}/${frameCount} \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7\u2026`);
     }
-    if (deps.applyCameraAnimation) {
-      deps.applyCameraAnimation(tMs);
-    }
-    renderer2.render(scene2, camera2);
-    if (opts.transparentBg) {
-      compositeCtx.clearRect(0, 0, opts.width, opts.height);
-      compositeCtx.drawImage(canvas2, 0, 0, opts.width, opts.height);
-      prepareTransparentGifFrame(compositeCtx, opts.width, opts.height, KEY_RGB);
-    } else {
-      compositeCtx.fillStyle = backgroundColor;
-      compositeCtx.fillRect(0, 0, opts.width, opts.height);
-      compositeCtx.drawImage(canvas2, 0, 0, opts.width, opts.height);
-    }
-    gif.addFrame(compositeCtx, { copy: true, delay: delayMsPerFrame });
-    onProgress?.((i + 1) / frameCount * 0.5);
-    onStatus?.(`\u09AB\u09CD\u09B0\u09C7\u09AE ${i + 1}/${frameCount} \u09B0\u09C7\u09A8\u09CD\u09A1\u09BE\u09B0 \u09B9\u099A\u09CD\u099B\u09C7\u2026`);
+  } finally {
+    camera2.position.copy(savedCameraPos);
+    camera2.rotation.copy(savedCameraRot);
+    if (deps.controls?.target) camera2.lookAt(deps.controls.target);
+    deps.resetMeshToBaseTransform();
+    endExportResolution(deps);
+    restoreTransparentSurface?.();
   }
-  camera2.position.copy(savedCameraPos);
-  camera2.rotation.copy(savedCameraRot);
-  if (deps.controls?.target) camera2.lookAt(deps.controls.target);
-  deps.resetMeshToBaseTransform();
-  endExportResolution(deps);
-  restoreTransparentSurface?.();
   onStatus?.("GIF \u098F\u09A8\u0995\u09CB\u09A1 \u09B9\u099A\u09CD\u099B\u09C7 (\u098F\u09A4\u09C7 \u0995\u09BF\u099B\u09C1\u099F\u09BE \u09B8\u09AE\u09AF\u09BC \u09B2\u09BE\u0997\u09A4\u09C7 \u09AA\u09BE\u09B0\u09C7)\u2026");
   const blob = await new Promise((resolve, reject) => {
     gif.on("progress", (p) => {
@@ -36504,7 +36523,9 @@ function initShapeStudio({
   function reorderScene() {
     order.forEach((id, i) => {
       const entry = layers.get(id);
-      if (entry) entry.group.position.z = entry.layer.posZ + i * 0.02;
+      if (entry && entry.group && entry.group.position && entry.layer) {
+        entry.group.position.z = (entry.layer.posZ || 0) + i * 0.02;
+      }
     });
   }
   function defaultLayer(presetType) {
@@ -37218,7 +37239,7 @@ function initShapeStudio({
     clearTimeout(persistTimer);
     const write = () => {
       try {
-        const data = { order, layers: order.map((id) => layers.get(id).layer) };
+        const data = { order, layers: order.map((id) => layers.get(id)?.layer).filter(Boolean) };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       } catch (_) {
       }
@@ -37335,6 +37356,8 @@ var stickerBgColorPicker = document.getElementById("stickerBgColorPicker");
 var stickerTextColorPicker = document.getElementById("stickerTextColorPicker");
 var stickerBorderWidthRange = document.getElementById("stickerBorderWidthRange");
 var stickerBorderWidthValue = document.getElementById("stickerBorderWidthValue");
+var stickerBorderColorPicker = document.getElementById("stickerBorderColorPicker");
+var stickerShadowCheckbox = document.getElementById("stickerShadowCheckbox");
 var sticker3DModeGrid = document.getElementById("sticker3DModeGrid");
 var stickerIndependentControls = document.getElementById("stickerIndependentControls");
 var stickerTextScaleRange = document.getElementById("stickerTextScaleRange");
@@ -42404,6 +42427,9 @@ window.addEventListener("keydown", (e) => {
   if (tag === "input" || tag === "textarea" || tag === "select" || e.target.isContentEditable) {
     return;
   }
+  if (e.ctrlKey || e.metaKey || e.altKey) {
+    return;
+  }
   if (e.code === "Space" && !isSpaceHeld) {
     isSpaceHeld = true;
     if (state.dragEnabled && !isPointerDragging) {
@@ -43562,6 +43588,10 @@ document.addEventListener("click", (event) => {
 viewportEl.addEventListener("pointerdown", beginHistoryEdit, true);
 window.addEventListener("pointerup", finishHistoryEdit, true);
 window.addEventListener("keydown", (event) => {
+  const tag = (event.target.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "textarea" || tag === "select" || event.target.isContentEditable) {
+    return;
+  }
   const mod = event.ctrlKey || event.metaKey;
   if (!mod || event.altKey) return;
   const key = event.key.toLowerCase();

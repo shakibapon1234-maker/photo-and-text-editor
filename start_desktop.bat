@@ -9,22 +9,6 @@ if exist "%~dp0node_modules\electron\dist\electron.exe" (
     set "ELECTRON_EXE=%~dp0node_modules\electron\dist\electron.exe"
     goto :HAVE_ELECTRON
 )
-if exist "G:\all\app launcher\App-Launcher\node_modules\electron\dist\electron.exe" (
-    set "ELECTRON_EXE=G:\all\app launcher\App-Launcher\node_modules\electron\dist\electron.exe"
-    goto :HAVE_ELECTRON
-)
-if exist "G:\all\Video-Editor\node_modules\electron\dist\electron.exe" (
-    set "ELECTRON_EXE=G:\all\Video-Editor\node_modules\electron\dist\electron.exe"
-    goto :HAVE_ELECTRON
-)
-if exist "G:\all\SABRE\Sabre\node_modules\electron\dist\electron.exe" (
-    set "ELECTRON_EXE=G:\all\SABRE\Sabre\node_modules\electron\dist\electron.exe"
-    goto :HAVE_ELECTRON
-)
-if exist "G:\all\GELELIO\Gellelio-training-mode\node_modules\electron\dist\electron.exe" (
-    set "ELECTRON_EXE=G:\all\GELELIO\Gellelio-training-mode\node_modules\electron\dist\electron.exe"
-    goto :HAVE_ELECTRON
-)
 
 :HAVE_ELECTRON
 

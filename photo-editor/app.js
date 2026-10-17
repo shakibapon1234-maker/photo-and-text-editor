@@ -1433,14 +1433,26 @@
 
     let _currentPreviewUrl = null; // tracks object URL so we can revoke on next update
 
-    function updatePreview(blob) {
-        // Revoke the previous preview URL to free memory (Fix: memory leak)
-        if (_currentPreviewUrl) {
-            URL.revokeObjectURL(_currentPreviewUrl);
+    function setPreviewUrl(urlOrBlob) {
+        if (!urlOrBlob) return;
+        if (_currentPreviewUrl && _currentPreviewUrl.startsWith('blob:')) {
+            const isHistorical = Array.isArray(historyStack) && historyStack.some(h => h.url === _currentPreviewUrl);
+            if (!isHistorical) {
+                try { URL.revokeObjectURL(_currentPreviewUrl); } catch (_) {}
+            }
         }
-        const url = URL.createObjectURL(blob);
-        _currentPreviewUrl = url;
-        previewImage.src = url;
+        if (urlOrBlob instanceof Blob) {
+            _currentPreviewUrl = URL.createObjectURL(urlOrBlob);
+        } else {
+            _currentPreviewUrl = urlOrBlob;
+        }
+        previewImage.src = _currentPreviewUrl;
+        return _currentPreviewUrl;
+    }
+
+    function updatePreview(blob) {
+        if (!blob) return;
+        return setPreviewUrl(blob);
     }
 
     function formatBytes(bytes) {
