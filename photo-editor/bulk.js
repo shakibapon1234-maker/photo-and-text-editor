@@ -1,4 +1,4 @@
-﻿// ================================================================
+// ================================================================
 // Bulk Resize — upload 5, 7, or more photos at once, pick one
 // Facebook size preset, and get every photo back at the exact same
 // size in a single ZIP download.

@@ -2,7 +2,7 @@
 // কনভেনশন: pure/helper ফাংশনগুলো top-level এ (Node দিয়ে syntax-check করা যায়),
 // সব async কাজ defensive try/catch দিয়ে ঘেরা, যাতে একটা রিসোর্স ফেইল করলে পুরো SW ভেঙে না পড়ে।
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const APP_SHELL_CACHE = `photo-editor-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `photo-editor-runtime-${CACHE_VERSION}`;
 const KNOWN_CACHES = [APP_SHELL_CACHE, RUNTIME_CACHE];
@@ -15,6 +15,9 @@ const APP_SHELL_PATHS = [
     './style.css',
     './app.js',
     './bulk.js',
+    './collage.js',
+    './jszip.min.js',
+    '../gif.js',
     './social-presets.js',
     './watermark.js',
     './manifest.json',
@@ -94,7 +97,7 @@ self.addEventListener('message', (event) => {
 async function networkFirst(request, cacheName) {
     try {
         const networkResponse = await fetch(request);
-        if (networkResponse && networkResponse.ok) {
+        if (networkResponse && (networkResponse.ok || networkResponse.type === 'opaque')) {
             const cache = await caches.open(cacheName);
             cache.put(request, networkResponse.clone()).catch(() => {});
         }
@@ -111,7 +114,7 @@ async function staleWhileRevalidate(request, cacheName) {
     const cached = await cache.match(request);
     const networkFetch = fetch(request)
         .then((networkResponse) => {
-            if (networkResponse && networkResponse.ok) {
+            if (networkResponse && (networkResponse.ok || networkResponse.type === 'opaque')) {
                 cache.put(request, networkResponse.clone()).catch(() => {});
             }
             return networkResponse;

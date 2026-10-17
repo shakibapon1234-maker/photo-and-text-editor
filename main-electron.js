@@ -317,23 +317,24 @@ function startInternalServer(callback) {
             }
 
             // Static files with Range & Pipeline streaming
-            const sanitizedRelPath = pathname === '/' ? 'index.html' : pathname.replace(/^[\\\/]+/, '');
+            let resolvedRelPath = pathname === '/' ? 'index.html' : pathname.replace(/^[\\\/]+/, '');
             const isLocal = isLoopbackClient(req);
 
-            if (!isStaticAccessAllowed(sanitizedRelPath, isLocal)) {
-                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
-                return res.end('403 Forbidden');
-            }
-
-            let filePath = path.join(__dirname, sanitizedRelPath);
+            let filePath = path.join(__dirname, resolvedRelPath);
             try {
                 const stats = await fs.promises.stat(filePath);
                 if (stats.isDirectory()) {
                     filePath = path.join(filePath, 'index.html');
+                    resolvedRelPath = path.join(resolvedRelPath, 'index.html');
                 }
             } catch (_) {
                 res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
                 return res.end('404 Not Found');
+            }
+
+            if (!isStaticAccessAllowed(resolvedRelPath, isLocal)) {
+                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+                return res.end('403 Forbidden');
             }
 
             fs.stat(filePath, (err, stats) => {
@@ -368,7 +369,12 @@ function startInternalServer(callback) {
                         end = match[2] ? parseInt(match[2], 10) : fileSize - 1;
                     }
 
-                    if (isNaN(start) || start >= fileSize || end >= fileSize || start > end) {
+                    // RFC 7233 / 9110: Clamp end to fileSize - 1 if it exceeds or equals fileSize
+                    if (end >= fileSize) {
+                        end = fileSize - 1;
+                    }
+
+                    if (isNaN(start) || start < 0 || start >= fileSize || start > end) {
                         res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` });
                         return res.end();
                     }

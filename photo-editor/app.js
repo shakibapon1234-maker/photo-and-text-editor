@@ -13,6 +13,13 @@
     let originalHeight = 0;
     let aspectRatio = 1;
 
+    // BG-Remove overlay canvases — declared here so clearAllEdits (outer scope)
+    // can access them; initBgRemoveModule() will assign the real DOM references.
+    let bgLassoCanvas = null;
+    let bgCloneCanvas = null;
+    let bgEraseCanvas = null;
+    let bgWandCanvas  = null;
+
     // --- DOM Elements ---
     const uploadArea = document.getElementById('uploadArea');
     const fileInput = document.getElementById('fileInput');
@@ -468,6 +475,11 @@
             if (targetKB) {
                 // Iterative compression to reach target size
                 compressToTargetSize(targetKB, format).then(blob => {
+                    if (!blob) {
+                        applyFileSize.classList.remove('loading');
+                        showToast('❌ ছবি এনকোড করা যায়নি — ভিন্ন ফরম্যাট বা ছোট canvas চেষ্টা করুন', 'error');
+                        return;
+                    }
                     processedBlob = blob;
                     fileSizeResult.style.display = 'block';
                     newFileSize.textContent = formatBytes(blob.size);
@@ -476,6 +488,11 @@
                     pushHistory(blob, `ফাইল সাইজ → ${targetKB}KB`);
                     applyFileSize.classList.remove('loading');
                     showToast('✅ ফাইল সাইজ সফলভাবে পরিবর্তন হয়েছে!', 'success');
+                }).catch(err => {
+                    // Fix: button was stuck in loading state forever on error
+                    applyFileSize.classList.remove('loading');
+                    showToast('❌ কম্প্রেশনে ত্রুটি হয়েছে', 'error');
+                    console.error('compressToTargetSize error:', err);
                 });
             } else {
                 // Simple quality adjustment
@@ -483,6 +500,12 @@
                 canvas.height = originalHeight;
                 ctx.drawImage(originalImage, 0, 0);
                 canvas.toBlob(blob => {
+                    // Fix: toBlob can return null for large canvases or unsupported format
+                    if (!blob) {
+                        applyFileSize.classList.remove('loading');
+                        showToast('❌ ছবি এনকোড করা যায়নি — ভিন্ন ফরম্যাট বা ছোট canvas চেষ্টা করুন', 'error');
+                        return;
+                    }
                     processedBlob = blob;
                     fileSizeResult.style.display = 'block';
                     newFileSize.textContent = formatBytes(blob.size);
@@ -498,32 +521,38 @@
 
     async function compressToTargetSize(targetKB, format) {
         const targetBytes = targetKB * 1024;
-        let low = 0.01;
-        let high = 1.0;
         let bestBlob = null;
-        let iterations = 0;
-        const maxIterations = 20;
+        let dimensionReduced = false;
 
         canvas.width = originalWidth;
         canvas.height = originalHeight;
         ctx.drawImage(originalImage, 0, 0);
 
-        while (iterations < maxIterations && (high - low) > 0.01) {
-            const mid = (low + high) / 2;
-            const blob = await new Promise(resolve => {
-                canvas.toBlob(resolve, format, mid);
-            });
+        // PNG ignores quality — binary search would spin 20 iterations achieving nothing
+        // and freeze the UI. For PNG, skip straight to dimension reduction.
+        if (format !== 'image/png') {
+            let low = 0.01;
+            let high = 1.0;
+            let iterations = 0;
+            const maxIterations = 20;
 
-            if (blob.size <= targetBytes) {
-                bestBlob = blob;
-                low = mid;
-            } else {
-                high = mid;
+            while (iterations < maxIterations && (high - low) > 0.01) {
+                const mid = (low + high) / 2;
+                const blob = await new Promise(resolve => {
+                    canvas.toBlob(resolve, format, mid);
+                });
+                if (!blob) break; // Fix: null guard — canvas too large or unsupported format
+                if (blob.size <= targetBytes) {
+                    bestBlob = blob;
+                    low = mid;
+                } else {
+                    high = mid;
+                }
+                iterations++;
             }
-            iterations++;
         }
 
-        // If still larger, try reducing dimensions proportionally
+        // If still larger (or PNG), try reducing dimensions proportionally
         if (!bestBlob || bestBlob.size > targetBytes) {
             let scale = 1.0;
             while (scale > 0.1) {
@@ -535,28 +564,36 @@
                 ctx.drawImage(originalImage, 0, 0, newW, newH);
 
                 const blob = await new Promise(resolve => {
-                    canvas.toBlob(resolve, format, high);
+                    canvas.toBlob(resolve, format, format === 'image/png' ? undefined : high);
                 });
+                if (!blob) continue; // Fix: null guard
 
                 if (blob.size <= targetBytes) {
                     bestBlob = blob;
+                    dimensionReduced = true;
+                    // Warn user that dimensions were silently reduced
+                    const pct = Math.round(scale * 100);
+                    showToast(`⚠️ টার্গেট সাইজে পৌঁছাতে ছবির মাত্রা ${pct}%-এ কমানো হয়েছে`, 'error');
                     break;
                 }
             }
         }
 
         if (!bestBlob) {
-            // Fallback: smallest we can get
+            // Fallback: smallest we can get — but warn the user explicitly
             canvas.width = originalWidth;
             canvas.height = originalHeight;
             ctx.drawImage(originalImage, 0, 0);
             bestBlob = await new Promise(resolve => {
-                canvas.toBlob(resolve, format, 0.01);
+                canvas.toBlob(resolve, format, format === 'image/png' ? undefined : 0.01);
             });
+            // Fix: show warning instead of silent "success"
+            showToast(`⚠️ ${targetKB}KB টার্গেট অর্জন করা যায়নি — সর্বোচ্চ কম্প্রেসড ফাইল ব্যবহার করা হয়েছে`, 'error');
         }
 
         return bestBlob;
     }
+
 
     // ============================================
     // Tool 2: Pixel Resize
@@ -1334,16 +1371,42 @@
         }
         const reader = new FileReader();
         reader.onload = () => {
+            const dataUrl = reader.result;
+            const assetEntry = { src: dataUrl, added: Date.now(), name: originalFile?.name || 'Photo Editor image' };
+            const entryJson = JSON.stringify(assetEntry);
+
+            // 1. First set pending-asset so immediate handoff to Presentation Studio succeeds
             try {
-                const assets = JSON.parse(localStorage.getItem(PRESENTATION_ASSET_KEY) || '[]');
-                if (!assets.some(asset => asset.src === reader.result)) {
-                    assets.push({ src: reader.result, added: Date.now(), name: originalFile?.name || 'Photo Editor image' });
-                    localStorage.setItem(PRESENTATION_ASSET_KEY, JSON.stringify(assets.slice(-30)));
+                localStorage.setItem('presentation-studio-pending-asset-v1', entryJson);
+            } catch (e) {
+                // If even a single image exceeds localStorage quota (~5MB), inform user
+                showToast('❌ ছবিটি অনেক বড়, Presentation-এ পাঠানো সম্ভব হয়নি (কোটা পূর্ণ)', 'error');
+                return;
+            }
+
+            // 2. Safely add to Asset Library with progressive pruning if quota exceeded
+            try {
+                let assets = [];
+                try { assets = JSON.parse(localStorage.getItem(PRESENTATION_ASSET_KEY) || '[]'); } catch (_) { assets = []; }
+                if (!assets.some(asset => asset.src === dataUrl)) {
+                    assets.push(assetEntry);
+                    // Keep at most 15 recent items to avoid exhausting localStorage quota for autosave
+                    if (assets.length > 15) assets = assets.slice(-15);
+                    let saved = false;
+                    while (assets.length > 0 && !saved) {
+                        try {
+                            localStorage.setItem(PRESENTATION_ASSET_KEY, JSON.stringify(assets));
+                            saved = true;
+                        } catch (quotaErr) {
+                            // Prune oldest asset and retry
+                            assets.shift();
+                        }
+                    }
                 }
-                localStorage.setItem('presentation-studio-pending-asset-v1', JSON.stringify({ src: reader.result, added: Date.now(), name: originalFile?.name || 'Photo Editor image' }));
                 showToast('📊 ছবিটি Presentation Asset Library-তে পাঠানো হয়েছে', 'success');
             } catch (_) {
-                showToast('❌ Presentation asset save করা যায়নি', 'error');
+                // Pending asset was already set, so handoff still works
+                showToast('📊 ছবিটি প্রেজেন্টেশনে পাঠানো হয়েছে (লাইব্রেরি ফুল)', 'info');
             }
         };
         reader.readAsDataURL(source);
@@ -1358,7 +1421,7 @@
             try {
                 localStorage.setItem('3d-studio-pending-image-v1', reader.result);
                 showToast('🧊 ছবিটি 3D Studio-তে পাঠানো হয়েছে — 3D tab খুলুন', 'success');
-            } catch (_) { showToast('❌ 3D Studio-তে পাঠানো যায়নি', 'error'); }
+            } catch (_) { showToast('❌ 3D Studio-তে পাঠানো যায়নি (ছবির সাইজ অনেক বড়)', 'error'); }
         };
         reader.readAsDataURL(source);
     }
@@ -1368,8 +1431,15 @@
     // Utilities
     // ============================================
 
+    let _currentPreviewUrl = null; // tracks object URL so we can revoke on next update
+
     function updatePreview(blob) {
+        // Revoke the previous preview URL to free memory (Fix: memory leak)
+        if (_currentPreviewUrl) {
+            URL.revokeObjectURL(_currentPreviewUrl);
+        }
         const url = URL.createObjectURL(blob);
+        _currentPreviewUrl = url;
         previewImage.src = url;
     }
 
@@ -1393,6 +1463,8 @@
             toast.classList.remove('show');
         }, 3000);
     }
+    // Export to window so external scripts (bulk.js, etc.) can call showToast()
+    window.showToast = showToast;
 
     // ============================================
     // Phase 6: Undo / Redo History
@@ -1766,14 +1838,14 @@
         const bgRemoveInside  = document.getElementById('bgRemoveInsideBtn');
         const bgCancelLasso   = document.getElementById('bgCancelLassoBtn');
         const bgLassoHint     = document.getElementById('bgLassoHint');
-        const bgLassoCanvas   = document.getElementById('bgLassoCanvas');
+        bgLassoCanvas   = document.getElementById('bgLassoCanvas'); // assigned to outer-scope let
 
         // Phase 14: single-image solid background replace
         const bgSolidReplaceWrap = document.getElementById('bgSolidReplaceWrap');
         const bgSolidReplaceToggle = document.getElementById('bgSolidReplaceToggle');
         const bgSolidReplaceColor = document.getElementById('bgSolidReplaceColor');
 
-        const bgCloneCanvas       = document.getElementById('bgCloneCanvas');
+        bgCloneCanvas       = document.getElementById('bgCloneCanvas'); // assigned to outer-scope let
         const cloneBrushSize      = document.getElementById('cloneBrushSize');
         const cloneBrushSizeVal   = document.getElementById('cloneBrushSizeVal');
         const cloneHardness       = document.getElementById('cloneHardness');
@@ -1795,7 +1867,7 @@
         const paintBucketBtn    = document.getElementById('paintBucketBtn');
 
         // Phase 6 — Method 6: Erase/Restore Brush
-        const bgEraseCanvas       = document.getElementById('bgEraseCanvas');
+        bgEraseCanvas       = document.getElementById('bgEraseCanvas'); // assigned to outer-scope let
         const eraseModeEraseBtn   = document.getElementById('eraseModeEraseBtn');
         const eraseModeRestoreBtn = document.getElementById('eraseModeRestoreBtn');
         const eraseBrushSize      = document.getElementById('eraseBrushSize');
@@ -1810,7 +1882,7 @@
         const eraseCancelBtn      = document.getElementById('eraseCancelBtn');
 
         // Phase 6 — Method 7: Magic Wand Selection
-        const bgWandCanvas      = document.getElementById('bgWandCanvas');
+        bgWandCanvas      = document.getElementById('bgWandCanvas'); // assigned to outer-scope let
         const wandTolerance     = document.getElementById('wandTolerance');
         const wandToleranceVal  = document.getElementById('wandToleranceVal');
         const wandContiguous    = document.getElementById('wandContiguous');
