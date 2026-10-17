@@ -100,9 +100,20 @@ function isAllowedOrigin(req) {
     return false;
 }
 
+function isValidHostHeader(req) {
+    const hostHeader = (req.headers.host || '').split(':')[0].toLowerCase();
+    if (!hostHeader) return false;
+    if (hostHeader === 'localhost' || hostHeader === '127.0.0.1') return true;
+    if (/^(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})$/.test(hostHeader)) return true;
+    return false;
+}
+
 function isLocalOrigin(req) {
     const origin = req.headers.origin;
-    if (!origin) return true; // Direct same-origin request without Origin header
+    if (!origin) {
+        const hostHeader = (req.headers.host || '').split(':')[0].toLowerCase();
+        return (hostHeader === 'localhost' || hostHeader === '127.0.0.1');
+    }
     try {
         const u = new URL(origin);
         const host = u.hostname;
@@ -173,10 +184,17 @@ function isStaticAccessAllowed(relativeFilePath, isLoopback) {
 
 const server = http.createServer((req, res) => {
     (async () => {
-        // Set No-Cache headers
+        // Validate Host header to protect against DNS rebinding attacks
+        if (!isValidHostHeader(req)) {
+            res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+            return res.end('400 Bad Request: Invalid Host');
+        }
+
+        // Set No-Cache and security headers
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
 
         // CORS policy: only set when origin is explicitly allowed
         const reqOrigin = req.headers.origin;
@@ -200,6 +218,12 @@ const server = http.createServer((req, res) => {
         } catch (_) {
             res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
             return res.end('400 Bad Request: Malformed URI');
+        }
+
+        // ── Health check (EADDRINUSE second-instance detection) ──────────
+        if (pathname === '/health') {
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+            return res.end(JSON.stringify({ ok: true, name: 'photo-and-text-editor', port: PORT }));
         }
 
         // ── API Endpoints for Mobile Remote Control ──────────────────────
@@ -249,6 +273,7 @@ const server = http.createServer((req, res) => {
                 res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
                 return res.end(JSON.stringify({ success: false, error: 'Too many concurrent video conversions. Please wait.' }));
             }
+            activeConversions++;
             try {
                 const body = await readRequestBody(req, 2 * 1024 * 1024);
                 const data = JSON.parse(body);
@@ -257,6 +282,7 @@ const server = http.createServer((req, res) => {
                 const rawTrim = data.customTrim !== undefined ? String(data.customTrim).trim() : '';
 
                 if (!VALID_PRESETS.has(preset)) {
+                    activeConversions = Math.max(0, activeConversions - 1);
                     res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
                     return res.end(JSON.stringify({ success: false, error: 'Invalid preset specified' }));
                 }
@@ -265,6 +291,7 @@ const server = http.createServer((req, res) => {
                 let customTrim = '';
                 if (rawTrim) {
                     if (!/^\d+(\.\d+)?$/.test(rawTrim) && !/^(\d{1,2}:)?\d{1,2}:\d{2}(\.\d+)?$/.test(rawTrim)) {
+                        activeConversions = Math.max(0, activeConversions - 1);
                         res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
                         return res.end(JSON.stringify({ success: false, error: 'Invalid customTrim format' }));
                     }
@@ -274,6 +301,7 @@ const server = http.createServer((req, res) => {
                 const ALLOWED_VIDEO_EXTS = new Set(['.mp4', '.mov', '.mkv', '.avi', '.webm', '.flv', '.wmv', '.m4v', '.ts']);
                 const ext = path.extname(inputPath).toLowerCase();
                 if (!inputPath || !fs.existsSync(inputPath) || !ALLOWED_VIDEO_EXTS.has(ext)) {
+                    activeConversions = Math.max(0, activeConversions - 1);
                     res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
                     return res.end(JSON.stringify({ success: false, error: 'Invalid or non-existent video file' }));
                 }
@@ -282,8 +310,6 @@ const server = http.createServer((req, res) => {
                 const cp = require('child_process');
                 const args = [scriptPath, inputPath, preset];
                 if (customTrim) args.push(customTrim);
-
-                activeConversions++;
                 const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
                 cp.execFile(pythonCmd, args, {
                     maxBuffer: 15 * 1024 * 1024,
@@ -304,6 +330,7 @@ const server = http.createServer((req, res) => {
                     return res.end(JSON.stringify({ success: true, outputPath: outp, sizeMB }));
                 });
             } catch (err) {
+                activeConversions = Math.max(0, activeConversions - 1);
                 const status = err.message === 'Payload too large' ? 413 : 400;
                 res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
                 return res.end(JSON.stringify({ error: err.message }));
@@ -347,7 +374,7 @@ const server = http.createServer((req, res) => {
                 }
 
                 // Serialize concurrent writes through saveProjectPromise queue
-                await (saveProjectPromise = saveProjectPromise.then(async () => {
+                await (saveProjectPromise = saveProjectPromise.catch(() => {}).then(async () => {
                     await atomicWriteFileAsync(path.join(__dirname, 'recovered-project.json'), JSON.stringify(data));
                     await atomicWriteFileAsync(path.join(__dirname, 'presentation-default-deck.js'), 'window.DEFAULT_RECOVERED_SLIDES = ' + JSON.stringify(data.slides) + ';\n');
                 }));
@@ -370,21 +397,25 @@ const server = http.createServer((req, res) => {
         let resolvedRelPath = pathname === '/' ? 'index.html' : pathname.replace(/^[\\\/]+/, '');
         const isLocal = isLoopbackClient(req);
 
+        if (!isStaticAccessAllowed(resolvedRelPath, isLocal)) {
+            res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+            return res.end('403 Forbidden');
+        }
+
         let filePath = path.join(__dirname, resolvedRelPath);
         try {
             const stats = await fs.promises.stat(filePath);
             if (stats.isDirectory()) {
                 filePath = path.join(filePath, 'index.html');
                 resolvedRelPath = path.join(resolvedRelPath, 'index.html');
+                if (!isStaticAccessAllowed(resolvedRelPath, isLocal)) {
+                    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+                    return res.end('403 Forbidden');
+                }
             }
         } catch (_) {
             res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
             return res.end('404 Not Found');
-        }
-
-        if (!isStaticAccessAllowed(resolvedRelPath, isLocal)) {
-            res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
-            return res.end('403 Forbidden');
         }
 
         fs.stat(filePath, (err, stats) => {
@@ -400,10 +431,7 @@ const server = http.createServer((req, res) => {
 
             if (range) {
                 const match = range.match(/^bytes=(\d*)-(\d*)$/);
-                if (!match) {
-                    res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` });
-                    return res.end();
-                }
+                if (match) {
 
                 let start, end;
                 if (match[1] === '') {
@@ -444,8 +472,12 @@ const server = http.createServer((req, res) => {
                         console.warn('Range stream pipeline notice:', err.message);
                     }
                 });
-            } else {
-                res.writeHead(200, {
+                return;
+            }
+            // Multi-range or invalid range: fall through to full-file 200 stream
+            }
+
+            res.writeHead(200, {
                     'Content-Length': fileSize,
                     'Accept-Ranges': 'bytes',
                     'Content-Type': contentType
@@ -456,7 +488,6 @@ const server = http.createServer((req, res) => {
                         console.warn('File stream pipeline notice:', err.message);
                     }
                 });
-            }
         });
     })().catch(err => {
         console.error('Server request exception:', err);

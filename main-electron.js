@@ -94,9 +94,20 @@ function isLoopbackClient(req) {
     return remoteIp === '127.0.0.1' || remoteIp === '::1' || remoteIp === '::ffff:127.0.0.1';
 }
 
+function isValidHostHeader(req) {
+    const hostHeader = (req.headers.host || '').split(':')[0].toLowerCase();
+    if (!hostHeader) return false;
+    if (hostHeader === 'localhost' || hostHeader === '127.0.0.1') return true;
+    if (/^(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3})$/.test(hostHeader)) return true;
+    return false;
+}
+
 function isLocalOrigin(req) {
     const origin = req.headers.origin;
-    if (!origin) return true;
+    if (!origin) {
+        const hostHeader = (req.headers.host || '').split(':')[0].toLowerCase();
+        return (hostHeader === 'localhost' || hostHeader === '127.0.0.1');
+    }
     try {
         const u = new URL(origin);
         const host = u.hostname;
@@ -165,9 +176,15 @@ function isStaticAccessAllowed(relativeFilePath, isLoopback) {
 function startInternalServer(callback) {
     server = http.createServer((req, res) => {
         (async () => {
+            if (!isValidHostHeader(req)) {
+                res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+                return res.end('400 Bad Request: Invalid Host');
+            }
+
             res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
+            res.setHeader('X-Content-Type-Options', 'nosniff');
 
             // Strictly restricted CORS header
             const reqOrigin = req.headers.origin;
@@ -191,6 +208,12 @@ function startInternalServer(callback) {
             } catch (_) {
                 res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
                 return res.end('400 Bad Request: Malformed URI');
+            }
+
+            // Health check (EADDRINUSE second-instance detection)
+            if (pathname === '/health') {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                return res.end(JSON.stringify({ ok: true, name: 'photo-and-text-editor', port: SERVER_PORT }));
             }
 
             // Mobile Remote Endpoints
@@ -239,6 +262,7 @@ function startInternalServer(callback) {
                     res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
                     return res.end(JSON.stringify({ success: false, error: 'Too many concurrent video conversions. Please wait.' }));
                 }
+                activeConversions++;
                 try {
                     const body = await readRequestBody(req, 2 * 1024 * 1024);
                     const data = JSON.parse(body);
@@ -247,6 +271,7 @@ function startInternalServer(callback) {
                     const rawTrim = data.customTrim !== undefined ? String(data.customTrim).trim() : '';
 
                     if (!VALID_PRESETS.has(preset)) {
+                        activeConversions = Math.max(0, activeConversions - 1);
                         res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
                         return res.end(JSON.stringify({ success: false, error: 'Invalid preset specified' }));
                     }
@@ -254,6 +279,7 @@ function startInternalServer(callback) {
                     let customTrim = '';
                     if (rawTrim) {
                         if (!/^\d+(\.\d+)?$/.test(rawTrim) && !/^(\d{1,2}:)?\d{1,2}:\d{2}(\.\d+)?$/.test(rawTrim)) {
+                            activeConversions = Math.max(0, activeConversions - 1);
                             res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
                             return res.end(JSON.stringify({ success: false, error: 'Invalid customTrim format' }));
                         }
@@ -263,6 +289,7 @@ function startInternalServer(callback) {
                     const ALLOWED_VIDEO_EXTS = new Set(['.mp4', '.mov', '.mkv', '.avi', '.webm', '.flv', '.wmv', '.m4v', '.ts']);
                     const ext = path.extname(inputPath).toLowerCase();
                     if (!inputPath || !fs.existsSync(inputPath) || !ALLOWED_VIDEO_EXTS.has(ext)) {
+                        activeConversions = Math.max(0, activeConversions - 1);
                         res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
                         return res.end(JSON.stringify({ success: false, error: 'Invalid or non-existent video file' }));
                     }
@@ -272,7 +299,6 @@ function startInternalServer(callback) {
                     const args = [scriptPath, inputPath, preset];
                     if (customTrim) args.push(customTrim);
 
-                    activeConversions++;
                     const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
                     cp.execFile(pythonCmd, args, {
                         maxBuffer: 15 * 1024 * 1024,
@@ -293,6 +319,7 @@ function startInternalServer(callback) {
                         return res.end(JSON.stringify({ success: true, outputPath: outp, sizeMB }));
                     });
                 } catch (err) {
+                    activeConversions = Math.max(0, activeConversions - 1);
                     const status = err.message === 'Payload too large' ? 413 : 400;
                     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
                     return res.end(JSON.stringify({ error: err.message }));
@@ -335,7 +362,7 @@ function startInternalServer(callback) {
                     }
 
                     // Serialize concurrent writes through saveProjectPromise queue
-                    await (saveProjectPromise = saveProjectPromise.then(async () => {
+                    await (saveProjectPromise = saveProjectPromise.catch(() => {}).then(async () => {
                         await atomicWriteFileAsync(path.join(__dirname, 'recovered-project.json'), JSON.stringify(data));
                         await atomicWriteFileAsync(path.join(__dirname, 'presentation-default-deck.js'), 'window.DEFAULT_RECOVERED_SLIDES = ' + JSON.stringify(data.slides) + ';\n');
                     }));
@@ -358,21 +385,25 @@ function startInternalServer(callback) {
             let resolvedRelPath = pathname === '/' ? 'index.html' : pathname.replace(/^[\\\/]+/, '');
             const isLocal = isLoopbackClient(req);
 
+            if (!isStaticAccessAllowed(resolvedRelPath, isLocal)) {
+                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+                return res.end('403 Forbidden');
+            }
+
             let filePath = path.join(__dirname, resolvedRelPath);
             try {
                 const stats = await fs.promises.stat(filePath);
                 if (stats.isDirectory()) {
                     filePath = path.join(filePath, 'index.html');
                     resolvedRelPath = path.join(resolvedRelPath, 'index.html');
+                    if (!isStaticAccessAllowed(resolvedRelPath, isLocal)) {
+                        res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+                        return res.end('403 Forbidden');
+                    }
                 }
             } catch (_) {
                 res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
                 return res.end('404 Not Found');
-            }
-
-            if (!isStaticAccessAllowed(resolvedRelPath, isLocal)) {
-                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
-                return res.end('403 Forbidden');
             }
 
             fs.stat(filePath, (err, stats) => {
@@ -388,62 +419,55 @@ function startInternalServer(callback) {
 
                 if (range) {
                     const match = range.match(/^bytes=(\d*)-(\d*)$/);
-                    if (!match) {
-                        res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` });
-                        return res.end();
-                    }
-
-                    let start, end;
-                    if (match[1] === '') {
-                        const suffix = parseInt(match[2], 10);
-                        if (isNaN(suffix) || suffix <= 0) {
-                            res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` });
-                            return res.end();
+                    if (match) {
+                        let start, end;
+                        if (match[1] === '') {
+                            const suffix = parseInt(match[2], 10);
+                            if (!isNaN(suffix) && suffix > 0) {
+                                start = Math.max(0, fileSize - suffix);
+                                end = fileSize - 1;
+                            }
+                        } else {
+                            start = parseInt(match[1], 10);
+                            end = match[2] ? parseInt(match[2], 10) : fileSize - 1;
                         }
-                        start = Math.max(0, fileSize - suffix);
-                        end = fileSize - 1;
-                    } else {
-                        start = parseInt(match[1], 10);
-                        end = match[2] ? parseInt(match[2], 10) : fileSize - 1;
-                    }
 
-                    // RFC 7233 / 9110: Clamp end to fileSize - 1 if it exceeds or equals fileSize
-                    if (end >= fileSize) {
-                        end = fileSize - 1;
-                    }
-
-                    if (isNaN(start) || start < 0 || start >= fileSize || start > end) {
-                        res.writeHead(416, { 'Content-Range': `bytes */${fileSize}` });
-                        return res.end();
-                    }
-
-                    const chunkSize = (end - start) + 1;
-                    res.writeHead(206, {
-                        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-                        'Accept-Ranges': 'bytes',
-                        'Content-Length': chunkSize,
-                        'Content-Type': contentType
-                    });
-
-                    const fileStream = fs.createReadStream(filePath, { start, end });
-                    pipeline(fileStream, res, (err) => {
-                        if (err && err.code !== 'ERR_STREAM_PREMATURE_CLOSE') {
-                            console.warn('Range stream pipeline notice:', err.message);
+                        if (end >= fileSize) {
+                            end = fileSize - 1;
                         }
-                    });
-                } else {
-                    res.writeHead(200, {
-                        'Content-Length': fileSize,
-                        'Accept-Ranges': 'bytes',
-                        'Content-Type': contentType
-                    });
-                    const fileStream = fs.createReadStream(filePath);
-                    pipeline(fileStream, res, (err) => {
-                        if (err && err.code !== 'ERR_STREAM_PREMATURE_CLOSE') {
-                            console.warn('File stream pipeline notice:', err.message);
+
+                        if (!isNaN(start) && start >= 0 && start < fileSize && start <= end) {
+                            const chunkSize = (end - start) + 1;
+                            res.writeHead(206, {
+                                'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                                'Accept-Ranges': 'bytes',
+                                'Content-Length': chunkSize,
+                                'Content-Type': contentType
+                            });
+
+                            const fileStream = fs.createReadStream(filePath, { start, end });
+                            pipeline(fileStream, res, (errStream) => {
+                                if (errStream && errStream.code !== 'ERR_STREAM_PREMATURE_CLOSE') {
+                                    console.warn('Range stream pipeline notice:', errStream.message);
+                                }
+                            });
+                            return;
                         }
-                    });
+                    }
+                    // Multi-range or invalid range: fall through to full file
                 }
+
+                res.writeHead(200, {
+                    'Content-Length': fileSize,
+                    'Accept-Ranges': 'bytes',
+                    'Content-Type': contentType
+                });
+                const fileStream = fs.createReadStream(filePath);
+                pipeline(fileStream, res, (errStream) => {
+                    if (errStream && errStream.code !== 'ERR_STREAM_PREMATURE_CLOSE') {
+                        console.warn('File stream pipeline notice:', errStream.message);
+                    }
+                });
             });
         })().catch(err => {
             console.error('Electron internal server error:', err);
@@ -461,8 +485,41 @@ function startInternalServer(callback) {
 
     server.on('error', (err) => {
         if (err.code === 'EADDRINUSE') {
-            console.warn(`Port ${SERVER_PORT} already in use – verifying connection.`);
-            if (callback) callback();
+            // পোর্ট অন্য কেউ ব্যবহার করছে — health-check দিয়ে verify করি
+            // এটা আমাদেরই server কিনা (যেমন second-instance ক্ষেত্রে)
+            console.warn(`Port ${SERVER_PORT} already in use – verifying our server.`);
+            const http = require('http');
+            const req = http.request(
+                { host: '127.0.0.1', port: SERVER_PORT, path: '/health', timeout: 2000 },
+                (res) => {
+                    let body = '';
+                    res.on('data', (chunk) => { body += chunk; });
+                    res.on('end', () => {
+                        try {
+                            const json = JSON.parse(body);
+                            if (json.ok === true) {
+                                console.log('Our server already running – proceeding.');
+                                if (callback) callback();
+                                return;
+                            }
+                        } catch (_) {}
+                        showPortConflictError();
+                    });
+                }
+            );
+            req.on('error', showPortConflictError);
+            req.on('timeout', () => { req.destroy(); showPortConflictError(); });
+            req.end();
+
+            function showPortConflictError() {
+                console.error(`Port ${SERVER_PORT} is in use by an unknown process. Aborting.`);
+                const { dialog } = require('electron');
+                dialog.showErrorBox(
+                    'Port Conflict',
+                    `Port ${SERVER_PORT} is already in use by another application.\nPlease close it and restart Photo & 3D Text Studio.`
+                );
+                require('electron').app.quit();
+            }
         } else {
             console.error('Server error:', err);
         }

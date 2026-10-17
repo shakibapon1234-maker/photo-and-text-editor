@@ -86,14 +86,27 @@ PRESETS = {
     }
 }
 
-def parse_time_seconds(time_str):
+def parse_time_seconds(time_val):
+    if time_val is None:
+        return 0.0
+    if isinstance(time_val, (int, float)):
+        return max(0.0, float(time_val))
+    s = str(time_val).strip()
+    if not s:
+        return 0.0
+    if ":" in s:
+        parts = s.split(":")
+        try:
+            if len(parts) == 3:
+                return float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
+            elif len(parts) == 2:
+                return float(parts[0]) * 60 + float(parts[1])
+        except (ValueError, TypeError):
+            return 0.0
     try:
-        parts = time_str.split(":")
-        if len(parts) == 3:
-            return float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
-    except Exception:
-        pass
-    return 0.0
+        return max(0.0, float(s))
+    except (ValueError, TypeError):
+        return 0.0
 
 def convert_video(input_path, output_path, preset_key="loop_60s", custom_trim=None, progress_callback=None):
     ffmpeg_exe = get_ffmpeg_path()
@@ -109,13 +122,7 @@ def convert_video(input_path, output_path, preset_key="loop_60s", custom_trim=No
 
     preset = PRESETS[preset_key]
     raw_trim = custom_trim if custom_trim is not None else preset.get("trim")
-
-    trim_float = 0.0
-    if raw_trim is not None:
-        try:
-            trim_float = float(raw_trim)
-        except (ValueError, TypeError):
-            trim_float = 0.0
+    trim_float = parse_time_seconds(raw_trim)
 
     target_seconds = trim_float if trim_float > 0 else 600.0
 
@@ -159,25 +166,32 @@ def convert_video(input_path, output_path, preset_key="loop_60s", custom_trim=No
     time_regex = re.compile(r"time=(\d{2}:\d{2}:\d{2}\.\d+)")
     speed_regex = re.compile(r"speed=\s*([\d\.]+x)")
 
-    for line in process.stdout:
-        line_str = line.strip()
-        time_match = time_regex.search(line_str)
-        speed_match = speed_regex.search(line_str)
-        
-        percent = None
-        speed_str = speed_match.group(1) if speed_match else ""
+    try:
+        for line in process.stdout:
+            line_str = line.strip()
+            time_match = time_regex.search(line_str)
+            speed_match = speed_regex.search(line_str)
+            
+            percent = None
+            speed_str = speed_match.group(1) if speed_match else ""
 
-        if time_match:
-            current_secs = parse_time_seconds(time_match.group(1))
-            if target_seconds > 0:
-                percent = min(100.0, (current_secs / target_seconds) * 100.0)
+            if time_match:
+                current_secs = parse_time_seconds(time_match.group(1))
+                if target_seconds > 0:
+                    percent = min(100.0, (current_secs / target_seconds) * 100.0)
 
-        if progress_callback:
-            progress_callback(percent, line_str, speed_str)
+            if progress_callback:
+                progress_callback(percent, line_str, speed_str)
 
-    process.wait()
-    if process.returncode != 0:
-        raise RuntimeError(f"FFmpeg process exited with code {process.returncode}")
+        process.wait()
+        if process.returncode != 0:
+            raise RuntimeError(f"FFmpeg process exited with code {process.returncode}")
+    except Exception:
+        try:
+            process.kill()
+        except Exception:
+            pass
+        raise
 
     return output_path
 

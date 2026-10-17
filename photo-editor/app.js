@@ -528,6 +528,8 @@
         canvas.height = originalHeight;
         ctx.drawImage(originalImage, 0, 0);
 
+        let bestQuality = 0.85;
+
         // PNG ignores quality — binary search would spin 20 iterations achieving nothing
         // and freeze the UI. For PNG, skip straight to dimension reduction.
         if (format !== 'image/png') {
@@ -544,6 +546,7 @@
                 if (!blob) break; // Fix: null guard — canvas too large or unsupported format
                 if (blob.size <= targetBytes) {
                     bestBlob = blob;
+                    bestQuality = mid;
                     low = mid;
                 } else {
                     high = mid;
@@ -564,7 +567,7 @@
                 ctx.drawImage(originalImage, 0, 0, newW, newH);
 
                 const blob = await new Promise(resolve => {
-                    canvas.toBlob(resolve, format, format === 'image/png' ? undefined : high);
+                    canvas.toBlob(resolve, format, format === 'image/png' ? undefined : bestQuality);
                 });
                 if (!blob) continue; // Fix: null guard
 
@@ -1745,11 +1748,14 @@
         if (cropHeight) cropHeight.value = originalHeight;
         if (typeof drawCropPreview === 'function') drawCropPreview();
 
-        if (typeof clearColorPreview === 'function') clearColorPreview();
-        if (bgLassoCanvas && typeof lassoCtx !== 'undefined' && lassoCtx) lassoCtx.clearRect(0, 0, bgLassoCanvas.width, bgLassoCanvas.height);
-        if (bgCloneCanvas && typeof cloneCtx !== 'undefined' && cloneCtx) cloneCtx.clearRect(0, 0, bgCloneCanvas.width, bgCloneCanvas.height);
-        if (bgEraseCanvas && typeof eraseCtx !== 'undefined' && eraseCtx) eraseCtx.clearRect(0, 0, bgEraseCanvas.width, bgEraseCanvas.height);
-        if (bgWandCanvas && typeof wandCtx !== 'undefined' && wandCtx) wandCtx.clearRect(0, 0, bgWandCanvas.width, bgWandCanvas.height);
+        if (typeof window.__bgResetOverlays === 'function') {
+            window.__bgResetOverlays();
+        } else {
+            if (bgLassoCanvas) bgLassoCanvas.getContext('2d')?.clearRect(0, 0, bgLassoCanvas.width, bgLassoCanvas.height);
+            if (bgCloneCanvas) bgCloneCanvas.getContext('2d')?.clearRect(0, 0, bgCloneCanvas.width, bgCloneCanvas.height);
+            if (bgEraseCanvas) bgEraseCanvas.getContext('2d')?.clearRect(0, 0, bgEraseCanvas.width, bgEraseCanvas.height);
+            if (bgWandCanvas) bgWandCanvas.getContext('2d')?.clearRect(0, 0, bgWandCanvas.width, bgWandCanvas.height);
+        }
 
         renderHistoryList();
         showToast('🧹 সব এডিট মুছে আপলোড করা মূল ফটোতে ফিরিয়ে আনা হয়েছে', 'success');
@@ -2394,6 +2400,14 @@
             bgColorCanvas.style.display = 'none';
             bgColorCtx.clearRect(0, 0, bgColorCanvas.width, bgColorCanvas.height);
         }
+
+        window.__bgResetOverlays = function() {
+            clearColorPreview();
+            if (bgLassoCanvas) bgLassoCanvas.getContext('2d')?.clearRect(0, 0, bgLassoCanvas.width, bgLassoCanvas.height);
+            if (bgCloneCanvas) bgCloneCanvas.getContext('2d')?.clearRect(0, 0, bgCloneCanvas.width, bgCloneCanvas.height);
+            if (bgEraseCanvas) bgEraseCanvas.getContext('2d')?.clearRect(0, 0, bgEraseCanvas.width, bgEraseCanvas.height);
+            if (bgWandCanvas) bgWandCanvas.getContext('2d')?.clearRect(0, 0, bgWandCanvas.width, bgWandCanvas.height);
+        };
 
         function scheduleColorPreview() {
             if (!bgLivePreview || !bgLivePreview.checked || !originalImage || !bgColorCtx) return;

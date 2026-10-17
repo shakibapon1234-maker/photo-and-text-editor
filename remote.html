@@ -168,25 +168,58 @@
         peerConn = null;
       }
 
+      let reconnectTimer = 0;
+      function scheduleReconnect(delay = 2500) {
+        if (isConnected) return;
+        clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => {
+          if (!isConnected && targetRoom) {
+            if (!peer || peer.destroyed) {
+              initPeerConnection(targetRoom);
+            } else if (peer.disconnected) {
+              try { peer.reconnect(); } catch(_) {}
+              connectToHost(targetRoom);
+            } else {
+              connectToHost(targetRoom);
+            }
+          }
+        }, delay);
+      }
+
       if (!peer || peer.destroyed) {
         try {
           peer = new Peer(null, { debug: 0 });
           peer.on('open', () => {
             connectToHost(targetRoom);
           });
+          peer.on('disconnected', () => {
+            console.warn('Peer disconnected from cloud server, reconnecting...');
+            try { if (!peer.destroyed) peer.reconnect(); } catch(_) {}
+            scheduleReconnect(1500);
+          });
           peer.on('error', (err) => {
             console.warn('Peer error:', err);
             updateConnStatus('⚠️ ' + (err.type || 'Retrying connection...'), '#ef4444');
-            setTimeout(() => {
-              if (!isConnected && targetRoom) initPeerConnection(targetRoom);
-            }, 3000);
+            scheduleReconnect(3000);
           });
         } catch (e) {
           updateConnStatus('⚠️ Cloud library loading...', '#ef4444');
         }
-      } else if (peer.open) {
+      } else if (peer.disconnected) {
+        try { peer.reconnect(); } catch(_) {}
+        connectToHost(targetRoom);
+      } else {
         connectToHost(targetRoom);
       }
+    }
+
+    let connReconnectTimer = 0;
+    function scheduleConnRetry(delay = 2500) {
+      if (isConnected) return;
+      clearTimeout(connReconnectTimer);
+      connReconnectTimer = setTimeout(() => {
+        if (!isConnected && targetRoom) connectToHost(targetRoom);
+      }, delay);
     }
 
     function connectToHost(room) {
@@ -196,6 +229,7 @@
 
         peerConn.on('open', () => {
           isConnected = true;
+          clearTimeout(connReconnectTimer);
           updateConnStatus('🟢 Connected to ' + room, '#10b981');
           showToast('✓ Connected to Presentation!');
         });
@@ -209,20 +243,17 @@
         peerConn.on('close', () => {
           isConnected = false;
           updateConnStatus('🔴 Disconnected. Reconnecting...', '#ef4444');
-          setTimeout(() => {
-            if (!isConnected && targetRoom) connectToHost(targetRoom);
-          }, 2500);
+          scheduleConnRetry(2500);
         });
 
         peerConn.on('error', (err) => {
           console.warn('Peer conn error:', err);
           updateConnStatus('⚠️ Retrying ' + room + '...', '#f59e0b');
-          setTimeout(() => {
-            if (!isConnected && targetRoom) connectToHost(targetRoom);
-          }, 3000);
+          scheduleConnRetry(3000);
         });
       } catch (e) {
         updateConnStatus('⚠️ Connection failed', '#ef4444');
+        scheduleConnRetry(3000);
       }
     }
 

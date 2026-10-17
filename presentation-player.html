@@ -1919,10 +1919,25 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
           });
         });
 
+        cloudPeer.on('disconnected', () => {
+          console.warn('Cloud Peer disconnected. Attempting to reconnect...');
+          try {
+            if (!cloudPeer.destroyed) {
+              cloudPeer.reconnect();
+            }
+          } catch (_) {}
+        });
+
         cloudPeer.on('error', (err) => {
           console.warn('Cloud Peer error:', err);
           if (err.type === 'unavailable-id') {
             generateNewRoomCode();
+          } else if (err.type === 'network' || err.type === 'server-error') {
+            try {
+              if (cloudPeer.disconnected && !cloudPeer.destroyed) {
+                cloudPeer.reconnect();
+              }
+            } catch (_) {}
           }
         });
       } catch (e) {

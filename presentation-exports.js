@@ -98,8 +98,11 @@
       if (!confirmed) return;
 
       // Load into editor
-      window.slides = extracted;
-      try { slides.length = 0; extracted.forEach(s => slides.push(s)); } catch (_) {}
+      if (typeof window.setSlides === 'function') {
+        window.setSlides(extracted);
+      } else {
+        window.slides = extracted;
+      }
       try { current = 0; } catch(_) {}
       try { selected = null; } catch(_) {}
       if (typeof render === 'function') render();
@@ -327,16 +330,21 @@
     }
 
     // ── Build final HTML ──────────────────────────────────────────────────
-    let finalHtml = baseTemplate.replace('let slides = [];', 'let slides = ' + currentSlidesJson + ';');
+    const safeSlidesJson = currentSlidesJson
+      .replace(/</g, '\\u003c')
+      .replace(/\u2028/g, '\\u2028')
+      .replace(/\u2029/g, '\\u2029');
+
+    let finalHtml = baseTemplate.replace('let slides = [];', () => 'let slides = ' + safeSlidesJson + ';');
     // Inject embedded server host
-    finalHtml = finalHtml.replace('</head>', `<script>window.__EMBEDDED_SERVER_HOST = ${JSON.stringify(serverHost)};<\/script>\n</head>`);
+    finalHtml = finalHtml.replace('</head>', () => `<script>window.__EMBEDDED_SERVER_HOST = ${JSON.stringify(serverHost)};<\/script>\n</head>`);
     // Hide dropzone since slides are preloaded
-    finalHtml = finalHtml.replace('<div id="dropzone">', '<div id="dropzone" class="hidden">');
-    finalHtml = finalHtml.replace('</body>', exportedControlsEnhancement + '\n</body>');
+    finalHtml = finalHtml.replace('<div id="dropzone">', () => '<div id="dropzone" class="hidden">');
+    finalHtml = finalHtml.replace('</body>', () => exportedControlsEnhancement + '\n</body>');
 
     // If no audio, mark soundtrack controls with no-audio class & hide
     if (!hasAudio) {
-      finalHtml = finalHtml.replace('id="soundtrackControls" class="soundtrack-ctrl-group"', 'id="soundtrackControls" class="soundtrack-ctrl-group no-audio" style="display:none;"');
+      finalHtml = finalHtml.replace('id="soundtrackControls" class="soundtrack-ctrl-group"', () => 'id="soundtrackControls" class="soundtrack-ctrl-group no-audio" style="display:none;"');
     }
 
     // Bundle AI Assistant doll directly inline so standalone export works on any computer offline
@@ -348,12 +356,12 @@
           if (finalHtml.includes('<script src="presentation-ai-assistant.js"></script>')) {
             finalHtml = finalHtml.replace(
               '<script src="presentation-ai-assistant.js"></script>',
-              `<script>\n/* Embedded AI Assistant Doll */\n${aiCode}\n<\/script>`
+              () => `<script>\n/* Embedded AI Assistant Doll */\n${aiCode}\n<\/script>`
             );
           } else {
             finalHtml = finalHtml.replace(
               '</body>',
-              `<script>\n/* Embedded AI Assistant Doll */\n${aiCode}\n<\/script>\n</body>`
+              () => `<script>\n/* Embedded AI Assistant Doll */\n${aiCode}\n<\/script>\n</body>`
             );
           }
         }
@@ -368,7 +376,7 @@
         if (peerCode && peerCode.length > 1000) {
           finalHtml = finalHtml.replace(
             '<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>',
-            `<script>\n/* Embedded PeerJS WebRTC */\n${peerCode}\n<\/script>`
+            () => `<script>\n/* Embedded PeerJS WebRTC */\n${peerCode}\n<\/script>`
           );
         }
       }
@@ -382,7 +390,7 @@
         if (qrCode && qrCode.length > 500) {
           finalHtml = finalHtml.replace(
             '</head>',
-            `<script>\n/* Embedded Offline QR Generator */\n${qrCode}\n<\/script>\n</head>`
+            () => `<script>\n/* Embedded Offline QR Generator */\n${qrCode}\n<\/script>\n</head>`
           );
         }
       }
@@ -390,7 +398,7 @@
 
     // Inject audio init script just before </body>
     if (audioEmbedScript) {
-      finalHtml = finalHtml.replace('</body>', audioEmbedScript + '\n</body>');
+      finalHtml = finalHtml.replace('</body>', () => audioEmbedScript + '\n</body>');
       console.log('✅ Presentation soundtrack successfully embedded with interactive volume controls.');
     } else {
       console.log('ℹ️ Exporting standalone slideshow without soundtrack.');

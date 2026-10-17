@@ -2,7 +2,7 @@
 // কনভেনশন: pure/helper ফাংশনগুলো top-level এ (Node দিয়ে syntax-check করা যায়),
 // সব async কাজ defensive try/catch দিয়ে ঘেরা, যাতে একটা রিসোর্স ফেইল করলে পুরো SW ভেঙে না পড়ে।
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const APP_SHELL_CACHE = `photo-editor-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `photo-editor-runtime-${CACHE_VERSION}`;
 const KNOWN_CACHES = [APP_SHELL_CACHE, RUNTIME_CACHE];
@@ -18,6 +18,7 @@ const APP_SHELL_PATHS = [
     './collage.js',
     './jszip.min.js',
     '../gif.js',
+    '../gif.worker.js',
     './social-presets.js',
     './watermark.js',
     './manifest.json',
@@ -109,7 +110,7 @@ async function networkFirst(request, cacheName) {
     }
 }
 
-async function staleWhileRevalidate(request, cacheName) {
+async function staleWhileRevalidate(request, cacheName, event) {
     const cache = await caches.open(cacheName);
     const cached = await cache.match(request);
     const networkFetch = fetch(request)
@@ -122,22 +123,16 @@ async function staleWhileRevalidate(request, cacheName) {
         .catch(() => null);
 
     if (cached) {
-        // ব্যাকগ্রাউন্ডে আপডেট চালিয়ে যাওয়া হচ্ছে, কিন্তু ইউজারকে সাথে সাথে cached ভার্সন দেওয়া হচ্ছে
-        event_waitUntilSafe(networkFetch);
+        // ব্যাকগ্রাউন্ডে আপডেট চালিয়ে যাওয়া হচ্ছে, এবং Service Worker যাতে আগে বন্ধ না হয়ে যায়
+        // তাই event.waitUntil দিয়ে লাইফসাইকেল বাঁচিয়ে রাখা হচ্ছে
+        if (event && typeof event.waitUntil === 'function') {
+            event.waitUntil(networkFetch);
+        }
         return cached;
     }
     const networkResponse = await networkFetch;
     if (networkResponse) return networkResponse;
     throw new Error('অফলাইন এবং ক্যাশেও পাওয়া যায়নি: ' + request.url);
-}
-
-// staleWhileRevalidate-এর ব্যাকগ্রাউন্ড fetch-টা যেন সার্ভিস ওয়ার্কার সময়ের আগে বন্ধ না হয়ে যায়,
-// কিন্তু এখানে সরাসরি event.waitUntil অ্যাক্সেস নেই (helper function-এ কল হচ্ছে) — তাই promise-টা
-// নিজে থেকেই resolve হতে দেওয়া হচ্ছে (fire-and-forget), কোনো throw যাতে unhandled না থাকে সেটা catch করা আছে।
-function event_waitUntilSafe(promise) {
-    if (promise && typeof promise.catch === 'function') {
-        promise.catch(() => {});
-    }
 }
 
 self.addEventListener('fetch', (event) => {
@@ -172,13 +167,13 @@ self.addEventListener('fetch', (event) => {
 
     if (isSameOrigin) {
         // এই অ্যাপের নিজের ফাইল (js/css/আইকন) — stale-while-revalidate, অফলাইনেও কাজ করবে
-        event.respondWith(staleWhileRevalidate(request, APP_SHELL_CACHE));
+        event.respondWith(staleWhileRevalidate(request, APP_SHELL_CACHE, event));
         return;
     }
 
     if (RUNTIME_CACHE_HOSTS.has(url.hostname)) {
         // ফন্ট/JSZip CDN — প্রথমবার অনলাইনে থাকলে ক্যাশ হয়ে যাবে, পরে অফলাইনেও পাওয়া যাবে
-        event.respondWith(staleWhileRevalidate(request, RUNTIME_CACHE));
+        event.respondWith(staleWhileRevalidate(request, RUNTIME_CACHE, event));
         return;
     }
 

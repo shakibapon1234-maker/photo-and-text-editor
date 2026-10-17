@@ -70,6 +70,13 @@
     return null;
   }
 
+  const ALLOWED_ELEMENT_TYPES = new Set(['text', 'image', 'shape', 'video', 'table', 'chart']);
+  function isSafeElementSrc(src) {
+    if (typeof src !== 'string') return false;
+    const s = src.trim();
+    return /^(data:image\/[a-zA-Z0-9+.-]+;base64,|blob:|https?:\/\/|\/)/i.test(s);
+  }
+
   function validateDeckSchema(deck) {
     if (!Array.isArray(deck) || deck.length === 0) return null;
     return deck.map(s => {
@@ -78,7 +85,12 @@
       }
       return {
         ...s,
-        elements: Array.isArray(s.elements) ? s.elements.filter(e => e && typeof e === 'object' && e.id) : []
+        elements: Array.isArray(s.elements) ? s.elements.filter(e => {
+          if (!e || typeof e !== 'object' || !e.id) return false;
+          if (e.type && !ALLOWED_ELEMENT_TYPES.has(e.type)) return false;
+          if (e.type === 'image' && e.src && !isSafeElementSrc(e.src)) return false;
+          return true;
+        }) : []
       };
     });
   }
@@ -135,10 +147,11 @@
           }
 
           // Apply to editor with full synchronization
-          if (typeof window.setSlides === 'function') window.setSlides(loadedSlides);
-          else window.slides = loadedSlides;
-
-          try { slides.length = 0; loadedSlides.forEach(s => slides.push(s)); } catch (_) {}
+          if (typeof window.setSlides === 'function') {
+            window.setSlides(loadedSlides);
+          } else {
+            window.slides = loadedSlides;
+          }
           if (typeof window.setCurrent === 'function') window.setCurrent(0);
           else window.current = 0;
           try { current = 0; } catch(_) {}

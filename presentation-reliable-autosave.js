@@ -85,9 +85,12 @@
       if (value === null || value === undefined) return String(value);
       if (typeof value === 'string') {
         if (value.length < 64) return value;
-        // Fast 32-bit FNV-1a hash over entire string so any middle edits are caught
+        if (value.startsWith('data:')) {
+          return 'data:' + value.length + '_' + value.slice(0, 32) + '_' + value.slice(-32);
+        }
         let h = 0x811c9dc5;
-        for (let i = 0; i < value.length; i++) {
+        const step = value.length > 10000 ? Math.floor(value.length / 500) : 1;
+        for (let i = 0; i < value.length; i += step) {
           h ^= value.charCodeAt(i);
           h = (h * 0x01000193) >>> 0;
         }
@@ -147,14 +150,18 @@
     try {
       // Only write compact outline without heavy base64 strings so it never fills localStorage quota
       const safeData = sanitizeForLocalStorage(data);
-      localStorage.setItem(LS_AUTOSAVE, JSON.stringify({ slides: safeData.slides, current: safeData.current }));
+      localStorage.setItem(LS_AUTOSAVE, JSON.stringify({
+        slides: safeData.slides,
+        current: safeData.current,
+        savedAt: data.savedAt || Date.now()
+      }));
     } catch (_) {
       /* storage quota safe */
     }
   }
 
   async function updateSnapshotsHistoryInIDB(data) {
-    if (!db) return;
+    if (!db || !data || !Array.isArray(data.slides) || data.slides.length === 0) return;
     try {
       let list = (await get('snapshots_history')) || [];
       if (!Array.isArray(list)) list = [];
@@ -171,15 +178,69 @@
 
   let lastSavedFingerprint = '';
   let lastSavedSlideCount = -1;
+  let serverSaveTimer = 0;
+  let serverSaveFailCount = 0;
 
-  async function saveNow() {
+  function updateUnavailableMediaBanner() {
+    let banner = document.getElementById('missingMediaWarningBanner');
+    const hasMissing = hasUnavailableMedia(slides);
+    if (!hasMissing) {
+      if (banner) banner.remove();
+      return;
+    }
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'missingMediaWarningBanner';
+      banner.style.cssText = 'position:fixed;top:54px;left:50%;transform:translateX(-50%);background:#b91c1c;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.4);display:flex;align-items:center;gap:8px';
+      banner.innerHTML = '<span>⚠️ কিছু ছবি লোড করা সম্ভব হয়নি ([placeholder])। ডেটা সুরক্ষার জন্য অটোসেভ স্থগিত রয়েছে।</span><button style="background:#fff;color:#b91c1c;border:none;padding:2px 6px;border-radius:4px;cursor:pointer;font-weight:bold">×</button>';
+      banner.querySelector('button').onclick = () => banner.remove();
+      document.body.appendChild(banner);
+    }
+  }
+
+  function triggerServerSave(data, immediate = false) {
+    clearTimeout(serverSaveTimer);
+    const doSave = async () => {
+      try {
+        if (typeof fetch !== 'function') return;
+        const res = await fetch('/api/save-project', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        if (res.ok) {
+          serverSaveFailCount = 0;
+        } else {
+          serverSaveFailCount++;
+          if (serverSaveFailCount === 3) {
+            window.showPresentationToast?.('⚠️ সার্ভার ব্যাকআপ ব্যর্থ হয়েছে। লোকাল ব্যাকআপ চালু আছে।');
+          }
+        }
+      } catch (_) {
+        serverSaveFailCount++;
+        if (serverSaveFailCount === 3) {
+          window.showPresentationToast?.('⚠️ সার্ভার সংযোগ বিচ্ছিন্ন। লোকাল ব্যাকআপ চালু আছে।');
+        }
+      }
+    };
+    if (immediate) {
+      doSave();
+    } else {
+      serverSaveTimer = setTimeout(doSave, 15000);
+    }
+  }
+
+  async function saveNow(forceImmediateServer = false) {
     if (!ready || !db) return;
+    if (!slides || !Array.isArray(slides) || slides.length === 0) return;
     if (writing) { queued = true; return; }
 
     if (hasUnavailableMedia(slides)) {
       console.warn('Skipped saving an incomplete presentation backup.');
+      updateUnavailableMediaBanner();
       return;
     }
+    updateUnavailableMediaBanner();
 
     const currentFingerprint = computeDeckFingerprint(slides, current);
     const countChanged = Array.isArray(slides) && slides.length !== lastSavedSlideCount;
@@ -202,16 +263,8 @@
       lastSavedFingerprint = currentFingerprint;
       lastSavedSlideCount = Array.isArray(slides) ? slides.length : 0;
 
-      // 3. Persistent backend server write
-      try {
-        if (typeof fetch === 'function') {
-          fetch('/api/save-project', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          }).catch(() => {});
-        }
-      } catch (_) {}
+      // 3. Persistent backend server write (debounced for performance)
+      triggerServerSave(data, forceImmediateServer);
 
       // 4. Emergency secondary backup & snapshot history in IndexedDB (prevents localStorage exhaustion)
       put('emergency_backup', data).catch(() => {});
@@ -245,36 +298,49 @@
   };
 
   window.addEventListener('presentation:change', () => schedule(true));
-  window.presentationSaveNow = () => saveNow();
+  window.presentationSaveNow = (immediate = true) => saveNow(immediate);
 
+  let closeHandled = false;
   const handleAppClose = () => {
+    if (closeHandled) return;
+    closeHandled = true;
     clearTimeout(timer);
-    lastSavedFingerprint = '';
+    clearTimeout(serverSaveTimer);
     try {
       const data = snapshot();
       saveToLocalStorage(data);
       const payload = JSON.stringify(data);
-      // Chromium limits sendBeacon/keepalive payloads to ~64KB
-      if (payload.length < 60000) {
+      let byteLen = 0;
+      try {
+        byteLen = new TextEncoder().encode(payload).length;
+      } catch (_) {
+        byteLen = payload.length;
+      }
+      // Chromium limits sendBeacon payloads to ~64KB
+      if (byteLen < 64000) {
         if (navigator.sendBeacon) {
           const blob = new Blob([payload], { type: 'application/json' });
           navigator.sendBeacon('/api/save-project', blob);
         }
       } else {
-        // For large decks, attempt keepalive fetch with quota-safe summary or saveNow
+        // Outline under 64KB for emergency server beacon
         try {
-          fetch('/api/save-project', {
-            method: 'POST',
-            body: payload,
-            keepalive: true,
-            headers: { 'Content-Type': 'application/json' }
-          }).catch(() => {});
+          const safeOutline = JSON.stringify(sanitizeForLocalStorage(data));
+          if (navigator.sendBeacon) {
+            const blob = new Blob([safeOutline], { type: 'application/json' });
+            navigator.sendBeacon('/api/save-project', blob);
+          }
         } catch (_) {}
       }
-      saveNow();
     } catch (_) {}
   };
   window.addEventListener('beforeunload', handleAppClose);
+  window.addEventListener('pagehide', handleAppClose);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      saveNow(true);
+    }
+  });
   window.addEventListener('pagehide', handleAppClose);
 
   // ── Modal & UI Recovery System ──────────────────────────────────
@@ -464,7 +530,9 @@
     const lsEmergency = (() => {
       try { return JSON.parse(localStorage.getItem(LS_EMERGENCY) || 'null'); } catch (_) { return null; }
     })();
-    const snapshots = getSnapshotsHistory();
+    let snapshots = [];
+    try { snapshots = (await get('snapshots_history')) || []; } catch (_) {}
+    if (!Array.isArray(snapshots)) snapshots = [];
 
     const candidates = [];
     if (idbCurrent?.slides?.length) candidates.push({ tag: '🌟 বর্তমান অটো-সেভ (Current Autosave)', data: idbCurrent });
@@ -543,9 +611,9 @@
 
     modal.querySelector('#closeRecoveryModal').onclick = () => modal.remove();
     modal.querySelector('#closeRecoveryModal2').onclick = () => modal.remove();
-    modal.querySelector('#manualSnapshotBtn').onclick = () => {
+    modal.querySelector('#manualSnapshotBtn').onclick = async () => {
       const snap = snapshot();
-      updateSnapshotsHistory(snap);
+      await updateSnapshotsHistoryInIDB(snap);
       alert('সফলভাবে স্ন্যাপশট সংরক্ষিত হয়েছে!');
       openRecoveryModal();
     };
@@ -616,17 +684,19 @@
       let bestCandidate = null;
       if (candidates.length > 0) {
         candidates.sort((a, b) => {
-          const missingMediaDiff = countUnavailableMedia(a.data.slides) - countUnavailableMedia(b.data.slides);
-          if (missingMediaDiff !== 0) return missingMediaDiff;
           const timeA = a.data.savedAt || 0;
           const timeB = b.data.savedAt || 0;
           const timeDiff = timeB - timeA;
-          // If one save is definitively newer (by more than 3 seconds), honor the newer user state
-          if (Math.abs(timeDiff) > 3000) {
+          // If one candidate is distinctly newer (>5s), prioritize the newer state
+          if (Math.abs(timeDiff) > 5000) {
             return timeDiff;
           }
-          // If timestamps are essentially simultaneous, prefer candidate with more slides
-          const countDiff = b.data.slides.length - a.data.slides.length;
+          // If essentially concurrent, prefer the candidate with fewer missing media
+          const missingA = countUnavailableMedia(a.data.slides);
+          const missingB = countUnavailableMedia(b.data.slides);
+          if (missingA !== missingB) return missingA - missingB;
+          // Then prefer candidate with more slides
+          const countDiff = (b.data.slides?.length || 0) - (a.data.slides?.length || 0);
           if (countDiff !== 0) return countDiff;
           return timeDiff;
         });

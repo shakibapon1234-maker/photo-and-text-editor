@@ -365,7 +365,9 @@
     if (_iconModal) _iconModal.classList.add('hidden');
     if (typeof render === 'function') render();
     if (typeof updateHandles === 'function') updateHandles();
+    else if (typeof window.updateHandles === 'function') window.updateHandles();
     if (typeof showToast === 'function') showToast(`✓ ${info.name.split(' (')[0]} আইকন যুক্ত হয়েছে!`);
+    else if (typeof window.showPresentationToast === 'function') window.showPresentationToast(`✓ ${info.name.split(' (')[0]} আইকন যুক্ত হয়েছে!`);
     window.dispatchEvent(new CustomEvent('presentation:change'));
   }
 

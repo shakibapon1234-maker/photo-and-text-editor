@@ -114,6 +114,7 @@
     r.title = 'Drag to rotate (Shift for 15° snap)';
     node.appendChild(r);
   }
+  window.updateHandles = updateHandles;
 
   function begin(kind, event, item, side = '') {
     window.__presentationLiveDrag = true;

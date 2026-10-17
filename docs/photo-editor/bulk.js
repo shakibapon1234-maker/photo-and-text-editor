@@ -1,4 +1,4 @@
-﻿// ================================================================
+// ================================================================
 // Bulk Resize — upload 5, 7, or more photos at once, pick one
 // Facebook size preset, and get every photo back at the exact same
 // size in a single ZIP download.
@@ -431,8 +431,14 @@
             const removedImg = await new Promise((resolve, reject) => {
                 const url = URL.createObjectURL(resultBlob);
                 const im = new Image();
-                im.onload = () => resolve(im);
-                im.onerror = reject;
+                im.onload = () => {
+                    URL.revokeObjectURL(url);
+                    resolve(im);
+                };
+                im.onerror = (e) => {
+                    URL.revokeObjectURL(url);
+                    reject(e);
+                };
                 im.src = url;
             });
             if (bulkBgReplaceColor && bulkBgReplaceColor.checked) {
@@ -490,6 +496,15 @@
 
     bulkProcessBtn.addEventListener("click", async () => {
         if (!items.length || !selectedPreset || typeof window.renderSocialCanvas !== "function") return;
+
+        if (bulkApplyBgRemove && bulkApplyBgRemove.checked) {
+            const apiKey = (localStorage.getItem("removebg_api_key") || "").trim();
+            if (!apiKey) {
+                alert("⚠️ Background Removal API Key পাওয়া যায়নি!\n\nঅনুগ্রহ করে AI Settings থেকে Remove.bg API Key যুক্ত করুন অথবা Background Removal অপশনটি আনচেক করুন।");
+                return;
+            }
+        }
+
         const useZip = typeof JSZip !== "undefined";
         const mode = getBulkMode();
         const preset = selectedPreset;
