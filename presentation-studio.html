@@ -443,6 +443,7 @@ document.addEventListener('pointerdown',event=>{
   renderInspector();addTextTransformHandle();
 },true);
 
+// Legacy transform handles replaced by presentation-hard-transform-controls.js
 const originalImageAwareRender=render;
 render=function(){
   originalImageAwareRender();
@@ -450,21 +451,7 @@ render=function(){
     const node=$('slide').querySelector('.image-el[data-id="'+el.id+'"]');
     if(node)node.style.transform='rotate('+(Number(el.rotation)||0)+'deg)';
   });
-  addImageTransformHandles();
 };
-document.head.insertAdjacentHTML('beforeend','<style>.image-el{overflow:visible;user-select:none}.image-el img{pointer-events:none!important;user-select:none}.image-move-handle,.image-rotate-handle,.image-resize-handle{position:absolute;width:40px;height:18px;border:1px solid #1769e8;border-radius:4px;background:#fff;color:#1769e8;font:700 9px Arial;text-align:center;line-height:16px;cursor:grab;z-index:6;user-select:none}.image-move-handle,.image-rotate-handle{left:50%;transform:translateX(-50%)}.image-move-handle{top:6px}.image-rotate-handle{top:30px}.image-resize-handle{right:-20px;bottom:-20px;cursor:nwse-resize}.image-rotate-handle:after{content:"";position:absolute;left:19px;top:16px;height:13px;border-left:2px solid #ffb11b}</style>');
-document.addEventListener('pointerdown',event=>{
-  const target=event.target,node=target.closest&&target.closest('.image-el');
-  if(!node)return;
-  event.stopImmediatePropagation();selected=node.dataset.id;
-  document.querySelectorAll('.element').forEach(item=>item.classList.toggle('selected',item===node));renderInspector();addImageTransformHandles();
-  const handle=target.closest('.image-move-handle,.image-rotate-handle,.image-resize-handle');
-  if(!handle)return;
-  const el=selectedEl();
-  if(handle.classList.contains('image-move-handle')){moveImageFromHandle(event,node,el);return;}
-  if(handle.classList.contains('image-resize-handle')){resizeImageFromHandle(event,node,el);return;}
-  rotateImageFromHandle(event,node,el);
-},true);
 $('slide').addEventListener('pointerdown',event=>{if(!event.target.closest('.element,.hard-resize,.hard-rotate')&&!event.target.closest('#ctx-toolbar')){selected=null;render()}},true);
 document.addEventListener('pointerdown',event=>{if(!event.target.closest('.element,.hard-resize,.hard-rotate')&&!event.target.closest('.right')&&!event.target.closest('#textToolsMenu,#textTools')&&!event.target.closest('#ctx-toolbar')){selected=null;render()}},true);
 // (Selection is managed via pointerdown and hard-transform-controls to avoid jumping between text boxes)
@@ -500,4 +487,4 @@ $('inlineGradientStart').oninput=event=>updateInlineTextColor(el=>{el.color=even
 $('inlineGradientEnd').oninput=event=>updateInlineTextColor(el=>{el.textGradientTo=event.target.value;el.textGradient=true});
 $('inlineGradientAngle').oninput=event=>updateInlineTextColor(el=>{el.textGradientAngle=Number(event.target.value)||0;el.textGradient=true});
 render();
-</script><script src="presentation-hard-transform-controls.js?v=16"></script><script src="presentation-shape-rotate-control.js?v=1"></script><script src="presentation-shape-rotate-overlay.js?v=4"></script><script src="presentation-video-elements.js?v=3"></script><script src="presentation-3d-text-live.js?v=1"></script><script src="presentation-shape-resize-fix.js?v=2"></script><script src="presentation-editing-fixes.js?v=11"></script><script src="presentation-context-toolbar.js?v=15"></script><script src="presentation-icon-library.js?v=1"></script><script src="presentation-ai-assistant.js?v=1"></script><script src="presentation-performance-fix.js?v=1"></script><script src="presentation-html-import-patch.js?v=1"></script><script src="presentation-visa-loader.js?v=1"></script></body></html>
+</script><script src="presentation-hard-transform-controls.js?v=16"></script><script src="presentation-shape-rotate-control.js?v=1"></script><script src="presentation-shape-rotate-overlay.js?v=4"></script><script src="presentation-video-elements.js?v=3"></script><script src="presentation-3d-text-live.js?v=1"></script><script src="presentation-shape-resize-fix.js?v=2"></script><script src="presentation-editing-fixes.js?v=11"></script><script src="presentation-context-toolbar.js?v=15"></script><script src="presentation-icon-library.js?v=1"></script><script src="presentation-ai-assistant.js?v=1"></script><script src="presentation-performance-fix.js?v=1"></script><script src="presentation-html-import-patch.js?v=1"></script></body></html>

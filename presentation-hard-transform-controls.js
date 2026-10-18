@@ -32,30 +32,36 @@
     .hard-resize {
       position: absolute;
       z-index: 9999;
-      width: 12px;
-      height: 12px;
+      width: 14px;
+      height: 14px;
       background: #ffffff;
       border: 2px solid #1769e8;
       border-radius: 3px;
-      box-shadow: 0 1px 4px #000a;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.7);
       touch-action: none;
       box-sizing: border-box;
       pointer-events: auto !important;
       cursor: pointer;
+    }
+    .hard-resize::before {
+      content: '';
+      position: absolute;
+      inset: -8px;
+      pointer-events: auto;
     }
     .hard-resize:hover {
       background: #ffb11b !important;
       border-color: #ffffff !important;
       transform: scale(1.3);
     }
-    .hard-resize.n  { left: 50%; top: -6px; transform: translateX(-50%); cursor: ns-resize; }
-    .hard-resize.s  { left: 50%; bottom: -6px; transform: translateX(-50%); cursor: ns-resize; }
-    .hard-resize.e  { right: -6px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
-    .hard-resize.w  { left: -6px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
-    .hard-resize.nw { left: -6px; top: -6px; cursor: nwse-resize; }
-    .hard-resize.ne { right: -6px; top: -6px; cursor: nesw-resize; }
-    .hard-resize.sw { left: -6px; bottom: -6px; cursor: nesw-resize; }
-    .hard-resize.se { right: -6px; bottom: -6px; cursor: nwse-resize; }
+    .hard-resize.n  { left: 50%; top: -7px; transform: translateX(-50%); cursor: ns-resize; }
+    .hard-resize.s  { left: 50%; bottom: -7px; transform: translateX(-50%); cursor: ns-resize; }
+    .hard-resize.e  { right: -7px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+    .hard-resize.w  { left: -7px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+    .hard-resize.nw { left: -7px; top: -7px; cursor: nwse-resize; }
+    .hard-resize.ne { right: -7px; top: -7px; cursor: nesw-resize; }
+    .hard-resize.sw { left: -7px; bottom: -7px; cursor: nesw-resize; }
+    .hard-resize.se { right: -7px; bottom: -7px; cursor: nwse-resize; }
 
     /* Top Rotation Handle with visible stem */
     .hard-rotate {
