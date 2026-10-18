@@ -392,8 +392,19 @@
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        background: #000 !important;
+        background: #000;
         cursor: pointer !important;
+        overflow: hidden !important;
+        transition: background 0.3s ease !important;
+      }
+      #presStageBrollLayer {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 0 !important;
+        overflow: hidden !important;
+        pointer-events: none !important;
       }
       #__pres_stage {
         position: relative !important;
@@ -407,6 +418,7 @@
         box-shadow: 0 0 50px rgba(0,0,0,0.9) !important;
         overflow: hidden !important;
         isolation: isolate !important;
+        z-index: 1 !important;
       }
       /* The editor background is stored on a slide as bgMedia.  Give that
          layer its own stacking level so broad editor CSS cannot hide it in
@@ -919,27 +931,48 @@
       stage.style.removeProperty('background-position');
       stage.style.removeProperty('background-repeat');
 
-      // 1. Background
-      if (sl.background === 'custom') {
-        stage.style.background = sl.bgColor || '#17233c';
-        stage.style.backgroundImage = '';
-      } else if (sl.background === 'image' && sl.bgImage) {
-        stage.style.backgroundImage = 'url("' + sl.bgImage + '")';
-        stage.style.backgroundSize = 'cover';
-        stage.style.backgroundPosition = 'center';
-      } else {
-        stage.style.background = (typeof themes !== 'undefined' && themes[sl.background]) ? themes[sl.background] : '#17233c';
-        stage.style.backgroundImage = '';
-      }
+      // 1. Full-screen background and B-Roll covering entire play screen (eliminates black borders!)
+      const container = $('__pres_stage_container');
+      let presBroll = container ? container.querySelector('#presStageBrollLayer') : null;
 
-      // 2. B-Roll Layer
-      if (sl.brollPreset && sl.brollPreset !== 'none') {
-        const broll = document.createElement('div');
-        broll.id = 'brollLayer';
+      if (sl.brollPreset && sl.brollPreset !== 'none' && !sl.bgMedia && !sl.bgMediaAssetId) {
         let pClass = sl.brollPreset;
         if (pClass === 'cloudSunset') pClass = 'sunset cloudSunset';
-        broll.className = pClass + ' ' + sl.brollPreset + ' speed-' + (sl.brollSpeed || 'normal');
-        stage.appendChild(broll);
+        const targetClass = 'broll-canvas-layer ' + pClass + ' ' + sl.brollPreset + ' speed-' + (sl.brollSpeed || 'normal');
+        if (!presBroll && container) {
+          presBroll = document.createElement('div');
+          presBroll.id = 'presStageBrollLayer';
+          presBroll.className = targetClass;
+          container.insertBefore(presBroll, container.firstChild);
+        } else if (presBroll) {
+          presBroll.className = targetClass;
+        }
+        if (container) container.style.background = 'transparent';
+        stage.style.background = 'transparent';
+        stage.style.backgroundImage = '';
+      } else {
+        if (presBroll) presBroll.remove();
+        let bg = '#17233c';
+        if (sl.background === 'custom') {
+          bg = sl.bgColor || '#17233c';
+        } else if (sl.background === 'image' && sl.bgImage) {
+          bg = 'radial-gradient(circle at center, #1e293b, #090d17 80%)';
+        } else if (typeof themes !== 'undefined' && themes[sl.background]) {
+          bg = themes[sl.background];
+        }
+        if (container) container.style.background = bg;
+
+        if (sl.background === 'custom') {
+          stage.style.background = sl.bgColor || '#17233c';
+          stage.style.backgroundImage = '';
+        } else if (sl.background === 'image' && sl.bgImage) {
+          stage.style.backgroundImage = 'url("' + sl.bgImage + '")';
+          stage.style.backgroundSize = 'cover';
+          stage.style.backgroundPosition = 'center';
+        } else {
+          stage.style.background = (typeof themes !== 'undefined' && themes[sl.background]) ? themes[sl.background] : '#17233c';
+          stage.style.backgroundImage = '';
+        }
       }
 
       // 3. Media Background (Video or Image)

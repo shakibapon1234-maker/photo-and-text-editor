@@ -100,6 +100,12 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
       position: fixed; inset: 0;
       display: flex; align-items: center; justify-content: center;
       background: #000;
+      overflow: hidden;
+      transition: background 0.3s ease;
+    }
+    #stageContainerBroll {
+      position: absolute; inset: 0; width: 100vw; height: 100vh;
+      z-index: 0; overflow: hidden; pointer-events: none;
     }
     #stage {
       position: relative;
@@ -108,6 +114,7 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
       transform: scale(var(--pres-scale, 1));
       background: #17233c; overflow: hidden;
       box-shadow: 0 0 40px rgba(0,0,0,0.8);
+      z-index: 1;
     }
 
     /* ── Background Media & B-Roll ────────────────────────────────────── */
@@ -120,7 +127,7 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
       position: absolute; inset: 0; z-index: 1; pointer-events: none;
     }
     /* ── High Quality Animated B-Roll & Background Presets ── */
-    #brollLayer {
+    #brollLayer, .broll-canvas-layer {
       position: absolute !important;
       inset: 0 !important;
       width: 100% !important;
@@ -130,7 +137,8 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
       pointer-events: none !important;
       transform: translateZ(0);
     }
-    #brollLayer:before, #brollLayer:after {
+    #brollLayer:before, #brollLayer:after,
+    .broll-canvas-layer:before, .broll-canvas-layer:after {
       content: "" !important;
       position: absolute !important;
       inset: -50% !important;
@@ -141,18 +149,18 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
       will-change: transform;
       pointer-events: none !important;
     }
-    #brollLayer.space {
+    #brollLayer.space, .broll-canvas-layer.space {
       background: radial-gradient(circle at 70% 25%, #ffd166 0%, #ff8c00 1.5%, transparent 4%),
                   radial-gradient(circle at 20% 80%, #6366f1 0%, #312e81 8%, transparent 20%),
                   radial-gradient(circle at 50% 50%, #0f172a 0%, #020617 100%) !important;
     }
-    #brollLayer.space:before {
+    #brollLayer.space:before, .broll-canvas-layer.space:before {
       background-image: radial-gradient(circle, #ffffff 1px, transparent 1.5px), radial-gradient(circle, #93c5fd 1.5px, transparent 2px) !important;
       background-size: 60px 60px, 110px 110px !important;
       background-position: 0 0, 30px 30px !important;
       animation: broll_space_drift 25s linear infinite !important;
     }
-    #brollLayer.space:after {
+    #brollLayer.space:after, .broll-canvas-layer.space:after {
       background: radial-gradient(ellipse at 50% 50%, transparent 35%, rgba(139, 92, 246, 0.35) 45%, transparent 55%),
                   radial-gradient(circle at 80% 30%, rgba(236, 72, 153, 0.25) 0%, transparent 40%) !important;
       animation: broll_space_pulse 16s ease-in-out infinite alternate !important;
@@ -167,17 +175,17 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
       100% { transform: scale(0.95) rotate(-10deg); opacity: 0.7; }
     }
 
-    #brollLayer.aurora {
+    #brollLayer.aurora, .broll-canvas-layer.aurora {
       background: #020617 !important;
     }
-    #brollLayer.aurora:before {
+    #brollLayer.aurora:before, .broll-canvas-layer.aurora:before {
       background: radial-gradient(ellipse at 20% 80%, rgba(16, 185, 129, 0.65) 0%, transparent 50%),
                   radial-gradient(ellipse at 70% 30%, rgba(56, 189, 248, 0.7) 0%, transparent 55%),
                   radial-gradient(ellipse at 90% 70%, rgba(168, 85, 247, 0.6) 0%, transparent 50%) !important;
       filter: blur(25px) !important;
       animation: broll_aurora_wave 10s ease-in-out infinite alternate !important;
     }
-    #brollLayer.aurora:after {
+    #brollLayer.aurora:after, .broll-canvas-layer.aurora:after {
       background: radial-gradient(ellipse at 50% 20%, rgba(244, 114, 182, 0.4) 0%, transparent 45%),
                   radial-gradient(ellipse at 40% 90%, rgba(34, 197, 94, 0.5) 0%, transparent 50%) !important;
       filter: blur(35px) !important;
@@ -192,17 +200,17 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
       100% { transform: translate3d(-6%, 6%, 0) rotate(-5deg); }
     }
 
-    #brollLayer.sky {
+    #brollLayer.sky, .broll-canvas-layer.sky {
       background: linear-gradient(165deg, #0284c7, #38bdf8 45%, #bae6fd) !important;
     }
-    #brollLayer.sky:before {
+    #brollLayer.sky:before, .broll-canvas-layer.sky:before {
       background: radial-gradient(ellipse at 15% 35%, #fff 0 10%, transparent 28%),
                   radial-gradient(ellipse at 55% 65%, rgba(255,255,255,0.9) 0 12%, transparent 30%),
                   radial-gradient(ellipse at 88% 25%, #fff 0 10%, transparent 28%) !important;
       filter: blur(8px) !important;
       animation: broll_clouds 22s linear infinite !important;
     }
-    #brollLayer.sky:after {
+    #brollLayer.sky:after, .broll-canvas-layer.sky:after {
       inset: auto 20% 40% auto !important;
       width: 48px !important;
       height: 16px !important;
@@ -219,15 +227,15 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
       to { transform: translate3d(60vw, -30vh, 0) scale(1.2); }
     }
 
-    #brollLayer.night {
+    #brollLayer.night, .broll-canvas-layer.night {
       background: linear-gradient(155deg, #020617, #0f172a 60%, #1e1b4b) !important;
     }
-    #brollLayer.night:before {
+    #brollLayer.night:before, .broll-canvas-layer.night:before {
       background-image: radial-gradient(#fde047 0.8px, transparent 1.2px), radial-gradient(#ffffff 1px, transparent 1.5px) !important;
       background-size: 40px 40px, 90px 90px !important;
       animation: broll_stars_twinkle 15s linear infinite !important;
     }
-    #brollLayer.night:after {
+    #brollLayer.night:after, .broll-canvas-layer.night:after {
       inset: auto -10% 0 !important;
       height: 45% !important;
       background: repeating-linear-gradient(90deg, #090d16 0 25px, #131d2e 26px 45px, #090d16 46px 65px) !important;
@@ -244,17 +252,20 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
       100% { transform: translate3d(4%, 0, 0); }
     }
 
-    #brollLayer.sunset, #brollLayer.cloudSunset {
+    #brollLayer.sunset, #brollLayer.cloudSunset,
+    .broll-canvas-layer.sunset, .broll-canvas-layer.cloudSunset {
       background: linear-gradient(175deg, #4c0519, #be123c 35%, #f97316 65%, #fde047 90%) !important;
     }
-    #brollLayer.sunset:before, #brollLayer.cloudSunset:before {
+    #brollLayer.sunset:before, #brollLayer.cloudSunset:before,
+    .broll-canvas-layer.sunset:before, .broll-canvas-layer.cloudSunset:before {
       background: radial-gradient(ellipse at 15% 70%, #ffc76c 0 10%, transparent 28%),
                   radial-gradient(ellipse at 50% 75%, #ffedd5 0 8%, transparent 22%),
                   radial-gradient(ellipse at 85% 55%, #fed7aa 0 10%, transparent 30%) !important;
       filter: blur(12px) !important;
       animation: broll_sunset_clouds 18s linear infinite alternate !important;
     }
-    #brollLayer.sunset:after, #brollLayer.cloudSunset:after {
+    #brollLayer.sunset:after, #brollLayer.cloudSunset:after,
+    .broll-canvas-layer.sunset:after, .broll-canvas-layer.cloudSunset:after {
       display: none;
     }
     @keyframes broll_sunset_clouds {
@@ -262,15 +273,15 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
       100% { transform: translate3d(6%, -2%, 0) scale(1.05); }
     }
 
-    #brollLayer.water {
+    #brollLayer.water, .broll-canvas-layer.water {
       background: linear-gradient(180deg, #0369a1, #0284c7 45%, #075985) !important;
     }
-    #brollLayer.water:before {
+    #brollLayer.water:before, .broll-canvas-layer.water:before {
       background: repeating-radial-gradient(ellipse at 50% 105%, rgba(186, 230, 253, 0.4) 0 1px, transparent 2px 16px) !important;
       transform-origin: 50% 100% !important;
       animation: broll_water_ripple 6s ease-in-out infinite alternate !important;
     }
-    #brollLayer.water:after {
+    #brollLayer.water:after, .broll-canvas-layer.water:after {
       background: linear-gradient(110deg, transparent 35%, rgba(224, 242, 254, 0.3) 48%, transparent 58%) !important;
       animation: broll_water_shimmer 6s linear infinite !important;
     }
@@ -1108,37 +1119,52 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
       });
       stage.replaceChildren();
 
-      // ── Robust Background Handling (Colors, Themes, Gradients, Images, Videos) ──
-      if (slide.background === 'custom') {
-        stage.style.background = slide.bgColor || '#17233c';
-        stage.style.backgroundImage = '';
-      } else if (slide.background === 'image' && slide.bgImage) {
-        stage.style.backgroundImage = 'linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url("' + slide.bgImage + '")';
-        stage.style.backgroundSize = 'cover';
-        stage.style.backgroundPosition = 'center';
-      } else if (slide.background && (slide.background.startsWith('linear-gradient') || slide.background.startsWith('radial-gradient') || slide.background.startsWith('#') || slide.background.startsWith('rgb'))) {
-        stage.style.background = slide.background;
-        stage.style.backgroundImage = '';
-      } else if (themes[slide.background]) {
-        stage.style.background = themes[slide.background];
-        stage.style.backgroundImage = '';
-      } else if (slide.bgColor && slide.bgColor !== 'transparent') {
-        stage.style.background = slide.bgColor;
-        stage.style.backgroundImage = '';
-      } else {
-        // Default theme fallback
-        stage.style.background = (themes.fashion || '#17233c');
-        stage.style.backgroundImage = '';
-      }
+      // ── Robust Full-Bleed Background & B-Roll Handling (Eliminates Black Borders) ──
+      const container = document.getElementById('stageContainer');
+      let presBroll = container ? container.querySelector('#stageContainerBroll') : null;
 
-      // ── B-Roll Animated Layer ──
-      if (slide.brollPreset && slide.brollPreset !== 'none') {
-        const broll = document.createElement('div');
-        broll.id = 'brollLayer';
+      if (slide.brollPreset && slide.brollPreset !== 'none' && !slide.bgMedia) {
         let pClass = slide.brollPreset;
         if (pClass === 'cloudSunset') pClass = 'sunset cloudSunset';
-        broll.className = pClass + ' ' + slide.brollPreset + ' speed-' + (slide.brollSpeed || 'normal');
-        stage.appendChild(broll);
+        const targetClass = 'broll-canvas-layer ' + pClass + ' ' + slide.brollPreset + ' speed-' + (slide.brollSpeed || 'normal');
+        if (!presBroll && container) {
+          presBroll = document.createElement('div');
+          presBroll.id = 'stageContainerBroll';
+          presBroll.className = targetClass;
+          container.insertBefore(presBroll, container.firstChild);
+        } else if (presBroll) {
+          presBroll.className = targetClass;
+        }
+        if (container) container.style.background = 'transparent';
+        stage.style.background = 'transparent';
+        stage.style.backgroundImage = '';
+      } else {
+        if (presBroll) presBroll.remove();
+        let bg = '#17233c';
+        if (slide.background === 'custom') {
+          bg = slide.bgColor || '#17233c';
+        } else if (slide.background === 'image' && slide.bgImage) {
+          bg = 'radial-gradient(circle at center, #1e293b, #090d17 80%)';
+        } else if (slide.background && (slide.background.startsWith('linear-gradient') || slide.background.startsWith('radial-gradient') || slide.background.startsWith('#') || slide.background.startsWith('rgb'))) {
+          bg = slide.background;
+        } else if (themes[slide.background]) {
+          bg = themes[slide.background];
+        } else if (slide.bgColor && slide.bgColor !== 'transparent') {
+          bg = slide.bgColor;
+        }
+        if (container) container.style.background = bg;
+
+        if (slide.background === 'custom') {
+          stage.style.background = slide.bgColor || '#17233c';
+          stage.style.backgroundImage = '';
+        } else if (slide.background === 'image' && slide.bgImage) {
+          stage.style.backgroundImage = 'linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1)), url("' + slide.bgImage + '")';
+          stage.style.backgroundSize = 'cover';
+          stage.style.backgroundPosition = 'center';
+        } else {
+          stage.style.background = bg;
+          stage.style.backgroundImage = '';
+        }
       }
 
       // ── Background Video / GIF Media Layer ──

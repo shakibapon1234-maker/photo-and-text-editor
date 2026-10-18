@@ -384,11 +384,14 @@
 
   window.setPresentationZoom = function(level) {
     _zoomLevel = Math.max(0.3, Math.min(3.0, Math.round(level * 100) / 100));
-    const slide = $('slide');
-    if (slide) {
-      slide.style.transform = `scale(${_zoomLevel})`;
-      slide.style.transformOrigin = 'center center';
-      slide.style.transition = 'transform 0.08s ease-out';
+    if (typeof applySlideFitting === 'function') {
+      applySlideFitting();
+    } else {
+      const slide = $('slide');
+      if (slide) {
+        slide.style.transform = `scale(${_zoomLevel})`;
+        slide.style.transformOrigin = 'center center';
+      }
     }
     updateZoomUI();
   };
@@ -401,10 +404,11 @@
       const hud = document.createElement('div');
       hud.id = 'presentationZoomHud';
       hud.innerHTML = `
-        <button id="zoomOutBtn" title="Zoom Out (Ctrl + Scroll Down)">−</button>
-        <span id="zoomPercentageBadge" title="Click to Reset Zoom (100%)">100%</span>
-        <button id="zoomInBtn" title="Zoom In (Ctrl + Scroll Up)">+</button>
-        <button id="zoomResetBtn" title="Reset Zoom to 100%">Reset</button>
+        <span style="color:#94a3b8;font-size:10px;font-weight:700;margin-right:4px;display:inline-flex;align-items:center;gap:3px;" title="Canvas Viewport Zoom (স্লাইড ক্যানভাস জুম - লেখার সাইজ নয়)">🔍 Canvas:</span>
+        <button id="zoomOutBtn" title="Zoom Out Canvas (স্লাইড ক্যানভাস ছোট করুন)">−</button>
+        <span id="zoomPercentageBadge" title="Click to Reset Canvas Zoom (100%)">100%</span>
+        <button id="zoomInBtn" title="Zoom In Canvas (স্লাইড ক্যানভাস বড় করুন)">+</button>
+        <button id="zoomResetBtn" title="Reset Canvas Zoom to 100% (স্বাভাবিক সাইজ)">Reset</button>
       `;
       stageWrap.appendChild(hud);
 
@@ -1262,11 +1266,19 @@
 
     const wrapW = stageWrap.clientWidth - 48;
     const wrapH = stageWrap.clientHeight - 48;
-    const fitScale = (wrapW > 0 && wrapH > 0) ? Math.min(1, wrapW / 960, wrapH / 540) : 1;
+    // Scale comfortably to fit available space, allowing up to 1.35x on wide displays
+    const fitScale = (wrapW > 0 && wrapH > 0) ? Math.min(1.35, wrapW / 960, wrapH / 540) : 1;
     const effectiveZoom = (_zoomLevel || 1.0) * fitScale;
 
     slide.style.transform = `scale(${effectiveZoom})`;
     slide.style.transformOrigin = 'center center';
+
+    // Prevent accidental scrollbars when at standard view
+    if (_zoomLevel <= 1.05) {
+      stageWrap.style.overflow = 'hidden';
+    } else {
+      stageWrap.style.overflow = 'auto';
+    }
   }
   window.applySlideFitting = applySlideFitting;
   window.addEventListener('resize', applySlideFitting);
