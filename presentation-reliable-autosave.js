@@ -238,6 +238,7 @@
     if (hasUnavailableMedia(slides)) {
       console.warn('Skipped saving an incomplete presentation backup.');
       updateUnavailableMediaBanner();
+      _showSaveStatus('⚠️ মিডিয়া লোড হয়নি', '#f59e0b');
       return;
     }
     updateUnavailableMediaBanner();
@@ -249,6 +250,7 @@
     }
 
     writing = true;
+    _showSaveStatus('💾 সেভ হচ্ছে...', '#f59e0b');
 
     try {
       const data = snapshot();
@@ -263,6 +265,8 @@
       lastSavedFingerprint = currentFingerprint;
       lastSavedSlideCount = Array.isArray(slides) ? slides.length : 0;
 
+      _showSaveStatus('✅ সেভ হয়েছে', '#22c55e');
+
       // 3. Persistent backend server write (debounced for performance)
       triggerServerSave(data, forceImmediateServer);
 
@@ -271,6 +275,7 @@
       updateSnapshotsHistoryInIDB(data).catch(() => {});
     } catch (error) {
       console.warn('Presentation autosave failed', error);
+      _showSaveStatus('⚠️ সেভ ব্যর্থ', '#ef4444');
     } finally {
       writing = false;
       if (queued) {
@@ -278,6 +283,13 @@
         setTimeout(saveNow, 200);
       }
     }
+  }
+
+  // Show save status only after DOM is ready (showSaveStatus defined later in boot)
+  function _showSaveStatus(text, color) {
+    if (document.readyState === 'loading') return;
+    // showSaveStatus is defined after this function but in same IIFE scope
+    if (typeof showSaveStatus === 'function') showSaveStatus(text, color);
   }
 
   function schedule(immediate = false) {
@@ -300,6 +312,40 @@
   window.addEventListener('presentation:change', () => schedule(true));
   window.presentationSaveNow = (immediate = true) => saveNow(immediate);
 
+  // ── Save Status Indicator ──────────────────────────────────────
+  let _saveStatusTimer = 0;
+  function showSaveStatus(text, color = '#22c55e') {
+    let el = document.getElementById('_autoSaveStatusDot');
+    if (!el) {
+      el = document.createElement('span');
+      el.id = '_autoSaveStatusDot';
+      el.style.cssText = 'font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;transition:all 0.3s;margin-left:6px;white-space:nowrap;';
+      const top = document.querySelector('.top');
+      if (top) top.appendChild(el);
+    }
+    el.textContent = text;
+    el.style.background = color + '22';
+    el.style.color = color;
+    el.style.border = '1px solid ' + color + '55';
+    clearTimeout(_saveStatusTimer);
+    if (color === '#22c55e') {
+      _saveStatusTimer = setTimeout(() => { if (el) el.style.opacity = '0.4'; }, 3000);
+    } else {
+      el.style.opacity = '1';
+    }
+  }
+
+
+  // ── Periodic IDB Backup every 8s ──────────────────────────────
+  // This ensures IDB is always within 8s of the latest edit,
+  // so a sudden refresh loses at most 8 seconds of work.
+  setInterval(() => {
+    if (ready && db && !writing) {
+      saveNow(false).catch(() => {});
+    }
+  }, 8000);
+
+
   let closeHandled = false;
   const handleAppClose = () => {
     if (closeHandled) return;
@@ -308,7 +354,10 @@
     clearTimeout(serverSaveTimer);
     try {
       const data = snapshot();
+      // Always synchronously save to localStorage on close
       saveToLocalStorage(data);
+
+      // Also attempt IDB write via keepalive fetch to server as final backup
       const payload = JSON.stringify(data);
       let byteLen = 0;
       try {
