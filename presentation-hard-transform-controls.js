@@ -95,6 +95,17 @@
       border-left: 2px solid #ffb11b;
       pointer-events: none;
     }
+
+    /* Suppress handle hit-areas during active element drag to prevent
+       pointer events on ::before inset zones causing drag trembling. */
+    #slide.is-dragging .hard-resize,
+    #slide.is-dragging .hard-rotate {
+      pointer-events: none !important;
+    }
+    #slide.is-dragging .hard-resize::before,
+    #slide.is-dragging .hard-rotate::before {
+      pointer-events: none !important;
+    }
   </style>`);
 
   const nodeFor = item => item && $('slide')?.querySelector('.element[data-id="' + item.id + '"]');
@@ -226,7 +237,7 @@
     _pendingDrag = { event, item, wasAlreadySelected: (selected === item.id) };
   }, true);
 
-  const DRAG_THRESHOLD = 5; // pixels
+  const DRAG_THRESHOLD = 8; // pixels
 
   window.addEventListener('pointermove', event => {
     // If we have a pending drag, check threshold before starting
