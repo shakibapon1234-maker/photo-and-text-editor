@@ -31,23 +31,12 @@
 
   .stage-wrap {
     position: relative !important;
-    transition: background 0.3s ease !important;
-  }
-  #stageWrapBrollLayer {
-    position: absolute !important;
-    inset: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    z-index: 0 !important;
-    overflow: hidden !important;
-    pointer-events: none !important;
   }
   #slide {
     position: relative !important;
     z-index: 2 !important;
-    border: 1.5px solid rgba(255, 255, 255, 0.28) !important;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75) !important;
     border-radius: 4px !important;
+    box-shadow: 0 15px 45px rgba(0, 0, 0, 0.6) !important;
   }
 
   /* Automatically pause background animation when dragging objects to free 100% CPU/GPU for interactive transforms */
@@ -229,42 +218,16 @@
     if (!s) return;
     const p = s.brollPreset || 'none', sp = s.brollSpeed || 'normal';
     let layer = $('brollLayer');
-    const stageWrap = document.querySelector('.stage-wrap');
-    let wrapLayer = $('stageWrapBrollLayer');
     const slide = $('slide');
+    const wrapLayer = $('stageWrapBrollLayer');
+    if (wrapLayer) wrapLayer.remove();
 
     if (p === 'none' || s.bgMedia || s.bgMediaAssetId) {
       if (layer) layer.remove();
-      if (wrapLayer) wrapLayer.remove();
-      if (stageWrap) {
-        let themeBg = '#17233c';
-        if (s.background === 'custom') {
-          themeBg = s.bgColor || '#17233c';
-        } else if (s.background === 'image' && s.bgImage) {
-          themeBg = 'radial-gradient(circle at center, #1e293b, #090d17 80%)';
-        } else if (typeof themes !== 'undefined' && themes[s.background]) {
-          themeBg = themes[s.background];
-        }
-        stageWrap.style.background = themeBg;
-      }
       return;
     }
 
     const targetClass = p + ' speed-' + sp;
-    // 1. Full-screen animated background layer covering the entire play/editing screen
-    if (stageWrap) {
-      if (!wrapLayer) {
-        wrapLayer = document.createElement('div');
-        wrapLayer.id = 'stageWrapBrollLayer';
-        wrapLayer.className = 'broll-canvas-layer ' + targetClass;
-        stageWrap.insertBefore(wrapLayer, stageWrap.firstChild);
-      } else if (wrapLayer.className !== 'broll-canvas-layer ' + targetClass) {
-        wrapLayer.className = 'broll-canvas-layer ' + targetClass;
-      }
-      stageWrap.style.background = 'transparent';
-    }
-
-    // 2. Slide canvas inside stageWrap blends seamlessly with full backdrop
     if (!layer) {
       layer = document.createElement('div');
       layer.id = 'brollLayer';
@@ -272,10 +235,6 @@
       if (slide) slide.insertBefore(layer, $('animatedBackgroundLayer') || slide.firstChild);
     } else if (layer.className !== targetClass) {
       layer.className = targetClass;
-    }
-    // Make slide background transparent so the full-screen stageWrap broll shines through seamlessly
-    if (slide) {
-      slide.style.background = 'transparent';
     }
   }
 
