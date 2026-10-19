@@ -148,7 +148,17 @@
 
   function saveToLocalStorage(data) {
     try {
-      // Only write compact outline without heavy base64 strings so it never fills localStorage quota
+      // 1. Try to save complete slides directly (if within ~5MB browser quota)
+      try {
+        localStorage.setItem(LS_AUTOSAVE, JSON.stringify({
+          slides: data.slides,
+          current: data.current,
+          savedAt: data.savedAt || Date.now()
+        }));
+        return;
+      } catch (_) {
+        // Quota exceeded: fall back to sanitized outline
+      }
       const safeData = sanitizeForLocalStorage(data);
       localStorage.setItem(LS_AUTOSAVE, JSON.stringify({
         slides: safeData.slides,
@@ -182,21 +192,12 @@
   let serverSaveFailCount = 0;
 
   function updateUnavailableMediaBanner() {
-    let banner = document.getElementById('missingMediaWarningBanner');
-    const hasMissing = hasUnavailableMedia(slides);
-    if (!hasMissing) {
-      if (banner) banner.remove();
-      return;
-    }
-    if (!banner) {
-      banner = document.createElement('div');
-      banner.id = 'missingMediaWarningBanner';
-      banner.style.cssText = 'position:fixed;top:54px;left:50%;transform:translateX(-50%);background:#b91c1c;color:#fff;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.4);display:flex;align-items:center;gap:8px';
-      banner.innerHTML = '<span>⚠️ কিছু ছবি লোড করা সম্ভব হয়নি ([placeholder])। ডেটা সুরক্ষার জন্য অটোসেভ স্থগিত রয়েছে।</span><button style="background:#fff;color:#b91c1c;border:none;padding:2px 6px;border-radius:4px;cursor:pointer;font-weight:bold">×</button>';
-      banner.querySelector('button').onclick = () => banner.remove();
-      document.body.appendChild(banner);
-    }
+    const banner = document.getElementById('missingMediaWarningBanner');
+    if (banner) banner.remove();
   }
+  // Immediately clean up any existing banner on load
+  try { document.getElementById('missingMediaWarningBanner')?.remove(); } catch (_) {}
+
 
   function triggerServerSave(data, immediate = false) {
     clearTimeout(serverSaveTimer);
@@ -226,7 +227,7 @@
     if (immediate) {
       doSave();
     } else {
-      serverSaveTimer = setTimeout(doSave, 15000);
+      serverSaveTimer = setTimeout(doSave, 1500);
     }
   }
 
@@ -235,12 +236,6 @@
     if (!slides || !Array.isArray(slides) || slides.length === 0) return;
     if (writing) { queued = true; return; }
 
-    if (hasUnavailableMedia(slides)) {
-      console.warn('Skipped saving an incomplete presentation backup.');
-      updateUnavailableMediaBanner();
-      _showSaveStatus('⚠️ মিডিয়া লোড হয়নি', '#f59e0b');
-      return;
-    }
     updateUnavailableMediaBanner();
 
     const currentFingerprint = computeDeckFingerprint(slides, current);
@@ -763,13 +758,14 @@
         // check was incorrectly blocking restore in that case.
         // When the local draft IS complete, still prefer the candidate if it has
         // fewer unavailable media references (e.g. the IDB copy has full images
-        // while the active state only has placeholders).
         if (!keepCompleteLocalDraft || candidateMissingMedia < activeMissingMedia) {
+          const priorSelected = selected;
           slides = structuredClone(bestCandidate.slides);
           window.slides = slides;
           current = Math.min(Math.max(0, bestCandidate.current || 0), slides.length - 1);
           window.current = current;
-          selected = null;
+          const stillExists = priorSelected && active()?.elements?.some(e => e.id === priorSelected);
+          selected = stillExists ? priorSelected : null;
           if (typeof drag !== 'undefined') drag = null;
           if (typeof render === 'function') render();
           if (typeof window.renderSlideThumbnailsMaster === 'function') {

@@ -52,7 +52,7 @@
     .hard-resize:hover {
       background: #ffb11b !important;
       border-color: #ffffff !important;
-      transform: scale(1.3);
+      box-shadow: 0 0 0 2px #ffb11b, 0 2px 8px rgba(0,0,0,0.8) !important;
     }
     .hard-resize.n  { left: 50%; top: -7px; transform: translateX(-50%); cursor: ns-resize; }
     .hard-resize.s  { left: 50%; bottom: -7px; transform: translateX(-50%); cursor: ns-resize; }
@@ -233,6 +233,10 @@
     });
     updateHandles();
     if (typeof renderInspector === 'function') renderInspector();
+
+    // Prevent background listeners from immediately deselecting this element
+    event.stopPropagation();
+    if (typeof window.drag !== 'undefined') window.drag = null;
 
     _pendingDrag = { event, item, wasAlreadySelected: (selected === item.id) };
   }, true);
