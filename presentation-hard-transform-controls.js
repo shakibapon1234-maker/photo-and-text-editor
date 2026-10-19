@@ -28,40 +28,36 @@
       -webkit-user-select: text !important;
       cursor: text !important;
     }
-    /* 8 cardinal resize handles */
+    /* 8 cardinal resize handles — larger hit area replaces the removed ::before */
     .hard-resize {
       position: absolute;
       z-index: 9999;
-      width: 14px;
-      height: 14px;
+      width: 18px;
+      height: 18px;
       background: #ffffff;
       border: 2px solid #1769e8;
-      border-radius: 3px;
+      border-radius: 4px;
       box-shadow: 0 1px 6px rgba(0,0,0,0.7);
       touch-action: none;
       box-sizing: border-box;
       pointer-events: auto !important;
       cursor: pointer;
     }
-    .hard-resize::before {
-      content: '';
-      position: absolute;
-      inset: -4px;
-      pointer-events: auto;
-    }
+    /* No ::before expansion — the 18×18 visual handle is the hit area.
+       An expanded inset causes oscillation near element borders in Electron. */
     .hard-resize:hover {
       background: #ffb11b !important;
       border-color: #ffffff !important;
       box-shadow: 0 0 0 2px #ffb11b, 0 2px 8px rgba(0,0,0,0.8) !important;
     }
-    .hard-resize.n  { left: 50%; top: -7px; transform: translateX(-50%); cursor: ns-resize; }
-    .hard-resize.s  { left: 50%; bottom: -7px; transform: translateX(-50%); cursor: ns-resize; }
-    .hard-resize.e  { right: -7px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
-    .hard-resize.w  { left: -7px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
-    .hard-resize.nw { left: -7px; top: -7px; cursor: nwse-resize; }
-    .hard-resize.ne { right: -7px; top: -7px; cursor: nesw-resize; }
-    .hard-resize.sw { left: -7px; bottom: -7px; cursor: nesw-resize; }
-    .hard-resize.se { right: -7px; bottom: -7px; cursor: nwse-resize; }
+    .hard-resize.n  { left: 50%; top: -9px; transform: translateX(-50%); cursor: ns-resize; }
+    .hard-resize.s  { left: 50%; bottom: -9px; transform: translateX(-50%); cursor: ns-resize; }
+    .hard-resize.e  { right: -9px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+    .hard-resize.w  { left: -9px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+    .hard-resize.nw { left: -9px; top: -9px; cursor: nwse-resize; }
+    .hard-resize.ne { right: -9px; top: -9px; cursor: nesw-resize; }
+    .hard-resize.sw { left: -9px; bottom: -9px; cursor: nesw-resize; }
+    .hard-resize.se { right: -9px; bottom: -9px; cursor: nwse-resize; }
 
     /* Top Rotation Handle with visible stem */
     .hard-rotate {
@@ -170,6 +166,11 @@
     // 1. Intercept handles FIRST
     const handle = event.target.closest?.('.hard-resize, .hard-rotate');
     if (handle) {
+      // Signal to deselect listeners (Electron workaround: stopImmediatePropagation
+      // may not reach capture listeners on ancestor nodes in sandboxed renderer).
+      window.__hardTransformHandled = true;
+      requestAnimationFrame(() => { window.__hardTransformHandled = false; });
+
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
@@ -219,6 +220,11 @@
 
     const item = active()?.elements?.find(x => x.id === node.dataset.id);
     if (!item) return;
+
+    // Signal to deselect listeners that we are handling element selection.
+    // This is the Electron-safe alternative to stopImmediatePropagation across ancestors.
+    window.__hardTransformHandled = true;
+    requestAnimationFrame(() => { window.__hardTransformHandled = false; });
 
     // 6. Select element & queue drag (Smooth & effortless dragging for Text, Shapes, and Images)
     selected = item.id;

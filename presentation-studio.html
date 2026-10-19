@@ -460,8 +460,17 @@ render=function(){
     if(node)node.style.transform='rotate('+(Number(el.rotation)||0)+'deg)';
   });
 };
-$('slide').addEventListener('pointerdown',event=>{if(!event.target.closest('.element,.hard-resize,.hard-rotate')&&!event.target.closest('#ctx-toolbar')){selected=null;render()}},true);
-document.addEventListener('pointerdown',event=>{if(!event.target.closest('.element,.hard-resize,.hard-rotate')&&!event.target.closest('.right')&&!event.target.closest('#textToolsMenu,#textTools')&&!event.target.closest('#ctx-toolbar')){selected=null;render()}},true);
+$('slide').addEventListener('pointerdown',event=>{
+  // Guard: hard-transform-controls.js sets this flag when it handles an element click.
+  // In Electron's sandbox, stopImmediatePropagation does not always reach capture
+  // listeners on ancestor nodes, so we use an explicit flag instead.
+  if(window.__hardTransformHandled)return;
+  if(!event.target.closest('.element,.hard-resize,.hard-rotate')&&!event.target.closest('#ctx-toolbar')){selected=null;render()}
+},true);
+document.addEventListener('pointerdown',event=>{
+  if(window.__hardTransformHandled)return;
+  if(!event.target.closest('.element,.hard-resize,.hard-rotate')&&!event.target.closest('.right')&&!event.target.closest('#textToolsMenu,#textTools')&&!event.target.closest('#ctx-toolbar')){selected=null;render()}
+},true);
 // (Selection is managed via pointerdown and hard-transform-controls to avoid jumping between text boxes)
 try{const pending=JSON.parse(localStorage.getItem('presentation-studio-pending-asset-v1')||'null');if(pending?.src){addImage(pending.src);localStorage.removeItem('presentation-studio-pending-asset-v1');}}catch(_){/* ignore invalid cross-tool handoff */}
 document.addEventListener('change',event=>{
