@@ -46,7 +46,7 @@
     .hard-resize::before {
       content: '';
       position: absolute;
-      inset: -8px;
+      inset: -4px;
       pointer-events: auto;
     }
     .hard-resize:hover {
@@ -94,17 +94,6 @@
       height: 18px;
       border-left: 2px solid #ffb11b;
       pointer-events: none;
-    }
-
-    /* Suppress handle hit-areas during active element drag to prevent
-       pointer events on ::before inset zones causing drag trembling. */
-    #slide.is-dragging .hard-resize,
-    #slide.is-dragging .hard-rotate {
-      pointer-events: none !important;
-    }
-    #slide.is-dragging .hard-resize::before,
-    #slide.is-dragging .hard-rotate::before {
-      pointer-events: none !important;
     }
   </style>`);
 
@@ -165,7 +154,10 @@
     };
 
     try {
-      stage.setPointerCapture?.(event.pointerId);
+      // Always capture on the slide stage — capturing on a small handle element
+      // causes pointercancel in Electron's sandboxed renderer (Chromium) because
+      // the handle can lose layout during the drag. The stage element is stable.
+      stage?.setPointerCapture?.(event.pointerId);
     } catch (_) {}
   }
 
@@ -182,8 +174,11 @@
       event.stopPropagation();
       event.stopImmediatePropagation();
 
-      const item = selectedEl();
+      const handleNode = handle.closest?.('#slide .element');
+      const item = (handleNode ? active()?.elements?.find(x => x.id === handleNode.dataset.id) : null) || selectedEl();
       if (!item) return;
+
+      selected = item.id;
 
       if (handle.classList.contains('hard-rotate')) {
         begin('rotate', event, item);
@@ -236,6 +231,7 @@
 
     // Prevent background listeners from immediately deselecting this element
     event.stopPropagation();
+    event.stopImmediatePropagation();
     if (typeof window.drag !== 'undefined') window.drag = null;
 
     _pendingDrag = { event, item, wasAlreadySelected: (selected === item.id) };
@@ -367,10 +363,16 @@
     event.stopPropagation();
     event.stopImmediatePropagation();
     try {
+      event.target?.releasePointerCapture?.(event.pointerId);
+    } catch (_) {}
+    try {
       $('slide')?.releasePointerCapture?.(event.pointerId);
     } catch (_) {}
     action = null;
     render();
+    // Immediately persist the new position/size so a quick refresh does not lose
+    // the drag result. autosave's render-hook debounces to 600ms which is too slow.
+    try { window.presentationSaveNow?.(true); } catch (_) {}
   }, true);
 
   window.addEventListener('pointercancel', event => {
@@ -379,6 +381,12 @@
     window.__presentationLiveDrag = false;
     $('slide')?.classList.remove('is-dragging');
     document.querySelectorAll('#slide .element.is-active-drag').forEach(el => el.classList.remove('is-active-drag'));
+    try {
+      event.target?.releasePointerCapture?.(event.pointerId);
+    } catch (_) {}
+    try {
+      $('slide')?.releasePointerCapture?.(event.pointerId);
+    } catch (_) {}
     if (!action) return;
     action = null;
     render();

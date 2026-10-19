@@ -127,7 +127,9 @@ window.addEventListener('pointermove', e => {
       // Threshold passed: genuinely a drag
       drag = _pendingDragStudio;
       window.__presentationLiveDrag = true;
-      try { _pendingDragStudio.target.setPointerCapture?.(_pendingDragStudio.pointerId); } catch (_) {}
+      // Capture on the slide stage (stable across drags) — capturing on the
+      // element node itself can fire pointercancel in Electron's sandbox.
+      try { $('slide')?.setPointerCapture?.(_pendingDragStudio.pointerId); } catch (_) {}
       _pendingDragStudio = null;
     } else {
       return;
@@ -154,13 +156,19 @@ window.addEventListener('pointerup', e => {
   _pendingDragStudio = null;
   window.drag = null;
   window.__presentationLiveDrag = false;
-  if (moved) render();
+  try { $('slide')?.releasePointerCapture?.(e.pointerId); } catch (_) {}
+  if (moved) {
+    render();
+    // Save immediately so a quick refresh does not lose the new position
+    try { window.presentationSaveNow?.(true); } catch (_) {}
+  }
 });
-window.addEventListener('pointercancel', () => {
+window.addEventListener('pointercancel', e => {
   drag = null;
   _pendingDragStudio = null;
   window.drag = null;
   window.__presentationLiveDrag = false;
+  try { $('slide')?.releasePointerCapture?.(e.pointerId); } catch (_) {}
 });
 function addText(){const el={id:crypto.randomUUID(),type:'text',text:'নতুন টেক্সট',x:12,y:58,w:55,h:10,size:38,color:'#ffffff',weight:'700'};active().elements.push(el);selected=el.id;render()}
 // Image uploads receive a synchronous local save before any asynchronous
@@ -487,4 +495,4 @@ $('inlineGradientStart').oninput=event=>updateInlineTextColor(el=>{el.color=even
 $('inlineGradientEnd').oninput=event=>updateInlineTextColor(el=>{el.textGradientTo=event.target.value;el.textGradient=true});
 $('inlineGradientAngle').oninput=event=>updateInlineTextColor(el=>{el.textGradientAngle=Number(event.target.value)||0;el.textGradient=true});
 render();
-</script><script src="presentation-hard-transform-controls.js?v=16"></script><script src="presentation-shape-rotate-control.js?v=1"></script><script src="presentation-shape-rotate-overlay.js?v=4"></script><script src="presentation-video-elements.js?v=3"></script><script src="presentation-3d-text-live.js?v=1"></script><script src="presentation-shape-resize-fix.js?v=2"></script><script src="presentation-editing-fixes.js?v=11"></script><script src="presentation-context-toolbar.js?v=15"></script><script src="presentation-icon-library.js?v=1"></script><script src="presentation-ai-assistant.js?v=1"></script><script src="presentation-performance-fix.js?v=1"></script><script src="presentation-html-import-patch.js?v=1"></script></body></html>
+</script><script src="presentation-hard-transform-controls.js?v=17"></script><script src="presentation-shape-rotate-control.js?v=1"></script><script src="presentation-shape-rotate-overlay.js?v=4"></script><script src="presentation-video-elements.js?v=3"></script><script src="presentation-3d-text-live.js?v=1"></script><script src="presentation-shape-resize-fix.js?v=2"></script><script src="presentation-editing-fixes.js?v=11"></script><script src="presentation-context-toolbar.js?v=15"></script><script src="presentation-icon-library.js?v=1"></script><script src="presentation-ai-assistant.js?v=1"></script><script src="presentation-performance-fix.js?v=1"></script><script src="presentation-html-import-patch.js?v=1"></script></body></html>
