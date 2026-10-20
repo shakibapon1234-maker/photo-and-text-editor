@@ -149,6 +149,18 @@
       dy: event.clientY - rect.top - (item.y * rect.height) / 100
     };
 
+    if (kind === 'move' && window.selectedIds && window.selectedIds.size > 1 && window.selectedIds.has(item.id)) {
+      action.multiStarts = Array.from(window.selectedIds).map(id => {
+        const el = active()?.elements?.find(x => x.id === id);
+        if (el) {
+          const dn = nodeFor(el);
+          if (dn) dn.classList.add('is-active-drag');
+          return { el, startX: el.x, startY: el.y };
+        }
+        return null;
+      }).filter(Boolean);
+    }
+
     try {
       // Always capture on the slide stage — capturing on a small handle element
       // causes pointercancel in Electron's sandboxed renderer (Chromium) because
@@ -226,14 +238,42 @@
     window.__hardTransformHandled = true;
     requestAnimationFrame(() => { window.__hardTransformHandled = false; });
 
-    // 6. Select element & queue drag (Smooth & effortless dragging for Text, Shapes, and Images)
-    selected = item.id;
+    // 6. Multi-selection support (Shift, Ctrl, Meta) & group awareness
+    if (!window.selectedIds) window.selectedIds = new Set();
+    const isMultiKey = !!(event.shiftKey || event.ctrlKey || event.metaKey);
+
+    if (isMultiKey) {
+      if (window.selectedIds.has(item.id)) {
+        window.selectedIds.delete(item.id);
+        selected = window.selectedIds.size > 0 ? Array.from(window.selectedIds)[window.selectedIds.size - 1] : null;
+      } else {
+        window.selectedIds.add(item.id);
+        selected = item.id;
+      }
+    } else {
+      if (window.selectedIds.size > 1 && window.selectedIds.has(item.id)) {
+        selected = item.id;
+      } else {
+        window.selectedIds.clear();
+        window.selectedIds.add(item.id);
+        selected = item.id;
+      }
+    }
+
+    if (item.groupId) {
+      active()?.elements?.forEach(el => {
+        if (el.groupId === item.groupId) window.selectedIds.add(el.id);
+      });
+    }
+
     document.querySelectorAll('#slide .element').forEach(el => {
-      el.classList.toggle('selected', el === node);
+      const isSel = window.selectedIds.has(el.dataset.id);
+      el.classList.toggle('selected', isSel);
       el.classList.remove('is-active-drag');
     });
     updateHandles();
     if (typeof renderInspector === 'function') renderInspector();
+    if (typeof window.syncMultiSelectionUI === 'function') window.syncMultiSelectionUI();
 
     // Prevent background listeners from immediately deselecting this element
     event.stopPropagation();
@@ -273,8 +313,27 @@
     const { kind, item, side, rect, start, startClientX, startClientY, startCenterX, startCenterY, dx, dy } = action;
 
     if (kind === 'move') {
-      item.x = ((event.clientX - rect.left - dx) / rect.width) * 100;
-      item.y = ((event.clientY - rect.top - dy) / rect.height) * 100;
+      if (action.multiStarts && action.multiStarts.length > 1) {
+        const deltaX = ((event.clientX - startClientX) / rect.width) * 100;
+        const deltaY = ((event.clientY - startClientY) / rect.height) * 100;
+        action.multiStarts.forEach(m => {
+          m.el.x = m.startX + deltaX;
+          m.el.y = m.startY + deltaY;
+          const n = nodeFor(m.el);
+          if (n) {
+            n.style.left = m.el.x + '%';
+            n.style.top = m.el.y + '%';
+          }
+        });
+      } else {
+        item.x = ((event.clientX - rect.left - dx) / rect.width) * 100;
+        item.y = ((event.clientY - rect.top - dy) / rect.height) * 100;
+        const n = nodeFor(item);
+        if (n) {
+          n.style.left = item.x + '%';
+          n.style.top = item.y + '%';
+        }
+      }
     }
     else if (kind === 'rotate') {
       const cx = rect.left + (startCenterX * rect.width) / 100;
@@ -364,6 +423,22 @@
     // Remove active drag elevation from all elements
     document.querySelectorAll('#slide .element.is-active-drag').forEach(el => el.classList.remove('is-active-drag'));
 
+    if (pending && !action) {
+      if (!event.shiftKey && !event.ctrlKey && !event.metaKey && window.selectedIds && window.selectedIds.size > 1 && window.selectedIds.has(pending.item.id)) {
+        if (!pending.item.groupId) {
+          window.selectedIds.clear();
+          window.selectedIds.add(pending.item.id);
+          selected = pending.item.id;
+          document.querySelectorAll('#slide .element').forEach(el => {
+            el.classList.toggle('selected', el.dataset.id === selected);
+          });
+          updateHandles();
+          if (typeof renderInspector === 'function') renderInspector();
+          if (typeof window.syncMultiSelectionUI === 'function') window.syncMultiSelectionUI();
+        }
+      }
+    }
+
     if (!action) return;
     event.preventDefault();
     event.stopPropagation();
@@ -432,7 +507,15 @@
         node.style.transformOrigin = 'center center';
       }
     });
+    if (window.selectedIds && window.selectedIds.size > 0) {
+      document.querySelectorAll('#slide .element').forEach(el => {
+        if (window.selectedIds.has(el.dataset.id)) {
+          el.classList.add('selected');
+        }
+      });
+    }
     updateHandles();
+    if (typeof window.syncMultiSelectionUI === 'function') window.syncMultiSelectionUI();
   };
 
   render();

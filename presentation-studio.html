@@ -465,11 +465,11 @@ $('slide').addEventListener('pointerdown',event=>{
   // In Electron's sandbox, stopImmediatePropagation does not always reach capture
   // listeners on ancestor nodes, so we use an explicit flag instead.
   if(window.__hardTransformHandled)return;
-  if(!event.target.closest('.element,.hard-resize,.hard-rotate')&&!event.target.closest('#ctx-toolbar')){selected=null;render()}
+  if(!event.target.closest('.element,.hard-resize,.hard-rotate')&&!event.target.closest('#ctx-toolbar')){selected=null;if(window.selectedIds)window.selectedIds.clear();render();if(typeof window.syncMultiSelectionUI==='function')window.syncMultiSelectionUI();}
 },true);
 document.addEventListener('pointerdown',event=>{
   if(window.__hardTransformHandled)return;
-  if(!event.target.closest('.element,.hard-resize,.hard-rotate')&&!event.target.closest('.right')&&!event.target.closest('#textToolsMenu,#textTools')&&!event.target.closest('#ctx-toolbar')){selected=null;render()}
+  if(!event.target.closest('.element,.hard-resize,.hard-rotate')&&!event.target.closest('.right')&&!event.target.closest('#textToolsMenu,#textTools')&&!event.target.closest('#ctx-toolbar')){selected=null;if(window.selectedIds)window.selectedIds.clear();render();if(typeof window.syncMultiSelectionUI==='function')window.syncMultiSelectionUI();}
 },true);
 // (Selection is managed via pointerdown and hard-transform-controls to avoid jumping between text boxes)
 try{const pending=JSON.parse(localStorage.getItem('presentation-studio-pending-asset-v1')||'null');if(pending?.src){addImage(pending.src);localStorage.removeItem('presentation-studio-pending-asset-v1');}}catch(_){/* ignore invalid cross-tool handoff */}
@@ -504,4 +504,4 @@ $('inlineGradientStart').oninput=event=>updateInlineTextColor(el=>{el.color=even
 $('inlineGradientEnd').oninput=event=>updateInlineTextColor(el=>{el.textGradientTo=event.target.value;el.textGradient=true});
 $('inlineGradientAngle').oninput=event=>updateInlineTextColor(el=>{el.textGradientAngle=Number(event.target.value)||0;el.textGradient=true});
 render();
-</script><script src="presentation-hard-transform-controls.js?v=17"></script><script src="presentation-shape-rotate-control.js?v=1"></script><script src="presentation-shape-rotate-overlay.js?v=4"></script><script src="presentation-video-elements.js?v=3"></script><script src="presentation-3d-text-live.js?v=1"></script><script src="presentation-shape-resize-fix.js?v=2"></script><script src="presentation-editing-fixes.js?v=11"></script><script src="presentation-context-toolbar.js?v=15"></script><script src="presentation-icon-library.js?v=1"></script><script src="presentation-ai-assistant.js?v=1"></script><script src="presentation-performance-fix.js?v=1"></script><script src="presentation-html-import-patch.js?v=1"></script></body></html>
+</script><script src="presentation-hard-transform-controls.js?v=17"></script><script src="presentation-multi-select-animation.js?v=1"></script><script src="presentation-shape-rotate-control.js?v=1"></script><script src="presentation-shape-rotate-overlay.js?v=4"></script><script src="presentation-video-elements.js?v=3"></script><script src="presentation-3d-text-live.js?v=1"></script><script src="presentation-shape-resize-fix.js?v=2"></script><script src="presentation-editing-fixes.js?v=11"></script><script src="presentation-context-toolbar.js?v=15"></script><script src="presentation-icon-library.js?v=1"></script><script src="presentation-ai-assistant.js?v=1"></script><script src="presentation-performance-fix.js?v=1"></script><script src="presentation-html-import-patch.js?v=1"></script><script src="presentation-shortcuts-guide.js?v=1"></script><script src="presentation-slide-video-export.js?v=1"></script></body></html>
