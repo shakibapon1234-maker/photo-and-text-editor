@@ -54,6 +54,673 @@
   `);
 
   const customTemplates = [
+    // ── 1. Screenshot 1 Inspired: Mind Map Category Hub (Box Shape) ──
+    {
+      id: 'hub-spoke-category-box',
+      name: 'Category Hub - Box (ভিসা ও ক্যাটাগরি হাব)',
+      category: 'Mind Map',
+      desc: 'Central category hub with 4 corner box cards, numbered badges and connecting dotted lines',
+      badge: '★ Featured',
+      bg: 'custom',
+      bgColor: 'radial-gradient(ellipse at center, #35135d 0%, #1c0836 60%, #100322 100%)',
+      elements: [
+        // Center Yellow Rounded Box
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'round',
+          text: 'ভিসা ফাইল\nVISA FILE',
+          textColor: '#0f172a',
+          textSize: 25,
+          textWeight: '900',
+          textAlign: 'center',
+          x: 34,
+          y: 34,
+          w: 32,
+          h: 32,
+          fill: '#f59e0b',
+          stroke: '#ffffff',
+          line: 3,
+          opacity: 100,
+          rotation: 0
+        },
+        // Connecting Dotted Lines
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'dottedLine',
+          x: 26,
+          y: 26,
+          w: 12,
+          h: 4,
+          fill: '#e2e8f0',
+          stroke: '#e2e8f0',
+          line: 3,
+          opacity: 100,
+          rotation: 35
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'dottedLine',
+          x: 62,
+          y: 26,
+          w: 12,
+          h: 4,
+          fill: '#e2e8f0',
+          stroke: '#e2e8f0',
+          line: 3,
+          opacity: 100,
+          rotation: -35
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'dottedLine',
+          x: 26,
+          y: 70,
+          w: 12,
+          h: 4,
+          fill: '#e2e8f0',
+          stroke: '#e2e8f0',
+          line: 3,
+          opacity: 100,
+          rotation: -35
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'dottedLine',
+          x: 62,
+          y: 70,
+          w: 12,
+          h: 4,
+          fill: '#e2e8f0',
+          stroke: '#e2e8f0',
+          line: 3,
+          opacity: 100,
+          rotation: 35
+        },
+        // Top-Left Card (Personal - Red)
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'round',
+          x: 3,
+          y: 8,
+          w: 38,
+          h: 22,
+          fill: '#dc2626',
+          stroke: '#ffffff',
+          line: 2,
+          opacity: 100,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'circle',
+          text: '১',
+          textColor: '#dc2626',
+          textSize: 20,
+          textWeight: '900',
+          textAlign: 'center',
+          x: 5,
+          y: 12,
+          w: 5.5,
+          h: 14,
+          fill: '#ffffff',
+          stroke: '#ffffff',
+          line: 1,
+          opacity: 100,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'text',
+          text: 'Personal',
+          color: '#ffffff',
+          size: 21,
+          weight: '900',
+          textAlign: 'left',
+          x: 12,
+          y: 10,
+          w: 27,
+          h: 8,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'line',
+          x: 12,
+          y: 18,
+          w: 8,
+          h: 1,
+          fill: '#ffffff',
+          stroke: '#ffffff',
+          line: 1.5,
+          opacity: 100,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'text',
+          text: 'পরিচয় ও পারিবারিক তথ্য',
+          color: '#ffffff',
+          size: 13,
+          weight: '700',
+          textAlign: 'left',
+          x: 12,
+          y: 20,
+          w: 27,
+          h: 8,
+          rotation: 0
+        },
+        // Top-Right Card (Professional - Blue)
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'round',
+          x: 59,
+          y: 8,
+          w: 38,
+          h: 22,
+          fill: '#2563eb',
+          stroke: '#ffffff',
+          line: 2,
+          opacity: 100,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'circle',
+          text: '২',
+          textColor: '#2563eb',
+          textSize: 20,
+          textWeight: '900',
+          textAlign: 'center',
+          x: 61,
+          y: 12,
+          w: 5.5,
+          h: 14,
+          fill: '#ffffff',
+          stroke: '#ffffff',
+          line: 1,
+          opacity: 100,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'text',
+          text: 'Professional',
+          color: '#ffffff',
+          size: 21,
+          weight: '900',
+          textAlign: 'left',
+          x: 68,
+          y: 10,
+          w: 27,
+          h: 8,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'line',
+          x: 68,
+          y: 18,
+          w: 8,
+          h: 1,
+          fill: '#ffffff',
+          stroke: '#ffffff',
+          line: 1.5,
+          opacity: 100,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'text',
+          text: 'পেশা ও দেশে ফেরার কারণ',
+          color: '#ffffff',
+          size: 13,
+          weight: '700',
+          textAlign: 'left',
+          x: 68,
+          y: 20,
+          w: 27,
+          h: 8,
+          rotation: 0
+        },
+        // Bottom-Left Card (Financial - Green)
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'round',
+          x: 3,
+          y: 70,
+          w: 38,
+          h: 22,
+          fill: '#059669',
+          stroke: '#ffffff',
+          line: 2,
+          opacity: 100,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'circle',
+          text: '৩',
+          textColor: '#059669',
+          textSize: 20,
+          textWeight: '900',
+          textAlign: 'center',
+          x: 5,
+          y: 74,
+          w: 5.5,
+          h: 14,
+          fill: '#ffffff',
+          stroke: '#ffffff',
+          line: 1,
+          opacity: 100,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'text',
+          text: 'Financial',
+          color: '#ffffff',
+          size: 21,
+          weight: '900',
+          textAlign: 'left',
+          x: 12,
+          y: 72,
+          w: 27,
+          h: 8,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'line',
+          x: 12,
+          y: 80,
+          w: 8,
+          h: 1,
+          fill: '#ffffff',
+          stroke: '#ffffff',
+          line: 1.5,
+          opacity: 100,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'text',
+          text: 'ভ্রমণ খরচ বহনের ক্ষমতা',
+          color: '#ffffff',
+          size: 13,
+          weight: '700',
+          textAlign: 'left',
+          x: 12,
+          y: 82,
+          w: 27,
+          h: 8,
+          rotation: 0
+        },
+        // Bottom-Right Card (Others Documents - Orange)
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'round',
+          x: 59,
+          y: 70,
+          w: 38,
+          h: 22,
+          fill: '#ea580c',
+          stroke: '#ffffff',
+          line: 2,
+          opacity: 100,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'circle',
+          text: '৪',
+          textColor: '#ea580c',
+          textSize: 20,
+          textWeight: '900',
+          textAlign: 'center',
+          x: 61,
+          y: 74,
+          w: 5.5,
+          h: 14,
+          fill: '#ffffff',
+          stroke: '#ffffff',
+          line: 1,
+          opacity: 100,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'text',
+          text: 'Others Documents',
+          color: '#ffffff',
+          size: 20,
+          weight: '900',
+          textAlign: 'left',
+          x: 68,
+          y: 72,
+          w: 27,
+          h: 8,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'line',
+          x: 68,
+          y: 80,
+          w: 8,
+          h: 1,
+          fill: '#ffffff',
+          stroke: '#ffffff',
+          line: 1.5,
+          opacity: 100,
+          rotation: 0
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'text',
+          text: 'সফরের পরিকল্পনা ও সহায়ক নথি',
+          color: '#ffffff',
+          size: 13,
+          weight: '700',
+          textAlign: 'left',
+          x: 68,
+          y: 82,
+          w: 27,
+          h: 8,
+          rotation: 0
+        }
+      ]
+    },
+
+    // ── 2. User Requested: Mind Map Category Hub (Round Shape) ──
+    {
+      id: 'hub-spoke-category-round',
+      name: 'Category Hub - Round (রাউন্ড শেপ হাব)',
+      category: 'Mind Map',
+      desc: 'Central circular core node connected with dotted lines to 4 circular category nodes',
+      badge: '★ Featured',
+      bg: 'custom',
+      bgColor: 'radial-gradient(ellipse at center, #1e293b 0%, #0f172a 70%, #020617 100%)',
+      elements: [
+        // Center Circular Core Node
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'circle',
+          text: 'মূল কনসেপ্ট\nCORE TOPIC',
+          textColor: '#0f172a',
+          textSize: 20,
+          textWeight: '900',
+          textAlign: 'center',
+          x: 38,
+          y: 30,
+          w: 24,
+          h: 40,
+          fill: '#f59e0b',
+          stroke: '#ffffff',
+          line: 3,
+          opacity: 100,
+          rotation: 0
+        },
+        // Connecting Dotted Lines
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'dottedLine',
+          x: 26,
+          y: 24,
+          w: 14,
+          h: 4,
+          fill: '#94a3b8',
+          stroke: '#94a3b8',
+          line: 2.5,
+          opacity: 100,
+          rotation: 35
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'dottedLine',
+          x: 60,
+          y: 24,
+          w: 14,
+          h: 4,
+          fill: '#94a3b8',
+          stroke: '#94a3b8',
+          line: 2.5,
+          opacity: 100,
+          rotation: -35
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'dottedLine',
+          x: 26,
+          y: 72,
+          w: 14,
+          h: 4,
+          fill: '#94a3b8',
+          stroke: '#94a3b8',
+          line: 2.5,
+          opacity: 100,
+          rotation: -35
+        },
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'dottedLine',
+          x: 60,
+          y: 72,
+          w: 14,
+          h: 4,
+          fill: '#94a3b8',
+          stroke: '#94a3b8',
+          line: 2.5,
+          opacity: 100,
+          rotation: 35
+        },
+        // Node 1 (Top-Left Circle - Red)
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'circle',
+          text: '১\nব্যক্তিগত তথ্য\nPersonal Info',
+          textColor: '#ffffff',
+          textSize: 15,
+          textWeight: '800',
+          textAlign: 'center',
+          x: 8,
+          y: 6,
+          w: 20,
+          h: 36,
+          fill: '#ef4444',
+          stroke: '#ffffff',
+          line: 2,
+          opacity: 100,
+          rotation: 0
+        },
+        // Node 2 (Top-Right Circle - Blue)
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'circle',
+          text: '২\nপেশাগত বিবরণ\nProfessional',
+          textColor: '#ffffff',
+          textSize: 15,
+          textWeight: '800',
+          textAlign: 'center',
+          x: 72,
+          y: 6,
+          w: 20,
+          h: 36,
+          fill: '#3b82f6',
+          stroke: '#ffffff',
+          line: 2,
+          opacity: 100,
+          rotation: 0
+        },
+        // Node 3 (Bottom-Left Circle - Green)
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'circle',
+          text: '৩\nআর্থিক সক্ষমতা\nFinancial Proof',
+          textColor: '#ffffff',
+          textSize: 15,
+          textWeight: '800',
+          textAlign: 'center',
+          x: 8,
+          y: 58,
+          w: 20,
+          h: 36,
+          fill: '#10b981',
+          stroke: '#ffffff',
+          line: 2,
+          opacity: 100,
+          rotation: 0
+        },
+        // Node 4 (Bottom-Right Circle - Orange)
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'circle',
+          text: '৪\nঅন্যান্য ডকুমেন্টস\nOther Records',
+          textColor: '#ffffff',
+          textSize: 15,
+          textWeight: '800',
+          textAlign: 'center',
+          x: 72,
+          y: 58,
+          w: 20,
+          h: 36,
+          fill: '#f97316',
+          stroke: '#ffffff',
+          line: 2,
+          opacity: 100,
+          rotation: 0
+        }
+      ]
+    },
+
+    // ── 3. Unique Timeline & Milestones Roadmap ──
+    {
+      id: 'timeline-zigzag-milestones',
+      name: 'Alternating Timeline (সময়রেখা ও মাইলস্টোন)',
+      category: 'Roadmap',
+      desc: 'Central horizontal axis with alternating top/bottom milestone milestone cards (2023-2026)',
+      badge: 'Popular',
+      bg: 'custom',
+      bgColor: '#0b1329',
+      elements: [
+        { id: crypto.randomUUID(), type: 'text', text: 'প্রজেক্ট মাইলস্টোন ও ভবিষ্যৎ সময়রেখা', color: '#facc15', size: 32, weight: '900', textAlign: 'center', x: 10, y: 4, w: 80, h: 8 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'line', x: 6, y: 49, w: 88, h: 2, fill: '#38bdf8', stroke: '#38bdf8', line: 4, opacity: 100 },
+        // Step 1 (Top)
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '২০২৩\nরিসার্চ ও প্ল্যানিং\nমার্কেট স্টাডি ও টিম গঠন', textColor: '#ffffff', textSize: 13, textWeight: '700', textAlign: 'center', x: 7, y: 15, w: 18, h: 28, fill: '#1e293b', stroke: '#38bdf8', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', text: '০১', textColor: '#0f172a', textSize: 11, textWeight: '900', textAlign: 'center', x: 13, y: 46, w: 6, h: 8, fill: '#38bdf8', stroke: '#ffffff', line: 2, opacity: 100 },
+        // Step 2 (Bottom)
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '২০২৪\nপ্রোডাক্ট ডেভেলপমেন্ট\nকোর প্ল্যাটফর্ম ও টেস্ট লঞ্চ', textColor: '#ffffff', textSize: 13, textWeight: '700', textAlign: 'center', x: 29, y: 57, w: 18, h: 28, fill: '#1e293b', stroke: '#a855f7', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', text: '০২', textColor: '#ffffff', textSize: 11, textWeight: '900', textAlign: 'center', x: 35, y: 46, w: 6, h: 8, fill: '#a855f7', stroke: '#ffffff', line: 2, opacity: 100 },
+        // Step 3 (Top)
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '২০২৫\nমার্কেট এক্সপানশন\nদেশজুড়ে সেবা সম্প্রসারণ', textColor: '#ffffff', textSize: 13, textWeight: '700', textAlign: 'center', x: 52, y: 15, w: 18, h: 28, fill: '#1e293b', stroke: '#ec4899', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', text: '০৩', textColor: '#ffffff', textSize: 11, textWeight: '900', textAlign: 'center', x: 58, y: 46, w: 6, h: 8, fill: '#ec4899', stroke: '#ffffff', line: 2, opacity: 100 },
+        // Step 4 (Bottom)
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '২০২৬\nগ্লোবাল লঞ্চিং\nআন্তর্জাতিক বাজারে প্রবেশ', textColor: '#ffffff', textSize: 13, textWeight: '700', textAlign: 'center', x: 74, y: 57, w: 18, h: 28, fill: '#1e293b', stroke: '#10b981', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', text: '০৪', textColor: '#0f172a', textSize: 11, textWeight: '900', textAlign: 'center', x: 80, y: 46, w: 6, h: 8, fill: '#10b981', stroke: '#ffffff', line: 2, opacity: 100 }
+      ]
+    },
+
+    // ── 4. Unique SWOT 4-Quadrant Strategic Matrix ──
+    {
+      id: 'swot-strategic-matrix',
+      name: 'SWOT Matrix (কৌশলগত ৪-চতুর্ভুজ)',
+      category: 'Strategy',
+      desc: '4-quadrant strategic matrix (Strengths, Weaknesses, Opportunities, Threats) with center diamond badge',
+      badge: 'Clean',
+      bg: 'custom',
+      bgColor: '#090e17',
+      elements: [
+        { id: crypto.randomUUID(), type: 'text', text: 'SWOT কৌশলগত বিশ্লেষণ ম্যাট্রিক্স', color: '#ffd166', size: 30, weight: '900', textAlign: 'center', x: 10, y: 4, w: 80, h: 8 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'S • STRENGTHS (সবল দিক)\n\n• দক্ষ অভিজ্ঞ টিম\n• শক্তিশালী ব্র্যান্ড ইমেজ\n• নিজস্ব আধুনিক ল্যাব', textColor: '#ecfdf5', textSize: 14, textWeight: '800', textAlign: 'center', x: 6, y: 15, w: 42, h: 36, fill: '#064e3b', stroke: '#34d399', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'W • WEAKNESSES (দুর্বলতা)\n\n• সীমিত ভৌগোলিক বিস্তার\n• উচ্চ অপারেশনাল খরচ\n• অতিরিক্ত সার্ভিস চাপ', textColor: '#fff1f2', textSize: 14, textWeight: '800', textAlign: 'center', x: 52, y: 15, w: 42, h: 36, fill: '#881337', stroke: '#fb7185', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'O • OPPORTUNITIES (সম্ভাবনা)\n\n• অনলাইন মার্কেটের দ্রুত বৃদ্ধি\n• নতুন পার্টনারশিপ সুযোগ\n• এআই প্রযুক্তির সঠিক ব্যবহার', textColor: '#f0f9ff', textSize: 14, textWeight: '800', textAlign: 'center', x: 6, y: 55, w: 42, h: 36, fill: '#0c4a6e', stroke: '#38bdf8', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'T • THREATS (ঝুঁকি ও চ্যালেঞ্জ)\n\n• তীব্র প্রতিযোগী চাপ\n• পলিসির দ্রুত পরিবর্তন\n• মুদ্রাস্ফীতি ও ব্যয় বৃদ্ধি', textColor: '#fffbeb', textSize: 14, textWeight: '800', textAlign: 'center', x: 52, y: 55, w: 42, h: 36, fill: '#78350f', stroke: '#fbbf24', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'diamond', text: 'SWOT', textColor: '#0f172a', textSize: 13, textWeight: '900', textAlign: 'center', x: 44, y: 47, w: 12, h: 14, fill: '#f59e0b', stroke: '#ffffff', line: 2, opacity: 100 }
+      ]
+    },
+
+    // ── 5. Unique Head-to-Head VS Split Battle ──
+    {
+      id: 'versus-split-comparison',
+      name: 'VS Head-to-Head (বনাম - তুলনামূলক বিশ্লেষণ)',
+      category: 'Comparison',
+      desc: 'Dramatic split side-by-side battle comparison with central glowing VS badge',
+      badge: '★ Hot',
+      bg: 'custom',
+      bgColor: '#080b14',
+      elements: [
+        { id: crypto.randomUUID(), type: 'text', text: 'বিকল্প ১ বনাম বিকল্প ২ : নিখুঁত তুলনা', color: '#ffffff', size: 30, weight: '900', textAlign: 'center', x: 10, y: 4, w: 80, h: 8 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'বিকল্প ১ : ট্র্যাডিশনাল মডেল\n\n✗ দীর্ঘ প্রসেসিং সময়\n✗ ম্যানুয়াল পেপারওয়ার্ক\n✗ সীমিত সাপোর্ট (৯-৫টা)\n✗ অতিরিক্ত হিডেন চার্জ\n\nব্যয়বহুল ও জটিল প্রক্রিয়া', textColor: '#dbeafe', textSize: 15, textWeight: '700', textAlign: 'center', x: 6, y: 15, w: 41, h: 76, fill: '#1e3a8a', stroke: '#60a5fa', line: 2.5, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'বিকল্প ২ : স্মার্ট ডিজিটাল সলিউশন\n\n✓ ১০০% অটোমেটেড ও দ্রুত\n✓ পেপারলেস ক্লাউড স্টোরেজ\n✓ ২৪/৭ সার্বক্ষণিক এআই সাপোর্ট\n✓ স্বচ্ছ ফিক্সড প্রাইসিং\n\nসহজ, আধুনিক ও সাশ্রয়ী', textColor: '#fce7f3', textSize: 15, textWeight: '700', textAlign: 'center', x: 53, y: 15, w: 41, h: 76, fill: '#831843', stroke: '#f472b6', line: 2.5, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', text: 'VS', textColor: '#0f172a', textSize: 20, textWeight: '900', textAlign: 'center', x: 44, y: 44, w: 12, h: 18, fill: '#f59e0b', stroke: '#ffffff', line: 3, opacity: 100 }
+      ]
+    },
+
+    // ── 6. Unique Conversion Funnel & Stepped Progression ──
+    {
+      id: 'funnel-conversion-pyramid',
+      name: 'Conversion Funnel (ফানেল ও পর্যায়ক্রম)',
+      category: 'Marketing',
+      desc: 'Stepped funnel progression from Awareness to Leads, Decision and Conversion',
+      badge: 'Modern',
+      bg: 'custom',
+      bgColor: '#0b1120',
+      elements: [
+        { id: crypto.randomUUID(), type: 'text', text: 'সেলস ও কাস্টমার জার্নি ফানেল', color: '#38bdf8', size: 32, weight: '900', textAlign: 'center', x: 10, y: 4, w: 80, h: 8 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '১. সচেতনতা (Awareness) — ভিউয়ারস ও ট্রাফিক : ১০০,০০০+', textColor: '#ffffff', textSize: 16, textWeight: '900', textAlign: 'center', x: 10, y: 16, w: 80, h: 15, fill: '#1d4ed8', stroke: '#93c5fd', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '২. আগ্রহ ও সংযোগ (Interest) — ইনকোয়ারি ও লিডস : ২৫,০০০+', textColor: '#ffffff', textSize: 16, textWeight: '900', textAlign: 'center', x: 17, y: 34, w: 66, h: 15, fill: '#7c3aed', stroke: '#c4b5fd', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '৩. সিদ্ধান্ত (Decision) — ট্রায়াল ও প্রপোজাল : ৫,০০০+', textColor: '#ffffff', textSize: 16, textWeight: '900', textAlign: 'center', x: 24, y: 52, w: 52, h: 15, fill: '#db2777', stroke: '#fbcfe8', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '৪. অ্যাকশন (Action) — ক্লায়েন্ট কনভার্সন : ১,৫০০+', textColor: '#ffffff', textSize: 16, textWeight: '900', textAlign: 'center', x: 31, y: 70, w: 38, h: 15, fill: '#059669', stroke: '#6ee7b7', line: 2, opacity: 100 }
+      ]
+    },
+
+    // ── 7. Unique 4-Phase Cyclical Flow (PDCA Loop) ──
+    {
+      id: 'cycle-process-loop',
+      name: '4-Phase Cycle Flow (চক্রাকার সাইকেল)',
+      category: 'Process',
+      desc: 'Continuous improvement lifecycle flow: Plan → Execute → Monitor → Optimize',
+      badge: 'Popular',
+      bg: 'custom',
+      bgColor: 'radial-gradient(ellipse at center, #1e1b4b 0%, #0f172a 70%, #030712 100%)',
+      elements: [
+        { id: crypto.randomUUID(), type: 'text', text: 'ধারাবাহিক উন্নয়ন ও সাইকেল প্রক্রিয়া', color: '#facc15', size: 30, weight: '900', textAlign: 'center', x: 10, y: 4, w: 80, h: 8 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', text: 'CYCLE\nFLOW', textColor: '#ffd166', textSize: 16, textWeight: '900', textAlign: 'center', x: 41, y: 35, w: 18, h: 30, fill: '#1e293b', stroke: '#ffd166', line: 2.5, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '০১. পরিকল্পনা (Plan)\nলক্ষ্য নির্ধারণ ও রোডম্যাপ প্রস্তুত', textColor: '#ffffff', textSize: 14, textWeight: '800', textAlign: 'center', x: 8, y: 16, w: 34, h: 26, fill: '#0284c7', stroke: '#7dd3fc', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 44, y: 22, w: 12, h: 8, fill: '#38bdf8', stroke: '#ffffff', line: 1.5, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '০২. বাস্তবায়ন (Do)\nপরিকল্পনা অনুযায়ী কাজ সম্পাদন', textColor: '#ffffff', textSize: 14, textWeight: '800', textAlign: 'center', x: 58, y: 16, w: 34, h: 26, fill: '#059669', stroke: '#6ee7b7', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowDown', x: 72, y: 45, w: 6, h: 14, fill: '#34d399', stroke: '#ffffff', line: 1.5, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '০৩. নিরীক্ষা (Check)\nফলাফল বিশ্লেষণ ও ত্রুটি শনাক্ত', textColor: '#ffffff', textSize: 14, textWeight: '800', textAlign: 'center', x: 58, y: 62, w: 34, h: 26, fill: '#d97706', stroke: '#fde68a', line: 2, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowLeft', x: 44, y: 72, w: 12, h: 8, fill: '#f59e0b', stroke: '#ffffff', line: 1.5, opacity: 100 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '০৪. উন্নয়ন (Act)\nপরিমার্জন ও পরবর্তী ধাপে পদার্পণ', textColor: '#ffffff', textSize: 14, textWeight: '800', textAlign: 'center', x: 8, y: 62, w: 34, h: 26, fill: '#7c3aed', stroke: '#c4b5fd', line: 2, opacity: 100 }
+      ]
+    },
+
     {
       id: 'course-benefits',
       name: 'Course Features (কোর্স সুবিধা)',
@@ -546,6 +1213,145 @@
     ['clean', 'Clean White']
   ];
 
+  
+  function escapeXml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  function renderTemplateSvgPreview(item) {
+    if (item.previewSvg) {
+      return item.previewSvg;
+    }
+
+    const bgVal = item.bgColor || (typeof themes !== 'undefined' && themes[item.bg]) || '#17233c';
+    let bgSvg = '';
+
+    if (bgVal.includes('gradient')) {
+      const gradId = 'bgG_' + item.id.replace(/[^a-zA-Z0-9]/g, '');
+      if (item.id === 'hub-spoke-category-box') {
+        bgSvg = `<defs>
+          <radialGradient id="${gradId}" cx="50%" cy="50%" r="70%">
+            <stop offset="0%" stop-color="#3d1468"/>
+            <stop offset="60%" stop-color="#1e0a38"/>
+            <stop offset="100%" stop-color="#100320"/>
+          </radialGradient>
+        </defs>
+        <rect width="160" height="90" fill="url(#${gradId})" />`;
+      } else if (item.id === 'hub-spoke-category-round') {
+        bgSvg = `<defs>
+          <radialGradient id="${gradId}" cx="50%" cy="50%" r="70%">
+            <stop offset="0%" stop-color="#1e293b"/>
+            <stop offset="70%" stop-color="#0f172a"/>
+            <stop offset="100%" stop-color="#020617"/>
+          </radialGradient>
+        </defs>
+        <rect width="160" height="90" fill="url(#${gradId})" />`;
+      } else if (item.id === 'cycle-process-loop') {
+        bgSvg = `<defs>
+          <radialGradient id="${gradId}" cx="50%" cy="50%" r="70%">
+            <stop offset="0%" stop-color="#241e5e"/>
+            <stop offset="70%" stop-color="#0f172a"/>
+            <stop offset="100%" stop-color="#030712"/>
+          </radialGradient>
+        </defs>
+        <rect width="160" height="90" fill="url(#${gradId})" />`;
+      } else {
+        bgSvg = `<defs>
+          <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#1e293b"/>
+            <stop offset="100%" stop-color="#090d16"/>
+          </linearGradient>
+        </defs>
+        <rect width="160" height="90" fill="url(#${gradId})" />`;
+      }
+    } else {
+      bgSvg = `<rect width="160" height="90" fill="${escapeXml(bgVal)}" />`;
+    }
+
+    let elementsSvg = '';
+    (item.elements || []).forEach(el => {
+      const gx = (Number(el.x) || 0) * 1.6;
+      const gy = (Number(el.y) || 0) * 0.9;
+      const gw = (Number(el.w) || 0) * 1.6;
+      const gh = (Number(el.h) || 0) * 0.9;
+      const rot = Number(el.rotation) || 0;
+      const rotAttr = rot ? ` transform="rotate(${rot} ${gx + gw/2} ${gy + gh/2})"` : '';
+
+      if (el.type === 'shape') {
+        const fill = el.fill || '#4f8df7';
+        const stroke = el.stroke || '#ffffff';
+        const sw = Math.max(0.6, (Number(el.line) || 2) * 0.35);
+
+        if (el.shape === 'circle') {
+          const r = Math.min(gw, gh) / 2;
+          elementsSvg += `<circle cx="${gx + gw/2}" cy="${gy + gh/2}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${rotAttr} />`;
+        } else if (el.shape === 'oval') {
+          elementsSvg += `<ellipse cx="${gx + gw/2}" cy="${gy + gh/2}" rx="${gw/2}" ry="${gh/2}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${rotAttr} />`;
+        } else if (el.shape === 'dottedLine') {
+          elementsSvg += `<line x1="${gx}" y1="${gy + gh/2}" x2="${gx + gw}" y2="${gy + gh/2}" stroke="${fill || stroke}" stroke-width="${sw * 1.8}" stroke-linecap="round" stroke-dasharray="1 3.2"${rotAttr} />`;
+        } else if (el.shape === 'dashedLine') {
+          elementsSvg += `<line x1="${gx}" y1="${gy + gh/2}" x2="${gx + gw}" y2="${gy + gh/2}" stroke="${fill || stroke}" stroke-width="${sw * 1.8}" stroke-linecap="round" stroke-dasharray="4 2.5"${rotAttr} />`;
+        } else if (el.shape === 'line') {
+          elementsSvg += `<line x1="${gx}" y1="${gy + gh/2}" x2="${gx + gw}" y2="${gy + gh/2}" stroke="${fill || stroke}" stroke-width="${sw * 1.8}" stroke-linecap="round"${rotAttr} />`;
+        } else if (el.shape === 'chevron') {
+          const p = `${gx},${gy} ${gx+gw*0.7},${gy} ${gx+gw},${gy+gh/2} ${gx+gw*0.7},${gy+gh} ${gx},${gy+gh} ${gx+gw*0.3},${gy+gh/2}`;
+          elementsSvg += `<polygon points="${p}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${rotAttr} />`;
+        } else if (el.shape === 'diamond') {
+          const p = `${gx+gw/2},${gy} ${gx+gw},${gy+gh/2} ${gx+gw/2},${gy+gh} ${gx},${gy+gh/2}`;
+          elementsSvg += `<polygon points="${p}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${rotAttr} />`;
+        } else if (el.shape === 'round') {
+          const rx = Math.min(3, Math.min(gw, gh) * 0.22);
+          elementsSvg += `<rect x="${gx}" y="${gy}" width="${gw}" height="${gh}" rx="${rx}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${rotAttr} />`;
+        } else if (el.shape === 'arrowRight') {
+          const p = `${gx},${gy+gh*0.3} ${gx+gw*0.6},${gy+gh*0.3} ${gx+gw*0.6},${gy} ${gx+gw},${gy+gh/2} ${gx+gw*0.6},${gy+gh} ${gx+gw*0.6},${gy+gh*0.7} ${gx},${gy+gh*0.7}`;
+          elementsSvg += `<polygon points="${p}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${rotAttr} />`;
+        } else if (el.shape === 'arrowDown') {
+          const p = `${gx+gw*0.3},${gy} ${gx+gw*0.7},${gy} ${gx+gw*0.7},${gy+gh*0.6} ${gx+gw},${gy+gh*0.6} ${gx+gw/2},${gy+gh} ${gx},${gy+gh*0.6} ${gx+gw*0.3},${gy+gh*0.6}`;
+          elementsSvg += `<polygon points="${p}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${rotAttr} />`;
+        } else if (el.shape === 'arrowLeft') {
+          const p = `${gx+gw*0.4},${gy} ${gx+gw*0.4},${gy+gh*0.3} ${gx+gw},${gy+gh*0.3} ${gx+gw},${gy+gh*0.7} ${gx+gw*0.4},${gy+gh*0.7} ${gx+gw*0.4},${gy+gh} ${gx},${gy+gh/2}`;
+          elementsSvg += `<polygon points="${p}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${rotAttr} />`;
+        } else {
+          elementsSvg += `<rect x="${gx}" y="${gy}" width="${gw}" height="${gh}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${rotAttr} />`;
+        }
+
+        // Inside text
+        if (el.text) {
+          const lines = el.text.split('\n').filter(Boolean);
+          if (lines.length === 1) {
+            const fs = Math.max(2.8, Math.min(5, gh * 0.45));
+            elementsSvg += `<text x="${gx + gw/2}" y="${gy + gh/2 + 0.5}" font-size="${fs}" fill="${el.textColor || '#ffffff'}" font-weight="bold" font-family="system-ui, sans-serif" text-anchor="middle" dominant-baseline="central"${rotAttr}>${escapeXml(lines[0])}</text>`;
+          } else if (lines.length >= 2) {
+            const fs1 = Math.max(2.6, Math.min(4.5, gh * 0.35));
+            const fs2 = Math.max(2.2, Math.min(3.6, gh * 0.25));
+            elementsSvg += `<text x="${gx + gw/2}" y="${gy + gh/2 - fs1 * 0.6}" font-size="${fs1}" fill="${el.textColor || '#ffffff'}" font-weight="bold" font-family="system-ui, sans-serif" text-anchor="middle" dominant-baseline="central"${rotAttr}>${escapeXml(lines[0])}</text>`;
+            elementsSvg += `<text x="${gx + gw/2}" y="${gy + gh/2 + fs2 * 0.8}" font-size="${fs2}" fill="${el.textColor || '#ffffff'}" font-weight="600" opacity="0.9" font-family="system-ui, sans-serif" text-anchor="middle" dominant-baseline="central"${rotAttr}>${escapeXml(lines[1])}</text>`;
+          }
+        }
+      } else if (el.type === 'text') {
+        const lines = (el.text || '').split('\n').filter(Boolean);
+        const line = lines[0] || '';
+        const align = el.textAlign || 'center';
+        const tx = align === 'left' ? gx : (align === 'right' ? gx + gw : gx + gw/2);
+        const anchor = align === 'left' ? 'start' : (align === 'right' ? 'end' : 'middle');
+        const fs = Math.max(3, Math.min(5.2, (Number(el.size) || 16) * 0.15));
+        elementsSvg += `<text x="${tx}" y="${gy + gh/2 + 0.5}" font-size="${fs}" fill="${el.color || '#ffffff'}" font-weight="${el.weight || 'bold'}" font-family="system-ui, sans-serif" text-anchor="${anchor}" dominant-baseline="central"${rotAttr}>${escapeXml(line)}</text>`;
+      } else if (el.type === 'image') {
+        elementsSvg += `<rect x="${gx}" y="${gy}" width="${gw}" height="${gh}" rx="3" fill="#334155" opacity="0.75" />`;
+        elementsSvg += `<text x="${gx + gw/2}" y="${gy + gh/2 + 1}" font-size="6" fill="#94a3b8" text-anchor="middle" dominant-baseline="central">🖼️</text>`;
+      }
+    });
+
+    return `<svg viewBox="0 0 160 90" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block;border-radius:6px;">${bgSvg}${elementsSvg}</svg>`;
+  }
+
+
   document.head.insertAdjacentHTML('beforeend', `
     <style>
       .layout-gallery {
@@ -554,7 +1360,7 @@
         left: 50%;
         top: 65px;
         transform: translateX(-50%);
-        width: min(840px, calc(100vw - 30px));
+        width: min(940px, calc(100vw - 32px)); max-height: calc(100vh - 75px);
         max-height: calc(100vh - 90px);
         overflow-y: auto;
         padding: 18px 20px;
@@ -604,22 +1410,46 @@
         margin-bottom: 14px;
       }
       .template-card-custom {
-        background: #172238;
-        border: 1px solid #293854;
-        border-radius: 10px;
+        background: #141e33;
+        border: 1px solid #283750;
+        border-radius: 12px;
         padding: 12px;
         text-align: left;
         cursor: pointer;
-        transition: all 0.18s ease;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         display: flex;
         flex-direction: column;
         justify-content: space-between;
       }
       .template-card-custom:hover {
-        border-color: #ffb11b;
-        background: #1d2c49;
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        border-color: #ffd166;
+        background: #1a2844;
+        transform: translateY(-3px);
+        box-shadow: 0 12px 30px rgba(0,0,0,0.55);
+      }
+      .template-preview-box {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 10px;
+        background: #090e18;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: border-color 0.2s ease, transform 0.2s ease;
+      }
+      .template-card-custom:hover .template-preview-box {
+        border-color: #ffd166;
+      }
+      .template-preview-box svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+        user-select: none;
+        pointer-events: none;
       }
       .template-badge {
         display: inline-block;
@@ -766,12 +1596,18 @@
       const card = document.createElement('div');
       card.className = 'template-card-custom';
       card.innerHTML = `
-        <div>
-          <span class="template-badge">${item.badge}</span>
+        <div class="template-preview-box">
+          ${renderTemplateSvgPreview(item)}
+        </div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <span class="template-badge">${item.badge}</span>
+            <span style="font-size:10px;color:#94a3b8;font-weight:700">${item.category || 'Infographic'}</span>
+          </div>
           <div class="template-title">${item.name}</div>
           <div class="template-desc">${item.desc}</div>
         </div>
-        <button style="margin-top:10px;background:#2563eb;border-color:#60a5fa;width:100%;font-size:11px">Use Template →</button>
+        <button style="margin-top:10px;background:#2563eb;border:1px solid #60a5fa;color:#fff;border-radius:6px;padding:7px;width:100%;font-size:11px;font-weight:700;cursor:pointer">Use Template →</button>
       `;
       card.onclick = () => applyCustomTemplate(item);
       customGrid.appendChild(card);

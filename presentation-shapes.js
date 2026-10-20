@@ -4,12 +4,15 @@
   const defs = [
     // Lines
     ['line', 'Straight Line', 'Lines'],
+    ['dottedLine', 'Dotted Line', 'Lines'],
+    ['dashedLine', 'Dashed Line', 'Lines'],
     ['arrowLineRight', 'Arrow Line Right', 'Lines'],
     ['arrowLineLeft', 'Arrow Line Left', 'Lines'],
     ['doubleArrowLine', 'Double Arrow Line', 'Lines'],
     // Basic Shapes
     ['rect', 'Rectangle', 'Basic Shapes'],
     ['round', 'Rounded Rectangle', 'Basic Shapes'],
+    ['circle', 'Circle', 'Basic Shapes'],
     ['oval', 'Oval', 'Basic Shapes'],
     ['triangle', 'Triangle', 'Basic Shapes'],
     ['rightTriangle', 'Right Triangle', 'Basic Shapes'],
@@ -39,6 +42,10 @@
       // Lines
       case 'line':
         return `<svg viewBox="0 0 100 20" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><line x1="0" y1="10" x2="100" y2="10" stroke="var(--sf, #4f8df7)" stroke-width="var(--sl, 4px)" stroke-linecap="round" /></svg>`;
+      case 'dottedLine':
+        return `<svg viewBox="0 0 100 20" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><line x1="2" y1="10" x2="98" y2="10" stroke="var(--sf, #4f8df7)" stroke-width="var(--sl, 4px)" stroke-linecap="round" stroke-dasharray="1 10" /></svg>`;
+      case 'dashedLine':
+        return `<svg viewBox="0 0 100 20" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><line x1="2" y1="10" x2="98" y2="10" stroke="var(--sf, #4f8df7)" stroke-width="var(--sl, 4px)" stroke-linecap="round" stroke-dasharray="8 6" /></svg>`;
       case 'arrowLineRight':
         return `<svg viewBox="0 0 100 20" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><line x1="0" y1="10" x2="86" y2="10" stroke="var(--sf, #4f8df7)" stroke-width="var(--sl, 4px)" stroke-linecap="round" /><polygon points="84,2 100,10 84,18" fill="var(--sf, #4f8df7)" /></svg>`;
       case 'arrowLineLeft':
@@ -59,6 +66,8 @@
         return `<svg viewBox="0 0 100 50" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><polygon points="0,0 70,0 100,25 70,50 0,50 30,25" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" stroke-linejoin="round" /></svg>`;
 
       // Basic Shapes
+      case 'circle':
+        return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><circle cx="50" cy="50" r="46" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" /></svg>`;
       case 'round':
         return `<svg viewBox="0 0 100 60" preserveAspectRatio="none" style="width:100%;height:100%;display:block"><rect x="2" y="2" width="96" height="56" rx="14" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" /></svg>`;
       case 'oval':
