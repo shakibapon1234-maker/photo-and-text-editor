@@ -154,7 +154,7 @@
 
   #brollLayer.sunset, #brollLayer.cloudSunset,
   .broll-canvas-layer.sunset, .broll-canvas-layer.cloudSunset {
-    background: linear-gradient(175deg, #4c0519, #be123c 35%, #f97316 65%, #fde047 90%);
+    background: linear-gradient(175deg, #7c1328, #be123c 35%, #f97316 65%, #fde047 90%);
   }
   #brollLayer.sunset:before, #brollLayer.cloudSunset:before,
   .broll-canvas-layer.sunset:before, .broll-canvas-layer.cloudSunset:before {

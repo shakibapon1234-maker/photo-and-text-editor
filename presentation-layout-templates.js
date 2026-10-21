@@ -77,7 +77,11 @@
           stroke: '#f59e0b',
           line: 10,
           opacity: 100,
-          rotation: 0
+          rotation: 0,
+          animation: 'zoom',
+          animationDuration: 0.6,
+          animationOrder: 1,
+          animationStart: 'with'
         },
         // 2. Top Golden Star Trio
         {
@@ -91,7 +95,11 @@
           x: 35,
           y: 9,
           w: 30,
-          h: 6
+          h: 6,
+          animation: 'pop',
+          animationDuration: 0.5,
+          animationOrder: 2,
+          animationStart: 'after'
         },
         // 3. Bengali Thank You Header Badge (Crimson Red Rounded Pill)
         {
@@ -111,7 +119,11 @@
           stroke: '#b91c1c',
           line: 1,
           opacity: 100,
-          rotation: 0
+          rotation: 0,
+          animation: 'slideDown',
+          animationDuration: 0.6,
+          animationOrder: 3,
+          animationStart: 'after'
         },
         // 4. English Subtitle (Bold Deep Red)
         {
@@ -125,7 +137,11 @@
           x: 14,
           y: 35,
           w: 72,
-          h: 12
+          h: 12,
+          animation: 'fade',
+          animationDuration: 0.5,
+          animationOrder: 4,
+          animationStart: 'after'
         },
         // 5. Card 1: YouTube Handle
         {
@@ -145,7 +161,11 @@
           stroke: '#38bdf8',
           line: 2,
           opacity: 100,
-          rotation: 0
+          rotation: 0,
+          animation: 'slideUp',
+          animationDuration: 0.6,
+          animationOrder: 5,
+          animationStart: 'after'
         },
         // 6. Card 2: Website Card
         {
@@ -165,7 +185,11 @@
           stroke: '#38bdf8',
           line: 2,
           opacity: 100,
-          rotation: 0
+          rotation: 0,
+          animation: 'slideUp',
+          animationDuration: 0.6,
+          animationOrder: 6,
+          animationStart: 'after'
         },
         // 7. Card 3: Facebook Card (User Requested)
         {
@@ -185,7 +209,11 @@
           stroke: '#38bdf8',
           line: 2,
           opacity: 100,
-          rotation: 0
+          rotation: 0,
+          animation: 'slideUp',
+          animationDuration: 0.6,
+          animationOrder: 7,
+          animationStart: 'after'
         },
         // 8. Footer Callout: Questions or Suggestions
         {
@@ -199,7 +227,11 @@
           x: 25,
           y: 74,
           w: 50,
-          h: 7
+          h: 7,
+          animation: 'pop',
+          animationDuration: 0.5,
+          animationOrder: 8,
+          animationStart: 'after'
         }
       ]
     },
@@ -1832,8 +1864,27 @@
     s.background = tmpl.bg || 'custom';
     if (tmpl.bgColor) s.bgColor = tmpl.bgColor;
     s.elements = structuredClone(tmpl.elements);
-    // Assign fresh UUIDs
-    s.elements.forEach(e => e.id = crypto.randomUUID());
+    // Assign fresh UUIDs & ensure animations
+    s.elements.forEach((e, idx) => {
+      e.id = crypto.randomUUID();
+      if (!e.animation || e.animation === 'none') {
+        if (e.w >= 70 && e.h >= 70) {
+          e.animation = 'zoom';
+          e.animationDuration = 0.6;
+        } else if ((e.y || 0) < 30 && e.type === 'text') {
+          e.animation = 'slideDown';
+          e.animationDuration = 0.6;
+        } else if (e.type === 'shape') {
+          e.animation = 'slideUp';
+          e.animationDuration = 0.6;
+        } else {
+          e.animation = 'fade';
+          e.animationDuration = 0.5;
+        }
+        e.animationOrder = idx + 1;
+        e.animationStart = idx === 0 ? 'with' : 'after';
+      }
+    });
     selected = null;
     if (typeof render === 'function') render();
     $('layoutGallery')?.classList.add('hidden');

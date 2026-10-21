@@ -1308,19 +1308,22 @@
     slide.style.height = '540px';
     slide.style.flexShrink = '0';
 
-    const wrapW = stageWrap.clientWidth;
-    // Stage wrap has 40px top and 40px bottom padding reserved for the context toolbar
-    const wrapH = stageWrap.clientHeight - 80;
-    // Scale comfortably to fit available space edge-to-edge and vertically centered
-    const fitScale = (wrapW > 0 && wrapH > 0) ? Math.min(1.6, wrapW / 960, wrapH / 540) : 1;
+    // Account for top context toolbar (~52px) and bottom HUD / margin (~38px)
+    const availW = Math.max(320, stageWrap.clientWidth - 48);
+    const availH = Math.max(220, stageWrap.clientHeight - 92);
+    // Standard fit scale capped at 1.0 (never over-expand past 960x540 canvas)
+    const fitScale = (availW > 0 && availH > 0) ? Math.min(1.0, availW / 960, availH / 540) : 1;
     const effectiveZoom = (_zoomLevel || 1.0) * fitScale;
 
     slide.style.transform = `scale(${effectiveZoom})`;
     slide.style.transformOrigin = 'center center';
+    slide.style.margin = 'auto';
 
     // Prevent accidental scrollbars when at standard view
     if (_zoomLevel <= 1.05) {
       stageWrap.style.overflow = 'hidden';
+      stageWrap.scrollTop = 0;
+      stageWrap.scrollLeft = 0;
     } else {
       stageWrap.style.overflow = 'auto';
     }
