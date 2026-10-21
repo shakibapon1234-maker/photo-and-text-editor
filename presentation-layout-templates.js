@@ -172,7 +172,7 @@
           id: crypto.randomUUID(),
           type: 'shape',
           shape: 'round',
-          text: '📘 Facebook\nfacebook.com/gdstraininghubbd',
+          text: '📘 Facebook\nfacebook.com/gdstraininghub',
           textColor: '#ffffff',
           textSize: 13,
           textWeight: '700',

@@ -56,7 +56,7 @@
   }
 
   /* ── Apply animations to one slide with global animation offset ──── */
-  function applyToSlide(slide, mood, delayStep, duration, startAnimIdx = 0) {
+  function applyToSlide(slide, mood, delayStep, duration, triggerMode = 'click', startAnimIdx = 0) {
     if (!slide || !Array.isArray(slide.elements)) return 0;
 
     // Sort elements top-to-bottom by Y, then left-to-right by X
@@ -70,10 +70,10 @@
 
     sorted.forEach((el, i) => {
       el.animation       = anims[i];
-      el.animationDelay  = parseFloat((i * delayStep).toFixed(2));
+      el.animationDelay  = triggerMode === 'click' ? 0 : parseFloat((i * delayStep).toFixed(2));
       el.animationDuration = duration;
       el.animationOrder  = i + 1;
-      el.animationStart  = i === 0 ? 'with' : 'after';
+      el.animationStart  = triggerMode === 'click' ? 'click' : (i === 0 ? 'with' : 'after');
       el.animationLoop   = false;
     });
 
@@ -134,7 +134,7 @@
       gap: 7px;
       margin-bottom: 2px;
     }
-    .aa-mood-btn, .aa-scope-btn {
+    .aa-mood-btn, .aa-scope-btn, .aa-trigger-btn {
       padding: 8px 10px;
       border: 1.5px solid #2e3e58;
       border-radius: 7px;
@@ -148,12 +148,12 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .aa-mood-btn.selected, .aa-scope-btn.selected {
+    .aa-mood-btn.selected, .aa-scope-btn.selected, .aa-trigger-btn.selected {
       border-color: #ffb11b;
       background: #253650;
       color: #ffd166;
     }
-    .aa-mood-btn:hover, .aa-scope-btn:hover {
+    .aa-mood-btn:hover, .aa-scope-btn:hover, .aa-trigger-btn:hover {
       border-color: #ffb11b88;
     }
     .aa-slider-row {
@@ -244,6 +244,12 @@
         ).join('')}
       </div>
 
+      <span class="aa-label">🎮 অ্যানিমেশন চলার উপায় (Play Trigger)</span>
+      <div class="aa-btn-row" id="aaTriggerBtns">
+        <button type="button" class="aa-trigger-btn selected" data-trigger="click">🖱️ মাউস ক্লিক / কীবোর্ড (On Click)</button>
+        <button type="button" class="aa-trigger-btn" data-trigger="auto">⚡ অটো সিকোয়েন্স (Auto Play)</button>
+      </div>
+
       <span class="aa-label">📋 কোন স্লাইডে লাগাবেন?</span>
       <div class="aa-btn-row" id="aaScopeBtns">
         ${Object.entries(SCOPE_LABELS).map(([k,v]) =>
@@ -280,8 +286,9 @@
   document.body.appendChild(modal);
 
   /* ── State ───────────────────────────────────────────────────────── */
-  let selectedMood  = 'smart';
-  let selectedScope = 'current';
+  let selectedMood    = 'smart';
+  let selectedTrigger = 'click';
+  let selectedScope   = 'current';
 
   /* ── Mood button toggle ──────────────────────────────────────────── */
   document.getElementById('aaMoodBtns').addEventListener('click', e => {
@@ -289,6 +296,14 @@
     if (!btn) return;
     selectedMood = btn.dataset.mood;
     document.querySelectorAll('.aa-mood-btn').forEach(b => b.classList.toggle('selected', b === btn));
+  });
+
+  /* ── Trigger button toggle ───────────────────────────────────────── */
+  document.getElementById('aaTriggerBtns').addEventListener('click', e => {
+    const btn = e.target.closest('.aa-trigger-btn');
+    if (!btn) return;
+    selectedTrigger = btn.dataset.trigger;
+    document.querySelectorAll('.aa-trigger-btn').forEach(b => b.classList.toggle('selected', b === btn));
   });
 
   /* ── Scope button toggle ─────────────────────────────────────────── */
@@ -317,16 +332,16 @@
     if (selectedScope === 'all') {
       let cumulativeAnimIdx = 0;
       slides.forEach(slide => {
-        const count = applyToSlide(slide, selectedMood, delayStep, duration, cumulativeAnimIdx);
+        const count = applyToSlide(slide, selectedMood, delayStep, duration, selectedTrigger, cumulativeAnimIdx);
         cumulativeAnimIdx += count;
       });
       if (typeof window.showPresentationToast === 'function')
-        window.showPresentationToast(`✨ সব ${slides.length}টি স্লাইডে ক্রমান্বয়ে নতুন নতুন Animation লাগানো হয়েছে!`);
+        window.showPresentationToast(`✨ সব ${slides.length}টি স্লাইডে (${selectedTrigger === 'click' ? 'মাউস ক্লিক' : 'অটো প্লে'}) অ্যানিমেশন লাগানো হয়েছে!`);
     } else {
       const startOffset = (current * 5);
-      applyToSlide(slides[current], selectedMood, delayStep, duration, startOffset);
+      applyToSlide(slides[current], selectedMood, delayStep, duration, selectedTrigger, startOffset);
       if (typeof window.showPresentationToast === 'function')
-        window.showPresentationToast('✨ এই স্লাইডে Auto Animation লাগানো হয়েছে!');
+        window.showPresentationToast(`✨ এই স্লাইডে (${selectedTrigger === 'click' ? 'মাউস ক্লিক' : 'অটো প্লে'}) অ্যানিমেশন লাগানো হয়েছে!`);
     }
 
     if (typeof render === 'function') render();

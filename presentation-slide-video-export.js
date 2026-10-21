@@ -315,9 +315,9 @@
   const svgImgCache = new Map();
   async function preloadShapeSvg(el) {
     const shape = el.shape || 'rect';
-    const sf = el.fill || el.fillColor || el.boxBg || '#4f8df7';
-    const ss = el.stroke || el.borderColor || 'transparent';
-    const sl = (el.line !== undefined ? el.line : (el.strokeWidth || 2)) + 'px';
+    const sf = el.fill || el.fillColor || el.bgColor || el.boxBg || el.color || '#4f8df7';
+    const ss = el.stroke || el.borderColor || el.lineColor || 'transparent';
+    const sl = (el.line !== undefined ? el.line : (el.borderWidth !== undefined ? el.borderWidth : 2)) + 'px';
     const key = `${shape}_${sf}_${ss}_${sl}`;
     if (svgImgCache.has(key)) return svgImgCache.get(key);
 
@@ -341,6 +341,138 @@
     const img = await loadImage(uri);
     if (img) svgImgCache.set(key, img);
     return img;
+  }
+
+  // ── Animated B-Roll Canvas Renderer ───────────────────────────────────────
+  function drawBrollBackground(ctx, preset, t, W, H) {
+    if (!preset || preset === 'none') return false;
+
+    if (preset === 'night') {
+      // 1. Sky gradient
+      const grad = ctx.createLinearGradient(0, 0, W * 0.8, H);
+      grad.addColorStop(0, '#020617');
+      grad.addColorStop(0.6, '#0f172a');
+      grad.addColorStop(1, '#1e1b4b');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      // 2. Twinkling Stars
+      const starCount = 75;
+      for (let s = 0; s < starCount; s++) {
+        const sx = ((s * 137.5 + s * s * 13) % W);
+        const sy = ((s * 93.7 + s * 29) % (H * 0.65));
+        const sz = (s % 3 === 0) ? 2.2 * (H / 540) : 1.3 * (H / 540);
+        const twinkle = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * 2.5 + s * 1.7));
+        ctx.fillStyle = s % 4 === 0 ? `rgba(253, 224, 71, ${twinkle})` : `rgba(255, 255, 255, ${twinkle})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy, sz, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 3. City skyline silhouette along bottom
+      ctx.save();
+      const cityH = H * 0.38;
+      const baseY = H - cityH;
+      const poly = [
+        [0, 0.32], [0.08, 0.17], [0.16, 0.37], [0.23, 0.05], [0.32, 0.25],
+        [0.41, 0.12], [0.49, 0.35], [0.60, 0.04], [0.70, 0.30], [0.79, 0.10],
+        [0.89, 0.32], [1.0, 0.13], [1.0, 1.0], [0, 1.0]
+      ];
+      ctx.beginPath();
+      ctx.moveTo(poly[0][0] * W, baseY + poly[0][1] * cityH);
+      for (let p = 1; p < poly.length; p++) {
+        ctx.lineTo(poly[p][0] * W, baseY + poly[p][1] * cityH);
+      }
+      ctx.closePath();
+      ctx.fillStyle = '#090d16';
+      ctx.fill();
+
+      // Building vertical windows/stripes
+      ctx.clip();
+      const stripeW = 28 * (W / 960);
+      for (let bx = 0; bx < W; bx += stripeW * 1.5) {
+        ctx.fillStyle = (Math.floor(bx / stripeW) % 2 === 0) ? '#131d2e' : '#0a101d';
+        ctx.fillRect(bx, baseY, stripeW, cityH);
+      }
+      ctx.restore();
+      return true;
+    } else if (preset === 'space') {
+      const grad = ctx.createRadialGradient(W * 0.5, H * 0.5, 10, W * 0.5, H * 0.5, Math.max(W, H) / 1.3);
+      grad.addColorStop(0, '#0f172a');
+      grad.addColorStop(1, '#020617');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+
+      const neb1 = ctx.createRadialGradient(W * 0.7, H * 0.25, 5, W * 0.7, H * 0.25, W * 0.25);
+      neb1.addColorStop(0, 'rgba(255, 209, 102, 0.4)');
+      neb1.addColorStop(0.5, 'rgba(255, 140, 0, 0.15)');
+      neb1.addColorStop(1, 'transparent');
+      ctx.fillStyle = neb1;
+      ctx.fillRect(0, 0, W, H);
+
+      const neb2 = ctx.createRadialGradient(W * 0.2, H * 0.8, 5, W * 0.2, H * 0.8, W * 0.3);
+      neb2.addColorStop(0, 'rgba(99, 102, 241, 0.5)');
+      neb2.addColorStop(0.6, 'rgba(49, 46, 129, 0.15)');
+      neb2.addColorStop(1, 'transparent');
+      ctx.fillStyle = neb2;
+      ctx.fillRect(0, 0, W, H);
+
+      for (let s = 0; s < 80; s++) {
+        const sx = ((s * 153.2 + t * 4) % W);
+        const sy = ((s * 87.1 + t * 2) % H);
+        const sz = (s % 4 === 0) ? 2 * (H / 540) : 1.2 * (H / 540);
+        ctx.fillStyle = s % 3 === 0 ? '#93c5fd' : '#ffffff';
+        ctx.beginPath();
+        ctx.arc(sx, sy, sz, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return true;
+    } else if (preset === 'aurora') {
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(0, 0, W, H);
+
+      const aShift = Math.sin(t * 0.8) * 0.08 * W;
+      const g1 = ctx.createRadialGradient(W * 0.25 + aShift, H * 0.7, 10, W * 0.25 + aShift, H * 0.7, W * 0.45);
+      g1.addColorStop(0, 'rgba(16, 185, 129, 0.65)');
+      g1.addColorStop(0.6, 'rgba(16, 185, 129, 0.1)');
+      g1.addColorStop(1, 'transparent');
+      ctx.fillStyle = g1;
+      ctx.fillRect(0, 0, W, H);
+
+      const g2 = ctx.createRadialGradient(W * 0.7 - aShift, H * 0.35, 10, W * 0.7 - aShift, H * 0.35, W * 0.45);
+      g2.addColorStop(0, 'rgba(56, 189, 248, 0.6)');
+      g2.addColorStop(0.6, 'rgba(56, 189, 248, 0.1)');
+      g2.addColorStop(1, 'transparent');
+      ctx.fillStyle = g2;
+      ctx.fillRect(0, 0, W, H);
+      return true;
+    } else if (preset === 'sky') {
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#0284c7');
+      grad.addColorStop(0.45, '#38bdf8');
+      grad.addColorStop(1, '#bae6fd');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+      return true;
+    } else if (preset === 'sunset' || preset === 'cloudSunset') {
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#4c0519');
+      grad.addColorStop(0.35, '#be123c');
+      grad.addColorStop(0.65, '#f97316');
+      grad.addColorStop(0.9, '#fde047');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+      return true;
+    } else if (preset === 'water') {
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, '#0369a1');
+      grad.addColorStop(0.45, '#0284c7');
+      grad.addColorStop(1, '#075985');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+      return true;
+    }
+    return false;
   }
 
   function drawCanvasRoundRect(ctx, x, y, w, h, radius) {
@@ -455,8 +587,13 @@
       for (let f = 0; f < frameCount; f++) {
         const t = f / FPS;
 
-        // Draw slide background
-        fillBackground(ctx, slide, W, H);
+        // Draw slide background (B-Roll animation or theme/gradient)
+        const drewBroll = slide.brollPreset && slide.brollPreset !== 'none'
+          ? drawBrollBackground(ctx, slide.brollPreset, t, W, H)
+          : false;
+        if (!drewBroll) {
+          fillBackground(ctx, slide, W, H);
+        }
 
         if (slide.bgMedia || slide.bgImage) {
           const img = await preloadImage(slide.bgMedia || slide.bgImage);
@@ -592,8 +729,13 @@
     }
   }
 
-  async function renderSlideToCanvas(ctx, slide, W, H) {
-    fillBackground(ctx, slide, W, H);
+  async function renderSlideToCanvas(ctx, slide, W, H, t = 0) {
+    const drewBroll = slide.brollPreset && slide.brollPreset !== 'none'
+      ? drawBrollBackground(ctx, slide.brollPreset, t, W, H)
+      : false;
+    if (!drewBroll) {
+      fillBackground(ctx, slide, W, H);
+    }
 
     if (slide.bgMedia || slide.bgImage) {
       const src = slide.bgMedia || slide.bgImage;
@@ -678,22 +820,23 @@
     // ── Draw Shapes (Cards, Badges, Boxes, Lines, SVGs) ──────────────────────
     if (el.type === 'shape') {
       const shape = el.shape || 'rect';
-      const fill = el.fill || el.fillColor || el.boxBg;
-      const stroke = el.stroke || el.borderColor;
-      const lineWidth = (el.line !== undefined ? Number(el.line) : Number(el.strokeWidth || 0)) * (H / 540);
+      const fillVal = el.fill || el.fillColor || el.bgColor || el.boxBg || el.color || '#4f8df7';
+      const strokeVal = el.stroke || el.borderColor || el.lineColor || 'transparent';
+      const lineVal = (el.line !== undefined ? Number(el.line) : (el.borderWidth !== undefined ? Number(el.borderWidth) : 2));
+      const lineWidth = lineVal * (H / 540);
 
       if (shape === 'round' || shape === 'rect' || shape === 'pill') {
-        const rad = shape === 'round' ? Math.min(18 * (H / 540), w * 0.12, h * 0.25)
+        const rad = shape === 'round' ? Math.min(18 * (H / 540), w * 0.14, h * 0.28)
                   : shape === 'pill' ? Math.min(w, h) / 2
                   : 0;
 
-        if (fill && fill !== 'transparent' && fill !== 'none') {
-          ctx.fillStyle = fill;
+        if (fillVal && fillVal !== 'transparent' && fillVal !== 'none') {
+          ctx.fillStyle = fillVal;
           drawCanvasRoundRect(ctx, x, y, w, h, rad);
           ctx.fill();
         }
-        if (stroke && stroke !== 'transparent' && stroke !== 'none' && lineWidth > 0) {
-          ctx.strokeStyle = stroke;
+        if (strokeVal && strokeVal !== 'transparent' && strokeVal !== 'none' && lineWidth > 0) {
+          ctx.strokeStyle = strokeVal;
           ctx.lineWidth = lineWidth;
           drawCanvasRoundRect(ctx, x, y, w, h, rad);
           ctx.stroke();
@@ -703,12 +846,12 @@
         const ry = h / 2;
         ctx.beginPath();
         ctx.ellipse(x + rx, y + ry, rx, ry, 0, 0, Math.PI * 2);
-        if (fill && fill !== 'transparent' && fill !== 'none') {
-          ctx.fillStyle = fill;
+        if (fillVal && fillVal !== 'transparent' && fillVal !== 'none') {
+          ctx.fillStyle = fillVal;
           ctx.fill();
         }
-        if (stroke && stroke !== 'transparent' && stroke !== 'none' && lineWidth > 0) {
-          ctx.strokeStyle = stroke;
+        if (strokeVal && strokeVal !== 'transparent' && strokeVal !== 'none' && lineWidth > 0) {
+          ctx.strokeStyle = strokeVal;
           ctx.lineWidth = lineWidth;
           ctx.stroke();
         }

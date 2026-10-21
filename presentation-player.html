@@ -549,6 +549,7 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
     <button class="ctrl-btn" id="prevBtn" title="Previous Slide (←)">◀</button>
     <span class="ctrl-info" id="slideInfo">1 / 1</span>
     <button class="ctrl-btn" id="nextBtn" title="Next Slide (→ / Space)">▶</button>
+    <button class="ctrl-btn" id="autoPlayBtn" title="Auto Play: Off (Click to Start Auto Play)" style="font-size:12px;font-weight:800;width:auto;padding:0 12px;border-radius:20px;">▶ Auto</button>
     <div id="soundtrackControls" class="soundtrack-ctrl-group" title="Presentation Soundtrack">
       <button class="ctrl-btn" id="soundtrackToggleBtn" title="Soundtrack: Play / Mute (M)">🔊</button>
       <input type="range" id="soundtrackVolumeSlider" min="0" max="100" value="60" title="Soundtrack Volume (+ / -)">
@@ -962,6 +963,7 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
     let slides = [];
     let currentIndex = 0;
     let autoTimer = null;
+    let isAutoPlayActive = false;
     let recognition = null;
 
     function buildElement(el) {
@@ -1302,7 +1304,7 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
       updateDrawerActive();
 
       clearTimeout(autoTimer);
-      if (Number(slide.autoDuration) > 0) {
+      if (isAutoPlayActive && Number(slide.autoDuration) > 0) {
         autoTimer = setTimeout(() => advanceNext(), Number(slide.autoDuration) * 1000);
       }
     }
@@ -1708,6 +1710,30 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
         document.getElementById('dropzone').classList.add('hidden');
       }
     });
+
+    const autoPlayBtn = document.getElementById('autoPlayBtn');
+    if (autoPlayBtn) {
+      autoPlayBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        isAutoPlayActive = !isAutoPlayActive;
+        if (isAutoPlayActive) {
+          autoPlayBtn.innerHTML = '⏸ Pause';
+          autoPlayBtn.style.background = '#059669';
+          autoPlayBtn.style.borderColor = '#34d399';
+          clearTimeout(autoTimer);
+          const curSlide = slides[currentIndex];
+          const dur = Math.max(2, Number(curSlide?.autoDuration) || 5);
+          autoTimer = setTimeout(() => advanceNext(), dur * 1000);
+          showVoiceToast('▶ Auto-Play চালু হয়েছে', 'info', 1800);
+        } else {
+          autoPlayBtn.innerHTML = '▶ Auto';
+          autoPlayBtn.style.background = '#1c2b42';
+          autoPlayBtn.style.borderColor = '#4a6288';
+          clearTimeout(autoTimer);
+          showVoiceToast('⏸ Manual Mode (মাউস ক্লিকে স্লাইড চলবে)', 'info', 1800);
+        }
+      });
+    }
 
     document.getElementById('fsBtn').addEventListener('click', () => {
       if (!document.fullscreenElement) {
@@ -2149,6 +2175,14 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
 
     // ── Mobile Remote Modal Trigger ───────────────────────────────────
     document.getElementById('remoteBtn').addEventListener('click', () => {
+      clearTimeout(autoTimer);
+      isAutoPlayActive = false;
+      const apBtn = document.getElementById('autoPlayBtn');
+      if (apBtn) {
+        apBtn.innerHTML = '▶ Auto';
+        apBtn.style.background = '#1c2b42';
+        apBtn.style.borderColor = '#4a6288';
+      }
       const oldModal = document.getElementById('remoteModal');
       if (oldModal) { oldModal.remove(); return; }
 
