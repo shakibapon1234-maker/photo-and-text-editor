@@ -1308,16 +1308,28 @@
     slide.style.height = '540px';
     slide.style.flexShrink = '0';
 
-    // Account for top context toolbar (~52px) and bottom HUD / margin (~38px)
-    const availW = Math.max(320, stageWrap.clientWidth - 48);
-    const availH = Math.max(220, stageWrap.clientHeight - 92);
-    // Standard fit scale capped at 1.0 (never over-expand past 960x540 canvas)
-    const fitScale = (availW > 0 && availH > 0) ? Math.min(1.0, availW / 960, availH / 540) : 1;
+    const wrapW = Math.max(320, stageWrap.clientWidth - 32);
+    const wrapH = Math.max(220, stageWrap.clientHeight - 32);
+    // Fit scale naturally scales to fill available stage space comfortably up to 1.55x
+    const fitScale = (wrapW > 0 && wrapH > 0) ? Math.min(1.55, Math.min(wrapW / 960, wrapH / 540)) : 1;
     const effectiveZoom = (_zoomLevel || 1.0) * fitScale;
 
     slide.style.transform = `scale(${effectiveZoom})`;
     slide.style.transformOrigin = 'center center';
-    slide.style.margin = 'auto';
+    slide.style.margin = '';
+
+    // Prevent elements from being chopped off at the very top edge
+    if (Array.isArray(window.slides)) {
+      window.slides.forEach(s => {
+        if (Array.isArray(s.elements)) {
+          s.elements.forEach(el => {
+            if (typeof el.y === 'number' && el.y < 2.5) {
+              el.y = 2.5;
+            }
+          });
+        }
+      });
+    }
 
     // Prevent accidental scrollbars when at standard view
     if (_zoomLevel <= 1.05) {

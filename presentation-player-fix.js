@@ -1025,6 +1025,59 @@
     }
 
     // High-speed on-demand slide builder with Animation Sequencer
+    // ── Smooth Slide-to-Slide Transition Player ──────────────────────
+    function playSlideTransition(targetNode, trans = 'fade', durationSec = null) {
+      if (!targetNode || trans === 'none') return;
+      const keyframesMap = {
+        fade: [
+          { opacity: 0 },
+          { opacity: 1 }
+        ],
+        slide: [
+          { transform: 'translateX(90px)', opacity: 0 },
+          { transform: 'translateX(0)', opacity: 1 }
+        ],
+        slideLeft: [
+          { transform: 'translateX(90px)', opacity: 0 },
+          { transform: 'translateX(0)', opacity: 1 }
+        ],
+        slideRight: [
+          { transform: 'translateX(-90px)', opacity: 0 },
+          { transform: 'translateX(0)', opacity: 1 }
+        ],
+        slideUp: [
+          { transform: 'translateY(70px)', opacity: 0 },
+          { transform: 'translateY(0)', opacity: 1 }
+        ],
+        zoom: [
+          { transform: 'scale(0.88)', opacity: 0 },
+          { transform: 'scale(1)', opacity: 1 }
+        ],
+        zoomOut: [
+          { transform: 'scale(1.12)', opacity: 0 },
+          { transform: 'scale(1)', opacity: 1 }
+        ],
+        flip: [
+          { transform: 'perspective(1000px) rotateY(-25deg)', opacity: 0 },
+          { transform: 'perspective(1000px) rotateY(0deg)', opacity: 1 }
+        ],
+        wipe: [
+          { clipPath: 'inset(0 100% 0 0)' },
+          { clipPath: 'inset(0 0% 0 0)' }
+        ]
+      };
+
+      const kf = keyframesMap[trans] || keyframesMap.fade;
+      const dur = (Number(durationSec) > 0) ? Number(durationSec) * 1000 : ((trans === 'wipe' || trans === 'flip') ? 480 : 400);
+      targetNode.getAnimations().filter(a => a._isSlideTrans).forEach(a => a.cancel());
+      const anim = targetNode.animate(kf, {
+        duration: dur,
+        easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+        fill: 'both'
+      });
+      anim._isSlideTrans = true;
+    }
+
     function renderPresenterSlide(i) {
       clearTimeout(autoTimer);
       clearChainedTimers();
@@ -1038,6 +1091,7 @@
         try { v.pause(); v.removeAttribute('src'); v.load(); } catch (_) {}
       });
       stage.replaceChildren();
+      playSlideTransition(stage, sl.transition || 'fade', sl.transitionDuration);
 
       // Reset properties left by a preceding image-background slide. This
       // also makes a media background independent of the previous slide.
@@ -1228,7 +1282,8 @@
           // in preview while it is vertically centred on the design canvas.
           const pad = (el.padding !== undefined ? el.padding : 4) + 'px';
 
-          let css = 'position:absolute;left:' + el.x + '%;top:' + el.y + '%;width:' + el.w + '%;height:' + el.h + '%;font-size:' + txtSize + 'px;font-weight:' + fontW + ';font-family:' + (el.fontFamily || 'Inter, Arial, sans-serif') + ';text-align:' + textAlign + ';line-height:' + (el.lineSpacing || 1.2) + ';padding:' + pad + ';transform:rotate(' + rot + 'deg);transform-origin:center center;white-space:pre-wrap;word-break:break-word;box-sizing:border-box;display:flex;align-items:center;justify-content:' + (textAlign === 'left' ? 'flex-start' : textAlign === 'right' ? 'flex-end' : 'center') + ';';
+          const safeY = (typeof el.y === 'number' && el.y < 2.5) ? 2.5 : el.y;
+          let css = 'position:absolute;left:' + el.x + '%;top:' + safeY + '%;width:' + el.w + '%;height:' + el.h + '%;font-size:' + txtSize + 'px;font-weight:' + fontW + ';font-family:' + (el.fontFamily || 'Inter, Arial, sans-serif') + ';text-align:' + textAlign + ';line-height:' + (el.lineSpacing || 1.2) + ';padding:' + pad + ';transform:rotate(' + rot + 'deg);transform-origin:center center;white-space:pre-wrap;word-break:break-word;box-sizing:border-box;display:flex;align-items:' + (el.boxBg && el.boxBg !== 'transparent' ? 'center' : 'flex-start') + ';justify-content:' + (textAlign === 'left' ? 'flex-start' : textAlign === 'right' ? 'flex-end' : 'center') + ';';
 
           const boxBgColor = el.boxBg || el.backgroundColor || el.bgColor || (el.background && el.background.startsWith('#') ? el.background : null);
           let boxOp = 1;
@@ -1317,8 +1372,11 @@
           slideSteps.push(currentGroup);
         }
 
-        // Check if the very first step is configured to trigger with slide start
-        if (slideSteps.length > 0 && slideSteps[0].length > 0 && slideSteps[0][0].start === 'with') {
+        // Auto-trigger first animation step if 'with' or if slide has autoDuration
+        const shouldAutoStart = slideSteps.length > 0 && slideSteps[0].length > 0 && (
+          slideSteps[0][0].start === 'with' || Number(sl.autoDuration) > 0
+        );
+        if (shouldAutoStart) {
           executeStepGroup(slideSteps[0]);
           currentStepIdx = 1;
         }
@@ -1328,7 +1386,10 @@
 
       // Auto-advance if slide duration is set and not manual
       if (!singleSlideOnly && Number(sl.autoDuration) > 0) {
-        autoTimer = setTimeout(() => advanceNext(), Number(sl.autoDuration) * 1000);
+        const stepDelay = slideSteps.length > 0
+          ? Math.max(1.5, Number(sl.autoDuration) / Math.max(1, slideSteps.length))
+          : Number(sl.autoDuration);
+        autoTimer = setTimeout(() => advanceNext(), stepDelay * 1000);
       }
     }
 
@@ -1340,6 +1401,11 @@
         executeStepGroup(stepItems);
         currentStepIdx++;
         updateStatusDisplay();
+
+        if (!singleSlideOnly && Number(sl.autoDuration) > 0) {
+          const stepDelay = Math.max(1.5, Number(sl.autoDuration) / Math.max(1, slideSteps.length));
+          autoTimer = setTimeout(() => advanceNext(), stepDelay * 1000);
+        }
         return;
       }
 

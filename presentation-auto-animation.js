@@ -56,7 +56,7 @@
   }
 
   /* ── Apply animations to one slide with global animation offset ──── */
-  function applyToSlide(slide, mood, delayStep, duration, triggerMode = 'click', startAnimIdx = 0) {
+  function applyToSlide(slide, mood, delayStep, duration, triggerMode = 'auto', startAnimIdx = 0) {
     if (!slide || !Array.isArray(slide.elements)) return 0;
 
     // Sort elements top-to-bottom by Y, then left-to-right by X
@@ -134,7 +134,7 @@
       gap: 7px;
       margin-bottom: 2px;
     }
-    .aa-mood-btn, .aa-scope-btn, .aa-trigger-btn {
+    .aa-mood-btn, .aa-scope-btn, .aa-trigger-btn, .aa-trans-btn {
       padding: 8px 10px;
       border: 1.5px solid #2e3e58;
       border-radius: 7px;
@@ -148,12 +148,12 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .aa-mood-btn.selected, .aa-scope-btn.selected, .aa-trigger-btn.selected {
+    .aa-mood-btn.selected, .aa-scope-btn.selected, .aa-trigger-btn.selected, .aa-trans-btn.selected {
       border-color: #ffb11b;
       background: #253650;
       color: #ffd166;
     }
-    .aa-mood-btn:hover, .aa-scope-btn:hover, .aa-trigger-btn:hover {
+    .aa-mood-btn:hover, .aa-scope-btn:hover, .aa-trigger-btn:hover, .aa-trans-btn:hover {
       border-color: #ffb11b88;
     }
     .aa-slider-row {
@@ -246,8 +246,8 @@
 
       <span class="aa-label">🎮 অ্যানিমেশন চলার উপায় (Play Trigger)</span>
       <div class="aa-btn-row" id="aaTriggerBtns">
-        <button type="button" class="aa-trigger-btn selected" data-trigger="click">🖱️ মাউস ক্লিক / কীবোর্ড (On Click)</button>
-        <button type="button" class="aa-trigger-btn" data-trigger="auto">⚡ অটো সিকোয়েন্স (Auto Play)</button>
+        <button type="button" class="aa-trigger-btn selected" data-trigger="auto">⚡ অটো সিকোয়েন্স (Auto Play) — একা একা পরপর আসবে</button>
+        <button type="button" class="aa-trigger-btn" data-trigger="click">🖱️ মাউস ক্লিক / কীবোর্ড (On Click)</button>
       </div>
 
       <span class="aa-label">📋 কোন স্লাইডে লাগাবেন?</span>
@@ -255,6 +255,14 @@
         ${Object.entries(SCOPE_LABELS).map(([k,v]) =>
           `<button class="aa-scope-btn${k==='current'?' selected':''}" data-scope="${k}">${v}</button>`
         ).join('')}
+      </div>
+
+      <span class="aa-label">🔄 স্লাইড ট্রানজিশন (Slide Transition)</span>
+      <div class="aa-btn-row" id="aaTransBtns">
+        <button type="button" class="aa-trans-btn selected" data-trans="smart">🎲 Smart Mix</button>
+        <button type="button" class="aa-trans-btn" data-trans="fade">✨ Smooth Fade</button>
+        <button type="button" class="aa-trans-btn" data-trans="slideLeft">⏩ Slide Push</button>
+        <button type="button" class="aa-trans-btn" data-trans="zoom">🔍 Cinematic Zoom</button>
       </div>
 
       <div class="aa-slider-row">
@@ -287,8 +295,9 @@
 
   /* ── State ───────────────────────────────────────────────────────── */
   let selectedMood    = 'smart';
-  let selectedTrigger = 'click';
+  let selectedTrigger = 'auto';
   let selectedScope   = 'current';
+  let selectedTrans   = 'smart';
 
   /* ── Mood button toggle ──────────────────────────────────────────── */
   document.getElementById('aaMoodBtns').addEventListener('click', e => {
@@ -296,6 +305,14 @@
     if (!btn) return;
     selectedMood = btn.dataset.mood;
     document.querySelectorAll('.aa-mood-btn').forEach(b => b.classList.toggle('selected', b === btn));
+  });
+
+  /* ── Transition button toggle ────────────────────────────────────── */
+  document.getElementById('aaTransBtns').addEventListener('click', e => {
+    const btn = e.target.closest('.aa-trans-btn');
+    if (!btn) return;
+    selectedTrans = btn.dataset.trans;
+    document.querySelectorAll('.aa-trans-btn').forEach(b => b.classList.toggle('selected', b === btn));
   });
 
   /* ── Trigger button toggle ───────────────────────────────────────── */
@@ -328,22 +345,33 @@
   document.getElementById('aaApplyBtn').addEventListener('click', () => {
     const delayStep = parseFloat(delaySlider.value) || 0.25;
     const duration  = parseFloat(durSlider.value)   || 0.6;
+    const TRANS_POOL = ['fade', 'slideLeft', 'zoom', 'slideRight', 'wipe', 'flip'];
 
     if (selectedScope === 'all') {
       let cumulativeAnimIdx = 0;
-      slides.forEach(slide => {
+      slides.forEach((slide, sIdx) => {
         const count = applyToSlide(slide, selectedMood, delayStep, duration, selectedTrigger, cumulativeAnimIdx);
         cumulativeAnimIdx += count;
+        slide.transition = selectedTrans === 'smart' ? TRANS_POOL[sIdx % TRANS_POOL.length] : selectedTrans;
+        if (selectedTrigger === 'auto') {
+          slide.autoDuration = Math.max(4, Number(slide.autoDuration) || 5);
+        }
       });
       if (typeof window.showPresentationToast === 'function')
-        window.showPresentationToast(`✨ সব ${slides.length}টি স্লাইডে (${selectedTrigger === 'click' ? 'মাউস ক্লিক' : 'অটো প্লে'}) অ্যানিমেশন লাগানো হয়েছে!`);
+        window.showPresentationToast(`✨ সব ${slides.length}টি স্লাইড এবং উপাদানগুলোতে অটো অ্যানিমেশন ও ট্রানজিশন লাগানো হয়েছে!`);
     } else {
       const startOffset = (current * 5);
       applyToSlide(slides[current], selectedMood, delayStep, duration, selectedTrigger, startOffset);
+      slides[current].transition = selectedTrans === 'smart' ? 'fade' : selectedTrans;
+      if (selectedTrigger === 'auto') {
+        slides[current].autoDuration = Math.max(4, Number(slides[current].autoDuration) || 5);
+      }
       if (typeof window.showPresentationToast === 'function')
-        window.showPresentationToast(`✨ এই স্লাইডে (${selectedTrigger === 'click' ? 'মাউস ক্লিক' : 'অটো প্লে'}) অ্যানিমেশন লাগানো হয়েছে!`);
+        window.showPresentationToast(`✨ এই স্লাইডের উপাদান ও ট্রানজিশন অটো অ্যানিমেশন সফলভাবে লাগানো হয়েছে!`);
     }
 
+    if ($('transition')) $('transition').value = slides[current]?.transition || 'fade';
+    if ($('autoDuration')) $('autoDuration').value = slides[current]?.autoDuration || 0;
     if (typeof render === 'function') render();
     closeModal();
   });
@@ -351,6 +379,7 @@
   document.getElementById('aaClearBtn').addEventListener('click', () => {
     const target = selectedScope === 'all' ? slides : [slides[current]];
     target.forEach(slide => {
+      slide.transition = 'fade';
       if (!Array.isArray(slide?.elements)) return;
       slide.elements.forEach(el => {
         el.animation       = 'none';
@@ -361,6 +390,7 @@
         el.animationLoop   = false;
       });
     });
+    if ($('transition')) $('transition').value = 'fade';
     if (typeof render === 'function') render();
     if (typeof window.showPresentationToast === 'function')
       window.showPresentationToast('🗑️ Animation সব মুছে দেওয়া হয়েছে');

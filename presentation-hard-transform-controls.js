@@ -327,7 +327,7 @@
         });
       } else {
         item.x = ((event.clientX - rect.left - dx) / rect.width) * 100;
-        item.y = ((event.clientY - rect.top - dy) / rect.height) * 100;
+        item.y = Math.max(2, Math.min(97, ((event.clientY - rect.top - dy) / rect.height) * 100));
         const n = nodeFor(item);
         if (n) {
           n.style.left = item.x + '%';
@@ -620,7 +620,7 @@
       enhanceTables(); return;
     }
     item.x = Math.max(-item.w+3, Math.min(97, (event.clientX-rect.left-dx)/rect.width*100));
-    item.y = Math.max(-item.h+3, Math.min(97, (event.clientY-rect.top-dy)/rect.height*100));
+    item.y = Math.max(2, Math.min(97, (event.clientY-rect.top-dy)/rect.height*100));
     const node = $('slide')?.querySelector('.table-el[data-id="'+item.id+'"]');
     if (node) { node.style.left = item.x+'%'; node.style.top = item.y+'%'; }
   }, true);

@@ -848,6 +848,7 @@
 
     const total = allSlides.length;
     const frameIntervalMs = 1000 / FPS;
+    let prevSlideCanvas = null;
 
     try {
       // 4. Render Slides Frame-by-Frame
@@ -920,6 +921,53 @@
             }
           }
 
+          // ── Composite Slide-to-Slide Transition (0.5s = 15 frames) ──────────────
+          const TRANS_FRAMES = 15;
+          const trans = slide.transition || 'fade';
+          if (i > 0 && f < TRANS_FRAMES && prevSlideCanvas && trans !== 'none') {
+            const rawP = f / TRANS_FRAMES;
+            const p = 1 - Math.pow(1 - rawP, 2);
+
+            ctx.save();
+            if (trans === 'fade') {
+              ctx.globalAlpha = 1 - p;
+              ctx.drawImage(prevSlideCanvas, 0, 0);
+            } else if (trans === 'slide' || trans === 'slideLeft') {
+              ctx.drawImage(prevSlideCanvas, -p * W, 0);
+            } else if (trans === 'slideRight') {
+              ctx.drawImage(prevSlideCanvas, p * W, 0);
+            } else if (trans === 'slideUp') {
+              ctx.drawImage(prevSlideCanvas, 0, -p * H);
+            } else if (trans === 'zoom') {
+              ctx.globalAlpha = 1 - p;
+              const sc = 1 + 0.15 * p;
+              ctx.translate(W / 2, H / 2);
+              ctx.scale(sc, sc);
+              ctx.translate(-W / 2, -H / 2);
+              ctx.drawImage(prevSlideCanvas, 0, 0);
+            } else if (trans === 'zoomOut') {
+              ctx.globalAlpha = 1 - p;
+              const sc = Math.max(0.01, 1 - 0.15 * p);
+              ctx.translate(W / 2, H / 2);
+              ctx.scale(sc, sc);
+              ctx.translate(-W / 2, -H / 2);
+              ctx.drawImage(prevSlideCanvas, 0, 0);
+            } else if (trans === 'wipe') {
+              ctx.beginPath();
+              ctx.rect(p * W, 0, W * (1 - p), H);
+              ctx.clip();
+              ctx.drawImage(prevSlideCanvas, 0, 0);
+            } else if (trans === 'flip') {
+              const scX = Math.max(0.01, 1 - p);
+              ctx.globalAlpha = 1 - p;
+              ctx.translate(W / 2, H / 2);
+              ctx.scale(scX, 1);
+              ctx.translate(-W / 2, -H / 2);
+              ctx.drawImage(prevSlideCanvas, 0, 0);
+            }
+            ctx.restore();
+          }
+
           // Explicitly push frame to video track
           if (videoTrack && typeof videoTrack.requestFrame === 'function') {
             try { videoTrack.requestFrame(); } catch (_) {}
@@ -938,6 +986,15 @@
           const sleepMs = Math.max(0, frameDeadline - now);
           if (sleepMs > 1) await wait(sleepMs);
         }
+
+        // Save last frame of this slide to use as transition overlay for next slide
+        if (!prevSlideCanvas) {
+          prevSlideCanvas = document.createElement('canvas');
+          prevSlideCanvas.width = W;
+          prevSlideCanvas.height = H;
+        }
+        const pCtx = prevSlideCanvas.getContext('2d');
+        pCtx.drawImage(canvas, 0, 0);
       }
     } finally {
       // Clean up Audio
@@ -1366,12 +1423,17 @@
         ctx.textAlign = el.textAlign === 'left' ? 'left' : el.textAlign === 'right' ? 'right' : 'center';
         ctx.textBaseline = 'middle';
 
+        const safeTopY = Math.max(2.5 * (H / 540), y);
         const maxW = Math.max(10, w - 8);
         const lines = wrapCanvasText(ctx, el.text, maxW);
         const lineSpacing = Number(el.lineSpacing) || 1.25;
         const lineH = fontSize * lineSpacing;
         const totalTextH = lines.length * lineH;
-        let startY = y + (h - totalTextH) / 2 + lineH / 2;
+        const padY = (el.padding !== undefined ? Number(el.padding) : 4) * (H / 540);
+        // Only vertically center if there is a colored background box; otherwise align to top with padding (matches editor DOM)
+        let startY = (boxBg && boxBg !== 'transparent')
+          ? (safeTopY + (h - totalTextH) / 2 + lineH / 2)
+          : (safeTopY + padY + lineH / 2);
         const textX = el.textAlign === 'left' ? x + 4 : el.textAlign === 'right' ? x + w - 4 : x + w / 2;
 
         if (el.textDecoration === 'underline') {
