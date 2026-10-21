@@ -1,4 +1,4 @@
-/**
+﻿/**
  * presentation-context-toolbar.js
  * Microsoft Word-style context toolbar.
  * • Text selected/clicked   → Text Size, Text Color, Box BG, Opacity, Bold/Italic/Underline, Alignment
@@ -48,6 +48,10 @@
       <button id="ctx-bold"  title="Bold"><b>B</b></button>
       <button id="ctx-italic" title="Italic"><i>I</i></button>
       <button id="ctx-under" title="Underline"><u>U</u></button>
+      <div class="ctx-sep"></div>
+      <button id="ctx-case-upper" title="UPPERCASE — সব বড় হাতে" style="font-size:10px;font-weight:800;letter-spacing:0.5px;color:#ffd166">AA</button>
+      <button id="ctx-case-lower" title="lowercase — সব ছোট হাতে" style="font-size:10px;font-weight:800;letter-spacing:0.5px">aa</button>
+      <button id="ctx-case-title" title="Title Case — প্রতিটা শব্দের প্রথম অক্ষর বড়" style="font-size:10px;font-weight:800;letter-spacing:0.5px">Aa</button>
       <div class="ctx-sep"></div>
       <button id="ctx-left"   title="Align left">⬅</button>
       <button id="ctx-center" title="Align center">☰</button>
@@ -101,6 +105,10 @@
       <button id="ctx-shape-bold" title="Bold"><b>B</b></button>
       <button id="ctx-shape-italic" title="Italic"><i>I</i></button>
       <button id="ctx-shape-under" title="Underline"><u>U</u></button>
+      <div class="ctx-sep"></div>
+      <button id="ctx-shape-case-upper" title="UPPERCASE — সব বড় হাতে" style="font-size:10px;font-weight:800;letter-spacing:0.5px;color:#ffd166">AA</button>
+      <button id="ctx-shape-case-lower" title="lowercase — সব ছোট হাতে" style="font-size:10px;font-weight:800;letter-spacing:0.5px">aa</button>
+      <button id="ctx-shape-case-title" title="Title Case — প্রতিটা শব্দের প্রথম অক্ষর বড়" style="font-size:10px;font-weight:800;letter-spacing:0.5px">Aa</button>
       <div class="ctx-sep"></div>
       <button id="ctx-shape-left" title="Align left">⬅</button>
       <button id="ctx-shape-center" title="Align center">☰</button>
@@ -187,6 +195,12 @@
       applyText(item => {
         item.textDecoration = (item.textDecoration === 'underline') ? 'none' : 'underline';
       });
+    } else if (id === 'ctx-case-upper') {
+      applyText(item => { item.textTransform = 'uppercase'; });
+    } else if (id === 'ctx-case-lower') {
+      applyText(item => { item.textTransform = 'lowercase'; });
+    } else if (id === 'ctx-case-title') {
+      applyText(item => { item.textTransform = 'capitalize'; });
     } else if (id === 'ctx-left') {
       applyText(item => { item.textAlign = 'left'; });
     } else if (id === 'ctx-center') {
@@ -216,6 +230,12 @@
       applyShape(item => {
         item.textDecoration = (item.textDecoration === 'underline') ? 'none' : 'underline';
       });
+    } else if (id === 'ctx-shape-case-upper') {
+      applyShape(item => { item.textTransform = 'uppercase'; });
+    } else if (id === 'ctx-shape-case-lower') {
+      applyShape(item => { item.textTransform = 'lowercase'; });
+    } else if (id === 'ctx-shape-case-title') {
+      applyShape(item => { item.textTransform = 'capitalize'; });
     } else if (id === 'ctx-shape-left') {
       applyShape(item => { item.textAlign = 'left'; });
     } else if (id === 'ctx-shape-center') {
@@ -424,6 +444,10 @@
       $('ctx-italic').classList.toggle('ctx-active', item.fontStyle === 'italic');
       $('ctx-under').classList.toggle('ctx-active', item.textDecoration === 'underline');
 
+      const tcase = item.textTransform || 'none';
+      $('ctx-case-upper').classList.toggle('ctx-active', tcase === 'uppercase');
+      $('ctx-case-lower').classList.toggle('ctx-active', tcase === 'lowercase');
+      $('ctx-case-title').classList.toggle('ctx-active', tcase === 'capitalize');
       const align = item.textAlign || 'center';
       $('ctx-left').classList.toggle('ctx-active', align === 'left');
       $('ctx-center').classList.toggle('ctx-active', align === 'center');
@@ -457,6 +481,10 @@
       $('ctx-shape-italic').classList.toggle('ctx-active', item.fontStyle === 'italic');
       $('ctx-shape-under').classList.toggle('ctx-active', item.textDecoration === 'underline');
 
+      const tcase = item.textTransform || 'none';
+      $('ctx-shape-case-upper').classList.toggle('ctx-active', tcase === 'uppercase');
+      $('ctx-shape-case-lower').classList.toggle('ctx-active', tcase === 'lowercase');
+      $('ctx-shape-case-title').classList.toggle('ctx-active', tcase === 'capitalize');
       const align = item.textAlign || 'center';
       $('ctx-shape-left').classList.toggle('ctx-active', align === 'left');
       $('ctx-shape-center').classList.toggle('ctx-active', align === 'center');
@@ -605,6 +633,7 @@
         node.style.textDecorationThickness = '2.5px';
         node.style.textUnderlineOffset = '5px';
         node.style.textAlign = alignVal;
+        node.style.textTransform = item.textTransform || 'none';
 
         const content = node.querySelector('.text-content');
         if (content) {
@@ -614,6 +643,7 @@
           content.style.textDecorationThickness = '2.5px';
           content.style.textUnderlineOffset = '5px';
           content.style.textAlign = alignVal;
+          content.style.textTransform = item.textTransform || 'none';
           content.style.transform = isItalic ? 'skewX(-12deg)' : 'none';
           content.style.transformOrigin = 'left center';
         }
@@ -666,6 +696,7 @@
           label.style.textUnderlineOffset = '4px';
           label.style.justifyContent = (item.textAlign === 'left') ? 'flex-start' : (item.textAlign === 'right') ? 'flex-end' : 'center';
           label.style.textAlign = item.textAlign || 'center';
+          label.style.textTransform = item.textTransform || 'none';
           label.style.transform = isItalic ? 'skewX(-12deg)' : 'none';
         }
       }
