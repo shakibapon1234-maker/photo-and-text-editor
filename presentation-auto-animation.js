@@ -1,4 +1,4 @@
-/**
+﻿/**
  * presentation-auto-animation.js
  * One-click Auto Animation:
  * - Assigns varied entrance animations to ALL elements in the current slide
@@ -12,7 +12,7 @@
   /* ── Animation pools by mood ─────────────────────────────────────── */
   const POOLS = {
     smart: [
-      'slideDown', 'fade', 'slideLeft', 'slideRight', 'zoom',
+      'slideDown', 'fade', 'slideLeft', 'slideRight', 'zoom', 'cinematicDrop', 'lensZoom', 'glowExpand', 'slideSkewLeft', 'slideSkewRight', 'bounceDrop', 'rotate3dFlip', 'waveIn',
       'pop', 'blurFadeIn', 'wipeDown', 'wipeLeft', 'wipeRight',
       'elasticDrop', 'backInDown', 'flipX', 'zoomRotate', 'curtainWipe',
       'rollIn', 'spiralIn', 'stamp', 'lightSpeed', 'swingDown'

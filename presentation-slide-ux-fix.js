@@ -1,4 +1,4 @@
-/**
+﻿/**
  * presentation-slide-ux-fix.js
  * Fixes 3 UX issues:
  * 1. Drag-and-drop thumbnail reordering in the slide panel
@@ -290,4 +290,15 @@
     setTimeout(init, 500);
   }
 
+
+  /* Ensure text editing and multi-line text stays top-aligned and doesn't jump vertically on Enter */
+  document.head.insertAdjacentHTML('beforeend', <style id="textMultilineFixStyles">
+    .text-el .text-content {
+      align-items: flex-start !important;
+      align-content: flex-start !important;
+      white-space: pre-wrap !important;
+      word-break: break-word !important;
+      box-sizing: border-box !important;
+    }
+  </style>);
 })();

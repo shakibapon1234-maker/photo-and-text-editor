@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   const $ = id => document.getElementById(id);
 
   let _lastClickId = null;
@@ -65,7 +65,7 @@
       content = document.createElement('div');
       content.className = 'text-content';
       content.textContent = existingText;
-      content.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:' + (item.textAlign==='left'?'flex-start':item.textAlign==='right'?'flex-end':'center') + ';word-break:break-word;white-space:pre-wrap;cursor:text;outline:none;line-height:1.2;';
+      content.style.cssText = 'width:100%;height:100%;display:flex;align-items:flex-start;justify-content:' + (item.textAlign==='left'?'flex-start':item.textAlign==='right'?'flex-end':'center') + ';word-break:break-word;white-space:pre-wrap;cursor:text;outline:none;line-height:1.2;box-sizing:border-box;';
       node.appendChild(content);
     }
 
@@ -137,6 +137,24 @@
     content.onkeydown = e => {
       if (['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(e.code) || e.key === ' ' || e.key === 'Enter') {
         e.stopPropagation();
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+          const textNode = document.createTextNode('\n');
+          range.insertNode(textNode);
+          range.setStartAfter(textNode);
+          range.setEndAfter(textNode);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } else {
+          document.execCommand('insertLineBreak');
+        }
+        content.dispatchEvent(new Event('input', { bubbles: true }));
+        return;
       }
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -226,6 +244,30 @@
         sel.addRange(range);
       } catch (_) {}
     }, 10);
+
+    label.onkeydown = e => {
+      if (['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(e.code) || e.key === ' ' || e.key === 'Enter') {
+        e.stopPropagation();
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+          const textNode = document.createTextNode('\n');
+          range.insertNode(textNode);
+          range.setStartAfter(textNode);
+          range.setEndAfter(textNode);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } else {
+          document.execCommand('insertLineBreak');
+        }
+        label.dispatchEvent(new Event('input', { bubbles: true }));
+        return;
+      }
+    };
 
     label.oninput = e => {
       e.stopPropagation();

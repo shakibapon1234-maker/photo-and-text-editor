@@ -1,4 +1,4 @@
-(()=>{
+﻿(()=>{
   const $ = id => document.getElementById(id);
 
   // ── Horizontal Ribbon Toolbar (5 Organized Dropdown Tabs + Direct Actions) ──
@@ -550,6 +550,63 @@
       const rotStr = r ? (' rotate(' + r + 'deg)') : '';
       const baseMap = {
         // ── Entrance Animations ──────────────────────────
+                cinematicDrop: [
+          { opacity: 0, transform: 'translateY(-120px) scale(0.6)' + rotStr, filter: 'blur(10px)' },
+          { opacity: 1, transform: 'translateY(12px) scale(1.04)' + rotStr, filter: 'blur(0px)', offset: 0.65 },
+          { opacity: 1, transform: 'translateY(0) scale(1)' + rotStr }
+        ],
+        lensZoom: [
+          { opacity: 0, transform: 'scale(1.8)' + rotStr, filter: 'blur(15px)' },
+          { opacity: 1, transform: 'scale(1)' + rotStr, filter: 'blur(0px)' }
+        ],
+        glowExpand: [
+          { opacity: 0, transform: 'scale(0.3)' + rotStr, filter: 'drop-shadow(0 0 35px #38bdf8)' },
+          { opacity: 1, transform: 'scale(1.08)' + rotStr, filter: 'drop-shadow(0 0 15px #38bdf8)', offset: 0.7 },
+          { opacity: 1, transform: 'scale(1)' + rotStr, filter: 'drop-shadow(0 0 0px transparent)' }
+        ],
+        slideSkewLeft: [
+          { opacity: 0, transform: 'translateX(-140px) skewX(-20deg)' + rotStr },
+          { opacity: 1, transform: 'translateX(10px) skewX(5deg)' + rotStr, offset: 0.7 },
+          { opacity: 1, transform: 'translateX(0) skewX(0deg)' + rotStr }
+        ],
+        slideSkewRight: [
+          { opacity: 0, transform: 'translateX(140px) skewX(20deg)' + rotStr },
+          { opacity: 1, transform: 'translateX(-10px) skewX(-5deg)' + rotStr, offset: 0.7 },
+          { opacity: 1, transform: 'translateX(0) skewX(0deg)' + rotStr }
+        ],
+        bounceDrop: [
+          { opacity: 0, transform: 'translateY(-180px)' + rotStr },
+          { opacity: 1, transform: 'translateY(0)' + rotStr, offset: 0.5 },
+          { opacity: 1, transform: 'translateY(-30px)' + rotStr, offset: 0.7 },
+          { opacity: 1, transform: 'translateY(0)' + rotStr, offset: 0.85 },
+          { opacity: 1, transform: 'translateY(-8px)' + rotStr, offset: 0.93 },
+          { opacity: 1, transform: 'translateY(0)' + rotStr }
+        ],
+        rotate3dFlip: [
+          { opacity: 0, transform: 'perspective(700px) rotateY(-180deg) scale(0.4)' + rotStr },
+          { opacity: 1, transform: 'perspective(700px) rotateY(15deg) scale(1.05)' + rotStr, offset: 0.75 },
+          { opacity: 1, transform: 'perspective(700px) rotateY(0deg) scale(1)' + rotStr }
+        ],
+        waveIn: [
+          { opacity: 0, transform: 'translateY(40px) rotate(' + (r - 15) + 'deg) scale(0.8)' },
+          { opacity: 1, transform: 'translateY(-8px) rotate(' + (r + 4) + 'deg) scale(1.03)', offset: 0.7 },
+          { opacity: 1, transform: 'translateY(0) rotate(' + r + 'deg) scale(1)' }
+        ],
+        neonGlowLoop: [
+          { filter: 'drop-shadow(0 0 5px rgba(255,177,27,0.4))' },
+          { filter: 'drop-shadow(0 0 24px rgba(255,177,27,0.95))', offset: 0.5 },
+          { filter: 'drop-shadow(0 0 5px rgba(255,177,27,0.4))' }
+        ],
+        floatGentle: [
+          { transform: 'translateY(0)' + rotStr },
+          { transform: 'translateY(-12px)' + rotStr, offset: 0.5 },
+          { transform: 'translateY(0)' + rotStr }
+        ],
+        colorPulse: [
+          { transform: 'scale(1)' + rotStr, filter: 'brightness(1)' },
+          { transform: 'scale(1.05)' + rotStr, filter: 'brightness(1.35) drop-shadow(0 0 16px #38bdf8)', offset: 0.5 },
+          { transform: 'scale(1)' + rotStr, filter: 'brightness(1)' }
+        ],
         fade: [
           { opacity: 0, transform: 'rotate(' + r + 'deg)' },
           { opacity: 1, transform: 'rotate(' + r + 'deg)' }
