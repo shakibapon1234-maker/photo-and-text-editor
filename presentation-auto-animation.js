@@ -1,4 +1,4 @@
-﻿/**
+/**
  * presentation-auto-animation.js
  * One-click Auto Animation:
  * - Assigns varied entrance animations to ALL elements in the current slide
@@ -45,27 +45,19 @@
     all:     '📚 সব স্লাইড'
   };
 
-  /* ── Deterministic-but-varied picker (avoids repeating same anim 2x) ─ */
-  function pickAnims(pool, count) {
+  /* ── Continuous non-repeating picker across slides ───────────────── */
+  function pickAnims(pool, count, startIndex = 0) {
     const result = [];
-    let lastIdx = -1;
     for (let i = 0; i < count; i++) {
-      // Use a position-based hash to stay consistent per element
-      let idx;
-      do {
-        idx = (i * 7 + Math.floor(i / pool.length) * 3) % pool.length;
-        // Minor shuffle to avoid monotony
-        idx = (idx + i * 3) % pool.length;
-      } while (idx === lastIdx && pool.length > 1);
-      lastIdx = idx;
+      const idx = (startIndex + i) % pool.length;
       result.push(pool[idx]);
     }
     return result;
   }
 
-  /* ── Apply animations to one slide ───────────────────────────────── */
-  function applyToSlide(slide, mood, delayStep, duration) {
-    if (!slide || !Array.isArray(slide.elements)) return;
+  /* ── Apply animations to one slide with global animation offset ──── */
+  function applyToSlide(slide, mood, delayStep, duration, startAnimIdx = 0) {
+    if (!slide || !Array.isArray(slide.elements)) return 0;
 
     // Sort elements top-to-bottom by Y, then left-to-right by X
     const sorted = [...slide.elements].sort((a, b) => {
@@ -74,7 +66,7 @@
     });
 
     const pool = POOLS[mood] || POOLS.smart;
-    const anims = pickAnims(pool, sorted.length);
+    const anims = pickAnims(pool, sorted.length, startAnimIdx);
 
     sorted.forEach((el, i) => {
       el.animation       = anims[i];
@@ -84,6 +76,8 @@
       el.animationStart  = i === 0 ? 'with' : 'after';
       el.animationLoop   = false;
     });
+
+    return sorted.length;
   }
 
   /* ── UI: floating modal ───────────────────────────────────────────── */
@@ -321,11 +315,16 @@
     const duration  = parseFloat(durSlider.value)   || 0.6;
 
     if (selectedScope === 'all') {
-      slides.forEach(slide => applyToSlide(slide, selectedMood, delayStep, duration));
+      let cumulativeAnimIdx = 0;
+      slides.forEach(slide => {
+        const count = applyToSlide(slide, selectedMood, delayStep, duration, cumulativeAnimIdx);
+        cumulativeAnimIdx += count;
+      });
       if (typeof window.showPresentationToast === 'function')
-        window.showPresentationToast(`✨ সব ${slides.length}টি স্লাইডে Animation লাগানো হয়েছে!`);
+        window.showPresentationToast(`✨ সব ${slides.length}টি স্লাইডে ক্রমান্বয়ে নতুন নতুন Animation লাগানো হয়েছে!`);
     } else {
-      applyToSlide(slides[current], selectedMood, delayStep, duration);
+      const startOffset = (current * 5);
+      applyToSlide(slides[current], selectedMood, delayStep, duration, startOffset);
       if (typeof window.showPresentationToast === 'function')
         window.showPresentationToast('✨ এই স্লাইডে Auto Animation লাগানো হয়েছে!');
     }
@@ -333,7 +332,6 @@
     if (typeof render === 'function') render();
     closeModal();
   });
-
   /* ── Clear ───────────────────────────────────────────────────────── */
   document.getElementById('aaClearBtn').addEventListener('click', () => {
     const target = selectedScope === 'all' ? slides : [slides[current]];
@@ -355,65 +353,81 @@
   });
 
   /* ── Open/Close ──────────────────────────────────────────────────── */
-  function openModal() { modal.classList.add('open'); }
-  function closeModal() { modal.classList.remove('open'); }
+  function openModal() {
+    modal.classList.add('open');
+  }
+  function closeModal() {
+    modal.classList.remove('open');
+  }
 
-  document.getElementById('autoAnimClose').addEventListener('click', closeModal);
-  modal.addEventListener('pointerdown', e => {
-    if (e.target === modal) closeModal();
+  document.getElementById('autoAnimClose').addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeModal();
   });
+  
+  // Stop clicks inside the dialog from closing it
+  const animBox = document.getElementById('autoAnimBox');
+  if (animBox) {
+    animBox.addEventListener('pointerdown', e => e.stopPropagation());
+    animBox.addEventListener('click', e => e.stopPropagation());
+  }
+
+  // Backdrop click closes modal
+  modal.addEventListener('pointerdown', e => {
+    if (e.target === modal) {
+      e.stopPropagation();
+      closeModal();
+    }
+  });
+
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+    if (e.key === 'Escape' && modal.classList.contains('open')) {
+      e.stopPropagation();
+      closeModal();
+    }
   });
 
   window.openAutoAnimationModal = openModal;
 
   /* ── Inject button into Design dropdown ──────────────────────────── */
   function injectButton() {
-    // Try Design menu first
+    let btn = document.getElementById('autoAnimTriggerBtn');
     const designMenu = document.querySelector('.toolbar-menu[data-menu="design"]');
-    if (designMenu && !document.getElementById('autoAnimTriggerBtn')) {
-      const btn = document.createElement('button');
+
+    if (!btn && designMenu) {
+      btn = document.createElement('button');
       btn.id = 'autoAnimTriggerBtn';
       btn.innerHTML = '✨ Auto Animation';
       btn.title = 'এক ক্লিকে সব element-এ অ্যানিমেশন লাগান';
       btn.style.cssText = 'background:linear-gradient(90deg,#5b21b6,#7c3aed);border-color:#a78bfa;color:#fff;font-weight:800;white-space:nowrap;';
-      btn.addEventListener('click', e => {
+      designMenu.prepend(btn);
+    }
+
+    if (btn) {
+      btn.onclick = e => {
         e.stopPropagation();
-        // Close dropdown first
+        e.preventDefault();
+        // Close dropdown
         document.querySelectorAll('#toolbarGroups .toolbar-group.open')
           .forEach(g => g.classList.remove('open'));
-        openModal();
-      });
-      designMenu.prepend(btn);
+        setTimeout(openModal, 60);
+      };
       return true;
     }
 
-    // Fallback: also add as a standalone button next to Shortcuts
-    const toolbarGroups = document.getElementById('toolbarGroups');
-    if (toolbarGroups && !document.getElementById('autoAnimFallbackBtn')) {
-      const btn = document.createElement('button');
-      btn.id = 'autoAnimFallbackBtn';
-      btn.innerHTML = '✨ Auto Anim';
-      btn.title = 'Auto Animation — এক ক্লিকে সব element-এ অ্যানিমেশন';
-      btn.style.cssText = 'background:linear-gradient(90deg,#5b21b6,#7c3aed);border-color:#a78bfa;color:#fff;font-weight:800;padding:7px 10px;border-radius:7px;font-size:11px;';
-      btn.addEventListener('click', e => { e.stopPropagation(); openModal(); });
-      toolbarGroups.appendChild(btn);
-      return true;
-    }
     return false;
   }
 
   // Retry until toolbar is built (other scripts may build it after us)
   function tryInject(retries = 0) {
     if (injectButton()) return;
-    if (retries < 20) setTimeout(() => tryInject(retries + 1), 300);
+    if (retries < 25) setTimeout(() => tryInject(retries + 1), 250);
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => setTimeout(() => tryInject(), 600));
+    document.addEventListener('DOMContentLoaded', () => setTimeout(tryInject, 400));
   } else {
-    setTimeout(() => tryInject(), 600);
+    setTimeout(tryInject, 400);
   }
 
 })();

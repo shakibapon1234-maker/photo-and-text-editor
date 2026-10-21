@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="bn">
 <head>
 <meta charset="UTF-8" />
@@ -16,6 +16,8 @@
     overflow: hidden;
   }
   header.suite-header {
+    -webkit-app-region: drag;
+    padding: 0 140px 0 16px !important;
     height: 54px;
     background: #161920;
     border-bottom: 1px solid #282d37;
@@ -66,7 +68,10 @@
   }
   .suite-brand-mark span { position: relative; z-index: 1; }
   @keyframes suite-logo-spin { to { transform: rotate(360deg); } }
-  .suite-tabs {
+  .suite-brand, .suite-tabs, .tab-btn {
+    -webkit-app-region: no-drag;
+}
+.suite-tabs {
     display: flex;
     align-items: center;
     gap: 6px;

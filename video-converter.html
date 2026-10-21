@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="bn">
 <head>
     <meta charset="UTF-8">
@@ -254,8 +254,15 @@
 
         <form id="convertForm">
             <div class="form-group">
-                <label for="filePath">📁 Video File Path (ভিডিও ফাইল পাথ):</label>
-                <input type="text" id="filePath" placeholder="C:\Users\starlink\Downloads\video.mp4" required>
+                <label for="filePath">📁 Video File Path (ভিডিও ফাইল নির্বাচন বা পাথ):</label>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <input type="text" id="filePath" placeholder="পাথ লিখুন অথবা ডানপাশের বাটনে ক্লিক করে ফাইল বেছে নিন..." required style="flex:1;">
+                    <label class="btn-browse" style="padding:11px 16px;background:#315184;border:1px solid #79abff;border-radius:8px;color:#fff;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;">
+                        📂 ব্রাউজ ফাইল
+                        <input type="file" id="videoFileInput" accept="video/*,.mp4,.mov,.mkv,.avi,.webm,.flv,.wmv" style="display:none;">
+                    </label>
+                </div>
+                <small style="color:#94a3b8;font-size:11px;margin-top:5px;display:block;">💡 টিপস: <b>📂 ব্রাউজ ফাইল</b> বাটনে ক্লিক করে কম্পিউটার থেকে সরাসরি ভিডিও সিলেক্ট করতে পারেন। অথবা পাথ পেস্ট করতে চাইলে ফাইলের পুরো নাম সহ এক্সটেনশন (.mp4) দিন।</small>
             </div>
 
             <div class="form-group">
@@ -325,6 +332,23 @@
                 card.querySelector('input').checked = true;
             });
         });
+
+                const videoFileInput = document.getElementById('videoFileInput');
+        const filePathInput = document.getElementById('filePath');
+        if (videoFileInput) {
+            videoFileInput.addEventListener('change', (e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                    // In Electron/Chromium, file.path contains full local path!
+                    if (file.path) {
+                        filePathInput.value = file.path;
+                    } else {
+                        // Fallback: file name
+                        filePathInput.value = file.name;
+                    }
+                }
+            });
+        }
 
         const form = document.getElementById('convertForm');
         const submitBtn = document.getElementById('submitBtn');

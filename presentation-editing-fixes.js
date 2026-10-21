@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   const $ = id => document.getElementById(id);
 
   let _lastClickId = null;
@@ -187,6 +187,7 @@
     };
 
     if (typeof renderInspector === 'function') renderInspector();
+    if (typeof window.syncContextToolbar === 'function') window.syncContextToolbar();
   };
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -290,6 +291,7 @@
     };
 
     if (typeof renderInspector === 'function') renderInspector();
+    if (typeof window.syncContextToolbar === 'function') window.syncContextToolbar();
   };
 
   // The canvas also has drag/resize controls that listen to pointer events.
@@ -1306,10 +1308,11 @@
     slide.style.height = '540px';
     slide.style.flexShrink = '0';
 
-    const wrapW = stageWrap.clientWidth - 48;
-    const wrapH = stageWrap.clientHeight - 48;
-    // Scale comfortably to fit available space, allowing up to 1.35x on wide displays
-    const fitScale = (wrapW > 0 && wrapH > 0) ? Math.min(1.35, wrapW / 960, wrapH / 540) : 1;
+    const wrapW = stageWrap.clientWidth;
+    // Stage wrap has 40px top and 40px bottom padding reserved for the context toolbar
+    const wrapH = stageWrap.clientHeight - 80;
+    // Scale comfortably to fit available space edge-to-edge and vertically centered
+    const fitScale = (wrapW > 0 && wrapH > 0) ? Math.min(1.6, wrapW / 960, wrapH / 540) : 1;
     const effectiveZoom = (_zoomLevel || 1.0) * fitScale;
 
     slide.style.transform = `scale(${effectiveZoom})`;

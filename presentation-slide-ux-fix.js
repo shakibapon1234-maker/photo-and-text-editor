@@ -1,4 +1,4 @@
-﻿/**
+/**
  * presentation-slide-ux-fix.js
  * Fixes 3 UX issues:
  * 1. Drag-and-drop thumbnail reordering in the slide panel
@@ -12,6 +12,14 @@
    * 1. DROPDOWN AUTO-CLOSE ON OUTSIDE CLICK
    * ══════════════════════════════════════════════════════════════ */
   document.addEventListener('pointerdown', event => {
+    // Don't close menus if clicking inside modal, toast, or menu
+    if (event.target.closest(
+      '#autoAnimModal, #autoAnimBox, .modal, .shortcuts-modal-overlay, .shortcuts-modal-container, [data-no-close]'
+    )) return;
+    // If the autoAnimModal is open and user clicks the BACKDROP, let the modal's
+    // own handler process it - do NOT also close toolbar menus at this point
+    const animModal = document.getElementById('autoAnimModal');
+    if (animModal && animModal.classList.contains('open')) return;
     // If click is outside any toolbar-group, close all open menus
     if (!event.target.closest('.toolbar-group')) {
       document.querySelectorAll('#toolbarGroups .toolbar-group.open')
@@ -292,7 +300,7 @@
 
 
   /* Ensure text editing and multi-line text stays top-aligned and doesn't jump vertically on Enter */
-  document.head.insertAdjacentHTML('beforeend', <style id="textMultilineFixStyles">
+  document.head.insertAdjacentHTML('beforeend', `<style id="textMultilineFixStyles">
     .text-el .text-content {
       align-items: flex-start !important;
       align-content: flex-start !important;
@@ -300,5 +308,5 @@
       word-break: break-word !important;
       box-sizing: border-box !important;
     }
-  </style>);
+  </style>`);
 })();

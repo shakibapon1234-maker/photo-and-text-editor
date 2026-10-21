@@ -322,25 +322,35 @@
   /* ── CSS ─────────────────────────────────────────────────────────────────── */
   document.head.insertAdjacentHTML('beforeend', `<style>
     #ctx-toolbar {
-      position: fixed;
-      top: 58px; left: 0; right: 0;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      background: #0e1726;
-      border-bottom: 1px solid #26334a;
-      padding: 0 14px;
-      height: 40px;
-      gap: 0;
-      box-shadow: 0 2px 12px #0008;
-      transition: opacity .18s, transform .18s;
-      overflow: hidden;
+      position: fixed !important;
+      top: 48px !important;
+      left: 0 !important;
+      right: 0 !important;
+      z-index: 9999 !important;
+      display: flex !important;
+      align-items: center !important;
+      background: #0b1322 !important;
+      border-bottom: 2px solid #ffb11b !important;
+      padding: 0 14px !important;
+      height: 42px !important;
+      gap: 0 !important;
+      box-shadow: 0 6px 22px rgba(0, 0, 0, 0.75) !important;
+      transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.18s ease !important;
+      overflow-x: auto !important;
+      overflow-y: hidden !important;
+      scrollbar-width: none !important;
     }
-    #ctx-toolbar.ctx-empty {
-      height: 0;
-      padding: 0;
-      border: none;
-      overflow: hidden;
+    #ctx-toolbar.ctx-hidden-bar {
+      transform: translateY(-100%) !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+      visibility: hidden !important;
+    }
+    #ctx-toolbar.ctx-visible-bar {
+      transform: translateY(0) !important;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+      visibility: visible !important;
     }
     .ctx-group {
       display: flex;
@@ -410,18 +420,27 @@
       padding-left: 4px;
     }
     /* Permanently reserve room for toolbar so workspace never shifts down or up */
-    .workspace { margin-top: 40px !important; height: calc(100vh - 58px - 40px) !important; }
+    /* Workspace stays at full height, stage-wrap padding reserves top space for toolbar */
+    .workspace { margin-top: 0 !important; height: calc(100vh - 58px) !important; }
+    .stage-wrap { padding: 46px 16px 20px !important; box-sizing: border-box !important; }
   </style>`);
 
   /* ── Helpers ─────────────────────────────────────────────────────────────── */
   function showGroup(id) {
+    const elBar = document.getElementById('ctx-toolbar');
+    if (!elBar) return;
     ['ctx-default','ctx-text','ctx-shape','ctx-image'].forEach(g => {
-      const el = $(g);
+      const el = document.getElementById(g);
       if (el) el.classList.toggle('ctx-hidden', g !== id);
     });
+    elBar.classList.remove('ctx-hidden-bar', 'hidden');
+    elBar.classList.add('ctx-visible-bar');
   }
   function hideAll() {
-    showGroup('ctx-default');
+    const elBar = document.getElementById('ctx-toolbar');
+    if (!elBar) return;
+    elBar.classList.remove('ctx-visible-bar');
+    elBar.classList.add('ctx-hidden-bar');
   }
 
   /* ── Sync the bar to the currently selected element ─────────────────────── */
@@ -732,5 +751,6 @@
 
   /* ── Initial sync ────────────────────────────────────────────────────────── */
   hideAll();
+  window.syncContextToolbar = syncBar;
   render();
 })();

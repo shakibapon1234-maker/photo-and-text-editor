@@ -1,4 +1,4 @@
-﻿(()=>{
+(()=>{
   const $ = id => document.getElementById(id);
 
   // ── Horizontal Ribbon Toolbar (5 Organized Dropdown Tabs + Direct Actions) ──
@@ -31,17 +31,17 @@
       {
         key: 'insert',
         title: 'Insert ▾',
-        ids: ['addText', 'imageInput', 'assetBtn', 'addShape', 'add3dShape', 'addTable', 'addChart', 'addGlassCard', 'addHotspot', 'saveAssetBtn', 'videoElementBtn', 'toggleBullets', 'toggleNumbering', 'toggleAlphaList']
+        ids: ['addText', 'imageInput', 'assetBtn', 'addShape', 'addAnimatedFrame', 'add3dText', 'add3dShape', 'addTable', 'addChart', 'addGlassCard', 'addHotspot', 'saveAssetBtn', 'videoElementBtn', 'toggleBullets', 'toggleNumbering', 'toggleAlphaList']
       },
       {
         key: 'design',
         title: 'Design ▾',
-        ids: ['smartDesign', 'smartDesignerBtn', 'magicDeck', 'magicDeckBtn', 'brandKit', 'brandKitBtn', 'quickColors', 'colorToolbarBtn', 'colorBtn', 'textTools', 'btnElementAnimation']
+        ids: ['autoAnimTriggerBtn', 'smartDesign', 'smartDesignerBtn', 'magicDeck', 'magicDeckBtn', 'brandKit', 'brandKitBtn', 'quickColors', 'colorToolbarBtn', 'colorBtn', 'textTools']
       },
       {
         key: 'export',
         title: 'Export ▾',
-        ids: ['saveProject', 'loadProject', 'downloadSlideshow', 'exportVideo', 'restoreVaultBtn', 'projectInput']
+        ids: ['videoConverterBtn', 'saveProject', 'loadProject', 'downloadSlideshow', 'exportVideo', 'restoreVaultBtn', 'projectInput']
       },
       {
         key: 'present',
@@ -91,6 +91,38 @@
             menu.appendChild(control);
           }
           if (id === 'addChart') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Chart'));
+                    if (id === 'autoAnimTriggerBtn') {
+            control = document.getElementById('autoAnimTriggerBtn');
+            if (!control) {
+              control = document.createElement('button');
+              control.id = 'autoAnimTriggerBtn';
+              control.innerHTML = '✨ Auto Animation';
+              control.title = 'এক ক্লিকে সব element-এ অ্যানিমেশন লাগান';
+              control.style.cssText = 'background:linear-gradient(90deg,#5b21b6,#7c3aed);border-color:#a78bfa;color:#fff;font-weight:800;white-space:nowrap;';
+            }
+            // Always rebind onclick (whether freshly created or reused)
+            control.onclick = (e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              document.querySelectorAll('#toolbarGroups .toolbar-group.open').forEach(g => g.classList.remove('open'));
+              // Use setTimeout so the click event fully finishes before modal opens,
+              // preventing the global pointerdown listener from immediately dismissing it.
+              setTimeout(() => {
+                if (typeof window.openAutoAnimationModal === 'function') window.openAutoAnimationModal();
+              }, 60);
+            };
+          }
+          if (id === 'videoConverterBtn') {
+            control = document.getElementById('videoConverterBtn');
+            if (!control) {
+              control = document.createElement('button');
+              control.id = 'videoConverterBtn';
+              control.innerHTML = '🎬 Video Converter';
+              control.style.cssText = 'background:#2d1b4e;border-color:#cba6f7;color:#cba6f7;font-weight:700;margin:0;';
+              control.onclick = () => window.open('video-converter.html', '_blank');
+            }
+          }
+          if (id === 'addAnimatedFrame') control = document.getElementById('addAnimatedFrame') || Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Frame'));
           if (id === 'addGlassCard') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Glass'));
           if (id === 'magicDeck' || id === 'magicDeckBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Magic Deck'));
           if (id === 'smartDesign' || id === 'smartDesignerBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Smart Design'));
@@ -100,6 +132,27 @@
           if (id === 'soundtrack' || id === 'soundtrackBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Soundtrack'));
           if (id === 'restoreVaultBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('রিস্টোর') || b.id === 'restoreVaultBtn');
           if (id === 'downloadSlideshow') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Download') || b.textContent.includes('Slideshow'));
+          if (id === 'exportVideo') {
+            control = document.getElementById('exportVideo');
+            if (!control) {
+              control = document.createElement('button');
+              control.id = 'exportVideo';
+              control.type = 'button';
+              control.style.cssText = 'background:#1e0a3c;border:1px solid #a855f7;color:#d8b4fe;font-weight:800;white-space:nowrap;';
+            }
+            control.innerHTML = '🎬 Export as Video (.webm)';
+            control.title = 'সমস্ত স্লাইড একসাথে WebM ভিডিও হিসেবে ডাউনলোড করুন';
+            control.onclick = (e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              document.querySelectorAll('#toolbarGroups .toolbar-group.open').forEach(g => g.classList.remove('open'));
+              if (typeof window.startSlideVideoExport === 'function') {
+                window.startSlideVideoExport();
+              } else if (typeof window.openSlideVideoExportModal === 'function') {
+                window.openSlideVideoExportModal();
+              }
+            };
+          }
         }
 
         if (control && control.parentElement !== menu) {
@@ -179,7 +232,7 @@
     }
 
     // Move Direct Actions to right side
-    ['undoAction', 'redoAction', 'addAnimatedFrameBtn', 'add3dTextBtn', 'addVideoBtn'].forEach(id => {
+    ['undoAction', 'redoAction'].forEach(id => {
       let b = $(id);
       if (!b) {
         if (id === 'undoAction') b = Array.from(top.querySelectorAll('button')).find(x => x.textContent.trim() === 'Undo');
@@ -196,7 +249,7 @@
     // Clean up any other stray buttons in top bar into Export or Insert
     const exportMenu = groups.querySelector('.toolbar-menu[data-menu="export"]');
     Array.from(top.children).forEach(child => {
-      if (child.id === 'toolbarGroups' || child.id === 'directToolbarActions' || child.classList.contains('brand')) return;
+      if (child.id === 'toolbarGroups' || child.id === 'directToolbarActions' || child.id === 'videoConverterBtn' || child.classList.contains('brand')) return;
       if (child.tagName === 'BUTTON' || child.tagName === 'LABEL') {
         exportMenu?.appendChild(child);
       }
@@ -354,6 +407,10 @@
 
   document.addEventListener('pointerdown', event => {
     const groups = document.getElementById('toolbarGroups');
+    // Don't close menus when the auto-animation modal is open
+    const animModal = document.getElementById('autoAnimModal');
+    if (animModal && animModal.classList.contains('open')) return;
+    if (event.target.closest?.('#autoAnimModal, #autoAnimBox, .shortcuts-modal-overlay, .shortcuts-modal-container')) return;
     if (groups && !groups.contains(event.target)) {
       groups.querySelectorAll('.toolbar-group').forEach(x => x.classList.remove('open'));
     }
@@ -415,7 +472,7 @@
         /* Keep a default colour, but allow each slide's inline background
            (colour, gradient, or image) to replace it. */
         background: #17233c;
-        box-shadow: 0 0 50px rgba(0,0,0,0.9) !important;
+        box-shadow: none !important; outline: none !important;
         overflow: hidden !important;
         isolation: isolate !important;
         z-index: 1 !important;
@@ -1004,7 +1061,7 @@
         } else if (presBroll) {
           presBroll.className = targetClass;
         }
-        if (container) container.style.background = 'transparent';
+        if (container) container.style.background = '#000000';
         stage.style.background = 'transparent';
         stage.style.backgroundImage = '';
       } else {
@@ -1017,7 +1074,7 @@
         } else if (typeof themes !== 'undefined' && themes[sl.background]) {
           bg = themes[sl.background];
         }
-        if (container) container.style.background = bg;
+        if (container) container.style.background = '#000000';
 
         if (sl.background === 'custom') {
           stage.style.background = sl.bgColor || '#17233c';
