@@ -302,19 +302,133 @@
     }
   };
 
+  // ── Asset & SVG Caching ───────────────────────────────────────────────────
+  const imgCache = new Map();
+  async function preloadImage(src) {
+    if (!src) return null;
+    if (imgCache.has(src)) return imgCache.get(src);
+    const img = await loadImage(src);
+    if (img) imgCache.set(src, img);
+    return img;
+  }
+
+  const svgImgCache = new Map();
+  async function preloadShapeSvg(el) {
+    const shape = el.shape || 'rect';
+    const sf = el.fill || el.fillColor || el.boxBg || '#4f8df7';
+    const ss = el.stroke || el.borderColor || 'transparent';
+    const sl = (el.line !== undefined ? el.line : (el.strokeWidth || 2)) + 'px';
+    const key = `${shape}_${sf}_${ss}_${sl}`;
+    if (svgImgCache.has(key)) return svgImgCache.get(key);
+
+    let svg = '';
+    if (shape === 'pill') {
+      svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60" preserveAspectRatio="none"><rect x="2" y="2" width="96" height="56" rx="28" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" /></svg>`;
+    } else if (typeof window.getShapeSvg === 'function') {
+      svg = window.getShapeSvg(shape) || '';
+    }
+    if (!svg) {
+      svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60" preserveAspectRatio="none"><rect x="2" y="2" width="96" height="56" rx="14" fill="var(--sf, #4f8df7)" stroke="var(--ss, #fff)" stroke-width="var(--sl, 2px)" /></svg>`;
+    }
+    if (!svg.includes('xmlns=')) {
+      svg = svg.replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" ');
+    }
+    svg = svg.replace(/var\(--sf,\s*[^)]+\)/g, sf)
+             .replace(/var\(--ss,\s*[^)]+\)/g, ss)
+             .replace(/var\(--sl,\s*[^)]+\)/g, sl);
+
+    const uri = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    const img = await loadImage(uri);
+    if (img) svgImgCache.set(key, img);
+    return img;
+  }
+
+  function drawCanvasRoundRect(ctx, x, y, w, h, radius) {
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(x, y, w, h, radius);
+    } else {
+      const r = Math.min(radius, w / 2, h / 2);
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+  }
+
+  // ── Record Slides Loop with 30 FPS Animation & Audio Track ────────────────
   async function recordSlidesToVideo(allSlides, fallbackDur, W, H, onProgress) {
     const FPS = 30;
     const MIME = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
       ? 'video/webm;codecs=vp9'
       : 'video/webm';
 
+    onProgress(2, 'উপাদান ও ইমেজ প্রিলোড হচ্ছে...');
+
+    // 1. Preload all slide images and shape SVGs
+    for (const slide of allSlides) {
+      if (slide.bgMedia || slide.bgImage) {
+        await preloadImage(slide.bgMedia || slide.bgImage);
+      }
+      for (const el of (slide.elements || [])) {
+        if (el.type === 'image' && el.src) {
+          await preloadImage(el.src);
+        } else if (el.type === 'shape') {
+          await preloadShapeSvg(el);
+        }
+      }
+    }
+
+    // 2. Audio stream & soundtrack setup
+    let soundtrackAudio = null;
+    let audioContext = null;
+    let audioTrack = null;
+
+    try {
+      if (typeof window.getPresentationSoundtrack === 'function') {
+        const snd = await window.getPresentationSoundtrack();
+        if (snd && snd.src) {
+          soundtrackAudio = new Audio(snd.src);
+          soundtrackAudio.crossOrigin = 'anonymous';
+          soundtrackAudio.volume = (snd.volume !== undefined ? snd.volume : 60) / 100;
+          soundtrackAudio.loop = snd.loop !== false;
+
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          const sourceNode = audioContext.createMediaElementSource(soundtrackAudio);
+          const destNode = audioContext.createMediaStreamDestination();
+          sourceNode.connect(destNode);
+          sourceNode.connect(audioContext.destination);
+
+          const aTracks = destNode.stream.getAudioTracks();
+          if (aTracks.length > 0) {
+            audioTrack = aTracks[0];
+          }
+        }
+      }
+    } catch (aErr) {
+      console.warn('Audio soundtrack attach skipped:', aErr);
+    }
+
+    // 3. Create Canvas and MediaStream
     const canvas = document.createElement('canvas');
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext('2d');
 
-    const stream = canvas.captureStream(FPS);
-    const recorder = new MediaRecorder(stream, {
+    const canvasStream = canvas.captureStream(FPS);
+    const combinedTracks = [
+      ...canvasStream.getVideoTracks(),
+      ...(audioTrack ? [audioTrack] : [])
+    ];
+    const combinedStream = new MediaStream(combinedTracks);
+
+    const recorder = new MediaRecorder(combinedStream, {
       mimeType: MIME,
       videoBitsPerSecond: W > 1280 ? 9_000_000 : 5_000_000
     });
@@ -323,17 +437,82 @@
 
     recorder.start(100);
 
-    const total = allSlides.length;
+    if (soundtrackAudio) {
+      soundtrackAudio.currentTime = 0;
+      soundtrackAudio.play().catch(() => {});
+    }
 
+    const total = allSlides.length;
+    const frameIntervalMs = 1000 / FPS;
+
+    // 4. Render Slides Frame-by-Frame
     for (let i = 0; i < total; i++) {
       const slide = allSlides[i];
       const dur = Math.max(1, Number(slide.autoDuration) || fallbackDur);
-      const startPct = Math.round((i / total) * 100);
+      const frameCount = Math.round(dur * FPS);
+      const elements = slide.elements || [];
 
-      onProgress(startPct, `স্লাইড ${i + 1}/${total} রেন্ডারিং হচ্ছে...`);
+      for (let f = 0; f < frameCount; f++) {
+        const t = f / FPS;
 
-      await renderSlideToCanvas(ctx, slide, W, H);
-      await wait(dur * 1000);
+        // Draw slide background
+        fillBackground(ctx, slide, W, H);
+
+        if (slide.bgMedia || slide.bgImage) {
+          const img = await preloadImage(slide.bgMedia || slide.bgImage);
+          if (img) {
+            const opacity = Math.max(0, Math.min(100, slide.bgMediaOpacity ?? 100)) / 100;
+            ctx.globalAlpha = opacity;
+            ctx.drawImage(img, 0, 0, W, H);
+            ctx.globalAlpha = 1;
+          }
+        }
+
+        if (slide.bgOverlayOpacity) {
+          ctx.globalAlpha = Math.max(0, Math.min(100, slide.bgOverlayOpacity)) / 100;
+          ctx.fillStyle = slide.bgOverlayColor || '#000000';
+          ctx.fillRect(0, 0, W, H);
+          ctx.globalAlpha = 1;
+        }
+
+        // Render each element with animation calculation
+        for (const el of elements) {
+          let progress = 1;
+          if (el.animation && el.animation !== 'none') {
+            const delay = Number(el.animationDelay) || 0;
+            const animDur = Math.max(0.1, Number(el.animationDuration) || 0.6);
+            if (t < delay) {
+              progress = 0;
+            } else if (t < delay + animDur) {
+              progress = (t - delay) / animDur;
+            } else {
+              progress = 1;
+            }
+          }
+          if (progress > 0) {
+            await renderElement(ctx, el, W, H, progress);
+          }
+        }
+
+        // Update progress UI every 10 frames
+        if (f % 10 === 0 || f === frameCount - 1) {
+          const overallPct = Math.min(95, Math.round(((i + f / frameCount) / total) * 95));
+          onProgress(overallPct, `স্লাইড ${i + 1}/${total} অ্যানিমেশন রেন্ডারিং হচ্ছে (${Math.round((f / frameCount) * 100)}%)...`);
+        }
+
+        await wait(frameIntervalMs);
+      }
+    }
+
+    // 5. Clean up Audio
+    if (soundtrackAudio) {
+      try {
+        soundtrackAudio.pause();
+        soundtrackAudio.currentTime = 0;
+      } catch (_) {}
+    }
+    if (audioContext && audioContext.state !== 'closed') {
+      try { audioContext.close(); } catch (_) {}
     }
 
     onProgress(98, 'ভিডিও ফাইল ফাইনাল করা হচ্ছে...');
@@ -382,25 +561,33 @@
   };
 
   function fillBackground(ctx, slide, W, H) {
-    if (slide.background === 'custom') {
-      ctx.fillStyle = slide.bgColor || '#17233c';
+    let bg = slide.background === 'custom'
+      ? (slide.bgColor || '#0f172a')
+      : (THEME_COLORS[slide.background] || slide.bgColor || '#0f172a');
+    if (!bg) bg = '#0f172a';
+
+    if (bg.includes('radial-gradient')) {
+      const stops = [...bg.matchAll(/#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)/g)].map(m => m[0]);
+      const rad = ctx.createRadialGradient(W / 2, H / 2, 10, W / 2, H / 2, Math.max(W, H) / 1.35);
+      if (stops.length >= 2) {
+        stops.forEach((c, idx) => rad.addColorStop(idx / (stops.length - 1), c));
+        ctx.fillStyle = rad;
+      } else {
+        ctx.fillStyle = stops[0] || '#17233c';
+      }
       ctx.fillRect(0, 0, W, H);
-    } else {
-      const gradStr = THEME_COLORS[slide.background];
-      if (gradStr && gradStr.startsWith('linear-gradient')) {
-        const stops = [...gradStr.matchAll(/#[0-9a-fA-F]{3,8}/g)].map(m => m[0]);
-        const grad = ctx.createLinearGradient(0, 0, W, H);
-        if (stops.length >= 2) {
-          grad.addColorStop(0, stops[0]);
-          grad.addColorStop(1, stops[1]);
-        } else {
-          grad.addColorStop(0, '#17233c');
-          grad.addColorStop(1, '#090d17');
-        }
+    } else if (bg.includes('linear-gradient')) {
+      const stops = [...bg.matchAll(/#[0-9a-fA-F]{3,8}|rgba?\([^)]+\)/g)].map(m => m[0]);
+      const grad = ctx.createLinearGradient(0, 0, W, H);
+      if (stops.length >= 2) {
+        stops.forEach((c, idx) => grad.addColorStop(idx / (stops.length - 1), c));
         ctx.fillStyle = grad;
       } else {
-        ctx.fillStyle = gradStr || '#17233c';
+        ctx.fillStyle = stops[0] || '#17233c';
       }
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
     }
   }
@@ -411,7 +598,7 @@
     if (slide.bgMedia || slide.bgImage) {
       const src = slide.bgMedia || slide.bgImage;
       if (!src.startsWith('data:video') && !src.includes('.mp4') && !src.includes('.webm')) {
-        const img = await loadImage(src);
+        const img = await preloadImage(src);
         if (img) {
           const opacity = Math.max(0, Math.min(100, slide.bgMediaOpacity ?? 100)) / 100;
           ctx.globalAlpha = opacity;
@@ -430,11 +617,13 @@
 
     const elements = slide.elements || [];
     for (const el of elements) {
-      await renderElement(ctx, el, W, H);
+      await renderElement(ctx, el, W, H, 1);
     }
   }
 
-  async function renderElement(ctx, el, W, H) {
+  async function renderElement(ctx, el, W, H, animProgress = 1) {
+    if (animProgress <= 0) return;
+
     const x = (el.x / 100) * W;
     const y = (el.y / 100) * H;
     const w = (el.w / 100) * W;
@@ -442,42 +631,126 @@
 
     ctx.save();
 
+    // Base opacity
+    let alpha = (el.opacity !== undefined ? Math.max(0, Math.min(100, Number(el.opacity))) / 100 : 1);
+
+    // Easing curve: ease-out cubic
+    const eased = animProgress < 1 ? (1 - Math.pow(1 - animProgress, 3)) : 1;
+    alpha *= eased;
+
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    ctx.translate(cx, cy);
+
+    // Rotation
     const rot = ((Number(el.rotation) || 0) * Math.PI) / 180;
-    if (rot !== 0) {
-      ctx.translate(x + w / 2, y + h / 2);
-      ctx.rotate(rot);
-      ctx.translate(-(x + w / 2), -(y + h / 2));
+    if (rot !== 0) ctx.rotate(rot);
+
+    // Entrance animation transforms
+    if (animProgress < 1 && el.animation && el.animation !== 'none') {
+      const anim = el.animation;
+      const resScale = H / 540;
+      if (anim === 'slideDown') {
+        ctx.translate(0, -60 * resScale * (1 - eased));
+      } else if (anim === 'slideUp') {
+        ctx.translate(0, 60 * resScale * (1 - eased));
+      } else if (anim === 'slideLeft') {
+        ctx.translate(-80 * resScale * (1 - eased), 0);
+      } else if (anim === 'slideRight') {
+        ctx.translate(80 * resScale * (1 - eased), 0);
+      } else if (anim === 'zoom') {
+        const sc = 0.2 + 0.8 * eased;
+        ctx.scale(sc, sc);
+      } else if (anim === 'pop') {
+        const sc = animProgress < 0.7
+          ? 0.2 + 1.25 * (animProgress / 0.7)
+          : 1.45 - 0.45 * ((animProgress - 0.7) / 0.3);
+        ctx.scale(sc, sc);
+      } else if (anim === 'bounce' || anim === 'bounceDrop' || anim === 'elasticDrop') {
+        const sc = 0.4 + 0.6 * eased;
+        ctx.scale(sc, sc);
+      }
     }
 
-    if (el.opacity !== undefined) {
-      ctx.globalAlpha = Math.max(0, Math.min(100, Number(el.opacity))) / 100;
-    }
+    ctx.translate(-cx, -cy);
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
 
-    if (el.type === 'image' && el.src) {
-      const img = await loadImage(el.src);
-      if (img) ctx.drawImage(img, x, y, w, h);
-    } else if (el.type === 'text' || el.type === 'shape') {
+    // ── Draw Shapes (Cards, Badges, Boxes, Lines, SVGs) ──────────────────────
+    if (el.type === 'shape') {
+      const shape = el.shape || 'rect';
+      const fill = el.fill || el.fillColor || el.boxBg;
+      const stroke = el.stroke || el.borderColor;
+      const lineWidth = (el.line !== undefined ? Number(el.line) : Number(el.strokeWidth || 0)) * (H / 540);
+
+      if (shape === 'round' || shape === 'rect' || shape === 'pill') {
+        const rad = shape === 'round' ? Math.min(18 * (H / 540), w * 0.12, h * 0.25)
+                  : shape === 'pill' ? Math.min(w, h) / 2
+                  : 0;
+
+        if (fill && fill !== 'transparent' && fill !== 'none') {
+          ctx.fillStyle = fill;
+          drawCanvasRoundRect(ctx, x, y, w, h, rad);
+          ctx.fill();
+        }
+        if (stroke && stroke !== 'transparent' && stroke !== 'none' && lineWidth > 0) {
+          ctx.strokeStyle = stroke;
+          ctx.lineWidth = lineWidth;
+          drawCanvasRoundRect(ctx, x, y, w, h, rad);
+          ctx.stroke();
+        }
+      } else if (shape === 'circle') {
+        const rx = w / 2;
+        const ry = h / 2;
+        ctx.beginPath();
+        ctx.ellipse(x + rx, y + ry, rx, ry, 0, 0, Math.PI * 2);
+        if (fill && fill !== 'transparent' && fill !== 'none') {
+          ctx.fillStyle = fill;
+          ctx.fill();
+        }
+        if (stroke && stroke !== 'transparent' && stroke !== 'none' && lineWidth > 0) {
+          ctx.strokeStyle = stroke;
+          ctx.lineWidth = lineWidth;
+          ctx.stroke();
+        }
+      } else {
+        const svgImg = await preloadShapeSvg(el);
+        if (svgImg) {
+          ctx.drawImage(svgImg, x, y, w, h);
+        }
+      }
+
+      // Draw Shape Text
+      if (el.text) {
+        const fontSize = Math.round((Number(el.textSize || el.size) || 18) * (H / 540));
+        const fontWeight = el.textWeight || el.weight || '700';
+        const fontFamily = el.fontFamily || 'Arial, "Noto Sans Bengali", sans-serif';
+        ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+        ctx.fillStyle = el.textColor || el.color || '#ffffff';
+        ctx.textAlign = el.textAlign === 'left' ? 'left' : el.textAlign === 'right' ? 'right' : 'center';
+        ctx.textBaseline = 'middle';
+
+        const lines = String(el.text).split('\n');
+        const lineH = fontSize * 1.3;
+        const totalTextH = lines.length * lineH;
+        let startY = y + (h - totalTextH) / 2 + lineH / 2;
+        const textX = el.textAlign === 'left' ? x + 14 : el.textAlign === 'right' ? x + w - 14 : x + w / 2;
+
+        lines.forEach((line, i) => {
+          ctx.fillText(line, textX, startY + i * lineH, Math.max(10, w - 16));
+        });
+      }
+    } else if (el.type === 'text') {
       const boxBg = el.boxBg || el.backgroundColor || el.bgColor;
       if (boxBg && boxBg !== 'transparent') {
         const boxOpacity = el.boxOpacity !== undefined
           ? (Number(el.boxOpacity) > 1 ? Number(el.boxOpacity) / 100 : Number(el.boxOpacity))
           : 1;
+        ctx.save();
         ctx.globalAlpha *= boxOpacity;
         ctx.fillStyle = boxBg;
-        const r = 6;
-        ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.lineTo(x + w - r, y);
-        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-        ctx.lineTo(x + w, y + h - r);
-        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-        ctx.lineTo(x + r, y + h);
-        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-        ctx.lineTo(x, y + r);
-        ctx.quadraticCurveTo(x, y, x + r, y);
-        ctx.closePath();
+        drawCanvasRoundRect(ctx, x, y, w, h, 6 * (H / 540));
         ctx.fill();
-        ctx.globalAlpha = el.opacity !== undefined ? Math.max(0, Math.min(100, Number(el.opacity))) / 100 : 1;
+        ctx.restore();
       }
 
       if (el.text) {
@@ -493,13 +766,15 @@
         const lineH = fontSize * 1.25;
         const totalTextH = lines.length * lineH;
         let startY = y + (h - totalTextH) / 2 + lineH / 2;
-
-        const textX = el.textAlign === 'left' ? x + 6 : el.textAlign === 'right' ? x + w - 6 : x + w / 2;
+        const textX = el.textAlign === 'left' ? x + 8 : el.textAlign === 'right' ? x + w - 8 : x + w / 2;
 
         lines.forEach((line, i) => {
-          ctx.fillText(line, textX, startY + i * lineH, w - 8);
+          ctx.fillText(line, textX, startY + i * lineH, Math.max(10, w - 8));
         });
       }
+    } else if (el.type === 'image' && el.src) {
+      const img = await preloadImage(el.src);
+      if (img) ctx.drawImage(img, x, y, w, h);
     }
 
     ctx.restore();

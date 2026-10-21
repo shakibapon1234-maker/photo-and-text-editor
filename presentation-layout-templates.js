@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   const $ = id => document.getElementById(id);
 
   // High quality SVG icons as default badge images
@@ -54,141 +54,152 @@
   `);
 
   const customTemplates = [
-    // ── Thank You Slide Template ─────────────────────────────────
+    // ── Thank You Slide Template (User Custom Outro Design) ─────
     {
       id: 'thank-you-cinematic-card',
       name: 'Thank You Slide (ধন্যবাদ স্লাইড)',
       category: 'Outro & Ending',
-      desc: 'Cinematic gold & deep navy concluding slide with Thank You, social handles and contact info',
+      desc: 'Large vibrant blue frame, golden border, Bengali heading badge, and 3 contact cards (YouTube, Website, Facebook)',
       badge: '★ Outro',
       bg: 'custom',
       bgColor: 'radial-gradient(ellipse at center, #1b2845 0%, #0c1427 65%, #050914 100%)',
       elements: [
-        // Center Decorative Glow Box
+        // 1. Large Outer Rounded Blue Container Card with Gold Border
         {
           id: crypto.randomUUID(),
           type: 'shape',
           shape: 'round',
-          x: 20,
-          y: 12,
-          w: 60,
-          h: 76,
-          fill: 'rgba(15, 23, 42, 0.75)',
+          x: 7,
+          y: 6,
+          w: 86,
+          h: 88,
+          fill: '#5d7ce0',
           stroke: '#f59e0b',
-          line: 2,
+          line: 10,
           opacity: 100,
           rotation: 0
         },
-        // Decorative Top Star Badge
+        // 2. Top Golden Star Trio
         {
           id: crypto.randomUUID(),
           type: 'text',
           text: '★ ★ ★',
-          size: 20,
-          color: '#fbbf24',
+          size: 24,
+          color: '#f59e0b',
           weight: '900',
           textAlign: 'center',
           x: 35,
-          y: 16,
+          y: 9,
           w: 30,
           h: 6
         },
-        // Main THANK YOU Header
+        // 3. Bengali Thank You Header Badge (Crimson Red Rounded Pill)
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'round',
+          text: 'আমাদের সাথে থাকার জন্য আন্তরিক\nধন্যবাদ',
+          textColor: '#ffffff',
+          textSize: 25,
+          textWeight: '900',
+          textAlign: 'center',
+          x: 18,
+          y: 17,
+          w: 64,
+          h: 16,
+          fill: '#991b1b',
+          stroke: '#b91c1c',
+          line: 1,
+          opacity: 100,
+          rotation: 0
+        },
+        // 4. English Subtitle (Bold Deep Red)
         {
           id: crypto.randomUUID(),
           type: 'text',
-          text: 'THANK YOU!',
-          size: 58,
-          color: '#ffffff',
+          text: 'Thank you for watching our presentation.\nFor inquiries, collaboration or next steps, feel free\nto reach out!',
+          size: 15,
+          color: '#7f1d1d',
+          weight: '800',
+          textAlign: 'center',
+          x: 14,
+          y: 35,
+          w: 72,
+          h: 12
+        },
+        // 5. Card 1: YouTube Handle
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'round',
+          text: '▶ YouTube\nhttps://www.youtube.com/@\ngdstraininghubbd',
+          textColor: '#ffffff',
+          textSize: 13,
+          textWeight: '700',
+          textAlign: 'center',
+          x: 11,
+          y: 50,
+          w: 24,
+          h: 19,
+          fill: '#0f172a',
+          stroke: '#38bdf8',
+          line: 2,
+          opacity: 100,
+          rotation: 0
+        },
+        // 6. Card 2: Website Card
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'round',
+          text: '🌐 Website\nwww.gdstraininghub.com',
+          textColor: '#ffffff',
+          textSize: 13,
+          textWeight: '700',
+          textAlign: 'center',
+          x: 38,
+          y: 50,
+          w: 24,
+          h: 19,
+          fill: '#0f172a',
+          stroke: '#38bdf8',
+          line: 2,
+          opacity: 100,
+          rotation: 0
+        },
+        // 7. Card 3: Facebook Card (User Requested)
+        {
+          id: crypto.randomUUID(),
+          type: 'shape',
+          shape: 'round',
+          text: '📘 Facebook\nfacebook.com/gdstraininghubbd',
+          textColor: '#ffffff',
+          textSize: 13,
+          textWeight: '700',
+          textAlign: 'center',
+          x: 65,
+          y: 50,
+          w: 24,
+          h: 19,
+          fill: '#0f172a',
+          stroke: '#38bdf8',
+          line: 2,
+          opacity: 100,
+          rotation: 0
+        },
+        // 8. Footer Callout: Questions or Suggestions
+        {
+          id: crypto.randomUUID(),
+          type: 'text',
+          text: '💭 Any Questions or Suggestions?',
+          size: 16,
+          color: '#c2410c',
           weight: '900',
           textAlign: 'center',
-          x: 22,
-          y: 23,
-          w: 56,
-          h: 16,
-          textGradient: true,
-          textGradientTo: '#fbbf24',
-          textGradientAngle: 90
-        },
-        // Bengali Subtitle
-        {
-          id: crypto.randomUUID(),
-          type: 'text',
-          text: 'আমাদের সাথে থাকার জন্য আন্তরিক ধন্যবাদ',
-          size: 24,
-          color: '#ffd166',
-          weight: '700',
-          textAlign: 'center',
-          x: 22,
-          y: 39,
-          w: 56,
-          h: 8
-        },
-        // Thank you for watching description
-        {
-          id: crypto.randomUUID(),
-          type: 'text',
-          text: 'Thank you for watching our presentation.\nFor inquiries, collaboration or next steps, feel free to reach out!',
-          size: 15,
-          color: '#94a3b8',
-          weight: '500',
-          textAlign: 'center',
-          x: 24,
-          y: 48,
-          w: 52,
-          h: 10
-        },
-        // Contact Box Left
-        {
-          id: crypto.randomUUID(),
-          type: 'shape',
-          shape: 'pill',
-          text: '✉ contact@yourbrand.com',
-          textColor: '#ffffff',
-          textSize: 14,
-          textWeight: '700',
-          textAlign: 'center',
-          x: 24,
-          y: 62,
-          w: 24,
-          h: 8,
-          fill: '#1e293b',
-          stroke: '#38bdf8',
-          line: 1,
-          opacity: 100
-        },
-        // Contact Box Right
-        {
-          id: crypto.randomUUID(),
-          type: 'shape',
-          shape: 'pill',
-          text: '🌐 www.yourwebsite.com',
-          textColor: '#ffffff',
-          textSize: 14,
-          textWeight: '700',
-          textAlign: 'center',
-          x: 52,
-          y: 62,
-          w: 24,
-          h: 8,
-          fill: '#1e293b',
-          stroke: '#38bdf8',
-          line: 1,
-          opacity: 100
-        },
-        // Bottom Questions Note
-        {
-          id: crypto.randomUUID(),
-          type: 'text',
-          text: '💬 Any Questions or Suggestions?',
-          size: 13,
-          color: '#38bdf8',
-          weight: '700',
-          textAlign: 'center',
-          x: 30,
+          x: 25,
           y: 74,
-          w: 40,
-          h: 6
+          w: 50,
+          h: 7
         }
       ]
     },
