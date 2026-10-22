@@ -1378,6 +1378,59 @@
     }
   ];
 
+
+    // ── GDS Hub: Rounded Boxes → Pentagon Center (Screenshot 1 Style) ──
+    {
+      id: 'gds-hub-pentagon',
+      name: 'GDS Hub - Arrow to Center (জিডিএস হাব টেমপ্লেট)',
+      category: 'Aviation / GDS',
+      desc: 'Sky-blue gradient background with 5 labeled rounded boxes on the left connected by bold arrows to a central pentagon hub. Edit labels freely.',
+      badge: '★ Aviation',
+      bg: 'custom',
+      bgColor: 'radial-gradient(ellipse at 30% 50%, #60b8e8 0%, #3a8fd1 40%, #1a5fa8 80%, #0d3b6e 100%)',
+      elements: [
+        { id: crypto.randomUUID(), type: 'text', text: 'GDS সিস্টেম সমূহ', size: 32, color: '#ffffff', weight: '900', textAlign: 'left', x: 5, y: 3, w: 55, h: 10, animation: 'slideDown', animationDuration: 0.6, animationOrder: 1, animationStart: 'with' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'Galileo', textColor: '#ffffff', textSize: 26, textWeight: '900', textAlign: 'center', x: 4, y: 14, w: 38, h: 12, fill: '#3b82f6', stroke: '#ffffff', line: 3, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 2, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'Sabre', textColor: '#ffffff', textSize: 26, textWeight: '900', textAlign: 'center', x: 4, y: 29, w: 38, h: 12, fill: '#2563eb', stroke: '#ffffff', line: 3, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 3, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'Amadeus', textColor: '#ffffff', textSize: 26, textWeight: '900', textAlign: 'center', x: 4, y: 44, w: 38, h: 12, fill: '#1d4ed8', stroke: '#ffffff', line: 3, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 4, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'Worldspan', textColor: '#ffffff', textSize: 24, textWeight: '900', textAlign: 'center', x: 4, y: 59, w: 38, h: 12, fill: '#1e40af', stroke: '#ffffff', line: 3, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 5, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'Abacus', textColor: '#ffffff', textSize: 24, textWeight: '900', textAlign: 'center', x: 4, y: 74, w: 38, h: 12, fill: '#1e3a8a', stroke: '#ffffff', line: 3, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 6, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 43, y: 16, w: 13, h: 8, fill: '#1e3a8a', stroke: '#1e3a8a', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 7, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 43, y: 31, w: 13, h: 8, fill: '#1e3a8a', stroke: '#1e3a8a', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 7, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 43, y: 46, w: 13, h: 8, fill: '#1e3a8a', stroke: '#1e3a8a', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 7, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 43, y: 61, w: 13, h: 8, fill: '#1e3a8a', stroke: '#1e3a8a', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 7, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 43, y: 76, w: 13, h: 8, fill: '#1e3a8a', stroke: '#1e3a8a', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 7, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'pentagon', text: 'GDS', textColor: '#ffffff', textSize: 30, textWeight: '900', textAlign: 'center', x: 58, y: 20, w: 38, h: 60, fill: '#2563eb', stroke: '#ffffff', line: 4, opacity: 100, rotation: 0, animation: 'zoom', animationDuration: 0.7, animationOrder: 2, animationStart: 'after' }
+      ]
+    },
+
+    // ── Online Travel Agency: Horizontal Arrows → Colored Oval Labels ──
+    {
+      id: 'travel-agency-arrows-ovals',
+      name: 'Travel Agency - Arrows & Ovals (ট্রাভেল এজেন্সি টেমপ্লেট)',
+      category: 'Aviation / GDS',
+      desc: 'Dark night-sky background with bold title, horizontal arrow bars on the left, and 5 colorful oval name labels on the right. Easily editable.',
+      badge: '★ Agency',
+      bg: 'custom',
+      bgColor: 'radial-gradient(ellipse at 50% 40%, #0d2040 0%, #06132b 55%, #020c1e 100%)',
+      elements: [
+        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', x: 2, y: 3, w: 1, h: 1.5, fill: '#ffffff', stroke: '#ffffff', line: 0.5, opacity: 70, rotation: 0 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', x: 12, y: 7, w: 0.8, h: 1.2, fill: '#ffffff', stroke: '#ffffff', line: 0.5, opacity: 60, rotation: 0 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', x: 22, y: 4, w: 0.6, h: 1, fill: '#ffffff', stroke: '#ffffff', line: 0.5, opacity: 50, rotation: 0 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', x: 36, y: 6, w: 0.8, h: 1.2, fill: '#ffffff', stroke: '#ffffff', line: 0.5, opacity: 55, rotation: 0 },
+        { id: crypto.randomUUID(), type: 'text', text: 'Online Travel Agency', size: 36, color: '#ffffff', weight: '900', textAlign: 'left', x: 3, y: 2, w: 65, h: 12, animation: 'slideDown', animationDuration: 0.6, animationOrder: 1, animationStart: 'with' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 3, y: 16, w: 46, h: 11, fill: '#3b82f6', stroke: '#60a5fa', line: 1.5, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 2, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 3, y: 31, w: 46, h: 11, fill: '#3b82f6', stroke: '#60a5fa', line: 1.5, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 3, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 3, y: 46, w: 46, h: 11, fill: '#3b82f6', stroke: '#60a5fa', line: 1.5, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 4, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 3, y: 61, w: 46, h: 11, fill: '#3b82f6', stroke: '#60a5fa', line: 1.5, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 5, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 3, y: 76, w: 46, h: 11, fill: '#3b82f6', stroke: '#60a5fa', line: 1.5, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 6, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'Go Zayan', textColor: '#7c1d1d', textSize: 22, textWeight: '900', textAlign: 'center', x: 52, y: 13, w: 44, h: 17, fill: '#facc15', stroke: '#fef08a', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 2, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'Amybd', textColor: '#fef9c3', textSize: 22, textWeight: '900', textAlign: 'center', x: 52, y: 28, w: 44, h: 17, fill: '#dc2626', stroke: '#fca5a5', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 3, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'Sharetrip', textColor: '#ffffff', textSize: 22, textWeight: '900', textAlign: 'center', x: 52, y: 43, w: 44, h: 17, fill: '#059669', stroke: '#6ee7b7', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 4, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'Flyhub', textColor: '#ffffff', textSize: 22, textWeight: '900', textAlign: 'center', x: 52, y: 58, w: 44, h: 17, fill: '#7c3aed', stroke: '#c4b5fd', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 5, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'TravelBD', textColor: '#ffffff', textSize: 22, textWeight: '900', textAlign: 'center', x: 52, y: 73, w: 44, h: 17, fill: '#ea580c', stroke: '#fed7aa', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 6, animationStart: 'after' }
+      ]
+    }
   const standardLayouts = [
     ['title', 'Title Slide', 'Hero banner with main title and subtitle'],
     ['content', 'Title + Content', 'Header with bulleted content area'],
@@ -1442,6 +1495,25 @@
           </radialGradient>
         </defs>
         <rect width="160" height="90" fill="url(#${gradId})" />`;
+      } else if (item.id === 'gds-hub-pentagon') {
+        bgSvg = `<defs>
+          <radialGradient id="${gradId}" cx="30%" cy="50%" r="80%">
+            <stop offset="0%" stop-color="#60b8e8"/>
+            <stop offset="40%" stop-color="#3a8fd1"/>
+            <stop offset="80%" stop-color="#1a5fa8"/>
+            <stop offset="100%" stop-color="#0d3b6e"/>
+          </radialGradient>
+        </defs>
+        <rect width="160" height="90" fill="url(#${gradId})" />`;
+      } else if (item.id === 'travel-agency-arrows-ovals') {
+        bgSvg = `<defs>
+          <radialGradient id="${gradId}" cx="50%" cy="40%" r="70%">
+            <stop offset="0%" stop-color="#0d2040"/>
+            <stop offset="55%" stop-color="#06132b"/>
+            <stop offset="100%" stop-color="#020c1e"/>
+          </radialGradient>
+        </defs>
+        <rect width="160" height="90" fill="url(#${gradId})" />`;
       } else {
         bgSvg = `<defs>
           <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -1474,6 +1546,15 @@
           elementsSvg += `<circle cx="${gx + gw/2}" cy="${gy + gh/2}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${rotAttr} />`;
         } else if (el.shape === 'oval') {
           elementsSvg += `<ellipse cx="${gx + gw/2}" cy="${gy + gh/2}" rx="${gw/2}" ry="${gh/2}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${rotAttr} />`;
+        } else if (el.shape === 'pentagon') {
+          // Regular pentagon pointing up
+          const cx = gx + gw / 2, cy = gy + gh / 2;
+          const rx = gw / 2, ry = gh / 2;
+          const pts = [0, 1, 2, 3, 4].map(i => {
+            const angle = (i * 72 - 90) * Math.PI / 180;
+            return `${cx + rx * Math.cos(angle)},${cy + ry * Math.sin(angle)}`;
+          }).join(' ');
+          elementsSvg += `<polygon points="${pts}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"${rotAttr} />`;
         } else if (el.shape === 'dottedLine') {
           elementsSvg += `<line x1="${gx}" y1="${gy + gh/2}" x2="${gx + gw}" y2="${gy + gh/2}" stroke="${fill || stroke}" stroke-width="${sw * 1.8}" stroke-linecap="round" stroke-dasharray="1 3.2"${rotAttr} />`;
         } else if (el.shape === 'dashedLine') {
