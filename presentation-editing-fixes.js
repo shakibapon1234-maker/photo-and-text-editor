@@ -613,7 +613,7 @@
     const dropNote = slideBox.querySelector('.drop-note');
     if (dropNote) slideBox.appendChild(dropNote);
 
-    slideBox.querySelectorAll('.hard-selection-box, .hard-resize, .hard-rotate, .image-move-handle, .image-rotate-handle, .image-resize-handle').forEach(h => {
+    slideBox.querySelectorAll('.hard-selection-box').forEach(h => {
       slideBox.appendChild(h);
     });
   }

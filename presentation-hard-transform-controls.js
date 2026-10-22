@@ -161,12 +161,8 @@
       }).filter(Boolean);
     }
 
-    try {
-      // Always capture on the slide stage — capturing on a small handle element
-      // causes pointercancel in Electron's sandboxed renderer (Chromium) because
-      // the handle can lose layout during the drag. The stage element is stable.
-      stage?.setPointerCapture?.(event.pointerId);
-    } catch (_) {}
+    // Window-level pointer listeners track drags without pointer capture.
+    // Capture can trigger pointercancel in Electron's sandboxed iframe.
   }
 
   let _pendingDrag = null;
@@ -181,7 +177,9 @@
       // Signal to deselect listeners (Electron workaround: stopImmediatePropagation
       // may not reach capture listeners on ancestor nodes in sandboxed renderer).
       window.__hardTransformHandled = true;
-      requestAnimationFrame(() => { window.__hardTransformHandled = false; });
+      // Keep the guard through the whole pointer gesture. Some embedded
+      // Chromium builds dispatch compatibility events after the animation
+      // frame; clearing here lets the stage's legacy deselect handler win.
 
       event.preventDefault();
       event.stopPropagation();
@@ -236,7 +234,8 @@
     // Signal to deselect listeners that we are handling element selection.
     // This is the Electron-safe alternative to stopImmediatePropagation across ancestors.
     window.__hardTransformHandled = true;
-    requestAnimationFrame(() => { window.__hardTransformHandled = false; });
+    // Cleared on pointerup below so legacy canvas handlers cannot replace the
+    // element selection midway through a click/drag gesture.
 
     // 6. Multi-selection support (Shift, Ctrl, Meta) & group awareness
     if (!window.selectedIds) window.selectedIds = new Set();
@@ -415,6 +414,7 @@
   }, true);
 
   window.addEventListener('pointerup', event => {
+    window.__hardTransformHandled = false;
     const pending = _pendingDrag;
     _pendingDrag = null; // Cancel any pending drag that didn't start
     if (typeof window.drag !== 'undefined') window.drag = null;
@@ -443,12 +443,6 @@
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
-    try {
-      event.target?.releasePointerCapture?.(event.pointerId);
-    } catch (_) {}
-    try {
-      $('slide')?.releasePointerCapture?.(event.pointerId);
-    } catch (_) {}
     action = null;
     render();
     // Immediately persist the new position/size so a quick refresh does not lose
@@ -457,17 +451,12 @@
   }, true);
 
   window.addEventListener('pointercancel', event => {
+    window.__hardTransformHandled = false;
     _pendingDrag = null;
     if (typeof window.drag !== 'undefined') window.drag = null;
     window.__presentationLiveDrag = false;
     $('slide')?.classList.remove('is-dragging');
     document.querySelectorAll('#slide .element.is-active-drag').forEach(el => el.classList.remove('is-active-drag'));
-    try {
-      event.target?.releasePointerCapture?.(event.pointerId);
-    } catch (_) {}
-    try {
-      $('slide')?.releasePointerCapture?.(event.pointerId);
-    } catch (_) {}
     if (!action) return;
     action = null;
     render();
