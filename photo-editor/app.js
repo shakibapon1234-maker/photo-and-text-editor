@@ -3988,6 +3988,19 @@
         let zoomPercent = 100;
         let isFloating = false;
 
+        // A max-height on an auto-height flex wrapper does not constrain a
+        // portrait image reliably. Give Fit mode a definite viewport height
+        // so the image scales inside it instead of being clipped.
+        function fitPreviewStage() {
+            if (zoomMode !== 'fit' || !previewImage.naturalWidth || !previewImage.naturalHeight) return;
+            const width = previewImageWrapper.clientWidth;
+            if (!width) return;
+            const maxHeight = Math.max(220, window.innerHeight - 190);
+            const imageHeight = Math.min(maxHeight, width * previewImage.naturalHeight / previewImage.naturalWidth);
+            const minHeight = Math.min(440, maxHeight);
+            previewImageWrapper.style.height = Math.max(minHeight, imageHeight) + 'px';
+        }
+
         function notifyLayoutChange() {
             document.dispatchEvent(new CustomEvent('app:previewlayoutchange'));
         }
@@ -3999,6 +4012,7 @@
                 previewImageWrapper.classList.remove('zoomed');
                 previewImage.style.width = '';
                 previewImage.style.height = '';
+                fitPreviewStage();
                 zoomLevelLabel.textContent = 'ফিট';
             } else {
                 const targetWidth = Math.round(previewImage.naturalWidth * (zoomPercent / 100));
@@ -4048,7 +4062,10 @@
         // Re-apply the current zoom whenever a new src finishes loading
         // (dimensions may differ from before, e.g. after a crop/resize).
         previewImage.addEventListener('load', () => {
-            if (zoomMode === 'percent') applyZoom();
+            applyZoom();
+        });
+        window.addEventListener('resize', () => {
+            if (zoomMode === 'fit') fitPreviewStage();
         });
 
         // ---------- Floating window ----------
