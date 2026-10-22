@@ -149,13 +149,13 @@
       dy: event.clientY - rect.top - (item.y * rect.height) / 100
     };
 
-    if (kind === 'move' && window.selectedIds && window.selectedIds.size > 1 && window.selectedIds.has(item.id)) {
+    if ((kind === 'move' || kind === 'resize') && window.selectedIds && window.selectedIds.size > 1 && window.selectedIds.has(item.id)) {
       action.multiStarts = Array.from(window.selectedIds).map(id => {
         const el = active()?.elements?.find(x => x.id === id);
         if (el) {
           const dn = nodeFor(el);
           if (dn) dn.classList.add('is-active-drag');
-          return { el, startX: el.x, startY: el.y };
+          return { el, startX: el.x, startY: el.y, startW: el.w, startH: el.h };
         }
         return null;
       }).filter(Boolean);
@@ -401,6 +401,30 @@
       item.h = newH;
       item.x = startCenterX + slideShiftX - newW / 2;
       item.y = startCenterY + slideShiftY - newH / 2;
+
+      // Resize every selected object proportionally around the active handle's
+      // opposite corner/edge. This keeps a multi-selection together while the
+      // active element remains the one whose handles are being dragged.
+      if (action.multiStarts && action.multiStarts.length > 1) {
+        const scaleX = newW / start.w;
+        const scaleY = newH / start.h;
+        const anchorX = side.includes('w') ? start.x + start.w : start.x;
+        const anchorY = side.includes('n') ? start.y + start.h : start.y;
+        action.multiStarts.forEach(m => {
+          if (m.el === item) return;
+          m.el.x = anchorX + (m.startX - anchorX) * scaleX;
+          m.el.y = anchorY + (m.startY - anchorY) * scaleY;
+          m.el.w = Math.max(1, m.startW * scaleX);
+          m.el.h = Math.max(1, m.startH * scaleY);
+          const otherNode = nodeFor(m.el);
+          if (otherNode) {
+            otherNode.style.left = m.el.x + '%';
+            otherNode.style.top = m.el.y + '%';
+            otherNode.style.width = m.el.w + '%';
+            otherNode.style.height = m.el.h + '%';
+          }
+        });
+      }
     }
 
     const node = nodeFor(item);
