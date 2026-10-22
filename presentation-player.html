@@ -1119,7 +1119,9 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
 
     // ── Smooth Slide-to-Slide Transition Player ──────────────────────
     function playSlideTransition(targetNode, trans = 'fade', durationSec = null) {
-      if (!targetNode || trans === 'none') return;
+      if (!targetNode) return;
+      targetNode.getAnimations().filter(a => a._isSlideTrans).forEach(a => a.cancel());
+      if (trans === 'none') return;
       const keyframesMap = {
         fade: [
           { opacity: 0 },
@@ -1141,6 +1143,10 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
           { transform: 'translateY(70px)', opacity: 0 },
           { transform: 'translateY(0)', opacity: 1 }
         ],
+        slideDown: [
+          { transform: 'translateY(-70px)', opacity: 0 },
+          { transform: 'translateY(0)', opacity: 1 }
+        ],
         zoom: [
           { transform: 'scale(0.88)', opacity: 0 },
           { transform: 'scale(1)', opacity: 1 }
@@ -1153,6 +1159,22 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
           { transform: 'perspective(1000px) rotateY(-25deg)', opacity: 0 },
           { transform: 'perspective(1000px) rotateY(0deg)', opacity: 1 }
         ],
+        flipX: [
+          { transform: 'perspective(1000px) rotateX(25deg)', opacity: 0 },
+          { transform: 'perspective(1000px) rotateX(0deg)', opacity: 1 }
+        ],
+        blur: [
+          { opacity: 0, filter: 'blur(16px) scale(.96)' },
+          { opacity: 1, filter: 'blur(0) scale(1)' }
+        ],
+        circleWipe: [
+          { clipPath: 'circle(0% at 50% 50%)' },
+          { clipPath: 'circle(75% at 50% 50%)' }
+        ],
+        rotate: [
+          { transform: 'rotate(-7deg) scale(.92)', opacity: 0 },
+          { transform: 'rotate(0deg) scale(1)', opacity: 1 }
+        ],
         wipe: [
           { clipPath: 'inset(0 100% 0 0)' },
           { clipPath: 'inset(0 0% 0 0)' }
@@ -1161,7 +1183,6 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
 
       const kf = keyframesMap[trans] || keyframesMap.fade;
       const dur = (Number(durationSec) > 0) ? Number(durationSec) * 1000 : ((trans === 'wipe' || trans === 'flip') ? 480 : 400);
-      targetNode.getAnimations().filter(a => a._isSlideTrans).forEach(a => a.cancel());
       const anim = targetNode.animate(kf, {
         duration: dur,
         easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
@@ -1180,7 +1201,10 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
         try { v.pause(); v.removeAttribute('src'); v.load(); } catch (_) {}
       });
       stage.replaceChildren();
-      playSlideTransition(stage, slide.transition || "fade", slide.transitionDuration);
+      // Keep transitions off #stage because its responsive scale is expressed
+      // as a transform. Animate the viewport container so the slide's scale
+      // remains intact throughout directional and zoom transitions.
+      playSlideTransition(document.getElementById('stageContainer'), slide.transition || "fade", slide.transitionDuration);
 
       // ── Robust Full-Bleed Background & B-Roll Handling (Eliminates Black Borders) ──
       const container = document.getElementById('stageContainer');
@@ -1345,9 +1369,9 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
               item.node.style.visibility = 'hidden';
             });
           });
-          // Auto trigger first group if 'with' OR in autoPlay / timed mode
+          // Start the first group automatically only for "with previous" or explicit auto-play.
           const shouldAutoStart = slideSteps.length > 0 && slideSteps[0].length > 0 && (
-            slideSteps[0][0].start === 'with' || isAutoPlayActive || Number(slide.autoDuration) > 0
+            slideSteps[0][0].start === 'with' || isAutoPlayActive
           );
           if (shouldAutoStart) {
             executeStepGroup(slideSteps[0]);
@@ -1362,7 +1386,7 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
       updateDrawerActive();
 
       clearTimeout(autoTimer);
-      if (isAutoPlayActive || Number(slide.autoDuration) > 0) {
+      if (isAutoPlayActive) {
         const totalDur = Math.max(3, Number(slide.autoDuration) || 5);
         const stepDelay = slideSteps.length > 0
           ? Math.max(1.5, totalDur / Math.max(1, slideSteps.length))
@@ -1431,7 +1455,7 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
         currentStepIdx++;
         updateInfoDisplay();
 
-        if (isAutoPlayActive || Number(slide?.autoDuration) > 0) {
+        if (isAutoPlayActive) {
           const totalDur = Math.max(3, Number(slide?.autoDuration) || 5);
           const stepDelay = Math.max(1.5, totalDur / Math.max(1, slideSteps.length));
           autoTimer = setTimeout(() => advanceNext(), stepDelay * 1000);

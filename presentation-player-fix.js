@@ -1027,7 +1027,9 @@
     // High-speed on-demand slide builder with Animation Sequencer
     // ── Smooth Slide-to-Slide Transition Player ──────────────────────
     function playSlideTransition(targetNode, trans = 'fade', durationSec = null) {
-      if (!targetNode || trans === 'none') return;
+      if (!targetNode) return;
+      targetNode.getAnimations().filter(a => a._isSlideTrans).forEach(a => a.cancel());
+      if (trans === 'none') return;
       const keyframesMap = {
         fade: [
           { opacity: 0 },
@@ -1049,6 +1051,10 @@
           { transform: 'translateY(70px)', opacity: 0 },
           { transform: 'translateY(0)', opacity: 1 }
         ],
+        slideDown: [
+          { transform: 'translateY(-70px)', opacity: 0 },
+          { transform: 'translateY(0)', opacity: 1 }
+        ],
         zoom: [
           { transform: 'scale(0.88)', opacity: 0 },
           { transform: 'scale(1)', opacity: 1 }
@@ -1061,6 +1067,22 @@
           { transform: 'perspective(1000px) rotateY(-25deg)', opacity: 0 },
           { transform: 'perspective(1000px) rotateY(0deg)', opacity: 1 }
         ],
+        flipX: [
+          { transform: 'perspective(1000px) rotateX(25deg)', opacity: 0 },
+          { transform: 'perspective(1000px) rotateX(0deg)', opacity: 1 }
+        ],
+        blur: [
+          { opacity: 0, filter: 'blur(16px) scale(.96)' },
+          { opacity: 1, filter: 'blur(0) scale(1)' }
+        ],
+        circleWipe: [
+          { clipPath: 'circle(0% at 50% 50%)' },
+          { clipPath: 'circle(75% at 50% 50%)' }
+        ],
+        rotate: [
+          { transform: 'rotate(-7deg) scale(.92)', opacity: 0 },
+          { transform: 'rotate(0deg) scale(1)', opacity: 1 }
+        ],
         wipe: [
           { clipPath: 'inset(0 100% 0 0)' },
           { clipPath: 'inset(0 0% 0 0)' }
@@ -1069,7 +1091,6 @@
 
       const kf = keyframesMap[trans] || keyframesMap.fade;
       const dur = (Number(durationSec) > 0) ? Number(durationSec) * 1000 : ((trans === 'wipe' || trans === 'flip') ? 480 : 400);
-      targetNode.getAnimations().filter(a => a._isSlideTrans).forEach(a => a.cancel());
       const anim = targetNode.animate(kf, {
         duration: dur,
         easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
@@ -1091,7 +1112,12 @@
         try { v.pause(); v.removeAttribute('src'); v.load(); } catch (_) {}
       });
       stage.replaceChildren();
-      playSlideTransition(stage, sl.transition || 'fade', sl.transitionDuration);
+      // The stage itself is permanently scaled with !important for responsive
+      // presentation sizing. WAAPI transform transitions on that node lose to
+      // the important scale declaration, so animate its unclamped viewport
+      // container instead. This keeps slide sizing intact and makes directional,
+      // zoom, and flip transitions visible in Play Slideshow (All Slides).
+      playSlideTransition($('__pres_stage_container'), sl.transition || 'fade', sl.transitionDuration);
 
       // Reset properties left by a preceding image-background slide. This
       // also makes a media background independent of the previous slide.

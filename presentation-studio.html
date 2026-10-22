@@ -18,6 +18,11 @@
   <option value="zoomOut">🔎 Zoom Out (জুম আউট)</option>
   <option value="flip">🔄 3D Flip (ফ্লিপ)</option>
   <option value="wipe">🚪 Wipe Reveal (ওয়াইপ)</option>
+  <option value="slideDown">🔽 Slide Down (নিচে নামা)</option>
+  <option value="flipX">🪄 Vertical Flip (উলম্ব ফ্লিপ)</option>
+  <option value="blur">🌫️ Blur Reveal (ব্লার)</option>
+  <option value="circleWipe">⭕ Circle Reveal (বৃত্ত)</option>
+  <option value="rotate">🌀 Rotate In (ঘুরে আসা)</option>
   <option value="none">⏹ None (ডিরেক্ট কাট)</option>
 </select></label>
 <div class="row" style="margin-top:6px;gap:6px;">
@@ -361,17 +366,20 @@ if($('transitionDuration')){
 }
 setTimeout(()=>{
   if($('applyTransToAll')){
+    $('applyTransToAll').textContent='✨ সব স্লাইডে ভিন্ন ভিন্ন ট্রানজিশন লাগাও';
     $('applyTransToAll').onclick=()=>{
-      const transVal=$('transition').value;
+      const transitionCycle=['fade','slideLeft','slideRight','slideUp','zoom','zoomOut','flip','wipe','slideDown','flipX','blur','circleWipe','rotate'];
       const durVal=Math.max(0,Number($('autoDuration').value)||0);
       const transDurVal=Math.max(0.1,Number($('transitionDuration')?.value)||0.5);
-      slides.forEach(sl=>{
-        sl.transition=transVal;
+      slides.forEach((sl,index)=>{
+        sl.transition=transitionCycle[index%transitionCycle.length];
         sl.autoDuration=durVal;
         sl.transitionDuration=transDurVal;
       });
+      const btn=$('applyTransToAll');
+      if(btn) btn.textContent='✨ সব স্লাইডে ভিন্ন ভিন্ন ট্রানজিশন লাগাও';
       if(typeof window.showPresentationToast==='function')
-        window.showPresentationToast('✓ সব স্লাইডে "'+transVal+'" ট্রানজিশন ও '+durVal+' সে. প্রদর্শন সময় সেট করা হয়েছে!');
+        window.showPresentationToast('✨ সব স্লাইডে পালাক্রমে ভিন্ন ট্রানজিশন ও '+durVal+' সে. প্রদর্শন সময় সেট করা হয়েছে!');
     };
   }
   document.querySelectorAll('.quick-slide-dur-btn').forEach(btn=>{
