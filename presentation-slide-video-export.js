@@ -744,8 +744,10 @@
 
     // 2. Audio stream & soundtrack setup
     let soundtrackAudio = null;
+    let voiceoverAudio = null;
     let audioContext = null;
     let audioTrack = null;
+    let audioDestination = null;
 
     try {
       if (typeof window.getPresentationSoundtrack === 'function') {
@@ -762,11 +764,11 @@
             await audioContext.resume();
           }
           const sourceNode = audioContext.createMediaElementSource(soundtrackAudio);
-          const destNode = audioContext.createMediaStreamDestination();
-          sourceNode.connect(destNode);
+          audioDestination = audioContext.createMediaStreamDestination();
+          sourceNode.connect(audioDestination);
           sourceNode.connect(audioContext.destination);
 
-          const aTracks = destNode.stream.getAudioTracks();
+          const aTracks = audioDestination.stream.getAudioTracks();
           if (aTracks.length > 0) {
             audioTrack = aTracks[0];
           }
@@ -779,6 +781,24 @@
         try { audioContext.close(); } catch (_) {}
         audioContext = null;
       }
+    }
+
+    // Mix each slide's narration into the same recording audio track.
+    try {
+      if (allSlides.some(slide => slide.voiceoverData)) {
+        voiceoverAudio = new Audio();
+        voiceoverAudio.preload = 'auto';
+        audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+        if (audioContext.state === 'suspended') await audioContext.resume();
+        audioDestination = audioDestination || audioContext.createMediaStreamDestination();
+        const voiceSource = audioContext.createMediaElementSource(voiceoverAudio);
+        voiceSource.connect(audioDestination);
+        voiceSource.connect(audioContext.destination);
+        if (!audioTrack) audioTrack = audioDestination.stream.getAudioTracks()[0] || null;
+      }
+    } catch (voiceErr) {
+      console.warn('Slide voiceover audio attach skipped:', voiceErr);
+      voiceoverAudio = null;
     }
 
     // 3. Create Canvas in DOM and initialize MediaStream
@@ -831,7 +851,18 @@
       // 4. Render Slides Frame-by-Frame
       for (let i = 0; i < total; i++) {
         const slide = allSlides[i];
-        const dur = Math.max(1, Number(slide.autoDuration) || fallbackDur);
+        if (voiceoverAudio) {
+          voiceoverAudio.pause();
+          voiceoverAudio.currentTime = 0;
+          if (slide.voiceoverData) {
+            voiceoverAudio.src = slide.voiceoverData;
+            try { await voiceoverAudio.play(); } catch (e) { console.warn('Could not play slide voiceover:', e); }
+          } else {
+            voiceoverAudio.removeAttribute('src');
+            voiceoverAudio.load();
+          }
+        }
+        const dur = Math.max(1, Number(slide.autoDuration) || fallbackDur, Number(slide.voiceoverDuration) || 0);
         const elements = slide.elements || [];
 
         // Build sequential staggered animation schedule for this slide's elements
@@ -1008,6 +1039,9 @@
           soundtrackAudio.pause();
           soundtrackAudio.currentTime = 0;
         } catch (_) {}
+      }
+      if (voiceoverAudio) {
+        try { voiceoverAudio.pause(); voiceoverAudio.currentTime = 0; voiceoverAudio.removeAttribute('src'); } catch (_) {}
       }
       if (audioContext && audioContext.state !== 'closed') {
         try { audioContext.close(); } catch (_) {}

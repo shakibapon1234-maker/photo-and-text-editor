@@ -964,7 +964,28 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
     let currentIndex = 0;
     let autoTimer = null;
     let isAutoPlayActive = false;
+    let slideVoiceoverAudio = null;
+    let slideVoiceoverIndex = -1;
+    let slideVoiceoverNeedsUserStart = false;
     let recognition = null;
+
+    function playSlideVoiceover(slide, index) {
+      if (slideVoiceoverIndex === index) return;
+      slideVoiceoverIndex = index;
+      if (slideVoiceoverAudio) {
+        try { slideVoiceoverAudio.pause(); slideVoiceoverAudio.currentTime = 0; } catch (_) {}
+      }
+      slideVoiceoverAudio = null;
+      if (!slide || !slide.voiceoverData) return;
+      const audio = new Audio(slide.voiceoverData);
+      audio.preload = 'auto';
+      audio.volume = 1;
+      slideVoiceoverAudio = audio;
+      audio.play().then(() => { slideVoiceoverNeedsUserStart = false; }).catch(() => {
+        // Browsers can require a user gesture before playing audio in a new tab.
+        slideVoiceoverNeedsUserStart = true;
+      });
+    }
 
     function buildElement(el) {
       const node = document.createElement('div');
@@ -1195,6 +1216,7 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
       const stage = document.getElementById('stage');
       if (!slides.length || !stage) return;
       const slide = slides[currentIndex];
+      playSlideVoiceover(slide, currentIndex);
       // Release previous video hardware decoders
       const prevVids = stage.querySelectorAll('video');
       prevVids.forEach(v => {
@@ -1387,7 +1409,7 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
 
       clearTimeout(autoTimer);
       if (isAutoPlayActive) {
-        const totalDur = Math.max(3, Number(slide.autoDuration) || 5);
+        const totalDur = Math.max(3, Number(slide.autoDuration) || 5, Number(slide.voiceoverDuration) || 0);
         const stepDelay = slideSteps.length > 0
           ? Math.max(1.5, totalDur / Math.max(1, slideSteps.length))
           : totalDur;
@@ -1449,6 +1471,11 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
     function advanceNext() {
       clearTimeout(autoTimer);
       const slide = slides[currentIndex];
+      if (!isAutoPlayActive && slideVoiceoverNeedsUserStart && slideVoiceoverAudio && slide?.voiceoverData) {
+        slideVoiceoverNeedsUserStart = false;
+        slideVoiceoverAudio.play().catch(() => { slideVoiceoverNeedsUserStart = true; });
+        return;
+      }
       if (currentStepIdx < slideSteps.length) {
         const stepItems = slideSteps[currentStepIdx];
         executeStepGroup(stepItems);
@@ -1456,7 +1483,7 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
         updateInfoDisplay();
 
         if (isAutoPlayActive) {
-          const totalDur = Math.max(3, Number(slide?.autoDuration) || 5);
+          const totalDur = Math.max(3, Number(slide?.autoDuration) || 5, Number(slide?.voiceoverDuration) || 0);
           const stepDelay = Math.max(1.5, totalDur / Math.max(1, slideSteps.length));
           autoTimer = setTimeout(() => advanceNext(), stepDelay * 1000);
         }
@@ -1810,12 +1837,13 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
         e.stopPropagation();
         isAutoPlayActive = !isAutoPlayActive;
         if (isAutoPlayActive) {
+          if (slideVoiceoverAudio && slides[currentIndex]?.voiceoverData) slideVoiceoverAudio.play().then(() => { slideVoiceoverNeedsUserStart = false; }).catch(() => {});
           autoPlayBtn.innerHTML = '⏸ Pause';
           autoPlayBtn.style.background = '#059669';
           autoPlayBtn.style.borderColor = '#34d399';
           clearTimeout(autoTimer);
           const curSlide = slides[currentIndex];
-          const dur = Math.max(2, Number(curSlide?.autoDuration) || 5);
+          const dur = Math.max(2, Number(curSlide?.autoDuration) || 5, Number(curSlide?.voiceoverDuration) || 0);
           autoTimer = setTimeout(() => advanceNext(), dur * 1000);
           showVoiceToast('▶ Auto-Play চালু হয়েছে', 'info', 1800);
         } else {

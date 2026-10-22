@@ -375,6 +375,30 @@
     // Standalone exports open in manual mode; viewers can enable auto-play from
     // the player controls when they are ready.
     finalHtml = finalHtml.replace('let isAutoPlayActive = true;', 'let isAutoPlayActive = false;');
+    // Keep per-slide narration working even when the offline fallback player
+    // template was used instead of the current presentation-player.html file.
+    const hasVoiceoverRuntime = finalHtml.includes('function playSlideVoiceover(');
+    if (!hasVoiceoverRuntime) {
+      finalHtml = finalHtml.replace('let isAutoPlayActive = false;', `let isAutoPlayActive = false;
+    let slideVoiceoverAudio = null;
+    let slideVoiceoverIndex = -1;
+    let slideVoiceoverNeedsUserStart = false;
+    function playSlideVoiceover(slide) {
+      if (slideVoiceoverIndex === currentIndex) return;
+      slideVoiceoverIndex = currentIndex;
+      if (slideVoiceoverAudio) { try { slideVoiceoverAudio.pause(); slideVoiceoverAudio.currentTime = 0; } catch (_) {} }
+      slideVoiceoverAudio = null;
+      if (!slide || !slide.voiceoverData) return;
+      slideVoiceoverAudio = new Audio(slide.voiceoverData);
+      slideVoiceoverAudio.play().then(() => { slideVoiceoverNeedsUserStart = false; }).catch(() => { slideVoiceoverNeedsUserStart = true; });
+    }`);
+      finalHtml = finalHtml.replace('const slide = slides[currentIndex];', 'const slide = slides[currentIndex];\n      playSlideVoiceover(slide);');
+    }
+    finalHtml = finalHtml.replace(/Math\.max\(3, Number\(slide\??\.autoDuration\) \|\| 5\)/g, 'Math.max(3, Number(slide?.autoDuration) || 5, Number(slide?.voiceoverDuration) || 0)');
+    if (!hasVoiceoverRuntime) {
+      finalHtml = finalHtml.replace('isAutoPlayActive = !isAutoPlayActive;\n        if (isAutoPlayActive) {', 'isAutoPlayActive = !isAutoPlayActive;\n        if (isAutoPlayActive) {\n          if (slideVoiceoverAudio && slides[currentIndex]?.voiceoverData) slideVoiceoverAudio.play().catch(() => {});');
+    }
+    finalHtml = finalHtml.replace('function advanceNext() {\n      clearTimeout(autoTimer);\n      const slide = slides[currentIndex];', 'function advanceNext() {\n      clearTimeout(autoTimer);\n      const slide = slides[currentIndex];\n      if (!isAutoPlayActive && slideVoiceoverNeedsUserStart && slideVoiceoverAudio && slide?.voiceoverData) { slideVoiceoverNeedsUserStart = false; slideVoiceoverAudio.play().catch(() => { slideVoiceoverNeedsUserStart = true; }); return; }');
 
     // If no audio, mark soundtrack controls with no-audio class & hide
     if (!hasAudio) {

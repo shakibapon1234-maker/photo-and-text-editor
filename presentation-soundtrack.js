@@ -190,6 +190,8 @@
   let webAudioGain = null;
 
   async function getSoundtrackData() {
+    // Do not allow a stale in-memory Blob to override the user's Remove action.
+    if (!musicMeta.hasAudio) return null;
     let blob = null;
     let mime = musicMeta.mimeType || 'audio/mp4';
 
@@ -542,7 +544,13 @@
 
   $('removeSoundtrack').onclick = async () => {
     window.stopPresentationSoundtrack();
+    window._activeSoundtrack = null;
+    musicMeta.hasAudio = false;
     await deleteAudioBlobFromIDB();
+    if (activeAudio) {
+      try { activeAudio.removeAttribute('src'); activeAudio.load(); } catch (_) {}
+      activeAudio = null;
+    }
     if (cachedObjectUrl) {
       URL.revokeObjectURL(cachedObjectUrl);
       cachedObjectUrl = null;
