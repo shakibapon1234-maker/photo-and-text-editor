@@ -336,6 +336,10 @@
       .replace(/\u2029/g, '\\u2029');
 
     let finalHtml = baseTemplate.replace('let slides = [];', () => 'let slides = ' + safeSlidesJson + ';');
+    // Older embedded fallback templates auto-advance when a slide has a
+    // duration, even with Auto disabled. Make the Auto button the only switch.
+    finalHtml = finalHtml.replace(/isAutoPlayActive\s*\|\|\s*Number\(slide\??\.autoDuration\)\s*>\s*0/g, 'isAutoPlayActive');
+    finalHtml = finalHtml.replace(/slideSteps\[0\]\[0\]\.start === 'with' \|\| isAutoPlayActive \|\| Number\(slide\.autoDuration\) > 0/g, "slideSteps[0][0].start === 'with' || isAutoPlayActive");
     // Inject embedded server host
     finalHtml = finalHtml.replace('</head>', () => `<script>window.__EMBEDDED_SERVER_HOST = ${JSON.stringify(serverHost)};<\/script>\n</head>`);
     // Hide dropzone since slides are preloaded
@@ -368,8 +372,9 @@
       finalHtml = finalHtml.replace('stage.replaceChildren();', () => `stage.replaceChildren();\n      playSlideTransition(stage, slide.transition || 'fade');`);
     }
 
-    // Enable auto-play and automatic animation stepping in downloaded standalone player
-    finalHtml = finalHtml.replace('let isAutoPlayActive = false;', 'let isAutoPlayActive = true;');
+    // Standalone exports open in manual mode; viewers can enable auto-play from
+    // the player controls when they are ready.
+    finalHtml = finalHtml.replace('let isAutoPlayActive = true;', 'let isAutoPlayActive = false;');
 
     // If no audio, mark soundtrack controls with no-audio class & hide
     if (!hasAudio) {
