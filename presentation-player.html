@@ -1104,7 +1104,7 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
           + 'padding:' + pad + ';'
           + 'transform:rotate(' + rot + 'deg);transform-origin:center center;'
           + 'white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word;box-sizing:border-box;'
-          + 'display:flex;align-items:' + (el.boxBg && el.boxBg !== 'transparent' ? 'center' : 'flex-start') + ';justify-content:' + (textAlign === 'left' ? 'flex-start' : textAlign === 'right' ? 'flex-end' : 'center') + ';';
+          + 'display:flex;flex-direction:column;align-items:stretch;justify-content:' + (el.boxBg && el.boxBg !== 'transparent' ? 'center' : 'flex-start') + ';';
 
         if (el.textGradient) {
           css += 'background:linear-gradient(' + (el.textGradientAngle ?? 90) + 'deg, ' + txtColor + ', ' + (el.textGradientTo || '#4f8df7') + ');'

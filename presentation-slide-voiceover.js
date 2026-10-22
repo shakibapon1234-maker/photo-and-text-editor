@@ -2,6 +2,10 @@
 (function () {
   'use strict';
 
+  const alignmentStyle = document.createElement('style');
+  alignmentStyle.textContent = '#slide .text-el .text-content{display:block!important;width:100%!important;min-width:0!important;max-width:100%!important;text-align:inherit!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;box-sizing:border-box!important}';
+  document.head.appendChild(alignmentStyle);
+
   const right = document.querySelector('.workspace > .right');
   const duration = document.getElementById('autoDuration');
   if (!right || !duration || typeof slides === 'undefined') return;
