@@ -420,9 +420,9 @@
       padding-left: 4px;
     }
     /* Permanently reserve room for toolbar so workspace never shifts down or up */
-    /* Workspace stays at full height, stage-wrap padding reserves top space for toolbar */
+    /* The context bar is fixed below the app header; it does not occupy canvas space. */
     .workspace { margin-top: 0 !important; height: calc(100vh - 58px) !important; }
-    .stage-wrap { padding: 46px 16px 20px !important; box-sizing: border-box !important; }
+    .stage-wrap { padding: 18px 16px !important; box-sizing: border-box !important; }
   </style>`);
 
   /* ── Helpers ─────────────────────────────────────────────────────────────── */

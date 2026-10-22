@@ -1308,8 +1308,11 @@
     slide.style.height = '540px';
     slide.style.flexShrink = '0';
 
-    const wrapW = Math.max(320, stageWrap.clientWidth - 32);
-    const wrapH = Math.max(220, stageWrap.clientHeight - 32);
+    const wrapStyle = getComputedStyle(stageWrap);
+    const padX = (parseFloat(wrapStyle.paddingLeft) || 0) + (parseFloat(wrapStyle.paddingRight) || 0);
+    const padY = (parseFloat(wrapStyle.paddingTop) || 0) + (parseFloat(wrapStyle.paddingBottom) || 0);
+    const wrapW = Math.max(320, stageWrap.clientWidth - padX - 24);
+    const wrapH = Math.max(220, stageWrap.clientHeight - padY - 24);
     // Fit scale naturally scales to fill available stage space comfortably up to 1.55x
     const fitScale = (wrapW > 0 && wrapH > 0) ? Math.min(1.55, Math.min(wrapW / 960, wrapH / 540)) : 1;
     const effectiveZoom = (_zoomLevel || 1.0) * fitScale;

@@ -167,7 +167,7 @@
 
       <div class="ve-field">
         <label>⏱️ প্রতিটি উপাদানের অ্যানিমেশন বিরতি (Delay between elements):</label>
-        <input id="veElementDelay" type="number" min="0.5" max="10" step="0.5" value="2">
+        <input id="veElementDelay" type="number" min="0.1" max="10" step="0.1" value="0.4">
         <small>💡 একটি উপাদানের পর পরবর্তী উপাদান কত সেকেন্ড পর পর আসবে (ডিফল্ট: ২ সেকেন্ড)।</small>
       </div>
 
@@ -267,7 +267,7 @@
       return;
     }
 
-    const elementDelay = Math.max(0.4, parseFloat($('veElementDelay')?.value) || 2);
+    const elementDelay = Math.max(0.1, parseFloat($('veElementDelay')?.value) || 0.4);
     const fallbackDur = Math.max(1, parseFloat($('veSlideDur')?.value) || 2);
     const resVal = $('veResolution').value;
     const W = resVal === '1080' ? 1920 : 1280;
@@ -667,70 +667,47 @@
 
   // ── Element Staggered Animation Scheduler for Video ───────────────────────
   // Returns: { schedule: Map<el, {start, duration}>, effectiveDur: number }
-  function buildSlideAnimationSchedule(elements, holdDur, elementStepDelay = 2.0) {
+  function buildSlideAnimationSchedule(elements, holdDur, elementStepDelay = 0.4) {
     const schedule = new Map();
     if (!elements || elements.length === 0) return { schedule, effectiveDur: Math.max(2, holdDur) };
 
-    const stepDelay = Math.max(0.4, Number(elementStepDelay) || 2.0);
+    const stepDelay = Math.max(0.1, Number(elementStepDelay) || 0.4);
+    const sorted = elements
+      .filter(el => el.animation && el.animation !== 'none')
+      .sort((a, b) => (Number(a.animationOrder) || 0) - (Number(b.animationOrder) || 0));
 
-    // 1. Ensure all elements have entrance animations for video export
-    // If elements were imported from templates or lack animation, auto-assign smart entrance animations!
-    elements.forEach((el, idx) => {
-      if (!el.animation || el.animation === 'none') {
-        const isBgCard = (Number(el.w) >= 65 && Number(el.h) >= 65) || (Number(el.w) >= 80 && (Number(el.y) || 0) <= 15);
-        if (isBgCard) {
-          el.animation = 'zoom';
-          el.animationDuration = 0.6;
-        } else if ((Number(el.y) || 0) < 30 && el.type === 'text') {
-          el.animation = 'slideDown';
-          el.animationDuration = 0.6;
-        } else if (el.type === 'shape') {
-          el.animation = 'slideUp';
-          el.animationDuration = 0.6;
-        } else if (el.type === 'text' && (Number(el.size) <= 16 || (Number(el.y) || 0) > 65)) {
-          el.animation = 'fade';
-          el.animationDuration = 0.5;
-        } else {
-          el.animation = 'slideUp';
-          el.animationDuration = 0.6;
-        }
+    // Follow the same sequence metadata as the HTML player. Unanimated items
+    // stay visible from the start; only authored animations are scheduled.
+    const groups = [];
+    for (const el of sorted) {
+      const startMode = el.animationStart || 'click';
+      if (startMode === 'with' && groups.length) {
+        groups[groups.length - 1].push({ el, after: false });
+      } else if (startMode === 'after' && groups.length) {
+        groups[groups.length - 1].push({ el, after: true });
+      } else {
+        groups.push([{ el, after: false }]);
       }
+    }
+
+    let lastEnd = 0.25;
+    groups.forEach((group, groupIndex) => {
+      const groupStart = 0.25 + groupIndex * stepDelay;
+      let parallelEnd = groupStart;
+      let afterEnd = groupStart;
+      group.forEach(item => {
+        const duration = Math.max(0.1, Number(item.el.animationDuration) || 0.6);
+        const delay = Math.max(0, Number(item.el.animationDelay) || 0);
+        const start = item.after ? Math.max(parallelEnd, afterEnd) + delay : groupStart + delay;
+        schedule.set(item.el, { start, duration });
+        const end = start + duration;
+        if (item.after) afterEnd = end;
+        else parallelEnd = Math.max(parallelEnd, end);
+        lastEnd = Math.max(lastEnd, end);
+      });
     });
 
-    // 2. Sort elements into sequential entrance order:
-    // Large background container cards (w >= 70 && h >= 70) should enter first.
-    // Other elements sort by explicit animationOrder (if set) or top-to-bottom Y, left-to-right X.
-    const sorted = [...elements].sort((a, b) => {
-      const aIsContainer = (Number(a.w) >= 70 && Number(a.h) >= 70);
-      const bIsContainer = (Number(b.w) >= 70 && Number(b.h) >= 70);
-      if (aIsContainer && !bIsContainer) return -1;
-      if (!aIsContainer && bIsContainer) return 1;
-
-      if (a.animationOrder !== undefined && b.animationOrder !== undefined) {
-        return Number(a.animationOrder) - Number(b.animationOrder);
-      }
-      const dy = (Number(a.y) || 0) - (Number(b.y) || 0);
-      return Math.abs(dy) > 3 ? dy : (Number(a.x) || 0) - (Number(b.x) || 0);
-    });
-
-    const N = sorted.length;
-    const animDurPerEl = 0.6;
-
-    // 3. Stagger each element by exactly stepDelay (e.g. 2.0s)
-    // First element starts at t = 0.3s
-    sorted.forEach((el, k) => {
-      const start = 0.3 + k * stepDelay;
-      const duration = Math.min(0.8, Math.max(0.4, Number(el.animationDuration) || animDurPerEl));
-      schedule.set(el, { start, duration });
-    });
-
-    // 4. Effective slide duration:
-    // Last element starts at 0.3 + (N - 1) * stepDelay, runs for duration,
-    // and then the entire slide holds for holdDur (e.g. 2.0s) before advancing!
-    const lastAnimEnd = 0.3 + (N - 1) * stepDelay + animDurPerEl;
-    const effectiveDur = lastAnimEnd + Math.max(1.5, holdDur);
-
-    return { schedule, effectiveDur };
+    return { schedule, effectiveDur: lastEnd + Math.max(1, holdDur) };
   }
 
   // ── Record Slides Loop with 30 FPS Animation & Audio Track ────────────────
@@ -938,6 +915,8 @@
               ctx.drawImage(prevSlideCanvas, p * W, 0);
             } else if (trans === 'slideUp') {
               ctx.drawImage(prevSlideCanvas, 0, -p * H);
+            } else if (trans === 'slideDown') {
+              ctx.drawImage(prevSlideCanvas, 0, p * H);
             } else if (trans === 'zoom') {
               ctx.globalAlpha = 1 - p;
               const sc = 1 + 0.15 * p;
@@ -962,6 +941,32 @@
               ctx.globalAlpha = 1 - p;
               ctx.translate(W / 2, H / 2);
               ctx.scale(scX, 1);
+              ctx.translate(-W / 2, -H / 2);
+              ctx.drawImage(prevSlideCanvas, 0, 0);
+            } else if (trans === 'flipX') {
+              const scY = Math.max(0.01, 1 - p);
+              ctx.globalAlpha = 1 - p;
+              ctx.translate(W / 2, H / 2);
+              ctx.scale(1, scY);
+              ctx.translate(-W / 2, -H / 2);
+              ctx.drawImage(prevSlideCanvas, 0, 0);
+            } else if (trans === 'blur') {
+              ctx.filter = `blur(${(1 - p) * 14}px)`;
+              ctx.globalAlpha = 1 - p;
+              ctx.drawImage(prevSlideCanvas, 0, 0);
+              ctx.filter = 'none';
+            } else if (trans === 'circleWipe') {
+              ctx.beginPath();
+              ctx.rect(0, 0, W, H);
+              ctx.arc(W / 2, H / 2, p * W * 0.75, 0, Math.PI * 2, true);
+              ctx.clip('evenodd');
+              ctx.drawImage(prevSlideCanvas, 0, 0);
+            } else if (trans === 'rotate') {
+              ctx.globalAlpha = 1 - p;
+              ctx.translate(W / 2, H / 2);
+              ctx.rotate(-0.12 * (1 - p));
+              const sc = 0.92 + 0.08 * p;
+              ctx.scale(sc, sc);
               ctx.translate(-W / 2, -H / 2);
               ctx.drawImage(prevSlideCanvas, 0, 0);
             }
@@ -1127,6 +1132,20 @@
       if (cur) lines.push(cur);
     }
     return lines;
+  }
+
+  function fitCanvasText(ctx, text, maxW, maxH, baseSize, lineSpacing, makeFont) {
+    let size = Math.max(8, Number(baseSize) || 18);
+    let lines = [];
+    while (size >= 8) {
+      ctx.font = makeFont(size);
+      lines = wrapCanvasText(ctx, text, maxW);
+      const fitsWidth = lines.every(line => ctx.measureText(line).width <= maxW);
+      const fitsHeight = lines.length * size * lineSpacing <= maxH;
+      if (fitsWidth && fitsHeight) break;
+      size -= 1;
+    }
+    return { size: Math.max(8, size), lines };
   }
 
   async function renderSlideToCanvas(ctx, slide, W, H, t = 0) {
@@ -1355,19 +1374,21 @@
 
       // Draw Shape Text (with automatic word wrap, lineSpacing and padding support)
       if (el.text) {
-        const fontSize = Math.round((Number(el.textSize || el.size) || 18) * (H / 540));
+        const baseFontSize = Math.round((Number(el.textSize || el.size) || 18) * (H / 540));
         const fontWeight = el.textWeight || el.weight || '700';
         const fontFamily = el.fontFamily || 'Arial, "Noto Sans Bengali", sans-serif';
         const fontStyle = el.fontStyle || 'normal';
-        ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
         ctx.fillStyle = el.textColor || el.color || '#ffffff';
         ctx.textAlign = el.textAlign === 'left' ? 'left' : el.textAlign === 'right' ? 'right' : 'center';
         ctx.textBaseline = 'middle';
 
         const pad = (el.padding ?? 8) * (H / 540);
         const maxW = Math.max(10, w - pad * 2);
-        const lines = wrapCanvasText(ctx, el.text, maxW);
         const lineSpacing = Number(el.lineSpacing) || 1.25;
+        const fitted = fitCanvasText(ctx, el.text, maxW, Math.max(10, h - pad * 2), baseFontSize, lineSpacing,
+          size => `${fontStyle} ${fontWeight} ${size}px ${fontFamily}`);
+        const fontSize = fitted.size;
+        const lines = fitted.lines;
         const lineH = fontSize * lineSpacing;
         const totalTextH = lines.length * lineH;
         let startY = y + (h - totalTextH) / 2 + lineH / 2;
@@ -1396,7 +1417,7 @@
         }
 
         lines.forEach((line, i) => {
-          ctx.fillText(line, textX, startY + i * lineH);
+          ctx.fillText(line, textX, startY + i * lineH, maxW);
         });
       }
     } else if (el.type === 'text') {
@@ -1414,22 +1435,27 @@
       }
 
       if (el.text) {
-        const fontSize = Math.round((Number(el.size) || 18) * (H / 540));
+        const baseFontSize = Math.round((Number(el.size) || 18) * (H / 540));
         const fontWeight = el.weight || el.textWeight || '700';
         const fontFamily = el.fontFamily || 'Arial, "Noto Sans Bengali", sans-serif';
         const fontStyle = el.fontStyle || 'normal';
-        ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
         ctx.fillStyle = el.color || el.textColor || '#ffffff';
         ctx.textAlign = el.textAlign === 'left' ? 'left' : el.textAlign === 'right' ? 'right' : 'center';
         ctx.textBaseline = 'middle';
 
         const safeTopY = Math.max(2.5 * (H / 540), y);
         const maxW = Math.max(10, w - 8);
-        const lines = wrapCanvasText(ctx, el.text, maxW);
         const lineSpacing = Number(el.lineSpacing) || 1.25;
+        const padY = (el.padding !== undefined ? Number(el.padding) : 4) * (H / 540);
+        const fitHeight = (boxBg && boxBg !== 'transparent')
+          ? Math.max(10, h - padY * 2)
+          : Math.max(10, h - padY);
+        const fitted = fitCanvasText(ctx, el.text, maxW, fitHeight, baseFontSize, lineSpacing,
+          size => `${fontStyle} ${fontWeight} ${size}px ${fontFamily}`);
+        const fontSize = fitted.size;
+        const lines = fitted.lines;
         const lineH = fontSize * lineSpacing;
         const totalTextH = lines.length * lineH;
-        const padY = (el.padding !== undefined ? Number(el.padding) : 4) * (H / 540);
         // Only vertically center if there is a colored background box; otherwise align to top with padding (matches editor DOM)
         let startY = (boxBg && boxBg !== 'transparent')
           ? (safeTopY + (h - totalTextH) / 2 + lineH / 2)
@@ -1456,7 +1482,7 @@
         }
 
         lines.forEach((line, i) => {
-          ctx.fillText(line, textX, startY + i * lineH);
+          ctx.fillText(line, textX, startY + i * lineH, maxW);
         });
       }
     } else if (el.type === 'image' && el.src) {
