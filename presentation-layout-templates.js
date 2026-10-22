@@ -1379,56 +1379,62 @@
   ,
 
 
-    // ── GDS Hub: Rounded Boxes → Pentagon Center (Screenshot 1 Style) ──
+    // ★★ GDS Hub: Pentagon LEFT → Branches RIGHT ★★
     {
       id: 'gds-hub-pentagon',
-      name: 'GDS Hub - Arrow to Center (জিডিএস হাব টেমপ্লেট)',
+      name: 'GDS Hub - Center to Branch (জিডিএস হাব টেমপ্লেট)',
       category: 'Aviation / GDS',
-      desc: 'Sky-blue gradient background with 5 labeled rounded boxes on the left connected by bold arrows to a central pentagon hub. Edit labels freely.',
+      desc: 'Sky-blue gradient background. Pentagon GDS hub on LEFT, bold arrows pointing RIGHT to 5 labeled rounded boxes. Edit labels freely.',
       badge: '★ Aviation',
       bg: 'custom',
       bgColor: 'radial-gradient(ellipse at 30% 50%, #60b8e8 0%, #3a8fd1 40%, #1a5fa8 80%, #0d3b6e 100%)',
       elements: [
-        { id: crypto.randomUUID(), type: 'text', text: 'GDS সিস্টেম সমূহ', size: 32, color: '#ffffff', weight: '900', textAlign: 'left', x: 5, y: 3, w: 55, h: 10, animation: 'slideDown', animationDuration: 0.6, animationOrder: 1, animationStart: 'with' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'Galileo', textColor: '#ffffff', textSize: 26, textWeight: '900', textAlign: 'center', x: 4, y: 14, w: 38, h: 12, fill: '#3b82f6', stroke: '#ffffff', line: 3, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 2, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'Sabre', textColor: '#ffffff', textSize: 26, textWeight: '900', textAlign: 'center', x: 4, y: 29, w: 38, h: 12, fill: '#2563eb', stroke: '#ffffff', line: 3, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 3, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'Amadeus', textColor: '#ffffff', textSize: 26, textWeight: '900', textAlign: 'center', x: 4, y: 44, w: 38, h: 12, fill: '#1d4ed8', stroke: '#ffffff', line: 3, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 4, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'Worldspan', textColor: '#ffffff', textSize: 24, textWeight: '900', textAlign: 'center', x: 4, y: 59, w: 38, h: 12, fill: '#1e40af', stroke: '#ffffff', line: 3, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 5, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'Abacus', textColor: '#ffffff', textSize: 24, textWeight: '900', textAlign: 'center', x: 4, y: 74, w: 38, h: 12, fill: '#1e3a8a', stroke: '#ffffff', line: 3, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 6, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 43, y: 16, w: 13, h: 8, fill: '#1e3a8a', stroke: '#1e3a8a', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 7, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 43, y: 31, w: 13, h: 8, fill: '#1e3a8a', stroke: '#1e3a8a', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 7, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 43, y: 46, w: 13, h: 8, fill: '#1e3a8a', stroke: '#1e3a8a', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 7, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 43, y: 61, w: 13, h: 8, fill: '#1e3a8a', stroke: '#1e3a8a', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 7, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 43, y: 76, w: 13, h: 8, fill: '#1e3a8a', stroke: '#1e3a8a', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 7, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'pentagon', text: 'GDS', textColor: '#ffffff', textSize: 30, textWeight: '900', textAlign: 'center', x: 58, y: 20, w: 38, h: 60, fill: '#2563eb', stroke: '#ffffff', line: 4, opacity: 100, rotation: 0, animation: 'zoom', animationDuration: 0.7, animationOrder: 2, animationStart: 'after' }
+        { id: crypto.randomUUID(), type: 'text', text: 'GDS সিস্টেম সমূহ', size: 32, color: '#ffffff', weight: '900', textAlign: 'left', x: 5, y: 2, w: 90, h: 10, animation: 'slideDown', animationDuration: 0.6, animationOrder: 1, animationStart: 'with' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'pentagon', text: 'GDS', textColor: '#ffffff', textSize: 30, textWeight: '900', textAlign: 'center', x: 4, y: 18, w: 36, h: 62, fill: '#2563eb', stroke: '#ffffff', line: 4, opacity: 100, rotation: 0, animation: 'zoom', animationDuration: 0.7, animationOrder: 2, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 41, y: 20, w: 13, h: 8, fill: '#1e3a8a', stroke: '#1e3a8a', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 3, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 41, y: 31, w: 13, h: 8, fill: '#1e3a8a', stroke: '#1e3a8a', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 3, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 41, y: 42, w: 13, h: 8, fill: '#1e3a8a', stroke: '#1e3a8a', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 3, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 41, y: 53, w: 13, h: 8, fill: '#1e3a8a', stroke: '#1e3a8a', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 3, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 41, y: 64, w: 13, h: 8, fill: '#1e3a8a', stroke: '#1e3a8a', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 3, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'Galileo', textColor: '#ffffff', textSize: 24, textWeight: '900', textAlign: 'center', x: 55, y: 17, w: 40, h: 12, fill: '#f97316', stroke: '#fed7aa', line: 3, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 4, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'Sabre', textColor: '#ffffff', textSize: 24, textWeight: '900', textAlign: 'center', x: 55, y: 29, w: 40, h: 12, fill: '#10b981', stroke: '#6ee7b7', line: 3, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 5, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'Amadeus', textColor: '#1a1a2e', textSize: 24, textWeight: '900', textAlign: 'center', x: 55, y: 41, w: 40, h: 12, fill: '#facc15', stroke: '#fef08a', line: 3, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 6, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'Worldspan', textColor: '#ffffff', textSize: 22, textWeight: '900', textAlign: 'center', x: 55, y: 53, w: 40, h: 12, fill: '#8b5cf6', stroke: '#c4b5fd', line: 3, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 7, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: 'Abacus', textColor: '#fef08a', textSize: 22, textWeight: '900', textAlign: 'center', x: 55, y: 65, w: 40, h: 12, fill: '#dc2626', stroke: '#fca5a5', line: 3, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 8, animationStart: 'after' }
       ]
     },
 
-    // ── Online Travel Agency: Horizontal Arrows → Colored Oval Labels ──
+    // ★★ Online Travel Agency: Vertical Spine → Horizontal Branches → Arrows → Ovals ★★
     {
       id: 'travel-agency-arrows-ovals',
-      name: 'Travel Agency - Arrows & Ovals (ট্রাভেল এজেন্সি টেমপ্লেট)',
+      name: 'Travel Agency - Tree Branch Style (ট্রেভেল এজেন্সি টেমপ্লেট)',
       category: 'Aviation / GDS',
-      desc: 'Dark night-sky background with bold title, horizontal arrow bars on the left, and 5 colorful oval name labels on the right. Easily editable.',
+      desc: 'Dark night-sky background. Title at top-left. A vertical spine on the left with 5 horizontal branches going right, each ending with an arrowhead pointing to a colorful oval.',
       badge: '★ Agency',
       bg: 'custom',
       bgColor: 'radial-gradient(ellipse at 50% 40%, #0d2040 0%, #06132b 55%, #020c1e 100%)',
       elements: [
         { id: crypto.randomUUID(), type: 'shape', shape: 'circle', x: 2, y: 3, w: 1, h: 1.5, fill: '#ffffff', stroke: '#ffffff', line: 0.5, opacity: 70, rotation: 0 },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', x: 12, y: 7, w: 0.8, h: 1.2, fill: '#ffffff', stroke: '#ffffff', line: 0.5, opacity: 60, rotation: 0 },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', x: 22, y: 4, w: 0.6, h: 1, fill: '#ffffff', stroke: '#ffffff', line: 0.5, opacity: 50, rotation: 0 },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', x: 36, y: 6, w: 0.8, h: 1.2, fill: '#ffffff', stroke: '#ffffff', line: 0.5, opacity: 55, rotation: 0 },
-        { id: crypto.randomUUID(), type: 'text', text: 'Online Travel Agency', size: 36, color: '#ffffff', weight: '900', textAlign: 'left', x: 3, y: 2, w: 65, h: 12, animation: 'slideDown', animationDuration: 0.6, animationOrder: 1, animationStart: 'with' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 3, y: 16, w: 46, h: 11, fill: '#3b82f6', stroke: '#60a5fa', line: 1.5, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 2, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 3, y: 31, w: 46, h: 11, fill: '#3b82f6', stroke: '#60a5fa', line: 1.5, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 3, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 3, y: 46, w: 46, h: 11, fill: '#3b82f6', stroke: '#60a5fa', line: 1.5, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 4, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 3, y: 61, w: 46, h: 11, fill: '#3b82f6', stroke: '#60a5fa', line: 1.5, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 5, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 3, y: 76, w: 46, h: 11, fill: '#3b82f6', stroke: '#60a5fa', line: 1.5, opacity: 100, rotation: 0, animation: 'slideLeft', animationDuration: 0.5, animationOrder: 6, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'Go Zayan', textColor: '#7c1d1d', textSize: 22, textWeight: '900', textAlign: 'center', x: 52, y: 13, w: 44, h: 17, fill: '#facc15', stroke: '#fef08a', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 2, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'Amybd', textColor: '#fef9c3', textSize: 22, textWeight: '900', textAlign: 'center', x: 52, y: 28, w: 44, h: 17, fill: '#dc2626', stroke: '#fca5a5', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 3, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'Sharetrip', textColor: '#ffffff', textSize: 22, textWeight: '900', textAlign: 'center', x: 52, y: 43, w: 44, h: 17, fill: '#059669', stroke: '#6ee7b7', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 4, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'Flyhub', textColor: '#ffffff', textSize: 22, textWeight: '900', textAlign: 'center', x: 52, y: 58, w: 44, h: 17, fill: '#7c3aed', stroke: '#c4b5fd', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 5, animationStart: 'after' },
-        { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'TravelBD', textColor: '#ffffff', textSize: 22, textWeight: '900', textAlign: 'center', x: 52, y: 73, w: 44, h: 17, fill: '#ea580c', stroke: '#fed7aa', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 6, animationStart: 'after' }
+        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', x: 18, y: 7, w: 0.8, h: 1.2, fill: '#ffffff', stroke: '#ffffff', line: 0.5, opacity: 60, rotation: 0 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', x: 32, y: 4, w: 0.6, h: 1, fill: '#ffffff', stroke: '#ffffff', line: 0.5, opacity: 50, rotation: 0 },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'circle', x: 65, y: 5, w: 0.8, h: 1.2, fill: '#ffffff', stroke: '#ffffff', line: 0.5, opacity: 55, rotation: 0 },
+        { id: crypto.randomUUID(), type: 'text', text: 'Online Travel Agency', size: 38, color: '#ffffff', weight: '900', textAlign: 'left', x: 3, y: 2, w: 75, h: 12, animation: 'slideDown', animationDuration: 0.6, animationOrder: 1, animationStart: 'with' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'rect', x: 6, y: 16, w: 3, h: 74, fill: '#3b82f6', stroke: '#60a5fa', line: 0, opacity: 100, rotation: 0, animation: 'slideDown', animationDuration: 0.5, animationOrder: 2, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'rect', x: 9, y: 18, w: 32, h: 4, fill: '#3b82f6', stroke: '#60a5fa', line: 0, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.4, animationOrder: 3, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'rect', x: 9, y: 32, w: 32, h: 4, fill: '#3b82f6', stroke: '#60a5fa', line: 0, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.4, animationOrder: 4, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'rect', x: 9, y: 46, w: 32, h: 4, fill: '#3b82f6', stroke: '#60a5fa', line: 0, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.4, animationOrder: 5, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'rect', x: 9, y: 60, w: 32, h: 4, fill: '#3b82f6', stroke: '#60a5fa', line: 0, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.4, animationOrder: 6, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'rect', x: 9, y: 74, w: 32, h: 4, fill: '#3b82f6', stroke: '#60a5fa', line: 0, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.4, animationOrder: 7, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 38, y: 15, w: 11, h: 9, fill: '#60a5fa', stroke: '#60a5fa', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 8, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 38, y: 29, w: 11, h: 9, fill: '#60a5fa', stroke: '#60a5fa', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 8, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 38, y: 43, w: 11, h: 9, fill: '#60a5fa', stroke: '#60a5fa', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 8, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 38, y: 57, w: 11, h: 9, fill: '#60a5fa', stroke: '#60a5fa', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 8, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'arrowRight', x: 38, y: 71, w: 11, h: 9, fill: '#60a5fa', stroke: '#60a5fa', line: 1, opacity: 100, rotation: 0, animation: 'fade', animationDuration: 0.3, animationOrder: 8, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'Go Zayan', textColor: '#7c1d1d', textSize: 22, textWeight: '900', textAlign: 'center', x: 50, y: 12, w: 46, h: 17, fill: '#facc15', stroke: '#fef08a', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 9, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'Amybd', textColor: '#fef9c3', textSize: 22, textWeight: '900', textAlign: 'center', x: 50, y: 26, w: 46, h: 17, fill: '#dc2626', stroke: '#fca5a5', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 10, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'Sharetrip', textColor: '#ffffff', textSize: 22, textWeight: '900', textAlign: 'center', x: 50, y: 40, w: 46, h: 17, fill: '#059669', stroke: '#6ee7b7', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 11, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'Flyhub', textColor: '#ffffff', textSize: 22, textWeight: '900', textAlign: 'center', x: 50, y: 54, w: 46, h: 17, fill: '#7c3aed', stroke: '#c4b5fd', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 12, animationStart: 'after' },
+        { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'TravelBD', textColor: '#ffffff', textSize: 22, textWeight: '900', textAlign: 'center', x: 50, y: 68, w: 46, h: 17, fill: '#ea580c', stroke: '#fed7aa', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 13, animationStart: 'after' }
       ]
     }
   ];
