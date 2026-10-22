@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   const $ = id => document.getElementById(id);
 
   // High quality SVG icons as default badge images
@@ -1376,7 +1376,7 @@
         { id: crypto.randomUUID(), type: 'shape', shape: 'round', text: '🔒 মানসম্মত পণ্য ও নির্ভরযোগ্য সেবার প্রতিশ্রুতি সহ আমরা আছি আপনার পাশে। যোগাযোগ করুন: 01XXXXXXXXX', textColor: '#e2e8f0', textSize: 15, textWeight: '700', textAlign: 'center', x: 12, y: 68, w: 76, h: 14, fill: '#1e293b', stroke: '#475569', line: 1.5, opacity: 100 }
       ]
     }
-  ];
+  ,
 
 
     // ── GDS Hub: Rounded Boxes → Pentagon Center (Screenshot 1 Style) ──
@@ -1431,6 +1431,7 @@
         { id: crypto.randomUUID(), type: 'shape', shape: 'oval', text: 'TravelBD', textColor: '#ffffff', textSize: 22, textWeight: '900', textAlign: 'center', x: 52, y: 73, w: 44, h: 17, fill: '#ea580c', stroke: '#fed7aa', line: 2.5, opacity: 100, rotation: 0, animation: 'slideRight', animationDuration: 0.5, animationOrder: 6, animationStart: 'after' }
       ]
     }
+  ];
   const standardLayouts = [
     ['title', 'Title Slide', 'Hero banner with main title and subtitle'],
     ['content', 'Title + Content', 'Header with bulleted content area'],
@@ -1854,24 +1855,36 @@
   const customGrid = $('customTemplatesGrid');
   if (customGrid) {
     customGrid.innerHTML = '';
-    customTemplates.forEach(item => {
+    customTemplates.forEach(function(item) {
       const card = document.createElement('div');
       card.className = 'template-card-custom';
-      card.innerHTML = `
-        <div class="template-preview-box">
-          ${renderTemplateSvgPreview(item)}
-        </div>
-        <div style="flex:1">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-            <span class="template-badge">${item.badge}</span>
-            <span style="font-size:10px;color:#94a3b8;font-weight:700">${item.category || 'Infographic'}</span>
-          </div>
-          <div class="template-title">${item.name}</div>
-          <div class="template-desc">${item.desc}</div>
-        </div>
-        <button style="margin-top:10px;background:#2563eb;border:1px solid #60a5fa;color:#fff;border-radius:6px;padding:7px;width:100%;font-size:11px;font-weight:700;cursor:pointer">Use Template →</button>
-      `;
-      card.onclick = () => applyCustomTemplate(item);
+      card.innerHTML =
+        '<div class="template-preview-box">' + renderTemplateSvgPreview(item) + '</div>' +
+        '<div style="flex:1;margin-top:6px;">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">' +
+            '<span class="template-badge">' + (item.badge || '') + '</span>' +
+            '<span style="font-size:10px;color:#94a3b8;font-weight:700">' + (item.category || '') + '</span>' +
+          '</div>' +
+          '<div class="template-title">' + (item.name || '') + '</div>' +
+          '<div class="template-desc">' + (item.desc || '') + '</div>' +
+        '</div>' +
+        '<button class="tmpl-apply-btn" style="margin-top:10px;background:#2563eb;' +
+          'border:1px solid #60a5fa;color:#fff;border-radius:6px;padding:8px;' +
+          'width:100%;font-size:12px;font-weight:700;cursor:pointer;">' +
+          'Use Template →</button>';
+
+      // Card click or button click: confirm then apply
+      function tryApply(e) {
+        if (e && e.stopPropagation) e.stopPropagation();
+        var ok = window.confirm('Apply template: "' + (item.name || 'Template') + '"?\n\nThis will replace the current slide content.');
+        if (ok) applyCustomTemplate(item);
+      }
+
+      card.querySelector('.tmpl-apply-btn').onclick = tryApply;
+      card.onclick = function() {
+        var ok = window.confirm('Apply template: "' + (item.name || 'Template') + '"?\n\nThis will replace the current slide content.');
+        if (ok) applyCustomTemplate(item);
+      };
       customGrid.appendChild(card);
     });
   }

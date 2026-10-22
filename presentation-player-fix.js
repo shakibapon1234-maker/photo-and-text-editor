@@ -26,7 +26,22 @@
       {
         key: 'slide',
         title: 'Slide ▾',
-        ids: ['newSlide', 'duplicateSlide', 'deleteSlide', 'templateBtn']
+        ids: ['newSlide', 'duplicateSlide', 'deleteSlide', 'templateBtn'],
+        afterMove: {
+          'templateBtn': function(btn) {
+            // Always force templateBtn to open the layout gallery
+            btn.onclick = function(e) {
+              e.stopPropagation();
+              // Close any open dropdown first
+              document.querySelectorAll('#toolbarGroups .toolbar-group.open').forEach(function(g) { g.classList.remove('open'); });
+              var gallery = document.getElementById('layoutGallery');
+              if (gallery) {
+                gallery.classList.remove('hidden');
+                gallery.scrollTop = 0;
+              }
+            };
+          }
+        }
       },
       {
         key: 'insert',
@@ -158,6 +173,10 @@
         if (control && control.parentElement !== menu) {
           control.style.margin = '0';
           menu.appendChild(control);
+          // Run afterMove hook if defined for this button id
+          if (tab.afterMove && tab.afterMove[id] && typeof tab.afterMove[id] === 'function') {
+            tab.afterMove[id](control);
+          }
         }
       });
     });
