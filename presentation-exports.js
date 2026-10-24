@@ -318,6 +318,8 @@
       const stNameEl = document.getElementById('soundtrackName');
       const hasTrackHint = stNameEl && stNameEl.textContent && !stNameEl.textContent.includes('No soundtrack selected');
       if (hasTrackHint) {
+        alert('A soundtrack is selected, but its audio data could not be read. Please upload the music again, then download the slideshow.');
+        return;
         const proceed = confirm(
           '⚠️ সাউন্ডট্র্যাক অডিও ফাইলটি ব্রাউজার মেমোরিতে পাওয়া যায়নি!\n\n' +
           'সাউন্ড এবং ভলিউম কন্ট্রোলসহ স্লাইডশো পাওয়ার জন্য:\n' +
@@ -454,9 +456,74 @@
       }
     } catch (_) {}
 
+    // If autoplay is blocked, give the viewer an obvious user-gesture action
+    // to start the embedded soundtrack (local HTML files commonly need this).
+    const soundtrackRecoveryScript = hasAudio ? `
+  <script id="soundtrackRecoveryUi">
+    (function() {
+      let attempts = 0;
+      function attachSoundtrackRecovery() {
+        const audio = window._presentationAudio;
+        if (!audio) { if (++attempts < 100) setTimeout(attachSoundtrackRecovery, 100); return; }
+        if (document.getElementById('soundtrackRecoveryButton')) return;
+        const button = document.createElement('button');
+        button.id = 'soundtrackRecoveryButton';
+        button.type = 'button';
+        button.textContent = '🔊 Click to start background music';
+        button.style.cssText = 'position:fixed;z-index:2147483000;left:50%;bottom:76px;transform:translateX(-50%);padding:12px 20px;border:1px solid #f9a8d4;border-radius:999px;background:#9d174d;color:#fff;font:700 14px Arial,sans-serif;box-shadow:0 8px 28px #0009;cursor:pointer;display:none;';
+        document.body.appendChild(button);
+        const show = () => { if (audio.paused) button.style.display = 'block'; };
+        const hide = () => { button.style.display = 'none'; };
+        button.addEventListener('click', () => {
+          button.textContent = 'Starting background music…';
+          audio.play().then(hide).catch(err => {
+            console.error('[Soundtrack] Playback failed:', err);
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass || window._presentationSoundtrackFallback) {
+              button.textContent = 'Audio format not supported — convert to MP3 or WAV';
+              button.style.display = 'block';
+              return;
+            }
+            const context = new AudioContextClass();
+            context.resume().then(() => fetch(audio.src))
+              .then(response => response.arrayBuffer())
+              .then(bytes => context.decodeAudioData(bytes))
+              .then(buffer => {
+                const source = context.createBufferSource();
+                const gain = context.createGain();
+                source.buffer = buffer;
+                source.loop = audio.loop;
+                gain.gain.value = audio.volume;
+                source.connect(gain);
+                gain.connect(context.destination);
+                source.start();
+                window._presentationSoundtrackFallback = { context, source, gain };
+                audio.addEventListener('volumechange', () => { gain.gain.value = audio.volume; });
+                document.getElementById('soundtrackVolumeSlider')?.addEventListener('input', event => {
+                  gain.gain.value = Math.max(0, Math.min(100, Number(event.target.value) || 0)) / 100;
+                });
+                hide();
+              })
+              .catch(decodeErr => {
+                console.error('[Soundtrack] Audio decoding failed:', decodeErr);
+                button.textContent = 'Unsupported audio format — use MP3 or WAV';
+                button.style.display = 'block';
+                try { context.close(); } catch (_) {}
+              });
+          });
+        });
+        audio.addEventListener('playing', hide);
+        audio.addEventListener('pause', () => setTimeout(show, 150));
+        setTimeout(show, 700);
+      }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', attachSoundtrackRecovery);
+      else attachSoundtrackRecovery();
+    })();
+  <\/script>` : '';
+
     // Inject audio init script just before </body>
     if (audioEmbedScript) {
-      finalHtml = finalHtml.replace('</body>', () => audioEmbedScript + '\n</body>');
+      finalHtml = finalHtml.replace('</body>', () => audioEmbedScript + '\n' + soundtrackRecoveryScript + '\n</body>');
       console.log('✅ Presentation soundtrack successfully embedded with interactive volume controls.');
     } else {
       console.log('ℹ️ Exporting standalone slideshow without soundtrack.');

@@ -17,7 +17,15 @@
       case 'mp3': return 'audio/mpeg';
       case 'wav': return 'audio/wav';
       case 'ogg': return 'audio/ogg';
+      case 'oga': return 'audio/ogg';
+      case 'opus': return 'audio/ogg';
       case 'flac': return 'audio/flac';
+      case 'weba': return 'audio/webm';
+      case 'aif':
+      case 'aiff': return 'audio/aiff';
+      case 'wma': return 'audio/x-ms-wma';
+      case 'amr': return 'audio/amr';
+      case '3gp': return 'audio/3gpp';
       default: return 'audio/mp4';
     }
   }
@@ -229,6 +237,46 @@
   }
 
   window.getPresentationSoundtrack = getSoundtrackData;
+  window.hasPresentationSoundtrack = () => Boolean(musicMeta.hasAudio);
+
+  function getCachedSoundtrackData() {
+    if (!musicMeta.hasAudio || !window._activeSoundtrack?.blob) return null;
+    if (!cachedObjectUrl) cachedObjectUrl = URL.createObjectURL(window._activeSoundtrack.blob);
+    return {
+      blob: window._activeSoundtrack.blob,
+      src: cachedObjectUrl,
+      name: musicMeta.name,
+      volume: musicMeta.volume !== undefined ? musicMeta.volume : 60,
+      loop: musicMeta.loop !== false,
+      mimeType: musicMeta.mimeType || window._activeSoundtrack.mime || 'audio/mp4'
+    };
+  }
+
+  // Restore soundtrack data embedded in an exported slideshow when that HTML
+  // file is imported back into the editor.
+  window.importPresentationSoundtrack = async function(dataUrl, volume, loop, name) {
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:audio/')) return false;
+    const response = await fetch(dataUrl);
+    const sourceBlob = await response.blob();
+    if (!sourceBlob.size) return false;
+    const mime = sourceBlob.type || getCorrectAudioMime(name, '');
+    const blob = new Blob([await sourceBlob.arrayBuffer()], { type: mime });
+    const arrayBuffer = await blob.arrayBuffer();
+    musicMeta = {
+      name: name || 'presentation-music',
+      mimeType: mime,
+      volume: Number.isFinite(Number(volume)) ? Number(volume) : 60,
+      loop: loop !== false,
+      hasAudio: true
+    };
+    window._activeSoundtrack = { blob, buffer: arrayBuffer, mime, name: musicMeta.name, volume: musicMeta.volume, loop: musicMeta.loop };
+    if (cachedObjectUrl) URL.revokeObjectURL(cachedObjectUrl);
+    cachedObjectUrl = null;
+    await saveAudioBlobToIDB(blob, musicMeta, arrayBuffer);
+    saveMeta();
+    syncUI();
+    return true;
+  };
 
   window.stopPresentationSoundtrack = function() {
     if (activeAudio) {
@@ -255,23 +303,42 @@
   window.playPresentationSoundtrack = async function() {
     window.stopPresentationSoundtrack();
 
-    const data = await getSoundtrackData();
-    if (!data || !data.src) return null;
+    // Use the RAM-cached Blob first so audio.play() runs in the same user
+    // gesture as the Present click. Waiting for IndexedDB first can lose the
+    // browser's transient autoplay permission.
+    let data = getCachedSoundtrackData();
+    let playAttempt = null;
+    if (data) {
+      if (!activeAudio) activeAudio = new Audio();
+      activeAudio.src = data.src;
+      activeAudio.volume = data.volume / 100;
+      activeAudio.loop = data.loop;
+      try { playAttempt = activeAudio.play(); }
+      catch (playError) { playAttempt = Promise.reject(playError); }
+    } else {
+      data = await getSoundtrackData();
+    }
+    if (!data || !data.src) {
+      if (typeof window.showPresentationToast === 'function') {
+        window.showPresentationToast('No background music is loaded. Open Soundtrack and choose an audio file.');
+      }
+      return null;
+    }
 
     const volRatio = (data.volume !== undefined ? data.volume : 60) / 100;
     const shouldLoop = data.loop !== false;
 
     // 1. Try HTML5 Audio with proper Blob Object URL
-    if (!activeAudio) {
-      activeAudio = new Audio();
+    if (!activeAudio) activeAudio = new Audio();
+    if (!playAttempt) {
+      activeAudio.src = data.src;
+      activeAudio.volume = volRatio;
+      activeAudio.loop = shouldLoop;
     }
-    activeAudio.src = data.src;
-    activeAudio.volume = volRatio;
-    activeAudio.loop = shouldLoop;
 
     let success = false;
     try {
-      await activeAudio.play();
+      await (playAttempt || activeAudio.play());
       success = true;
     } catch (err) {
       console.warn('HTML5 Audio play failed, attempting Web Audio API decoding:', err);
@@ -354,7 +421,7 @@
 
       <label class="file-label" style="display:block;text-align:center;margin-top:8px;padding:10px;background:#1e293b;border:1px dashed #f9a8d4;border-radius:8px;cursor:pointer;">
         📁 Upload MP3 / WAV / M4A
-        <input id="soundtrackInput" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.mp4" style="display:none;">
+        <input id="soundtrackInput" type="file" style="display:none;">
       </label>
 
       <div style="margin-top:12px;">

@@ -110,13 +110,26 @@
       const isHtml = file.name.toLowerCase().endsWith('.html');
       const rd = new FileReader();
 
-      rd.onload = function() {
+      rd.onload = async function() {
         const text = rd.result;
         let loadedSlides = null;
+        let embeddedSoundtrack = null;
+        let soundtrackRestored = null;
 
         try {
           if (isHtml) {
             loadedSlides = extractSlidesFromHtml(text);
+            const audioMatch = text.match(/initSoundtrackEngine\(("data:audio\/[^\"]+"),\s*([^,]+),\s*(true|false),\s*("(?:\\.|[^\"])*")\)/);
+            if (audioMatch) {
+              try {
+                embeddedSoundtrack = {
+                  dataUrl: JSON.parse(audioMatch[1]),
+                  volume: Number(audioMatch[2]),
+                  loop: audioMatch[3] === 'true',
+                  name: JSON.parse(audioMatch[4])
+                };
+              } catch (_) {}
+            }
             if (!loadedSlides) {
               alert('❌ এই HTML ফাইলে কোনো Presentation ডেটা পাওয়া যায়নি!\n\nশুধুমাত্র এই অ্যাপের "Download Slideshow (.html)" দিয়ে তৈরি ফাইল লোড করা যাবে।');
               input.value = '';
@@ -169,8 +182,28 @@
           });
 
           if (typeof window.presentationSaveNow === 'function') window.presentationSaveNow();
+          if (embeddedSoundtrack && typeof window.importPresentationSoundtrack === 'function') {
+            try {
+              soundtrackRestored = await window.importPresentationSoundtrack(
+                embeddedSoundtrack.dataUrl,
+                embeddedSoundtrack.volume,
+                embeddedSoundtrack.loop,
+                embeddedSoundtrack.name
+              );
+            } catch (audioErr) {
+              console.warn('[HTML Import Patch] Embedded soundtrack could not be restored:', audioErr);
+              if (typeof window.showPresentationToast === 'function') {
+                window.showPresentationToast('Slides loaded, but embedded soundtrack could not be restored.');
+              }
+            }
+          }
           if (typeof window.showPresentationToast === 'function') {
-            window.showPresentationToast('✅ ' + loadedSlides.length + 'টি স্লাইড সফলভাবে লোড হয়েছে!');
+            const audioStatus = soundtrackRestored === true
+              ? ' Background music restored.'
+              : soundtrackRestored === false
+                ? ' Background music could not be restored.'
+                : '';
+            window.showPresentationToast('✅ ' + loadedSlides.length + 'টি স্লাইড সফলভাবে লোড হয়েছে!' + audioStatus);
           } else {
             alert('✅ ' + loadedSlides.length + 'টি স্লাইড সফলভাবে লোড হয়েছে!\n\n"Save Project (JSON)" দিয়ে JSON ফাইলে সেভ করুন।');
           }

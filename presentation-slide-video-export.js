@@ -773,6 +773,9 @@
             audioTrack = aTracks[0];
           }
         }
+        if (!snd && window.hasPresentationSoundtrack?.()) {
+          throw new Error('A soundtrack is marked as selected, but its audio data is unavailable. Re-upload the audio file before exporting.');
+        }
       }
     } catch (aErr) {
       console.warn('Audio soundtrack attach skipped:', aErr);
@@ -780,6 +783,9 @@
       if (audioContext) {
         try { audioContext.close(); } catch (_) {}
         audioContext = null;
+      }
+      if (window.hasPresentationSoundtrack?.()) {
+        throw new Error(aErr.message || 'The selected background soundtrack could not be attached to the exported video.');
       }
     }
 
@@ -840,7 +846,23 @@
 
     if (soundtrackAudio) {
       soundtrackAudio.currentTime = 0;
-      soundtrackAudio.play().catch(() => {});
+      try {
+        await soundtrackAudio.play();
+      } catch (playErr) {
+        console.error('Could not start presentation soundtrack for video export:', playErr);
+        try { recorder.stop(); } catch (_) {}
+        combinedTracks.forEach(track => { try { track.stop(); } catch (_) {} });
+        canvas.remove();
+        if (audioContext && audioContext.state !== 'closed') { try { await audioContext.close(); } catch (_) {} }
+        throw new Error('Background music could not start for video export. Please try the export again, then allow audio playback.');
+      }
+      if (!audioTrack || !audioTrack.enabled) {
+        try { recorder.stop(); } catch (_) {}
+        combinedTracks.forEach(track => { try { track.stop(); } catch (_) {} });
+        canvas.remove();
+        if (audioContext && audioContext.state !== 'closed') { try { await audioContext.close(); } catch (_) {} }
+        throw new Error('Background music was selected but could not be attached to the video audio track.');
+      }
     }
 
     const total = allSlides.length;

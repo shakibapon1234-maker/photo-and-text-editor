@@ -1294,7 +1294,7 @@
             const txtColor = el.textColor || el.color || '#ffffff';
             const txtSize = Number(el.textSize || el.size || 18);
             const txtWeight = el.textWeight || el.weight || '700';
-            label.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:' + (el.textAlign === 'left' ? 'flex-start' : el.textAlign === 'right' ? 'flex-end' : 'center') + ';text-align:' + (el.textAlign || 'center') + ';color:' + txtColor + ';font-size:' + txtSize + 'px;font-weight:' + txtWeight + ';font-family:' + (el.fontFamily || 'Inter, Arial, sans-serif') + ';line-height:1.25;word-break:break-word;overflow-wrap:break-word;white-space:pre-wrap;padding:8px 12px;box-sizing:border-box;z-index:2;';
+            label.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:' + (el.textAlign === 'left' ? 'flex-start' : el.textAlign === 'right' ? 'flex-end' : 'center') + ';text-align:' + (el.textAlign || 'center') + ';color:' + txtColor + ';font-size:' + txtSize + 'px;font-weight:' + txtWeight + ';font-style:' + (el.fontStyle || 'normal') + ';text-decoration:' + (el.textDecoration || 'none') + ';font-family:' + (el.fontFamily || 'Inter, Arial, sans-serif') + ';line-height:1.25;word-break:break-word;overflow-wrap:break-word;white-space:pre-wrap;padding:8px 12px;box-sizing:border-box;z-index:2;';
             label.textContent = el.text;
             node.appendChild(label);
           }
@@ -1342,7 +1342,7 @@
           const pad = (el.padding !== undefined ? el.padding : 4) + 'px';
 
           const safeY = (typeof el.y === 'number' && el.y < 2.5) ? 2.5 : el.y;
-          let css = 'position:absolute;left:' + el.x + '%;top:' + safeY + '%;width:' + el.w + '%;height:' + el.h + '%;font-size:' + txtSize + 'px;font-weight:' + fontW + ';font-family:' + (el.fontFamily || 'Inter, Arial, sans-serif') + ';text-align:' + textAlign + ';line-height:' + (el.lineSpacing || 1.2) + ';padding:' + pad + ';transform:rotate(' + rot + 'deg);transform-origin:center center;white-space:pre-wrap;word-break:break-word;box-sizing:border-box;display:flex;align-items:' + (el.boxBg && el.boxBg !== 'transparent' ? 'center' : 'flex-start') + ';justify-content:' + (textAlign === 'left' ? 'flex-start' : textAlign === 'right' ? 'flex-end' : 'center') + ';';
+          let css = 'position:absolute;left:' + el.x + '%;top:' + safeY + '%;width:' + el.w + '%;height:' + el.h + '%;font-size:' + txtSize + 'px;font-weight:' + fontW + ';font-style:' + (el.fontStyle || 'normal') + ';text-decoration:' + (el.textDecoration || 'none') + ';font-family:' + (el.fontFamily || 'Inter, Arial, sans-serif') + ';text-align:' + textAlign + ';line-height:' + (el.lineSpacing || 1.2) + ';padding:' + pad + ';transform:rotate(' + rot + 'deg);transform-origin:center center;white-space:pre-wrap;word-break:break-word;box-sizing:border-box;display:flex;align-items:' + (el.boxBg && el.boxBg !== 'transparent' ? 'center' : 'flex-start') + ';justify-content:' + (textAlign === 'left' ? 'flex-start' : textAlign === 'right' ? 'flex-end' : 'center') + ';';
 
           const boxBgColor = el.boxBg || el.backgroundColor || el.bgColor || (el.background && el.background.startsWith('#') ? el.background : null);
           let boxOp = 1;

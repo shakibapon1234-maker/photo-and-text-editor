@@ -2564,6 +2564,9 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
           presentationAudio.play().catch(() => {});
         }
       }
+      if (window._presentationSoundtrackFallback?.gain) {
+        window._presentationSoundtrackFallback.gain.gain.value = isSoundtrackMuted ? 0 : soundtrackVolume;
+      }
       updateSoundtrackUi();
     }
 
@@ -2583,6 +2586,9 @@ window.renderOfflineQrCode=function(canvas,text){if(!canvas||!text)return;try{va
         // MUTE
         isSoundtrackMuted = true;
         presentationAudio.volume = 0;
+      }
+      if (window._presentationSoundtrackFallback?.gain) {
+        window._presentationSoundtrackFallback.gain.gain.value = isSoundtrackMuted ? 0 : soundtrackVolume;
       }
       updateSoundtrackUi();
     }
