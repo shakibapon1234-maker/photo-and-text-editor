@@ -56,7 +56,7 @@
       {
         key: 'export',
         title: 'Export ▾',
-        ids: ['videoConverterBtn', 'saveProject', 'loadProject', 'downloadSlideshow', 'exportVideo', 'restoreVaultBtn', 'projectInput']
+        ids: ['videoConverterBtn', 'saveProject', 'loadProject', 'downloadSlideshow', 'exportVideo', 'exportPresentationPdf', 'restoreVaultBtn', 'projectInput']
       },
       {
         key: 'present',
@@ -147,6 +147,20 @@
           if (id === 'soundtrack' || id === 'soundtrackBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Soundtrack'));
           if (id === 'restoreVaultBtn') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('রিস্টোর') || b.id === 'restoreVaultBtn');
           if (id === 'downloadSlideshow') control = Array.from(top.querySelectorAll('button')).find(b => b.textContent.includes('Download') || b.textContent.includes('Slideshow'));
+          if (id === 'exportPresentationPdf') {
+            control = document.getElementById('exportPresentationPdf');
+            if (!control) {
+              control = document.createElement('button');
+              control.id = 'exportPresentationPdf';
+              control.type = 'button';
+              control.textContent = '▤ Export as PDF';
+              control.title = 'Print the presentation or save it as a PDF';
+              control.onclick = () => {
+                if (typeof window.exportPresentationPdf === 'function') window.exportPresentationPdf();
+                else window.showPresentationToast?.('PDF export is still loading. Please try again.');
+              };
+            }
+          }
           if (id === 'exportVideo') {
             control = document.getElementById('exportVideo');
             if (!control) {

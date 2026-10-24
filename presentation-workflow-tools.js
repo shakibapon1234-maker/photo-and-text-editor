@@ -119,7 +119,9 @@
   sorterButton.id = 'workflowSorterButton';
   sorterButton.textContent = '▦ Slide Sorter';
   sorterButton.title = 'Review and drag to reorder slides';
-  top.insertBefore(sorterButton, $('presentBtn') || null);
+  const presentAnchor = $('presentBtn');
+  if (presentAnchor?.parentElement === top) top.insertBefore(sorterButton, presentAnchor);
+  else top.appendChild(sorterButton);
   const sorter = document.createElement('div');
   sorter.id = 'slideSorterModal';
   sorter.className = 'hidden';
@@ -180,12 +182,64 @@
   // Browser/Electron print flow lets the user choose “Save as PDF” and keeps
   // one presentation slide per landscape page. Render clones are temporary;
   // the editor returns to the same slide and selection afterward.
-  const pdfButton = document.createElement('button');
+  const pdfButton = $('exportPresentationPdf') || document.createElement('button');
   pdfButton.id = 'exportPresentationPdf';
-  pdfButton.textContent = '▤ Print / Save as PDF';
-  pdfButton.title = 'Open the print dialog and choose Save as PDF';
-  top.insertBefore(pdfButton, $('loadProject') || null);
-  pdfButton.onclick = async () => {
+  pdfButton.textContent = '▤ Export as PDF';
+  pdfButton.title = 'Open the print dialog, then choose Save as PDF';
+  // The presentation toolbar is reorganized into dropdowns by
+  // presentation-player-fix.js. Put PDF beside the other export actions so it
+  // remains available from the Export tab instead of being left as a stray
+  // button in the original top bar.
+  const exportMenu = document.querySelector('#toolbarGroups .toolbar-menu[data-menu="export"]');
+  if (exportMenu) exportMenu.appendChild(pdfButton);
+  else {
+    const loadAnchor = $('loadProject');
+    if (loadAnchor?.parentElement === top) top.insertBefore(pdfButton, loadAnchor);
+    else top.appendChild(pdfButton);
+  }
+  if (!$('presentationPdfProgressStyles')) {
+    const progressStyles = document.createElement('style');
+    progressStyles.id = 'presentationPdfProgressStyles';
+    progressStyles.textContent = `
+      #presentationPdfProgress{position:fixed;inset:0;z-index:200000;display:grid;place-items:center;background:rgba(3,8,18,.72);backdrop-filter:blur(3px);font:14px Arial,sans-serif;color:#e7efff}
+      #presentationPdfProgress[hidden]{display:none}
+      #presentationPdfProgress .pdf-progress-card{width:min(440px,calc(100vw - 36px));padding:24px;border:1px solid #3b5278;border-radius:14px;background:#101a2c;box-shadow:0 20px 60px #000a}
+      #presentationPdfProgress strong{display:block;font-size:18px;color:#fff;margin-bottom:9px}
+      #presentationPdfProgress p{margin:0 0 17px;color:#b8c8e3;line-height:1.5}
+      #presentationPdfProgress .pdf-progress-track{height:12px;overflow:hidden;border-radius:99px;background:#263550}
+      #presentationPdfProgress .pdf-progress-fill{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,#1d72ed,#4dd7fa);transition:width .18s ease}
+      #presentationPdfProgress .pdf-progress-fill.indeterminate{width:38%;animation:pdfProgressSlide 1.15s ease-in-out infinite alternate}
+      @keyframes pdfProgressSlide{from{transform:translateX(0)}to{transform:translateX(165%)}}
+      #presentationPdfProgress .pdf-progress-hint{margin-top:11px;font-size:12px;color:#91a5c6}
+    `;
+    document.head.appendChild(progressStyles);
+  }
+  const progressOverlay = document.createElement('div');
+  progressOverlay.id = 'presentationPdfProgress';
+  progressOverlay.hidden = true;
+  progressOverlay.setAttribute('role', 'status');
+  progressOverlay.setAttribute('aria-live', 'polite');
+  progressOverlay.innerHTML = '<div class="pdf-progress-card"><strong>প্রেজেন্টেশন PDF তৈরি হচ্ছে</strong><p class="pdf-progress-message">প্রস্তুতি চলছে…</p><div class="pdf-progress-track" role="progressbar" aria-label="PDF তৈরির অগ্রগতি"><div class="pdf-progress-fill"></div></div><div class="pdf-progress-hint">এই উইন্ডো খোলা রাখুন</div></div>';
+  document.body.appendChild(progressOverlay);
+  const progressMessage = progressOverlay.querySelector('.pdf-progress-message');
+  const progressFill = progressOverlay.querySelector('.pdf-progress-fill');
+  function setPdfProgress(message, percent = null) {
+    if (!progressOverlay.isConnected) document.body.appendChild(progressOverlay);
+    progressOverlay.hidden = false;
+    progressMessage.textContent = message;
+    if (percent === null) {
+      progressFill.classList.add('indeterminate');
+      progressFill.style.width = '';
+      progressFill.parentElement.removeAttribute('aria-valuenow');
+    } else {
+      progressFill.classList.remove('indeterminate');
+      progressFill.style.width = `${percent}%`;
+      progressFill.parentElement.setAttribute('aria-valuenow', String(percent));
+    }
+  }
+  window.exportPresentationPdf = async () => {
+    const slideCount = slides.length;
+    setPdfProgress(`স্লাইড প্রস্তুত হচ্ছে: 0/${slideCount}`, 0);
     const printFrame = document.createElement('iframe');
     printFrame.id = 'presentationPdfFrame';
     printFrame.title = 'Presentation print preview';
@@ -199,6 +253,7 @@
     const slideMarkup = [];
     try {
       for (let index = 0; index < slides.length; index++) {
+        setPdfProgress(`স্লাইড প্রস্তুত হচ্ছে: ${index + 1}/${slideCount}`, 5 + Math.round(((index + 1) / slideCount) * 55));
         current = index; selected = null; window.selectedIds?.clear(); render();
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         const clone = $('slide').cloneNode(true);
@@ -210,6 +265,7 @@
       }
     } catch (error) {
       printFrame.remove();
+      progressOverlay.remove();
       window.showPresentationToast?.('Could not prepare the PDF preview.');
       console.error('PDF preparation failed:', error);
       return;
@@ -220,8 +276,7 @@
     }
     const base = document.createElement('base'); base.href = location.href;
     const styles = [...document.querySelectorAll('style,link[rel="stylesheet"]')].map(node => node.outerHTML).join('\n');
-    printWindow.document.open();
-    printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8">${base.outerHTML}${styles}<style>
+    const printHtml = `<!doctype html><html><head><meta charset="utf-8">${base.outerHTML}${styles}<style>
       @page{size:landscape;margin:0}html,body{margin:0;background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
       .pdf-page{width:100vw;height:100vh;display:grid;place-items:center;page-break-after:always;break-after:page;overflow:hidden}
       .pdf-page:last-child{page-break-after:auto;break-after:auto}.pdf-slide-canvas{width:100vw!important;height:56.25vw!important;max-height:100vh;aspect-ratio:16/9!important;margin:auto;box-shadow:none!important;overflow:hidden!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}
@@ -229,9 +284,38 @@
       .pdf-tools{position:fixed;z-index:100001;top:0;left:0;right:0;display:flex;justify-content:flex-end;gap:8px;padding:10px;background:#101827;color:#fff;font:14px Arial}
       .pdf-tools button{padding:7px 12px;border:1px solid #64748b;border-radius:5px;background:#243552;color:#fff;cursor:pointer}
       @media print{.pdf-page{width:100vw;height:100vh}.pdf-tools{display:none}}
-    </style></head><body><div class="pdf-tools"><button onclick="window.print()">Print / Save as PDF</button><button onclick="parent.document.getElementById('presentationPdfFrame')?.remove()">Close</button></div>${slideMarkup.join('')}<script>window.addEventListener('afterprint',()=>parent.document.getElementById('presentationPdfFrame')?.remove());window.addEventListener('load',()=>setTimeout(()=>window.print(),500));<\/script></body></html>`);
+    </style></head><body>${slideMarkup.join('')}</body></html>`;
+    if (window.studioPdf?.export) {
+      printFrame.remove();
+      setPdfProgress('PDF ফাইল তৈরি হচ্ছে… বড় প্রেজেন্টেশনে কিছুটা সময় লাগতে পারে।', null);
+      pdfButton.disabled = true;
+      try {
+        const result = await window.studioPdf.export(printHtml, 'presentation.pdf');
+        progressOverlay.remove();
+        pdfButton.disabled = false;
+        if (result?.success) window.showPresentationToast?.('✅ PDF saved successfully.');
+        else if (result?.canceled) window.showPresentationToast?.('PDF save cancelled.');
+        else window.showPresentationToast?.(`PDF export failed: ${result?.error || 'unknown error'}`);
+      } catch (error) {
+        progressOverlay.remove();
+        pdfButton.disabled = false;
+        console.error('Native PDF export failed:', error);
+        window.showPresentationToast?.(`PDF export failed: ${error.message || 'unknown error'}`);
+      }
+      return;
+    }
+    progressOverlay.remove();
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8">${base.outerHTML}${styles}<style>
+      @page{size:landscape;margin:0}html,body{margin:0;background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .pdf-page{width:100vw;height:100vh;display:grid;place-items:center;page-break-after:always;break-after:page;overflow:hidden}
+      .pdf-page:last-child{page-break-after:auto;break-after:auto}.pdf-slide-canvas{width:100vw!important;height:56.25vw!important;max-height:100vh;aspect-ratio:16/9!important;margin:auto;box-shadow:none!important;overflow:hidden!important;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+      .element{print-color-adjust:exact;-webkit-print-color-adjust:exact}.element img{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+      @media print{.pdf-page{width:100vw;height:100vh}}
+    </style></head><body>${slideMarkup.join('')}<script>window.addEventListener('load',()=>setTimeout(()=>window.print(),500));<\/script></body></html>`);
     printWindow.document.close();
   };
+  pdfButton.onclick = window.exportPresentationPdf;
 
   // Presenter View already includes speaker notes, a next-slide preview and an
   // elapsed rehearsal timer. Add a clearly named one-click rehearsal entry.

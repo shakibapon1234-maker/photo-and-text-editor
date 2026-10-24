@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, net, shell } = require('electron');
+const { app, BrowserWindow, session, net, shell, ipcMain, dialog } = require('electron');
 const path = require('path');
 const http = require('http');
 const net_mod = require('net');
@@ -24,6 +24,44 @@ if (!gotSingleInstanceLock) {
 }
 
 let mainWindow = null;
+ipcMain.handle('presentation:export-pdf', async (event, payload = {}) => {
+    const senderUrl = event.senderFrame?.url || '';
+    let senderOrigin = '';
+    try { senderOrigin = new URL(senderUrl).origin; } catch (_) {}
+    if (senderOrigin !== `http://localhost:${SERVER_PORT}` && senderOrigin !== `http://127.0.0.1:${SERVER_PORT}`) {
+        throw new Error('PDF export is available only from the local presentation app.');
+    }
+    const html = typeof payload.html === 'string' ? payload.html : '';
+    if (!html.startsWith('<!doctype html>') || html.length > 30 * 1024 * 1024) {
+        throw new Error('The presentation PDF content is invalid or too large.');
+    }
+
+    const renderWindow = new BrowserWindow({
+        width: 1280, height: 900, show: false, parent: mainWindow || undefined,
+        webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true }
+    });
+    try {
+        await renderWindow.loadURL('about:blank');
+        await renderWindow.webContents.executeJavaScript(`document.open();document.write(${JSON.stringify(html)});document.close();true`);
+        await Promise.race([
+            renderWindow.webContents.executeJavaScript(`Promise.all([document.fonts?.ready || Promise.resolve(), ...Array.from(document.images, image => image.decode().catch(() => {}))])`),
+            new Promise(resolve => setTimeout(resolve, 4000))
+        ]);
+        const pdf = await renderWindow.webContents.printToPDF({
+            printBackground: true, landscape: true, pageSize: 'A4',
+            margins: { top: 0, bottom: 0, left: 0, right: 0 }
+        });
+        const result = await dialog.showSaveDialog(mainWindow || undefined, {
+            title: 'Save presentation as PDF', defaultPath: payload.filename || 'presentation.pdf',
+            filters: [{ name: 'PDF', extensions: ['pdf'] }]
+        });
+        if (result.canceled || !result.filePath) return { canceled: true };
+        await fs.promises.writeFile(result.filePath, pdf);
+        return { success: true, filePath: result.filePath };
+    } finally {
+        if (!renderWindow.isDestroyed()) renderWindow.destroy();
+    }
+});
 let server = null;
 const SERVER_PORT = 8000;
 const openSockets = new Set();
@@ -546,6 +584,8 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             sandbox: true,
+            preload: path.join(__dirname, 'electron-preload.js'),
+            nodeIntegrationInSubFrames: true,
             partition: 'persist:studio'
         }
     });
